@@ -6,6 +6,7 @@ if (PHP_SAPI !== 'cli') {
 }
 
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+require_once __DIR__ . '/../shared/database_config.php';
 $options = getopt('', ['database:', 'confirm-empty']);
 $target = $options['database'] ?? '';
 if (!is_string($target) || !preg_match('/^[a-z][a-z0-9_]{2,63}$/D', $target)
@@ -37,8 +38,10 @@ try {
         }
         $scripts[$file] = $sql;
     }
-    $db = new mysqli(getenv('SMS_DB_HOST') ?: 'localhost', getenv('SMS_DB_USER') ?: 'root', getenv('SMS_DB_PASS') ?: '');
-    $db->set_charset('utf8mb4');
+    if (getenv('APP_ENV') === 'production') {
+        throw new RuntimeException('Use database/deploy.php for production initialization.');
+    }
+    $db = csms_database_connect(csms_database_config(), false);
     $stmt = $db->prepare('SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = ?');
     $stmt->bind_param('s', $target);
     $stmt->execute();

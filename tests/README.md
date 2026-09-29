@@ -1,5 +1,12 @@
 # Foundation regression (CLI only)
 
+HostForge/Docker build and runtime checks are in `docker-deployment.ps1`.
+See [deployment guide](../docs/hostforge-deployment.md) for prerequisites and
+the current validation limitation. `database_config.php` tests alias/port
+validation without opening a database. `deployment_migrations.php` and
+`deployment_admin.php` refuse unconfirmed or non-disposable database names;
+they are never production provisioning tools and are excluded from the image.
+
 These are maintained opt-in tests, not public testing/setup endpoints. Root
 Apache rules deny this directory; each PHP test also rejects non-CLI requests.
 Do not run against production. Stop interactive editing while tests run.

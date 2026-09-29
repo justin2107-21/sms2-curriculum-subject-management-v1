@@ -13,6 +13,8 @@ if (!in_array($action, ['seed','cleanup','verify'], true)
     exit(1);
 }
 putenv('SMS_DB_NAME=' . $database);
+// Explicit CLI target must win over deployment aliases too.
+putenv('DB_NAME=' . $database);
 require_once __DIR__ . '/../../shared/db.php';
 require_once __DIR__ . '/../../shared/http.php';
 require_once __DIR__ . '/../../shared/auth.php';

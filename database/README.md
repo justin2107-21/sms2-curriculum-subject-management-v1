@@ -1,5 +1,14 @@
 # Database migrations
 
+Production/HostForge initialization uses the separate CLI-only
+[`deploy.php`](deploy.php) journaled runner, not the development helper below.
+See [`hostforge-deployment.md`](../docs/hostforge-deployment.md). It operates on
+an explicitly confirmed, already-provisioned schema, omits all sample records,
+and refuses untracked existing schemas or incomplete migration history.
+Connection settings share `shared/database_config.php`: preferred `DB_*`,
+HostForge `DB_DATABASE`/`DB_USERNAME`/`DB_PASSWORD`, then legacy `SMS_DB_*`.
+`DB_PORT`/`SMS_DB_PORT` are supported. Local XAMPP fallbacks remain development-only.
+
 Controlled synthetic demo data is documented separately in
 [`seeds/README.md`](seeds/README.md). It is opt-in and is not a migration.
 

@@ -1,0 +1,6 @@
+# Linux container startup scripts must stay LF even on Windows checkouts.
+*.sh text eol=lf
+Dockerfile text eol=lf
+.dockerignore text eol=lf
+docker/*.conf text eol=lf
+docker/*.ini text eol=lf
