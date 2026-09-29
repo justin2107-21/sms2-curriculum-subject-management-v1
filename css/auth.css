@@ -1,0 +1,384 @@
+/* ── Shared auth page styles (register, register2, signin) ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background: #cfd8e3;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Outer border used on sign-in */
+.outer {
+  padding: 10px;
+  border: 2px solid #2563eb;
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 6px 32px rgba(0,0,0,0.12);
+}
+
+.card {
+  display: flex;
+  width: 820px;
+  min-height: 500px;
+  background: #fff;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 6px 32px rgba(0,0,0,0.13);
+}
+
+/* Sign-in card sits inside .outer so no shadow needed */
+.outer .card {
+  width: 800px;
+  min-height: 520px;
+  border-radius: 14px;
+  box-shadow: none;
+}
+
+/* ── Left panel ── */
+.left {
+  flex: 1;
+  background: #1a3a8c;
+  border-radius: 14px;
+  margin: 10px;
+  padding: 28px 32px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #fff;
+  min-height: 520px;
+}
+
+/* Logo + school name — row layout, pinned to the top */
+.left-top {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.left-logo {
+  width: 52px;
+  height: auto;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.left-school {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #c8d8f5;
+  letter-spacing: 0.01em;
+  line-height: 1.35;
+  text-align: left;
+}
+
+/* Main text block — centered, grows to fill remaining space */
+.left-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+/* Signin left — remove fixed width so it matches the shared flex: 1 rule */
+.outer .left {
+  border-radius: 12px;
+  margin: 0;
+}
+
+.left h1 {
+  font-size: 1.55rem;
+  font-weight: 700;
+  line-height: 1.3;
+  margin-bottom: 14px;
+}
+
+.left .subtitle {
+  color: #4da6ff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.left p {
+  font-size: 0.75rem;
+  color: #c5d3f0;
+  line-height: 1.6;
+}
+
+.left p span { color: #4da6ff; }
+
+/* ── Right panel ── */
+.right {
+  flex: 1;
+  padding: 28px 40px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 520px;
+}
+
+.bcp-logo {
+  width: 82px;
+  height: 92px;
+  margin-bottom: 14px;
+  object-fit: contain;
+}
+
+h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111;
+  margin-bottom: 22px;
+}
+
+/* ── Form fields ── */
+.form-group {
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: #555;
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+
+.form-group input {
+  width: 100%;
+  height: 44px;
+  border: 1.5px solid #d0d7e2;
+  border-radius: 6px;
+  padding: 0 14px;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s;
+  background: #fff;
+}
+
+.form-group input:focus { border-color: #2563eb; }
+
+/* ── Buttons ── */
+.btn-done,
+.btn-signin {
+  width: 100%;
+  height: 48px;
+  margin-top: 8px;
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: background 0.2s;
+  letter-spacing: 0.02em;
+}
+
+.btn-done:hover,
+.btn-signin:hover { background: #1d4ed8; }
+
+/* ── OTP resend link ── */
+.resend {
+  font-size: 0.78rem;
+  color: #555;
+  align-self: flex-start;
+  margin-bottom: 14px;
+  cursor: pointer;
+}
+
+.resend:hover { text-decoration: underline; color: #2563eb; }
+
+/* ── Register link under sign-in ── */
+.register-link {
+  margin-top: 16px;
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.register-link a { color: #2563eb; text-decoration: none; }
+.register-link a:hover { text-decoration: underline; }
+
+/* CSMS sign-in branding; registration keeps the shared template styling. */
+.csms-signin .outer {
+  border-color: #1a3a8c;
+  max-width: calc(100% - 24px);
+}
+
+.csms-signin .outer .card { max-width: 100%; }
+.csms-signin .left,
+.csms-signin .right { min-width: 0; }
+.csms-signin .left-body { gap: 4px; }
+.csms-signin .left-body > p:not(.subtitle) { font-size: .875rem; }
+.csms-signin .bcp-logo { height: auto; }
+.csms-signin input,
+.csms-signin button { font-family: inherit; }
+.csms-signin .btn-signin { background: #1a3a8c; }
+.csms-signin .btn-signin:hover { background: #153074; }
+.csms-signin .form-group input:focus { border-color: #1a3a8c; }
+.csms-signin .btn-signin:focus-visible {
+  outline: 2px solid #1a3a8c;
+  outline-offset: 3px;
+}
+
+.csms-signin .authorized-users-note {
+  margin-top: 16px;
+  color: #666;
+  font-size: .8rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* ── Wider card for the registration form (more fields) ── */
+.register-card {
+  width: 900px;
+  min-height: 560px;
+}
+
+/* ── Two-column name row ── */
+.form-row {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+}
+
+.form-row .form-group { flex: 1; }
+
+/* ── Inline select for role ── */
+.form-group select {
+  width: 100%;
+  height: 44px;
+  border: 1.5px solid #d0d7e2;
+  border-radius: 6px;
+  padding: 0 14px;
+  font-size: 0.9rem;
+  outline: none;
+  background: #fff;
+  transition: border-color 0.2s;
+  cursor: pointer;
+}
+.form-group select:focus { border-color: #2563eb; }
+
+/* ── Role toggle styles removed — role is always student on registration ── */
+
+/* ── Error / success banners ── */
+.auth-error,
+.auth-success {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 7px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  margin-bottom: 14px;
+  line-height: 1.4;
+}
+
+.auth-error {
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fca5a5;
+}
+
+.auth-success {
+  background: #dcfce7;
+  color: #16a34a;
+  border: 1px solid #86efac;
+}
+
+/* ════════════════════════════════════════════════════════════
+   RESPONSIVE — AUTH PAGES
+   Breakpoints: tablet ≤ 768px, mobile ≤ 480px
+════════════════════════════════════════════════════════════ */
+
+@media (max-width: 900px) {
+  .card,
+  .outer .card,
+  .register-card {
+    width: 95vw;
+    min-height: unset;
+  }
+}
+
+/* Stack panels vertically on tablet/mobile */
+@media (max-width: 768px) {
+  body { align-items: flex-start; padding: 16px 0; }
+
+  .outer {
+    width: 95vw;
+    padding: 8px;
+    border-radius: 16px;
+  }
+
+  .card,
+  .outer .card,
+  .register-card {
+    flex-direction: column;
+    width: 100%;
+    min-height: unset;
+    border-radius: 12px;
+  }
+
+  /* Left panel hidden on mobile */
+  .left {
+    display: none;
+  }
+
+  /* Right panel takes full width */
+  .right {
+    min-height: unset;
+    padding: 24px 20px 32px;
+    border-radius: 10px;
+  }
+
+  .bcp-logo {
+    width: 64px;
+    height: auto;
+    margin-bottom: 10px;
+  }
+
+  h2 { font-size: 1.25rem; margin-bottom: 18px; }
+
+  /* Name row stacks on mobile */
+  .form-row { flex-direction: column; gap: 0; }
+}
+
+@media (max-width: 480px) {
+  body { padding: 0; background: #fff; }
+
+  .outer {
+    width: 100%;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .card,
+  .outer .card,
+  .register-card {
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .left  { border-radius: 0; }
+  .right { border-radius: 0; padding: 20px 16px 28px; }
+
+  .form-group input,
+  .form-group select { height: 48px; font-size: 1rem; }
+
+  .btn-done,
+  .btn-signin { height: 52px; font-size: 1rem; margin-top: 12px; }
+}

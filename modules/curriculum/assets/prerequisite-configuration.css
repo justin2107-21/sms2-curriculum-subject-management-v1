@@ -1,0 +1,90 @@
+.prerequisite-content {
+  min-width: 0;
+}
+
+.prerequisite-table {
+  min-width: 1320px;
+}
+
+.prerequisite-table th,
+.prerequisite-table td {
+  vertical-align: top;
+}
+
+.requirement-subject {
+  display: block;
+  min-width: 165px;
+}
+
+.requirement-subject .record-code {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.requirement-subject .record-name {
+  color: #334155;
+  display: block;
+  font-size: .7rem;
+  line-height: 1.4;
+}
+
+.requirement-badge {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: .66rem;
+  font-weight: 800;
+  line-height: 1;
+  padding: 6px 9px;
+  white-space: nowrap;
+}
+
+.requirement-prerequisite {
+  background: #e8eefc;
+  border-color: #c4d2f5;
+  color: var(--sms2-sidebar-blue);
+}
+
+.requirement-corequisite {
+  background: #ecfdf5;
+  border-color: #bbf7d0;
+  color: #166534;
+}
+
+.requirement-placement-context {
+  color: #334155;
+  display: block;
+  font-size: .7rem;
+  line-height: 1.45;
+  min-width: 105px;
+}
+
+.requirement-placement-context span {
+  color: #64748b;
+  display: block;
+  font-size: .65rem;
+  margin-top: 2px;
+}
+
+.requirement-action-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.requirement-form-grid small {
+  color: #64748b;
+  font-size: .66rem;
+  line-height: 1.45;
+}
+
+.requirement-unavailable-note {
+  color: #92400e;
+  font-weight: 700;
+}
+
+@media (max-width: 700px) {
+  .prerequisite-filter-grid {
+    grid-template-columns: 1fr;
+  }
+}

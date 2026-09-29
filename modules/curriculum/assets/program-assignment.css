@@ -1,0 +1,120 @@
+.program-assignment-content {
+  min-width: 0;
+}
+
+.program-assignment-filter-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.subject-usage-filter-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.program-assignment-table {
+  min-width: 1460px;
+}
+
+.subject-usage-table {
+  min-width: 1180px;
+}
+
+.program-assignment-table .record-name,
+.subject-usage-table .record-name {
+  display: block;
+  min-width: 180px;
+}
+
+.assignment-program-context {
+  display: block;
+  min-width: 175px;
+}
+
+.assignment-program-context strong {
+  color: #1e293b;
+  display: block;
+  font-size: .72rem;
+}
+
+.assignment-program-context span {
+  color: #64748b;
+  display: block;
+  font-family: Consolas, monospace;
+  font-size: .66rem;
+  margin-top: 3px;
+}
+
+.assignment-program-type {
+  background: #f1f5f9;
+  border: 1px solid #d7dee8;
+  border-radius: 999px;
+  color: #475569;
+  display: inline-flex;
+  font-size: .66rem;
+  font-weight: 750;
+  max-width: 150px;
+  overflow-wrap: anywhere;
+  padding: 5px 8px;
+}
+
+.assignment-usage-badge {
+  align-items: center;
+  background: #e8eefc;
+  border: 1px solid #c4d2f5;
+  border-radius: 999px;
+  color: var(--sms2-sidebar-blue);
+  display: inline-flex;
+  font-size: .66rem;
+  font-weight: 800;
+  gap: 5px;
+  padding: 5px 8px;
+  white-space: nowrap;
+}
+
+.assignment-action-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 150px;
+}
+
+.assignment-action-group .has-dependency {
+  border-color: #f59e0b;
+}
+
+.assignment-dependency-warning {
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 7px;
+  color: #92400e;
+  font-size: .74rem;
+  line-height: 1.5;
+  margin-top: 12px;
+  padding: 10px 12px;
+}
+
+.program-assignment-content .mapping-filter-field input:disabled {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #94a3b8;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.program-assignment-content .mapping-filter-field input:disabled::placeholder {
+  color: #94a3b8;
+  opacity: 1;
+}
+
+@media (max-width: 1100px) {
+  .program-assignment-filter-grid,
+  .subject-usage-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .program-assignment-filter-grid,
+  .subject-usage-filter-grid {
+    grid-template-columns: 1fr;
+  }
+}

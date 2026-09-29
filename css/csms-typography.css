@@ -1,0 +1,410 @@
+/* Shared CSMS typography and navigation scale. Loaded after page/module styles. */
+:root {
+  --sms2-font-family: 'Segoe UI', sans-serif;
+  --sms2-text-xs: .8125rem;
+  --sms2-text-sm: .875rem;
+  --sms2-text-base: .9375rem;
+  --sms2-text-md: 1rem;
+  --sms2-text-lg: 1.125rem;
+  --sms2-text-xl: 1.375rem;
+  --sms2-text-page-title: clamp(1.625rem, 2.1vw, 2rem);
+  --sms2-sidebar-nav-size: 14.5px;
+  --sms2-sidebar-nav-weight: 500;
+  --sms2-sidebar-nav-line-height: 1.3;
+  --sms2-sidebar-nav-padding-y: 14px;
+  --sms2-sidebar-nav-padding-x: 15px;
+  --sms2-sidebar-icon-size: 15px;
+  --sms2-sidebar-icon-column-size: 10px;
+  --sms2-sidebar-icon-gap: 13px;
+  --sms2-sidebar-section-color: #818cf8;
+  --sms2-sidebar-section-size: 13px;
+  --sms2-sidebar-section-weight:700;
+  --sms2-topbar-height: 64px;
+}
+
+html {
+  font-family: var(--sms2-font-family);
+  font-size: 16px;
+}
+
+body {
+  font-family: var(--sms2-font-family);
+  font-size: var(--sms2-text-base);
+  line-height: 1.5;
+}
+
+button,
+input,
+select,
+textarea,
+table {
+  font-family: var(--sms2-font-family);
+}
+
+/* Shared page hierarchy */
+.page-title {
+  font-size: var(--sms2-text-page-title);
+  gap: 10px;
+  line-height: 1.2;
+}
+
+.page-title i { font-size: .9em; }
+
+.page-subtitle,
+.dashboard-subtitle,
+.system-admin-subtitle {
+  font-size: var(--sms2-text-md);
+  line-height: 1.55;
+}
+
+.domain-card-header h2,
+.detail-header h2,
+.dashboard-section-heading h2,
+.dashboard-card-header h2,
+.export-preview-heading h2,
+.settings-card-header h2 {
+  font-size: var(--sms2-text-lg);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.section-heading h3,
+.selection-state h2,
+.export-empty-state h3,
+.danger-info h3 {
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.eyebrow,
+.record-count,
+.subtle-text,
+.placement-note,
+.compact-select,
+.dashboard-section-heading p,
+.dashboard-card-header p,
+.dashboard-link,
+.system-admin-summary,
+.audit-summary,
+.system-admin-empty,
+.selection-state p,
+.dashboard-empty,
+.fact-grid dt,
+.compliance-summary span,
+.compliance-toolbar .select-control {
+  font-size: var(--sms2-text-xs);
+  line-height: 1.5;
+}
+
+/* Sidebar: preserve the accepted width while giving each group a calmer,
+   touch-friendly rhythm. Only .sidebar-divider draws section boundaries. */
+.sidebar-nav { padding-bottom: 28px; }
+
+.sidebar-brand,
+.sidebar-brand-2 {
+  border-bottom: 0;
+  border-top: 0;
+  padding: 18px 18px 10px;
+}
+
+.sidebar-nav > .sidebar-brand:first-child { padding-top: 20px; }
+
+.sidebar-brand .brand-title,
+.sidebar-brand .sidebar-section-title-long,
+.sidebar-brand .brand-sub {
+  font-size: var(--sms2-sidebar-section-size);
+  font-weight: var(--sms2-sidebar-section-weight);
+  letter-spacing: .035em;
+  line-height: 1.35;
+}
+
+.sidebar-brand .brand-title,
+.sidebar-brand .sidebar-section-title-long {
+  color: var(--sms2-sidebar-section-color);
+}
+
+.sidebar-divider {
+  background: rgba(255, 255, 255, .16);
+  height: 1px;
+  margin: 18px 16px 0;
+}
+
+.sidebar-item,
+a.sidebar-item {
+  font-size: var(--sms2-sidebar-nav-size);
+  font-weight: var(--sms2-sidebar-nav-weight);
+  gap: var(--sms2-sidebar-icon-gap);
+  line-height: var(--sms2-sidebar-nav-line-height);
+  min-height: 44px;
+  min-height: 44px;
+  padding: var(--sms2-sidebar-nav-padding-y) var(--sms2-sidebar-nav-padding-x);
+}
+
+.sidebar-item > i,
+a.sidebar-item > i {
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: antialiased;
+  flex: 0 0 var(--sms2-sidebar-icon-column-size);
+  font-size: var(--sms2-sidebar-icon-size);
+  text-align: center;
+}
+
+.sidebar-item .sidebar-long-label {
+  line-height: var(--sms2-sidebar-nav-line-height);
+  overflow-wrap: anywhere;
+}
+
+.nav-group {
+  border-radius: 10px;
+  margin: 3px 12px;
+}
+
+.dropdown-item { font-size: var(--sms2-text-sm); }
+
+/* Shared topbar */
+.topbar {
+  height: var(--sms2-topbar-height);
+  gap: 0;
+  padding-left: 24px;
+  padding-right: 24px;
+}
+
+.hamburger {
+  border-radius: 8px;
+  justify-content: center;
+  min-height: 40px;
+  min-width: 40px;
+}
+
+.topbar-right {
+  align-items: center;
+  gap: 16px;
+}
+
+.avatar {
+  height: 36px;
+  width: 36px;
+}
+
+.local-time-display {
+  align-items: center;
+  color: #475569;
+  display: inline-flex;
+  font-family: inherit;
+  font-size: var(--sms2-text-sm);
+  font-weight: 600;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.local-time-display i { color: #1a3a8c; }
+.local-time-display time { font-variant-numeric: tabular-nums; }
+
+/* Tables and pagination */
+.domain-table th,
+.domain-table td,
+.activity-table th,
+.activity-table td,
+.system-admin-table th,
+.system-admin-table td,
+.audit-table th,
+.audit-table td {
+  font-size: var(--sms2-text-sm);
+  line-height: 1.45;
+}
+
+.domain-table th,
+.activity-table th,
+.system-admin-table th,
+.audit-table th {
+  font-size: var(--sms2-text-xs);
+  font-weight: 700;
+}
+
+.pagination-summary,
+.page-button,
+.pagination-bar,
+.audit-pagination a,
+.audit-pagination span {
+  font-size: var(--sms2-text-xs);
+}
+
+/* Controls and actions */
+.search-control input,
+.select-control select,
+.mapping-filter-field select,
+.mapping-filter-field input,
+.form-field input,
+.form-field select,
+.form-field textarea,
+.export-context-grid select {
+  font-size: var(--sms2-text-sm);
+  line-height: 1.4;
+}
+
+.form-field,
+.mapping-filter-field,
+.export-context-grid .mapping-filter-field,
+.equivalency-field-label {
+  font-size: var(--sms2-text-sm);
+  font-weight: 600;
+}
+
+.primary-action-button,
+.secondary-action-button,
+.row-action-button,
+.remove-action-button,
+.button-primary,
+.button-muted,
+.button-danger,
+.view-button,
+.quick-action,
+.export-screen-toolbar a,
+.export-screen-toolbar button,
+.btn-save,
+.btn-danger {
+  font-family: inherit;
+  font-size: var(--sms2-text-sm);
+  line-height: 1.3;
+}
+
+/* Compact status elements retain their intentionally smaller visual weight. */
+.read-only-pill,
+.status-badge,
+.placement-indicator,
+.requirement-badge,
+.compliance-badge,
+.weighting-status-badge,
+.equivalency-result-badge,
+.equivalency-decision-badge,
+.history-change-badge,
+.history-placement-badge,
+.history-program-type,
+.assignment-usage-badge,
+.elective-subject-count {
+  font-family: inherit;
+  font-size: .75rem;
+}
+
+/* Notices, helpers, module context, and compact data descriptions. */
+.curriculum-content > .curriculum-notice,
+.curriculum-content > .technical-note,
+.dashboard-notice,
+.modal-context,
+.form-field small,
+.form-error,
+.confirmation-body,
+.program-combobox-state,
+.mapping-context-message,
+.mapping-context-stack span,
+.mapping-fixed-context span,
+.mapping-edit-note,
+.requirement-placement-context,
+.requirement-placement-context span,
+.requirement-form-grid small,
+.elective-description,
+.elective-context-stack span,
+.elective-empty-note,
+.assignment-program-context span,
+.assignment-program-type,
+.assignment-dependency-warning,
+.history-summary-card span,
+.subject-history-content > .history-date-context,
+.history-program-context span,
+.history-curriculum-context span,
+.history-version-context span,
+.history-subject-context span,
+.history-placement,
+.equivalency-field-value,
+.equivalency-usage-summary span,
+.equivalency-usage-list li,
+.equivalency-empty-context,
+.equivalency-subject-label span,
+.equivalency-reviewer,
+.grade-weighting-empty p,
+.grade-weighting-description,
+.grade-weighting-summary > div > span,
+.compliance-subtext,
+.compliance-reference-link,
+.compliance-history-lock,
+.export-option small,
+.export-action-status,
+.export-empty-state p {
+  font-size: var(--sms2-text-xs);
+  line-height: 1.5;
+}
+
+.mapping-filter-field,
+.subject-history-tab,
+.subject-equivalency-tab,
+.compliance-tab,
+.elective-group-name,
+.elective-membership-table .record-name,
+.elective-context-stack strong,
+.requirement-subject .record-name,
+.mapping-context-stack strong,
+.mapping-fixed-context strong,
+.assignment-program-context strong,
+.history-program-context strong,
+.history-curriculum-context strong,
+.history-version-context strong,
+.history-subject-context strong,
+.equivalency-subject-label strong,
+.weighting-component-name,
+.weighting-component-value,
+.compliance-name,
+.export-option strong {
+  font-size: var(--sms2-text-sm);
+  line-height: 1.45;
+}
+
+.fact-grid dd { font-size: var(--sms2-text-sm); }
+
+.record-code,
+.detail-code,
+.system-admin-code,
+.audit-action {
+  font-size: var(--sms2-text-xs);
+}
+
+/* Modal and autocomplete hierarchy */
+.modal-header h2 {
+  font-size: var(--sms2-text-lg);
+  line-height: 1.3;
+}
+
+.program-option-code,
+.program-option-name {
+  font-family: inherit;
+  font-size: var(--sms2-text-sm);
+}
+
+.program-option-type { font-size: var(--sms2-text-xs); }
+
+/* Dashboard cards */
+.summary-card-label { font-size: var(--sms2-text-xs); }
+.summary-card-value { font-size: 1.5rem; }
+.status-summary span { font-size: .75rem; }
+.status-summary strong { font-size: 1.125rem; }
+.activity-context small { font-size: var(--sms2-text-xs); }
+.audit-action { font-size: .75rem; }
+
+/* Settings page joins the same shell while retaining its existing cards. */
+.account-content { padding-bottom: 20px; }
+.avatar-role,
+.danger-info p,
+.field-error,
+.toast-label,
+.toast-msg { font-size: var(--sms2-text-xs); }
+.avatar-name { font-size: var(--sms2-text-lg); }
+
+@media (max-width: 600px) {
+  .page-title { font-size: var(--sms2-text-page-title); }
+  .topbar {
+    padding-left: 10px;
+    padding-right: 12px;
+  }
+  .topbar-right { gap: 10px; }
+  .local-time-display { font-size: .75rem; }
+  .local-time-display i { display: none; }
+}

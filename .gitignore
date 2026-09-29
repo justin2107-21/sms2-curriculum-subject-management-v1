@@ -1,0 +1,40 @@
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+config/local.php
+config/*.local.php
+config/secrets.php
+
+# Runtime output and generated files
+*.log
+logs/
+storage/logs/
+storage/cache/
+storage/tmp/
+storage/exports/
+tmp/
+temp/
+
+# Dependencies and test/build caches
+vendor/
+.phpunit.cache/
+.phpunit.result.cache
+coverage/
+
+# IDE and operating-system files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Local database exports and HTTP regression artifacts (not migrations/seeds)
+/sms_db*_backup*.sql
+/sms_db*_backup*.sql.gz
+/backups/
+*.cookies
+*.cookie
+cookies*.txt

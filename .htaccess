@@ -1,0 +1,9 @@
+# The project is served directly by local XAMPP. Never serve repository,
+# database, test, or local configuration artifacts as public downloads.
+Options -Indexes
+RewriteEngine On
+RewriteRule (^|/)(\.git|\.agents|\.codex|\.github|\.vscode|\.idea)(/|$) - [F,L,NC]
+RewriteRule ^(database|tests|config|storage|tmp|temp|logs)(/|$) - [F,L,NC]
+<FilesMatch "(?i)(\.(sql|log|ini|bak|dump|cookie|cookies)(\.(gz|zip))?$|^\.env(?:\..*)?$)">
+    Require all denied
+</FilesMatch>
