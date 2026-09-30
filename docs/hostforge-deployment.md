@@ -1,15 +1,43 @@
 # HostForge Docker deployment
 
-## Verification status (2026-09-29)
+## Verification status (2026-09-30)
 
-**Not deployment-verified yet.** Docker Desktop/CLI is absent on this machine;
-WSL is not installed. No Docker build, container runtime, in-container Apache
-security check or HostForge deployment is claimed. Do not push/deploy these
-changes as verified until `tests/docker-deployment.ps1` passes on a Docker host.
-A local preparation commit does not imply runtime validation. Push/deployment
-is withheld while this gate remains blocked.
+**Blocked by an actual MariaDB schema incompatibility; do not deploy yet.**
+Docker Desktop/WSL2 now work. The complete Windows PowerShell test was rerun,
+not just the previously failing command. The official PHP 8.2 Apache Bookworm
+image builds successfully. All 109 application PHP files lint inside the image,
+and mysqli/mysqlnd, curl, DOM, fileinfo, JSON, session, ctype and filter pass.
+Apache starts on injected PORT=8080 and its localhost-published health endpoint
+returns HTTP 200 with only `{"status":"ok"}`. Preferred DB variables connect to
+the isolated test database. No production application file was changed.
 
-Fallback checks performed without Docker: 16 environment-configuration checks;
+The test now reaches controlled initialization but MariaDB 10.11.19 rejects
+`005_create_curriculum_subject_requirements.sql` with driver error 1901:
+the self-reference CHECK uses columns also covered by ON UPDATE CASCADE foreign
+keys. The baseline and migrations 001-004 apply; 005 remains incomplete and
+the runner fails closed. An independent no-network disposable database reproduced
+this conflict; changing only the toy foreign keys to ON UPDATE RESTRICT succeeded.
+Migration 009 has the same CHECK/cascading-key pattern and also needs review.
+No application migration, foreign-key action or integrity check was altered.
+Changing key-update behavior requires explicit review, not disabling CHECKs or
+silently downgrading the test database. See the upstream
+[MariaDB constraint issue](https://jira.mariadb.org/browse/MDEV-25437).
+
+The full Docker gate has NOT passed. Alternate port/DB-alias HTTP runs, authenticated
+module regression, denied-URL tests, invalid-DB responses and final log checks remain
+unverified in the full Docker workflow because initialization stops it first.
+All temporary containers, anonymous database volumes and test networks were removed.
+No local `sms_db` was touched. Git push and HostForge deployment remain withheld.
+
+Harness fixes replace Windows PowerShell's corrupted inline `php -r` expression
+with `tests/docker-runtime-check.php`, mounted read-only outside DocumentRoot.
+They also handle native stderr using exit codes, avoid a case-insensitive `$Name`
+variable collision, preserve original failures during cleanup, and give apps a
+separate localhost-published frontend bridge while MariaDB stays internal-only.
+Tests/docs remain excluded from the production image.
+
+Historical fallback checks performed on 2026-09-29 without Docker:
+16 environment-configuration checks;
 29 database migration checks plus an actual forced partial-DDL failure/retry;
 41 foreign-key integrity checks; and 1,560 HTTP foundation checks for EACH naming
 style against a disposable local MariaDB schema and loopback PHP server. Root,
@@ -167,12 +195,16 @@ Applied migration SQL and domain/business rules were not edited.
 On Windows with Docker Desktop using Linux containers:
 
 ```powershell
-pwsh -File tests/docker-deployment.ps1
+powershell -ExecutionPolicy Bypass -File .\tests\docker-deployment.ps1
 ```
 
-Windows PowerShell can also invoke the script. It builds
+PowerShell 7 can also invoke the script. It builds
 `docker build -t csms-hostforge-test .`, then uses a uniquely named private Docker
-network and a temporary `mariadb:10.11` container. Passwords are generated at
+database network and a temporary `mariadb:10.11` container. Apps also join a
+separate frontend bridge with ports published only on 127.0.0.1; MariaDB has no
+published ports and remains on the internal network alone. This follows Docker's
+[frontend/backend network pattern](https://docs.docker.com/engine/network/).
+Passwords are generated at
 runtime and passed by environment names, never embedded in source/build args.
 The developer's `sms_db` is never a test target.
 
@@ -181,7 +213,7 @@ The test covers migration guards, both DB alias styles, actual host-visible
 regression, HTTPS cookie configuration, generic DB-failure responses, and
 representative denied URLs. It mounts CLI tests read-only into test containers
 only; production image does not contain them. It inspects PHP/Apache logs.
-Finally it removes only this run's containers, anonymous DB volume and network;
+Finally it removes only this run's containers, anonymous DB volume and networks;
 test images remain available for inspection. It does not prune unrelated Docker
 resources, push Git commits, or deploy to HostForge.
 

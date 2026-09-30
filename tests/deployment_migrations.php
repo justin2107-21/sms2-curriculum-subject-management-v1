@@ -18,6 +18,14 @@ function deploymentRun(array $args, int $expected): string {
     if (!is_resource($process)) { throw new RuntimeException('Cannot start migration CLI.'); }
     fclose($pipes[0]); $output=stream_get_contents($pipes[1]); fclose($pipes[1]);
     $error=stream_get_contents($pipes[2]); fclose($pipes[2]); $exit=proc_close($process);
+    if ($exit !== $expected) {
+        // Report only allowlisted runner diagnostics, never raw SQL/connection output.
+        preg_match_all('/^Applied [a-z0-9_.]+$/m', $output, $applied);
+        foreach ($applied[0] as $line) { fwrite(STDERR, $line . PHP_EOL); }
+        if (preg_match('/Deployment migration stopped; type [A-Za-z_]+, code [0-9]+/', $error, $failure)) {
+            fwrite(STDERR, $failure[0] . PHP_EOL);
+        }
+    }
     deployCheck($exit===$expected,'Migration CLI exit '.$expected);
     return $output.$error;
 }
