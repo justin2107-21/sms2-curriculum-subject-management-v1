@@ -25,6 +25,17 @@ engine for this fixture; MariaDB 10.11 correctly refuses creation of the old sha
 
 ## Other foundation checks
 
+`docker-bootstrap-scenarios.ps1` is called by the full Docker workflow, not run
+standalone. It creates a separate disposable MariaDB instance for production
+startup tests. No-bootstrap/disabled flags must leave it empty; a wrong confirmation
+or premature admin flag must exit before Apache. It tests missing roles, forced
+role/audit-write rollback, weak secrets, real first-admin login, idempotent retries
+with a different supplied password, non-admin collisions, second-admin refusal,
+and normal startup after every bootstrap variable is removed. Module smoke creates
+no academic/demo records—only the disposable admin and normal audit evidence.
+Temporary secrets are generated at runtime and never written to source/files.
+The existing foundation suite runs separately against its own disposable database.
+
 HostForge/Docker build and runtime checks are in `docker-deployment.ps1`.
 See [deployment guide](../docs/hostforge-deployment.md) for prerequisites and
 the current validation limitation. `database_config.php` tests alias/port

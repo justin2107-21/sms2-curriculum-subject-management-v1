@@ -1,5 +1,5 @@
 <?php
-// Explicit CLI maintenance only. Never called by container startup or HTTP.
+// CLI maintenance only: operator invocation or explicitly enabled startup gate, never HTTP.
 if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 require_once __DIR__ . '/../shared/database_config.php';
 

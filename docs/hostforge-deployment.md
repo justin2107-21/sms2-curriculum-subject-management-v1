@@ -3,7 +3,7 @@
 ## Verification status (2026-09-30)
 
 **Local Docker workflow passed; HostForge itself has not been deployed/tested.**
-The PHP 8.2 Apache Bookworm image builds, all 109 application PHP files lint
+The PHP 8.2 Apache Bookworm image builds, all application PHP files lint
 inside the image, and all required extensions including mysqli pass. The entire
 workflow passes on MariaDB 10.11.19: 14 baseline/migration journal entries,
 41 foreign keys, ports 8080/9090, both database-variable conventions, minimal
@@ -110,10 +110,11 @@ at build time; they are supplied by the official base. No application dependency
 on pdo_mysql, GD, intl or zip was found. mbstring is already supplied by the base,
 but the application does not require an additional installation.
 
-`docker/apache-entrypoint.sh` uses `set -eu`, validates `PORT`, and writes only
-Apache's listener/virtual-host configuration at container startup. It then execs
-the official entrypoint/foreground scripts; Apache becomes PID 1. CLI commands
-bypass Apache startup and never trigger automatic schema initialization.
+`docker/apache-entrypoint.sh` uses `set -eu`, validates `PORT`, and configures
+Apache's listener/virtual host. Normal startup does not initialize the database.
+Only the explicit temporary flags below enable CLI migrations/admin provisioning
+before the official foreground scripts make Apache PID 1. Bootstrap failure exits
+nonzero before Apache starts. CLI commands bypass these startup gates.
 
 DocumentRoot is `/var/www/html`; rewrite is enabled and `AllowOverride All`
 preserves the root `.htaccess`. Directory indexes are disabled. Server config
@@ -144,6 +145,77 @@ Do not globally trust `X-Forwarded-Proto` or disable CSRF to accommodate a proxy
 
 ## Controlled database initialization
 
+### First Production Database Bootstrap
+
+Use this explicit, temporary startup mechanism when HostForge has no shell/exec
+and its SQL console is read-only. It is not a public setup endpoint. Keep the app
+restricted during initial setup. A healthy `/health.php` says only that PHP/Apache
+work: it does not mean tables/users exist. An empty database causes login to fail.
+
+1. Keep the existing managed `DB_*` variables unchanged. Both preferred and
+   alternative aliases still use `shared/database_config.php`; `DATABASE_URL`
+   is not required. Keep `APP_ENV=production`, `SMS_SESSION_COOKIE_SECURE=1`,
+   `SMS_ALLOW_SETUP=0`, port 8080 and health path `/health.php`.
+2. Add these **temporary runtime environment variables** in HostForge's secret/
+   environment settings (never Git, Docker build arguments or a public form):
+
+   ```text
+   CSMS_RUN_MIGRATIONS=1
+   CSMS_MIGRATION_CONFIRM_DATABASE=<exact attached database name>
+   CSMS_BOOTSTRAP_ADMIN=1
+   CSMS_ADMIN_USERNAME=<chosen administrator username>
+   CSMS_ADMIN_PASSWORD=<unique strong secret>
+   CSMS_ADMIN_EMAIL=<real administrator email>
+   CSMS_ADMIN_FIRST_NAME=<administrator first name>
+   CSMS_ADMIN_LAST_NAME=<administrator last name>
+   ```
+
+   All eight are listed deliberately: the existing user schema requires email,
+   first name and last name. No default identity is invented. Username is limited
+   to 60 characters, email to 150, and each name to 100. Supply a unique randomly
+   generated password (at least 12, at most 72 UTF-8 bytes, no NUL); the upper bound
+   prevents silent bcrypt truncation. No password value is shown in logs/audits.
+3. Manually redeploy. Only literal `1` enables either gate; missing, empty, `0`,
+   `false`, `true`, `01`, or other values do not. The migration gate checks exact
+   agreement with both configured DB name and `SELECT DATABASE()`, then executes
+   existing `deploy.php --status`, `deploy.php --apply --confirm-database=...`, and
+   `inspect.php`. It never creates/drops the database or loads development data.
+4. Verify successful startup messages, 23 tables (22 application + journal),
+   14 applied journal entries (baseline + 13 migrations), and admin login using
+   your chosen credentials. Check dashboard, curriculum pages and logout. Expected
+   safe messages include `Startup migrations: completed and verified.` and
+   `First administrator provisioned; disable and remove bootstrap variables now.`
+5. **REMOVE ALL EIGHT temporary variables above**, including the password and
+   personal details—not merely setting flags to zero. Do not remove managed DB
+   credentials or the permanent production/session settings.
+6. Redeploy normally. Verify healthy status, working admin login and no startup
+   migration/provisioning messages. Existing schema, account and password remain.
+
+**DO NOT LEAVE BOOTSTRAP VARIABLES ENABLED.** The entrypoint removes them from
+Apache's inherited environment after successful startup, but Docker/HostForge
+still retain their configured values until you remove them in HostForge.
+
+`database/provision_admin.php` is CLI-only and uses PASSWORD_DEFAULT, prepared
+statements, the current `admin` role, an advisory lock and a transaction covering
+user + user_roles + `ADMIN_BOOTSTRAP_CREATE`. The audit actor is NULL (CLI/system),
+with only the new entity ID and non-sensitive source context. Failed role/audit
+writes roll back account creation. No authenticated session is fabricated.
+
+Retries are safe: completed migrations are not replayed; an existing matching
+administrator is left unchanged without resetting its password or adding another
+mapping/audit event. A matching non-admin username is rejected (never promoted).
+If another administrator exists, creating an additional bootstrap admin is refused.
+Missing schema, pending/invalid journal, missing admin role, invalid details and
+DB confirmation mismatch fail closed. Admin-only provisioning can be explicitly
+enabled later, but still requires the already-complete verified migration journal.
+
+If bootstrap fails, Apache does not start. Read the safe failure stage in container
+logs, correct configuration, and redeploy. A partial DDL failure needs controlled
+journal/schema recovery; never bypass checksums, delete a running marker blindly,
+or expose setup.php. Do not share passwords or raw environment dumps in support.
+
+### Optional operator CLI route
+
 Provision the database in HostForge first, then use its authorized container/CLI
 console or a one-off job with the SAME runtime database settings:
 
@@ -154,9 +226,8 @@ php database/inspect.php
 ```
 
 `YOUR_PROVISIONED_SCHEMA` is an operator-supplied schema name, not a password.
-No CLI console/predeploy-job capability is assumed to exist; if unavailable,
-stop and obtain a controlled maintenance connection. Never publish a web reset
-script to compensate.
+If no console/predeploy job exists, use the explicit temporary startup gates above.
+Never publish a web reset script to compensate.
 
 The runner is CLI-only. It:
 
@@ -182,9 +253,8 @@ an explicitly reviewed repair is an operator decision, not container startup.
 Fresh production initialization creates 22 application tables plus the journal,
 34 permissions and the existing compatibility mappings, but **zero users and
 zero student/domain sample records**. No default administrator exists. Arrange
-explicit authorized CLI account provisioning with a unique secret before making
-the application public; no production account-provisioning workflow was invented
-in this deployment task. The existing browser setup is blocked in Apache even if
+explicit first-admin provisioning above with a unique secret before making
+the application public. The existing browser setup is blocked in Apache even if
 someone accidentally enables its environment flags. Test-only account setup is
 excluded from the image and refuses non-disposable database names.
 

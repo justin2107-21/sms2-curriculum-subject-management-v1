@@ -14,6 +14,18 @@ if [ "${1:-}" = 'apache2-foreground' ]; then
     export PORT="$port"
     printf 'Listen %s\n' "$port" > /etc/apache2/ports.conf
     sed "s/@PORT@/$port/g" /usr/local/etc/csms/apache-vhost.conf > /etc/apache2/sites-available/000-default.conf
+    # Literal opt-in only. CLI commands never invoke these startup gates.
+    if [ "${CSMS_RUN_MIGRATIONS:-}" = '1' ]; then
+        php /var/www/html/database/startup.php
+    fi
+    if [ "${CSMS_BOOTSTRAP_ADMIN:-}" = '1' ]; then
+        php /var/www/html/database/provision_admin.php
+    fi
+    # Do not pass provisioning secrets into the Apache/PHP worker environment.
+    # Operators must still remove them from HostForge's stored configuration.
+    unset CSMS_ADMIN_PASSWORD CSMS_ADMIN_USERNAME CSMS_ADMIN_EMAIL
+    unset CSMS_ADMIN_FIRST_NAME CSMS_ADMIN_LAST_NAME
+    unset CSMS_RUN_MIGRATIONS CSMS_MIGRATION_CONFIRM_DATABASE CSMS_BOOTSTRAP_ADMIN
 fi
 
 # Official entrypoint/foreground scripts ultimately exec Apache as PID 1.

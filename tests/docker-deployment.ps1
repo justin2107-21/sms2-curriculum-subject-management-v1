@@ -131,6 +131,7 @@ try {
     $log = (Invoke-Docker @('logs',$badApp) | Out-String)
     if ($log.Contains($env:DB_PASS) -or $log -match 'PHP (Warning|Fatal|Notice)|AH00526|Syntax error') { throw 'Unsafe database-failure log output.' }
     Invoke-Docker @('exec',$appA,'php','database/inspect.php')
+    . (Join-Path $PSScriptRoot 'docker-bootstrap-scenarios.ps1')
     Write-Output 'PASS: Docker build, both DB styles, ports 8080/9090, security URLs, sessions, module regression and controlled DB failure.'
 } catch {
     $testFailure = $_
