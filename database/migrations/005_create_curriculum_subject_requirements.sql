@@ -30,11 +30,11 @@ CREATE TABLE curriculum_subject_requirements (
     CONSTRAINT fk_curriculum_subject_requirements_target_placement
         FOREIGN KEY (curriculum_version_id, subject_id)
         REFERENCES curriculum_version_subjects (curriculum_version_id, subject_id)
-        ON UPDATE CASCADE ON DELETE RESTRICT,
+        ON UPDATE RESTRICT ON DELETE RESTRICT,
     CONSTRAINT fk_curriculum_subject_requirements_required_placement
         FOREIGN KEY (curriculum_version_id, required_subject_id)
         REFERENCES curriculum_version_subjects (curriculum_version_id, subject_id)
-        ON UPDATE CASCADE ON DELETE RESTRICT,
+        ON UPDATE RESTRICT ON DELETE RESTRICT,
     CONSTRAINT fk_curriculum_subject_requirements_created_by
         FOREIGN KEY (created_by) REFERENCES users (id)
         ON UPDATE CASCADE ON DELETE SET NULL

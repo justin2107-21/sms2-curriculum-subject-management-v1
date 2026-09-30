@@ -107,6 +107,7 @@ try {
     New-TestApp $appA 8080 $styleA
     Invoke-Docker @('exec',$appA,'php','-m')
     Invoke-Docker @('exec',$appA,'php','tests/deployment_migrations.php')
+    Invoke-Docker @('exec',$appA,'php','tests/academic_fk_compatibility.php')
     Invoke-Docker @('exec','--env','SMS_TEST_ADMIN_PASSWORD',$appA,'php','tests/deployment_admin.php')
     Invoke-Docker @('exec',$appA,'php','tests/docker_http.php')
     Invoke-Docker @('exec','--env','SMS_TEST_ADMIN_PASSWORD','--env','SMS_TEST_BASE_URL=http://127.0.0.1:8080',$appA,'php','tests/foundation.php')

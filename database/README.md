@@ -1,5 +1,57 @@
 # Database migrations
 
+## Academic identity FK portability (migration 013)
+
+Subject/program/curriculum IDs are immutable technical identities, not institutional
+policy. MySQL/MariaDB portability requires the seven CHECK-related reference keys
+below to use **ON UPDATE RESTRICT / ON DELETE RESTRICT**:
+
+- `curriculum_subject_requirements`: `fk_curriculum_subject_requirements_target_placement`,
+  `fk_curriculum_subject_requirements_required_placement` (composite version/subject keys).
+- `subject_equivalencies`: `fk_subject_equivalencies_subject`,
+  `fk_subject_equivalencies_equivalent_subject`.
+- `compliance_rules`: `fk_compliance_rules_subject`, `fk_compliance_rules_program`,
+  `fk_compliance_rules_curriculum`.
+
+Fresh definitions 005/009/011 were revised with explicit approval. All CHECKs,
+UNIQUEs, column types, delete restrictions and other FKs remain unchanged.
+Fresh deployment order is baseline then 001-013: 14 journal entries, 22 application
+tables plus the journal, 41 FKs and 34 permissions. No default users/demo records.
+
+For an existing **journaled** database: back up, restrict application access for
+maintenance, run `php database/deploy.php --status`, then apply with the exact
+database confirmation as documented in the deployment guide. The runner recognizes
+only the three exact old normalized SQL hashes from commit `87db247`, and only
+when current sources match their exact reviewed replacement hashes. It retains
+old journal digests/timestamps; 013 gets its own new digest. Arbitrary checksum
+changes, unknown migrations, running markers and out-of-order histories still fail.
+No previous environment is assumed to have an empty journal.
+
+For an existing **unjournaled** XAMPP installation already through 012: do not
+invent journal entries or rerun baseline/001-012. After backup and schema review,
+apply only `013_mariadb_subject_fk_compatibility.sql` once with an authorized SQL
+client in a maintenance window. Its `USE sms_db` must be explicitly reviewed and
+retargeted to the confirmed application database if named differently. Verify the
+seven FK actions, all CHECK/UNIQUE/composite keys and unchanged row counts afterward.
+The deployment runner deliberately refuses automatic adoption of untracked schemas.
+
+013 adds temporary RESTRICT guards, drops the old named FKs, restores their original
+names with RESTRICT, then removes the temporary guards. FK checks stay enabled and
+there is no unguarded DML interval. MariaDB cannot replace the same FK name in one
+ALTER (see [MDEV-30416](https://jira.mariadb.org/browse/MDEV-30416)). DDL is not atomic
+across statements; an interruption leaves a running journal marker and may leave
+guard FKs. Do not blindly replay/delete the marker. Inspect the actual DDL and
+complete reviewed recovery or restore a backup before reopening application access.
+An old partial 005/009/011 failure is NOT an automatically upgradeable installation.
+
+Tests use a new MariaDB 10.11 Docker database and the actual XAMPP 10.4.32 binary in
+an isolated data directory. They cover populated legacy upgrades, exact row/CHECK/
+index/AUTO_INCREMENT preservation, unchanged historical hashes, hostile digest
+rejection, same-version relationships, self/duplicate/canonical/type rules,
+protected deletes and blocked identity updates. Local `sms_db` is never a target.
+
+## Existing initialization notes
+
 Production/HostForge initialization uses the separate CLI-only
 [`deploy.php`](deploy.php) journaled runner, not the development helper below.
 See [`hostforge-deployment.md`](../docs/hostforge-deployment.md). It operates on
@@ -34,7 +86,7 @@ variables; credentials must not be committed. The target database is mandatory.
 The CLI helper refuses any non-empty target and system databases. It reads
 `students.sql` first, then every numbered migration below in filename order,
 retargeting only explicit CREATE DATABASE / USE directives in memory. Applied
-migrations are not edited. The legacy baseline includes 25 template student
+migrations are not rewritten by that helper. The legacy baseline includes 25 template student
 samples; these are not validated BCP academic data. No administrator password is
 seeded. Development administrator setup remains separately opt-in via the
 existing guarded `shared/setup.php`.

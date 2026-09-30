@@ -2,32 +2,34 @@
 
 ## Verification status (2026-09-30)
 
-**Blocked by an actual MariaDB schema incompatibility; do not deploy yet.**
-Docker Desktop/WSL2 now work. The complete Windows PowerShell test was rerun,
-not just the previously failing command. The official PHP 8.2 Apache Bookworm
-image builds successfully. All 109 application PHP files lint inside the image,
-and mysqli/mysqlnd, curl, DOM, fileinfo, JSON, session, ctype and filter pass.
-Apache starts on injected PORT=8080 and its localhost-published health endpoint
-returns HTTP 200 with only `{"status":"ok"}`. Preferred DB variables connect to
-the isolated test database. No production application file was changed.
+**Local Docker workflow passed; HostForge itself has not been deployed/tested.**
+The PHP 8.2 Apache Bookworm image builds, all 109 application PHP files lint
+inside the image, and all required extensions including mysqli pass. The entire
+workflow passes on MariaDB 10.11.19: 14 baseline/migration journal entries,
+41 foreign keys, ports 8080/9090, both database-variable conventions, minimal
+HTTP 200 health, login/dashboard/module/logout regression, CSRF/RBAC/audit,
+sensitive URL denial, generic invalid-DB responses, and container log checks.
+The 1,560-check foundation suite runs once for EACH DB naming convention.
 
-The test now reaches controlled initialization but MariaDB 10.11.19 rejects
-`005_create_curriculum_subject_requirements.sql` with driver error 1901:
-the self-reference CHECK uses columns also covered by ON UPDATE CASCADE foreign
-keys. The baseline and migrations 001-004 apply; 005 remains incomplete and
-the runner fails closed. An independent no-network disposable database reproduced
-this conflict; changing only the toy foreign keys to ON UPDATE RESTRICT succeeded.
-Migration 009 has the same CHECK/cascading-key pattern and also needs review.
-No application migration, foreign-key action or integrity check was altered.
-Changing key-update behavior requires explicit review, not disabling CHECKs or
-silently downgrading the test database. See the upstream
-[MariaDB constraint issue](https://jira.mariadb.org/browse/MDEV-25437).
+The previous error 1901 was a CHECK/cascading-FK incompatibility in migrations
+005, 009 and 011. Seven explicitly approved identity-reference FKs now use
+ON UPDATE RESTRICT; DELETE RESTRICT, CHECKs, UNIQUEs and attribution FKs remain.
+Migration 013 upgrades old definitions using temporary restrictive guards while
+preserving original names. See [database compatibility guidance](../database/README.md#academic-identity-fk-portability-migration-013)
+and the [upstream MariaDB constraint issue](https://jira.mariadb.org/browse/MDEV-25437).
 
-The full Docker gate has NOT passed. Alternate port/DB-alias HTTP runs, authenticated
-module regression, denied-URL tests, invalid-DB responses and final log checks remain
-unverified in the full Docker workflow because initialization stops it first.
-All temporary containers, anonymous database volumes and test networks were removed.
-No local `sms_db` was touched. Git push and HostForge deployment remain withheld.
+Fresh installs and populated historical-schema upgrades also pass with the actual
+XAMPP MariaDB 10.4.32 binary in a new temporary data directory and non-default
+loopback port. Its regular server was unavailable, so no claim is made that an
+existing persistent journal was inspected. Exact pinned historical digests support
+such journals without bypassing checksum validation or rewriting their evidence.
+Oracle MySQL was not tested; XAMPP's bundled engine here is MariaDB.
+
+All temporary containers, anonymous volumes, networks, local test schemas and the
+isolated local server/data directory were removed. Local `sms_db` and the normal
+XAMPP data directory were not touched. No visual/browser QA or HostForge account
+configuration is claimed. Provisioned credentials, console access, DB TLS and
+initial administrator provisioning still require the deployment operator.
 
 Harness fixes replace Windows PowerShell's corrupted inline `php -r` expression
 with `tests/docker-runtime-check.php`, mounted read-only outside DocumentRoot.
@@ -188,7 +190,8 @@ excluded from the image and refuses non-disposable database names.
 
 `database/bootstrap.php` is still the legacy development empty-database helper;
 it now refuses `APP_ENV=production`. Do not use it for HostForge initialization.
-Applied migration SQL and domain/business rules were not edited.
+Only the approved identity-FK portability revisions and forward migration changed
+schema definitions; no module workflows or institutional policies changed.
 
 ## Repeatable Docker verification
 

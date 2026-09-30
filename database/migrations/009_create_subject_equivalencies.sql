@@ -29,10 +29,10 @@ CREATE TABLE subject_equivalencies (
         CHECK (decision_status IN ('pending', 'equivalent', 'not_equivalent')),
     CONSTRAINT fk_subject_equivalencies_subject
         FOREIGN KEY (subject_id) REFERENCES subjects (id)
-        ON UPDATE CASCADE ON DELETE RESTRICT,
+        ON UPDATE RESTRICT ON DELETE RESTRICT,
     CONSTRAINT fk_subject_equivalencies_equivalent_subject
         FOREIGN KEY (equivalent_subject_id) REFERENCES subjects (id)
-        ON UPDATE CASCADE ON DELETE RESTRICT,
+        ON UPDATE RESTRICT ON DELETE RESTRICT,
     CONSTRAINT fk_subject_equivalencies_reviewed_by
         FOREIGN KEY (reviewed_by) REFERENCES users (id)
         ON UPDATE CASCADE ON DELETE SET NULL,

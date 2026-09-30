@@ -1,5 +1,30 @@
 # Foundation regression (CLI only)
 
+## Academic FK portability regression
+
+`academic_fk_compatibility.php` is part of the Docker gate. It requires an explicitly
+confirmed disposable `csms_docker_test_*` schema and empty academic fixture tables.
+It tests database constraints directly with artificial records and cleans only
+captured IDs. The full foundation suite additionally tests prerequisite cycles,
+RBAC, CSRF, audits and current module workflows over HTTP.
+
+On Windows, run `powershell -ExecutionPolicy Bypass -File tests/local-fk-compatibility.ps1`
+to test the actual XAMPP binary (default `C:\xampp\mysql\bin`). This initializes a
+NEW temporary data directory with a random root secret, binds a random loopback
+port, and runs fresh initialization plus a populated legacy upgrade. It never
+starts/modifies the normal XAMPP instance or `sms_db`. Finally it drops its own
+disposable schemas, stops its own process and removes its temporary directory.
+`-MysqlBin` and `-Php` allow other installed binary locations.
+
+The legacy fixture recreates reviewed pre-013 SQL (including the old cascading
+keys), records its exact historical migration digests, and inserts prerequisite,
+equivalency and compliance records before applying 013. Tests verify unchanged
+rows, CHECK expressions, indexes, AUTO_INCREMENT values, journal evidence and
+unrelated FKs. Unknown checksum tampering must still fail. Use a legacy-compatible
+engine for this fixture; MariaDB 10.11 correctly refuses creation of the old shape.
+
+## Other foundation checks
+
 HostForge/Docker build and runtime checks are in `docker-deployment.ps1`.
 See [deployment guide](../docs/hostforge-deployment.md) for prerequisites and
 the current validation limitation. `database_config.php` tests alias/port

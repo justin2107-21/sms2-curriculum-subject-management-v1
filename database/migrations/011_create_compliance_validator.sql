@@ -80,13 +80,13 @@ CREATE TABLE compliance_rules (
         ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT fk_compliance_rules_subject
         FOREIGN KEY (subject_id) REFERENCES subjects (id)
-        ON UPDATE CASCADE ON DELETE RESTRICT,
+        ON UPDATE RESTRICT ON DELETE RESTRICT,
     CONSTRAINT fk_compliance_rules_program
         FOREIGN KEY (academic_program_id) REFERENCES academic_programs (id)
-        ON UPDATE CASCADE ON DELETE RESTRICT,
+        ON UPDATE RESTRICT ON DELETE RESTRICT,
     CONSTRAINT fk_compliance_rules_curriculum
         FOREIGN KEY (curriculum_id) REFERENCES curricula (id)
-        ON UPDATE CASCADE ON DELETE RESTRICT,
+        ON UPDATE RESTRICT ON DELETE RESTRICT,
     CONSTRAINT fk_compliance_rules_created_by
         FOREIGN KEY (created_by) REFERENCES users (id)
         ON UPDATE CASCADE ON DELETE SET NULL

@@ -33,4 +33,7 @@ foreach(['css/auth.css','js/page-loader.js','images/BCP_LOGO.png'] as $asset) {
 foreach(['.git/config','.github/workflows/php-lint.yml','.env','database/','database/deploy.php','database/seeds/development_seed.sql','database/migrations/','students.sql','sms_db_full_backup_test.sql','docs/hostforge-deployment.md','tests/foundation.php','docker/apache-vhost.conf','shared/setup.php','Dockerfile'] as $path) {
     dockerCheck(in_array($client->request($path)['status'],[403,404],true),'Sensitive URL denied: '.$path);
 }
+foreach (['database/migrations/005_create_curriculum_subject_requirements.sql','database/migrations/013_mariadb_subject_fk_compatibility.sql'] as $path) {
+    dockerCheck(in_array($client->request($path)['status'],[403,404],true),'Migration SQL denied: '.$path);
+}
 $client->close();
