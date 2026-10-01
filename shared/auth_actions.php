@@ -8,6 +8,12 @@ require_valid_csrf_token();
 
 $action = is_string($_POST['action'] ?? null) ? $_POST['action'] : '';
 
+// CSMS accounts are provisioned by authorized operators, never public signup.
+// Keep this before database access; registration stays disabled during outages.
+if ($action === 'register') {
+    json_response(false, 'Public registration is disabled. Contact your system administrator.', [], 403);
+}
+
 function respond(bool $ok, string $message, array $extra = [], int $status = 200): void
 {
     json_response($ok, $message, $extra, $status);
@@ -25,7 +31,7 @@ if ($action === 'logout') {
     respond(true, 'Logged out.');
 }
 
-$databaseActions = ['register', 'login', 'update_profile', 'change_password', 'delete_account'];
+$databaseActions = ['login', 'update_profile', 'change_password', 'delete_account'];
 if (!in_array($action, $databaseActions, true)) {
     respond(false, 'Unknown action.', [], 400);
 }
@@ -34,79 +40,6 @@ require_once __DIR__ . '/db.php';
 
 try {
     switch ($action) {
-        case 'register': {
-            $username = trim((string)($_POST['username'] ?? ''));
-            $email = trim((string)($_POST['email'] ?? ''));
-            $firstName = trim((string)($_POST['first_name'] ?? ''));
-            $lastName = trim((string)($_POST['last_name'] ?? ''));
-            $password = (string)($_POST['password'] ?? '');
-            $confirm = (string)($_POST['confirm_password'] ?? '');
-
-            if (!$username || !$email || !$firstName || !$lastName || !$password) {
-                respond(false, 'All fields are required.', [], 422);
-            }
-            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                respond(false, 'Invalid email address.', [], 422);
-            }
-            if (strlen($password) < 6) {
-                respond(false, 'Password must be at least 6 characters.', [], 422);
-            }
-            if ($password !== $confirm) {
-                respond(false, 'Passwords do not match.', [], 422);
-            }
-
-            $stmt = $conn->prepare('SELECT id FROM users WHERE username = ? OR email = ? LIMIT 1');
-            $stmt->bind_param('ss', $username, $email);
-            $stmt->execute();
-            if ($stmt->get_result()->num_rows > 0) {
-                respond(false, 'Username or email is already taken.', [], 409);
-            }
-            $stmt->close();
-
-            $hash = password_hash($password, PASSWORD_DEFAULT);
-
-            // Temporary SMS2-template compatibility role only. Public clients
-            // cannot choose this value. The transaction also assigns the
-            // matching normalized compatibility role; "student" is not
-            // assumed to be a final Curriculum and Subject Management role.
-            $temporaryRole = 'student';
-
-            $stmt = $conn->prepare(
-                'INSERT INTO users (username, email, first_name, last_name, password_hash, role)
-                 VALUES (?, ?, ?, ?, ?, ?)'
-            );
-            $conn->begin_transaction();
-            try {
-                $stmt->bind_param('ssssss', $username, $email, $firstName, $lastName, $hash, $temporaryRole);
-                $stmt->execute();
-                $newUserId = (int)$conn->insert_id;
-                $stmt->close();
-
-                $stmt = $conn->prepare('SELECT id FROM roles WHERE name = ? LIMIT 1');
-                $stmt->bind_param('s', $temporaryRole);
-                $stmt->execute();
-                $roleRow = $stmt->get_result()->fetch_assoc();
-                $stmt->close();
-
-                if (!$roleRow) {
-                    throw new RuntimeException('Temporary registration role is not configured.');
-                }
-
-                $roleId = (int)$roleRow['id'];
-                $stmt = $conn->prepare(
-                    'INSERT INTO user_roles (user_id, role_id, assigned_by) VALUES (?, ?, NULL)'
-                );
-                $stmt->bind_param('ii', $newUserId, $roleId);
-                $stmt->execute();
-                $stmt->close();
-                $conn->commit();
-            } catch (Throwable $error) {
-                $conn->rollback();
-                throw $error;
-            }
-            respond(true, 'Account created successfully.', [], 201);
-        }
-
         case 'login': {
             $username = trim((string)($_POST['username'] ?? ''));
             $password = (string)($_POST['password'] ?? '');

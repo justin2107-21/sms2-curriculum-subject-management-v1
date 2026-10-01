@@ -5,7 +5,7 @@ $testDir=Join-Path ([IO.Path]::GetTempPath()) ('csms-fk-test-'+[guid]::NewGuid()
 $null=New-Item -ItemType Directory -Path $testDir
 $listener=[Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,0)
 $listener.Start();$port=$listener.LocalEndpoint.Port;$listener.Stop()
-$names=@('DB_HOST','DB_PORT','DB_USER','DB_PASS','DB_NAME','APP_ENV','SMS_TEST_LOCAL_FK','MYSQL_PWD')
+$names=@('DB_HOST','DB_PORT','DB_USER','DB_PASS','DB_NAME','SMS_DB_NAME','APP_ENV','SMS_TEST_LOCAL_FK','MYSQL_PWD')
 $saved=@{};foreach($name in $names){$saved[$name]=[Environment]::GetEnvironmentVariable($name,'Process')}
 $server=$null
 try {

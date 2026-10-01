@@ -16,6 +16,10 @@ starts/modifies the normal XAMPP instance or `sms_db`. Finally it drops its own
 disposable schemas, stops its own process and removes its temporary directory.
 `-MysqlBin` and `-Php` allow other installed binary locations.
 
+The isolated local runner also initializes a separate fresh schema for the 40-check
+development-seed safety suite. That schema is dropped in its finally cleanup,
+including when a seed assertion fails. The normal local database is never targeted.
+
 The legacy fixture recreates reviewed pre-013 SQL (including the old cascading
 keys), records its exact historical migration digests, and inserts prerequisite,
 equivalency and compliance records before applying 013. Tests verify unchanged
@@ -86,9 +90,16 @@ Its finally block preserves append-only audit evidence. On cleanup failure it
 prints only fixture IDs/prefix, stops, and leaves the transaction rolled back for
 operator inspection. Do not replace this with broad prefix deletion.
 
-Coverage includes admin/unauthorized pages, registration role forgery,
+Coverage includes admin/unauthorized pages, disabled public registration,
 RBAC/CSRF/method rejection, domain CRUD/configuration, prerequisites, dependency
 guards, equivalency, weights, synthetic compliance, export, pagination and logout.
+Registration routes/actions must reject public signup, including a valid CSRF
+request with a forged role. Users, mappings and audits must remain unchanged.
+The compatibility student is now a CLI-created, transactionally provisioned
+disposable fixture, not created through a web registration backdoor. Tests also
+check all three Subject Master number inputs use step 0.01/min 0 and verify
+integer/fractional values round-trip through the existing backend.
+
 Successful mutations must produce exactly one expected audit event; rejected
 mutations and ordinary reads produce none. Local row counts must return to their
 starting values except audit logs. Existing template users/students are not test

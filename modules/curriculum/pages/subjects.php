@@ -108,9 +108,9 @@ require __DIR__ . '/../../../shared/sidebar.php';
         <label class="form-field"><span>Subject Code <strong>*</strong></span><input name="subject_code" id="subjectCode" maxlength="60" required/></label>
         <label class="form-field"><span>Subject Title <strong>*</strong></span><input name="subject_title" id="subjectTitle" maxlength="255" required/></label>
         <label class="form-field form-field-wide"><span>Description</span><textarea name="description" id="subjectDescription" rows="3"></textarea></label>
-        <label class="form-field"><span>Total Units <strong>*</strong></span><input type="number" name="units" id="subjectUnits" min="0" max="9999.99" step="1" required/></label>
-        <label class="form-field"><span>Lecture Units</span><input type="number" name="lecture_units" id="subjectLectureUnits" min="0" max="9999.99" step="1"/></label>
-        <label class="form-field"><span>Laboratory Units</span><input type="number" name="laboratory_units" id="subjectLaboratoryUnits" min="0" max="9999.99" step="1"/></label>
+        <label class="form-field"><span>Total Units <strong>*</strong></span><input type="number" name="units" id="subjectUnits" min="0" max="9999.99" step="0.01" required/></label>
+        <label class="form-field"><span>Lecture Units</span><input type="number" name="lecture_units" id="subjectLectureUnits" min="0" max="9999.99" step="0.01"/></label>
+        <label class="form-field"><span>Laboratory Units</span><input type="number" name="laboratory_units" id="subjectLaboratoryUnits" min="0" max="9999.99" step="0.01"/></label>
         <label class="form-field"><span>Technical Status <strong>*</strong></span><select name="status" id="subjectFormStatus" required><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
       </div>
       <div class="modal-actions"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="submit" class="button-primary" id="subjectSubmitButton">Create Subject</button></div>

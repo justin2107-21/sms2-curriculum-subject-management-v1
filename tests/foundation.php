@@ -120,20 +120,52 @@ try {
         $ids = [];
         foreach ((new DOMXPath($dom))->query('//*[@id]') as $element) { $ids[] = $element->getAttribute('id'); }
         check(count($ids) === count(array_unique($ids)), $page . ' unique DOM IDs');
+        if ($page === 'subjects') {
+            foreach (['subjectUnits','subjectLectureUnits','subjectLaboratoryUnits'] as $id) {
+                $field = (new DOMXPath($dom))->query('//*[@id="'.$id.'"]')->item(0);
+                check($field !== null && $field->getAttribute('step') === '0.01'
+                    && $field->getAttribute('min') === '0', $id . ' decimal step and nonnegative minimum');
+            }
+        }
     }
     foreach (['admin/users.php','admin/permissions.php','admin/audit_logs.php','admin/audit_logs.php?page=999999'] as $page) {
         expect($admin->request($page), 200, 'Admin system page ' . $page);
     }
-    expect($student->request('auth/register.php'), 200, 'Registration form');
+    expect($student->request('auth/register.php'), 404, 'Public registration page disabled');
+    expect($student->request('auth/register2.php'), 302, 'Legacy registration step redirects');
+    expect($student->request('auth/signin.php'), 200, 'Guest sign-in CSRF');
     $temporaryPassword = bin2hex(random_bytes(18));
+    $userCount = (int)$conn->query('SELECT COUNT(*) FROM users')->fetch_row()[0];
+    $roleCount = (int)$conn->query('SELECT COUNT(*) FROM user_roles')->fetch_row()[0];
+    $registrationAuditCount = auditCount();
     expect($student->request('shared/auth_actions.php', [
         'action'=>'register','username'=>$prefix,'email'=>$prefix.'@example.invalid',
         'first_name'=>'DEV-REGTEST','last_name'=>'DISPOSABLE','password'=>$temporaryPassword,
         'confirm_password'=>$temporaryPassword,'role'=>'admin',
-    ], 'POST'), 201, 'Forged registration role');
+    ], 'POST'), 403, 'Public registration rejected even with valid CSRF and forged role');
+    expect($student->request('shared/auth_actions.php', ['action'=>'register'], 'POST', ''), 403, 'Registration missing CSRF');
+    expect($student->request('shared/auth_actions.php', ['action'=>'register'], 'POST', 'invalid'), 403, 'Registration invalid CSRF');
+    expect($student->request('shared/auth_actions.php', ['action'=>'register']), 405, 'GET registration rejected');
+    expect($admin->request('shared/auth_actions.php', ['action'=>'register'], 'POST'), 403, 'Authenticated registration also disabled');
+    check((int)$conn->query('SELECT COUNT(*) FROM users')->fetch_row()[0] === $userCount
+        && (int)$conn->query('SELECT COUNT(*) FROM user_roles')->fetch_row()[0] === $roleCount
+        && auditCount() === $registrationAuditCount, 'Rejected registration changes no users, role mappings or audits');
+
+    // CLI-owned disposable fixture, not a replacement web provisioning route.
+    $hash = password_hash($temporaryPassword, PASSWORD_DEFAULT);
+    $email = $prefix.'@example.invalid';
+    $conn->begin_transaction();
+    try {
+        $stmt = $conn->prepare("INSERT INTO users(username,email,first_name,last_name,password_hash,role) VALUES (?,?,'DEV-REGTEST','DISPOSABLE',?,'student')");
+        $stmt->bind_param('sss',$prefix,$email,$hash); $stmt->execute(); $fixtureId = (int)$conn->insert_id; $stmt->close();
+        $stmt = $conn->prepare("INSERT INTO user_roles(user_id,role_id,assigned_by) SELECT ?,id,NULL FROM roles WHERE name='student'");
+        $stmt->bind_param('i',$fixtureId); $stmt->execute();
+        if ($stmt->affected_rows !== 1) { throw new RuntimeException('Temporary student role unavailable.'); }
+        $stmt->close(); $conn->commit(); own('users',['id'=>$fixtureId]);
+    } catch (Throwable $error) { $conn->rollback(); throw $error; }
     $stmt = $conn->prepare('SELECT id,role FROM users WHERE username=?'); $stmt->bind_param('s',$prefix); $stmt->execute();
     $testUser = own('users', $stmt->get_result()->fetch_assoc()); $stmt->close();
-    check($testUser['role'] === 'student', 'Registration cannot forge admin');
+    check($testUser['role'] === 'student', 'CLI fixture retains compatibility role');
     check((int)$conn->query('SELECT COUNT(*) FROM user_roles ur JOIN role_permissions rp ON ur.role_id=rp.role_id JOIN permissions p ON p.id=rp.permission_id WHERE ur.user_id=' . $testUser['id'] . " AND p.module NOT IN ('dashboard','account')")->fetch_row()[0] === 0, 'Unauthorized role has no domain permissions');
     expect($student->request('shared/auth_actions.php', ['action'=>'login','username'=>$prefix,'password'=>$temporaryPassword], 'POST'), 200, 'Student login');
     $studentDashboard = $student->request('dashboard/dashboard.php');
@@ -182,6 +214,9 @@ try {
     mutate('subject','create',['subject_code'=>$s['subject_code'],'subject_title'=>'Duplicate','units'=>'3'],409);
     mutate('subject','create',['subject_code'=>$prefix.'-NEG','subject_title'=>'Negative','units'=>'-1'],422);
     mutate('subject','update',['id'=>$s['id'],'subject_code'=>$s['subject_code'],'subject_title'=>$prefix.' Edited Subject','units'=>'3.25','lecture_units'=>'3','laboratory_units'=>'0.25','status'=>'inactive'],200,'SUBJECT_UPDATE');
+    $decimalSubject = readApi('subject','get',['id'=>$s['id']])['subject'];
+    check((string)$decimalSubject['units'] === '3.25' && (string)$decimalSubject['lecture_units'] === '3.00'
+        && (string)$decimalSubject['laboratory_units'] === '0.25', 'Integer and fractional subject units persist unchanged');
     foreach([0,1] as $i) {
         $data=['curriculum_code'=>$prefix.'-C'.$i,'curriculum_name'=>$prefix.' Curriculum '.$i,'academic_program_id'=>$programs[$i]['id'],'status'=>'active'];
         $curricula[]=own('curricula',mutate('curriculum','create',$data,201,'CURRICULUM_CREATE')['curriculum']);

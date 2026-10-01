@@ -21,9 +21,16 @@ try {
         if ($mode==='fresh') { localFkRun('deployment_migrations.php'); }
         localFkRun('academic_fk_compatibility.php',$mode==='legacy'?['--legacy']:[]);
     }
+    // Run seed safety on the same isolated server, never the normal sms_db.
+    $seedName='sms_db_foundation_test_'.bin2hex(random_bytes(6));
+    $db->query('CREATE DATABASE `'.$seedName.'` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+    $created[]=$seedName;
+    putenv('DB_NAME='.$seedName); putenv('SMS_DB_NAME='.$seedName);
+    localFkRun('../database/deploy.php',['--apply','--confirm-database='.$seedName]);
+    localFkRun('development_seed.php');
 } finally {
     foreach ($created as $name) {
-        if (!preg_match('/^csms_docker_test_local_[a-f0-9]{12}_(fresh|legacy)$/D',$name)) { throw new RuntimeException('Unsafe cleanup target'); }
+        if (!preg_match('/^(csms_docker_test_local_[a-f0-9]{12}_(fresh|legacy)|sms_db_foundation_test_[a-f0-9]{12})$/D',$name)) { throw new RuntimeException('Unsafe cleanup target'); }
         $db->query('DROP DATABASE `'.$name.'`');
     }
     echo 'PASS: Isolated local schemas removed.'.PHP_EOL;
