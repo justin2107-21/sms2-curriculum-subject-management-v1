@@ -1,5 +1,10 @@
 # Controlled synthetic development dataset
 
+The separate BSIT pre-oral dataset uses `bsit_preoral_manifest.json` and the
+local-only `bsit_preoral.php` CLI. Do not use the 42-row DEV-DEMO tooling below
+to seed BSIT. See [the Phase 2 guide](../../docs/preoral-phase2-bsit-dataset.md)
+for explicit backup/ownership guards and commands. Neither dataset auto-loads.
+
 **These records are DEVELOPMENT / SYNTHETIC DATA and do not represent official
 Bestlink College of the Philippines curricula, subjects, policies, or processes.**
 

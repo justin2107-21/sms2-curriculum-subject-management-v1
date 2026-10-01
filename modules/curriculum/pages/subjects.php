@@ -9,6 +9,7 @@ require_permission('subject.view');
 $userId = current_user_id();
 $canCreateSubjects = $userId !== null && user_can($userId, 'subject.create');
 $canUpdateSubjects = $userId !== null && user_can($userId, 'subject.update');
+$canViewPlacementContext = $userId !== null && user_can($userId, 'curriculum.view');
 $subjectColumnCount = $canUpdateSubjects ? 7 : 6;
 $avatarInitial = strtoupper(substr((string)($_SESSION['first_name'] ?? 'U'), 0, 1));
 $curriculumCssVersion = (int)filemtime(__DIR__ . '/../assets/curriculum.css');
@@ -80,6 +81,15 @@ require __DIR__ . '/../../../shared/sidebar.php';
           <select id="subjectPerPage"><option>10</option><option selected>20</option><option>50</option></select>
         </label>
       </form>
+      <?php if ($canViewPlacementContext): ?>
+      <div class="subject-context-toolbar" id="subjectPlacementContext">
+        <label class="form-field"><span>Curriculum Version</span><select id="subjectVersionFilter"><option value="">All curriculum versions</option></select></label>
+        <button type="button" class="button-muted" id="subjectMoreVersions" hidden>More versions</button>
+        <label class="form-field"><span>Year Level</span><select id="subjectYearFilter"><option value="">All year levels</option></select></label>
+        <label class="form-field"><span>Semester</span><select id="subjectSemesterFilter"><option value="">All semesters</option></select></label>
+        <p class="subtle-text" id="subjectContextNote" role="status">Filters use curriculum placements. Each Subject Master record appears only once.</p>
+      </div>
+      <?php endif; ?>
       <div class="table-scroll">
         <table class="domain-table subject-table">
           <thead><tr><th>Subject Code</th><th>Subject Title</th><th>Units</th><th>Lecture Units</th><th>Laboratory Units</th><th>Technical Status</th><?php if ($canUpdateSubjects): ?><th>Actions</th><?php endif; ?></tr></thead>

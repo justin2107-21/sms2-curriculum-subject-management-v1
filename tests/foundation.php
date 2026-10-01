@@ -196,6 +196,9 @@ try {
         check(auditCount()===$auditBefore,"Rejected $endpoint requests no success audit");
     }
     expect($student->api('subject_history','list'),403,'Student history API');
+    expect($guest->api('subject','contexts'),401,'Guest placement contexts');
+    expect($student->api('subject','contexts'),403,'Student placement contexts');
+    expect($admin->api('subject','contexts',[], 'POST'),405,'Placement context read-only method');
     expect($admin->api('subject_history','list',[], 'POST'),405,'History read-only API');
     expect($student->request('shared/student_actions.php',['action'=>'get']),403,'Legacy student CRUD restricted');
     $programs=[]; $subjects=[]; $curricula=[]; $versions=[]; $placements=[];
@@ -229,6 +232,9 @@ try {
         $versions[]=own('curriculum_versions',mutate('version','create',$data,201,'CURRICULUM_VERSION_CREATE')['version']);
     }
     $v=$versions[0];
+    $emptyPreview=readApi('export','preview',['academic_program_id'=>$programs[0]['id'],'curriculum_id'=>$curricula[0]['id'],'curriculum_version_id'=>$v['id']]);
+    check($emptyPreview['summary']['total_lecture_units']===null && $emptyPreview['summary']['total_laboratory_units']===null,
+        'Empty-version lecture/lab summary unavailable');
     mutate('version','create',['curriculum_id'=>$c['id'],'version_label'=>$v['version_label']],409);
     readApi('curriculum','get',['id'=>$c['id']]); readApi('version','get',['id'=>$v['id']]);
     for($i=0;$i<11;$i++) {
@@ -243,6 +249,34 @@ try {
     }
     $shared=own('curriculum_version_subjects',mutate('program_assignment','assign',['curriculum_version_id'=>$versions[2]['id'],'subject_id'=>$s['id']],201,'CURRICULUM_SUBJECT_ASSIGN')['assignment']);
     mutate('program_assignment','update',['id'=>$shared['id'],'year_level'=>'DEV-Shared','semester'=>'DEV-Term','sequence_order'=>0,'is_required'=>1],200,'CURRICULUM_SUBJECT_UPDATE');
+    $contextSubjects=readApi('subject','list',['search'=>$prefix,'curriculum_version_id'=>$v['id'],'per_page'=>50]);
+    check($contextSubjects['pagination']['total_records']===11,'Subject version filter');
+    $contextSubjects=readApi('subject','list',['search'=>$prefix,'year_level'=>'DEV-Year','semester'=>'DEV-Term','per_page'=>50]);
+    check($contextSubjects['pagination']['total_records']===12 && count(array_unique(array_column($contextSubjects['subjects'],'id')))===12,
+        'Subject contexts do not duplicate shared master records');
+    $contextSubjects=readApi('subject','list',['curriculum_version_id'=>$v['id'],'year_level'=>'DEV-Changed','semester'=>'DEV-Term']);
+    check($contextSubjects['pagination']['total_records']===1,'Combined placement context uses same placement');
+    check(readApi('subject','list',['year_level'=>"DEV-Year' OR 1=1 --"])['pagination']['total_records']===0,'Context text is parameterized');
+    readApi('subject','list',['curriculum_version_id'=>-1],422);
+    readApi('subject','list',['curriculum_version_id'=>2147483647],404);
+    readApi('subject','list',['semester'=>['bad']],422);
+    readApi('subject','contexts',['per_page'=>10000],422);
+    $contextChoices=readApi('subject','contexts',['search'=>$prefix,'curriculum_version_id'=>$v['id']]);
+    check($contextChoices['pagination']['total_records']===3 && in_array('DEV-Changed',$contextChoices['filter_values']['year_levels'],true),
+        'Bounded version choices and stored placement labels');
+    $singleContext=['academic_program_id'=>$programs[1]['id'],'curriculum_id'=>$curricula[1]['id'],'curriculum_version_id'=>$versions[2]['id']];
+    $subjectUpdate=['id'=>$s['id'],'subject_code'=>$s['subject_code'],'subject_title'=>$prefix.' Edited Subject','units'=>'3.25','status'=>'inactive'];
+    foreach([[null,null],['0','0'],['3','0.25']] as [$lecture,$lab]) {
+        mutate('subject','update',$subjectUpdate+['lecture_units'=>$lecture,'laboratory_units'=>$lab],200,'SUBJECT_UPDATE');
+        $summary=readApi('export','preview',$singleContext)['summary'];
+        check($lecture===null ? $summary['total_lecture_units']===null : (float)$summary['total_lecture_units']===(float)$lecture,
+            'Lecture summary distinguishes NULL, confirmed zero and numeric values');
+        check($lab===null ? $summary['total_laboratory_units']===null : (float)$summary['total_laboratory_units']===(float)$lab,
+            'Laboratory summary distinguishes NULL, confirmed zero and numeric values');
+        if($lecture===null) {
+            $print=expect($admin->request('modules/curriculum/pages/curriculum_print.php',$singleContext),200,'NULL-summary print view');
+        }
+    }
     $req=['curriculum_version_id'=>$v['id'],'subject_id'=>$subjects[0]['id'],'required_subject_id'=>$subjects[1]['id'],'requirement_type'=>'prerequisite'];
     $r1=own('curriculum_subject_requirements',mutate('requirement','create',$req,201,'SUBJECT_REQUIREMENT_CREATE')['relationship']);
     $r2=own('curriculum_subject_requirements',mutate('requirement','create',array_replace($req,['subject_id'=>$subjects[1]['id'],'required_subject_id'=>$subjects[2]['id']]),201,'SUBJECT_REQUIREMENT_CREATE')['relationship']);

@@ -68,8 +68,8 @@ class CurriculumExportRepository
             $this->db,
             'SELECT COUNT(*) AS total_subjects,
                     CAST(COALESCE(SUM(subjects.units), 0) AS DECIMAL(12,2)) AS total_units,
-                    CAST(COALESCE(SUM(subjects.lecture_units), 0) AS DECIMAL(12,2)) AS total_lecture_units,
-                    CAST(COALESCE(SUM(subjects.laboratory_units), 0) AS DECIMAL(12,2)) AS total_laboratory_units
+                    CAST(SUM(subjects.lecture_units) AS DECIMAL(12,2)) AS total_lecture_units,
+                    CAST(SUM(subjects.laboratory_units) AS DECIMAL(12,2)) AS total_laboratory_units
              FROM curriculum_version_subjects AS placements
              INNER JOIN subjects ON subjects.id = placements.subject_id
              WHERE placements.curriculum_version_id = ?',

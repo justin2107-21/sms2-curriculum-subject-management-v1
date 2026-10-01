@@ -79,6 +79,10 @@
 
     function tableState(element, columnCount, message, isError) {
         if (!element) return;
+        if (element === placementRows) {
+            element.innerHTML = '<p class="state-cell' + (isError ? ' error-state' : '') + '">' + ui.escapeHtml(message) + '</p>';
+            return;
+        }
         element.innerHTML = '<tr class="state-row"><td colspan="' + columnCount + '" class="state-cell' +
             (isError ? ' error-state' : '') + '">' + ui.escapeHtml(message) + '</td></tr>';
     }
@@ -429,51 +433,35 @@
         }
     }
 
-    async function loadPlacements(page) {
+    async function loadPlacements() {
         if (!state.selectedVersionId) return;
         const versionId = state.selectedVersionId;
         const sequence = ++state.placementRequest;
-        state.placementPage = Number(page) || 1;
+        state.placementPage = 1;
+        document.getElementById('placementPagination').innerHTML = '';
+        document.getElementById('placementCount').textContent = 'Loading summary…';
         tableState(placementRows, columns.placements, 'Loading assigned subjects…', false);
         try {
-            const payload = await ui.fetchJson(endpoints.assignments, {
-                action: 'list', curriculum_version_id: versionId, page: state.placementPage, per_page: 20
-            });
-            if (sequence !== state.placementRequest || versionId !== state.selectedVersionId) return;
-            state.placementPage = Number(payload.pagination.page);
-            ui.setCount(document.getElementById('placementCount'), Number(payload.pagination.total_records));
-            if (!payload.assignments.length) {
+            const assignments = await window.CurriculumPlacementView.load(
+                page => ui.fetchJson(endpoints.assignments, {
+                    action: 'list', curriculum_version_id: versionId, page, per_page: 50
+                }),
+                () => sequence === state.placementRequest && versionId === state.selectedVersionId
+            );
+            if (assignments === null) return;
+            const view = window.CurriculumPlacementView.render(assignments, ui, permissions.removeAssignments);
+            document.getElementById('placementCount').textContent = view.summary;
+            if (!assignments.length) {
                 const message = permissions.assignSubjects
                     ? 'No subjects are assigned to this curriculum version. Use Assign Subject to add a placement.'
                     : 'No subjects are assigned to this curriculum version.';
                 tableState(placementRows, columns.placements, message, false);
             } else {
-                placementRows.innerHTML = payload.assignments.map(function (assignment) {
-                    const placementClass = Number(assignment.is_required) === 1
-                        ? 'placement-required' : 'placement-optional';
-                    const placementLabel = Number(assignment.is_required) === 1 ? 'Required' : 'Optional';
-                    const remove = permissions.removeAssignments
-                        ? '<td class="row-actions"><button type="button" class="row-action-button destructive-action" ' +
-                            'data-remove-assignment="' + Number(assignment.id) + '" data-subject-label="' +
-                            ui.escapeHtml(assignment.subject_code + ' — ' + assignment.subject_title) +
-                            '"><i class="fa-solid fa-link-slash"></i> Remove</button></td>'
-                        : '';
-                    return '<tr>' +
-                        '<td>' + ui.escapeHtml(assignment.sequence_order ?? '—') + '</td>' +
-                        '<td><span class="record-code">' + ui.escapeHtml(assignment.subject_code) + '</span>' +
-                            '<br><span class="record-name">' + ui.escapeHtml(assignment.subject_title) + '</span></td>' +
-                        '<td>' + ui.escapeHtml(ui.formatUnits(assignment.units)) + '</td>' +
-                        '<td>' + ui.escapeHtml(assignment.year_level || '—') + '</td>' +
-                        '<td>' + ui.escapeHtml(assignment.semester || '—') + '</td>' +
-                        '<td><span class="placement-indicator ' + placementClass + '">' + placementLabel + '</span></td>' +
-                        remove + '</tr>';
-                }).join('');
+                placementRows.innerHTML = view.html;
             }
-            ui.renderPagination(document.getElementById('placementPagination'), payload.pagination, loadPlacements);
         } catch (error) {
-            if (sequence !== state.placementRequest) return;
-            ui.setCount(document.getElementById('placementCount'), 0);
-            document.getElementById('placementPagination').innerHTML = '';
+            if (sequence !== state.placementRequest || versionId !== state.selectedVersionId) return;
+            document.getElementById('placementCount').textContent = 'Summary unavailable';
             tableState(placementRows, columns.placements, error.message || 'Subject placements could not be loaded.', true);
         }
     }

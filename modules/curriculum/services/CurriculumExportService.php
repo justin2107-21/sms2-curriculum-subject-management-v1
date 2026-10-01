@@ -92,8 +92,8 @@ class CurriculumExportService
             'summary' => [
                 'total_subjects' => (int)$summary['total_subjects'],
                 'total_units' => (string)$summary['total_units'],
-                'total_lecture_units' => (string)$summary['total_lecture_units'],
-                'total_laboratory_units' => (string)$summary['total_laboratory_units'],
+                'total_lecture_units' => $summary['total_lecture_units'] === null ? null : (string)$summary['total_lecture_units'],
+                'total_laboratory_units' => $summary['total_laboratory_units'] === null ? null : (string)$summary['total_laboratory_units'],
             ],
             'subjects' => $subjects,
             'options' => $options,

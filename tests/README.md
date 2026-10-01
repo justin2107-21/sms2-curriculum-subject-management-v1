@@ -1,5 +1,26 @@
 # Foundation regression (CLI only)
 
+## BSIT pre-oral dataset checks
+
+`php tests/bsit_manifest.php` validates the single confirmed-unit manifest without
+opening a database. Optional `--source=PATH` compares the original final source
+attachment's codes/titles/units. `php tests/bsit_reads.php` performs read-only
+service/search/filter/CSV checks against the locally loaded BSIT dataset.
+
+The isolated local FK harness now also runs `bsit_seed.php`: BSIT rollback,
+idempotency, ownership corruption, changed fingerprints, external dependencies,
+owned-only cleanup/reseed and atomic legacy replacement tests. Never run that
+destructive fixture against normal sms_db. See the
+[Phase 2 report](../docs/preoral-phase2-bsit-dataset.md) for local-only gates,
+backup requirements, commands, results and remaining acceptance limitations.
+
+Run node tests/phase2_ui.cjs to check selected-version year/semester grouping,
+totals, escaping, management-control permissions and complete paginated loading.
+The Docker foundation HTTP suite covers Subject Master placement-context filters
+(including cross-version deduplication and access/method/input guards) and
+NULL-versus-confirmed-zero export summary behavior. No real local dataset is
+mutated by those Docker fixtures.
+
 ## Academic FK portability regression
 
 `academic_fk_compatibility.php` is part of the Docker gate. It requires an explicitly

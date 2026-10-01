@@ -1,0 +1,500 @@
+{
+  "dataset_id": "DEV-BSIT-PREORAL-2026",
+  "preparation_status": "CONFIRMED_TOTAL_UNITS",
+  "executable": false,
+  "unit_status": "TOTAL UNITS CONFIRMED; LECTURE/LABORATORY UNAVAILABLE",
+  "notice": "This dataset is used for pre-oral system demonstration. Subject codes, subject names, year levels, semesters, and total units were derived from the user-supplied BSIT subject list. Lecture/laboratory unit breakdowns and other unconfirmed institutional attributes are not represented as official data.",
+  "planned_structure": {
+    "academic_program": {
+      "program_code": "BSIT",
+      "program_name": "Bachelor of Science in Information Technology",
+      "program_type": null,
+      "status": "active"
+    },
+    "curriculum": {
+      "curriculum_code": "BSIT-DEMO-2026",
+      "curriculum_name": "BSIT Pre-Oral Demonstration Curriculum",
+      "program_reference": "BSIT",
+      "status": "active"
+    },
+    "curriculum_version": {
+      "version_label": "PREORAL-2026",
+      "curriculum_reference": "BSIT-DEMO-2026",
+      "effective_academic_year": null,
+      "description": "Synthetic pre-oral demonstration version based on the user-supplied BSIT subject list.",
+      "status": "draft"
+    },
+    "subject_defaults": {
+      "description": null,
+      "status": "active"
+    },
+    "placement_plan": {
+      "version_reference": "PREORAL-2026",
+      "one_per_subject": true,
+      "year_and_semester_source": "subjects manifest",
+      "sequence_order": null,
+      "is_required": 1,
+      "required_flag_note": "Existing technical/demo placement default only; not official BCP elective policy."
+    },
+    "expected_counts": {
+      "academic_programs": 1,
+      "curricula": 1,
+      "curriculum_versions": 1,
+      "subjects": 50,
+      "curriculum_version_subjects": 50,
+      "total_domain_records": 103
+    }
+  },
+  "subjects": [
+    {
+      "subject_code": "GE1",
+      "subject_name": "Understanding the Self",
+      "year_level": "1st Year",
+      "semester": "1st Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "GE2",
+      "subject_name": "Readings in Philippine History",
+      "year_level": "1st Year",
+      "semester": "1st Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "GE3",
+      "subject_name": "The Contemporary World",
+      "year_level": "1st Year",
+      "semester": "1st Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "GE4",
+      "subject_name": "Mathematics in the Modern World",
+      "year_level": "1st Year",
+      "semester": "1st Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "CC101",
+      "subject_name": "Introduction to Computing",
+      "year_level": "1st Year",
+      "semester": "1st Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "CCS1102/CC102",
+      "subject_name": "Computer Programming 1",
+      "year_level": "1st Year",
+      "semester": "1st Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "KOMFIL",
+      "subject_name": "Kontekstwalisadong Komunikasyon sa Filipino",
+      "year_level": "1st Year",
+      "semester": "1st Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "NSTP1",
+      "subject_name": "National Service Training Program 1",
+      "year_level": "1st Year",
+      "semester": "1st Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "PE1",
+      "subject_name": "Physical Fitness",
+      "year_level": "1st Year",
+      "semester": "1st Semester",
+      "total_units": 2,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "GE5",
+      "subject_name": "Purposive Communication",
+      "year_level": "1st Year",
+      "semester": "2nd Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "GE6",
+      "subject_name": "Art Appreciation",
+      "year_level": "1st Year",
+      "semester": "2nd Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "GE7",
+      "subject_name": "Science and Technology (ST) and Society",
+      "year_level": "1st Year",
+      "semester": "2nd Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "GE8",
+      "subject_name": "Ethics",
+      "year_level": "1st Year",
+      "semester": "2nd Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "MS101",
+      "subject_name": "Discrete Mathematics",
+      "year_level": "1st Year",
+      "semester": "2nd Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "CC103",
+      "subject_name": "Computer Programming 2",
+      "year_level": "1st Year",
+      "semester": "2nd Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "FILDIS",
+      "subject_name": "Filipino sa iba't-ibang Disiplina",
+      "year_level": "1st Year",
+      "semester": "2nd Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "NSTP2",
+      "subject_name": "National Service Training Program 2",
+      "year_level": "1st Year",
+      "semester": "2nd Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "PE2",
+      "subject_name": "Folk Dance and Rhythmic Activities",
+      "year_level": "1st Year",
+      "semester": "2nd Semester",
+      "total_units": 2,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "MS102",
+      "subject_name": "Quantitative Methods with Modelling Simulation",
+      "year_level": "2nd Year",
+      "semester": "1st Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "CC104",
+      "subject_name": "Data Structures And Algorithms",
+      "year_level": "2nd Year",
+      "semester": "1st Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "HCI101",
+      "subject_name": "Introduction To Human Computer Interaction",
+      "year_level": "2nd Year",
+      "semester": "1st Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "IPT101",
+      "subject_name": "Integrative Programming And Technologies 1",
+      "year_level": "2nd Year",
+      "semester": "1st Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "NET101",
+      "subject_name": "Networking 1",
+      "year_level": "2nd Year",
+      "semester": "1st Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "ITE1",
+      "subject_name": "IT ELECTIVE 1 (Web Fundamental)",
+      "year_level": "2nd Year",
+      "semester": "1st Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "SOSLIT",
+      "subject_name": "Sosyedad at Literatura",
+      "year_level": "2nd Year",
+      "semester": "1st Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "PE3",
+      "subject_name": "Individual and Dual Sports",
+      "year_level": "2nd Year",
+      "semester": "1st Semester",
+      "total_units": 2,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "GE9",
+      "subject_name": "The Life and Works of Jose Rizal",
+      "year_level": "2nd Year",
+      "semester": "2nd Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "DM102",
+      "subject_name": "Financial Management",
+      "year_level": "2nd Year",
+      "semester": "2nd Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "SIA101",
+      "subject_name": "System Integration and Architecture 1",
+      "year_level": "2nd Year",
+      "semester": "2nd Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "CC105",
+      "subject_name": "Information Management",
+      "year_level": "2nd Year",
+      "semester": "2nd Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "NET102",
+      "subject_name": "Networking 2",
+      "year_level": "2nd Year",
+      "semester": "2nd Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "WEB101",
+      "subject_name": "Web Development (Advance Web / Platform)",
+      "year_level": "2nd Year",
+      "semester": "2nd Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "ITE2",
+      "subject_name": "IT ELECTIVE 2 (Advance Javaor OOP)",
+      "year_level": "2nd Year",
+      "semester": "2nd Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "PE4",
+      "subject_name": "Team Sports",
+      "year_level": "2nd Year",
+      "semester": "2nd Semester",
+      "total_units": 2,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "CC106",
+      "subject_name": "Application Development and Emerging Technologies",
+      "year_level": "3rd Year",
+      "semester": "1st Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "IAS101",
+      "subject_name": "Information Assurance and Security 1",
+      "year_level": "3rd Year",
+      "semester": "1st Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "IM101",
+      "subject_name": "Fundamentals of Database System",
+      "year_level": "3rd Year",
+      "semester": "1st Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "ITSP1-A",
+      "subject_name": "ENTERPRISE SYSTEMS: CONCEPT AND PRACTICE",
+      "year_level": "3rd Year",
+      "semester": "1st Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "PM101",
+      "subject_name": "Project Management",
+      "year_level": "3rd Year",
+      "semester": "1st Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "ITE3",
+      "subject_name": "IT ELECTIVE 3 (Research)",
+      "year_level": "3rd Year",
+      "semester": "1st Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "SP101",
+      "subject_name": "Social and Professional Issues",
+      "year_level": "3rd Year",
+      "semester": "2nd Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "IAS102",
+      "subject_name": "Information Assurance and Security 2",
+      "year_level": "3rd Year",
+      "semester": "2nd Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "TEC101",
+      "subject_name": "Technopreneurship",
+      "year_level": "3rd Year",
+      "semester": "2nd Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "BPM101",
+      "subject_name": "Business Process Management in IT",
+      "year_level": "3rd Year",
+      "semester": "2nd Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "ITSP2A",
+      "subject_name": "Mobile Application and Development",
+      "year_level": "3rd Year",
+      "semester": "2nd Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "SA101",
+      "subject_name": "System Administration And Maintenance",
+      "year_level": "3rd Year",
+      "semester": "2nd Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "ITSP3A",
+      "subject_name": "Big Data Analysis",
+      "year_level": "4th Year",
+      "semester": "1st Semester",
+      "total_units": 5,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "PRAC3301",
+      "subject_name": "OJT - Practicum 1",
+      "year_level": "4th Year",
+      "semester": "1st Semester",
+      "total_units": 5,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "CAP101",
+      "subject_name": "Capstone Project 1",
+      "year_level": "4th Year",
+      "semester": "1st Semester",
+      "total_units": 3,
+      "lecture_units": null,
+      "laboratory_units": null
+    },
+    {
+      "subject_code": "ITE4",
+      "subject_name": "IT ELECTIVE 4 (System Integration and Architecture 2)",
+      "year_level": "4th Year",
+      "semester": "1st Semester",
+      "total_units": 5,
+      "lecture_units": null,
+      "laboratory_units": null
+    }
+  ]
+}

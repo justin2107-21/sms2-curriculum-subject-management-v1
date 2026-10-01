@@ -268,12 +268,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
               <?php endif; ?>
             </div>
           </div>
-          <div class="table-scroll">
-            <table class="domain-table placement-table">
-              <thead><tr><th>Order</th><th>Subject</th><th>Units</th><th>Year Level</th><th>Semester</th><th>Placement</th><?php if ($canUpdateCurricula): ?><th>Actions</th><?php endif; ?></tr></thead>
-              <tbody id="placementRows"><tr><td colspan="<?= $placementColumnCount ?>" class="state-cell">Select a curriculum version to view assigned subjects.</td></tr></tbody>
-            </table>
-          </div>
+          <div id="placementRows" class="placement-groups"><p class="state-cell">Select a curriculum version to view assigned subjects.</p></div>
           <div class="pagination-bar" id="placementPagination"></div>
         </div>
       </div>
@@ -407,6 +402,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 <script src="../assets/curriculum-common.js?v=<?= $curriculumCommonVersion ?>"></script>
+<script src="../assets/placement-groups.js?v=<?= (int)filemtime(__DIR__ . '/../assets/placement-groups.js') ?>"></script>
 <script src="../assets/curriculum-builder.js?v=<?= $curriculumBuilderVersion ?>"></script>
 </body>
 </html>

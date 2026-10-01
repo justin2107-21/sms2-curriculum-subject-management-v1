@@ -28,6 +28,7 @@ try {
     putenv('DB_NAME='.$seedName); putenv('SMS_DB_NAME='.$seedName);
     localFkRun('../database/deploy.php',['--apply','--confirm-database='.$seedName]);
     localFkRun('development_seed.php');
+    localFkRun('bsit_seed.php');
 } finally {
     foreach ($created as $name) {
         if (!preg_match('/^(csms_docker_test_local_[a-f0-9]{12}_(fresh|legacy)|sms_db_foundation_test_[a-f0-9]{12})$/D',$name)) { throw new RuntimeException('Unsafe cleanup target'); }

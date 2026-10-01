@@ -15,6 +15,11 @@
     const search = document.getElementById('subjectSearch');
     const status = document.getElementById('subjectStatus');
     const perPage = document.getElementById('subjectPerPage');
+    const versionFilter = document.getElementById('subjectVersionFilter');
+    const yearFilter = document.getElementById('subjectYearFilter');
+    const semesterFilter = document.getElementById('subjectSemesterFilter');
+    let contextRequest = 0;
+    let contextPage = 0;
     const form = document.getElementById('subjectForm');
     const modal = ui.createModal(document.getElementById('subjectModal'));
     let requestSequence = 0;
@@ -51,7 +56,10 @@
                 page: currentPage,
                 per_page: perPage.value,
                 search: search.value.trim(),
-                status: status.value
+                status: status.value,
+                curriculum_version_id: versionFilter?.value || '',
+                year_level: yearFilter?.value || '',
+                semester: semesterFilter?.value || ''
             });
             if (sequence !== requestSequence) return;
             currentPage = Number(payload.pagination.page);
@@ -70,6 +78,44 @@
             ui.setCount(count, 0);
             pagination.innerHTML = '';
             stateRow(error.message || 'Subjects could not be loaded.', true);
+        }
+    }
+
+    async function loadContexts(filtersOnly) {
+        if (!versionFilter) return;
+        const request = ++contextRequest;
+        const more = document.getElementById('subjectMoreVersions');
+        more.disabled = true;
+        try {
+            const payload = await ui.fetchJson(api, {
+                action: 'contexts', page: filtersOnly ? 1 : contextPage + 1,
+                per_page: 20, curriculum_version_id: versionFilter.value
+            });
+            if (request !== contextRequest) return;
+            if (!filtersOnly) {
+                payload.versions.forEach(version => {
+                    if (!Array.from(versionFilter.options).some(option => option.value === String(version.id))) {
+                        versionFilter.add(new Option(version.curriculum_code + ' — ' + version.version_label, version.id));
+                    }
+                });
+                contextPage = Number(payload.pagination.page);
+                more.hidden = contextPage >= Number(payload.pagination.total_pages);
+            }
+            [[yearFilter, payload.filter_values.year_levels, 'All year levels'],
+                [semesterFilter, payload.filter_values.semesters, 'All semesters']].forEach(([select, values, label]) => {
+                const selected = select.value;
+                select.replaceChildren(new Option(label, ''));
+                values.forEach(value => select.add(new Option(value, value)));
+                if (values.includes(selected)) select.value = selected;
+            });
+            document.getElementById('subjectContextNote').textContent = versionFilter.value
+                ? 'Placement context: ' + versionFilter.selectedOptions[0].textContent + '. Subject records remain unique.'
+                : 'Filters use curriculum placements. Each Subject Master record appears only once.';
+        } catch (error) {
+            if (request !== contextRequest) return;
+            document.getElementById('subjectContextNote').textContent = error.message || 'Placement filters could not be loaded.';
+        } finally {
+            if (request === contextRequest) more.disabled = false;
         }
     }
 
@@ -154,5 +200,17 @@
     status.addEventListener('change', function () { loadSubjects(1); });
     perPage.addEventListener('change', function () { loadSubjects(1); });
 
+    if (versionFilter) {
+        versionFilter.addEventListener('change', function () {
+            yearFilter.value = '';
+            semesterFilter.value = '';
+            loadContexts(true);
+            loadSubjects(1);
+        });
+        yearFilter.addEventListener('change', function () { loadSubjects(1); });
+        semesterFilter.addEventListener('change', function () { loadSubjects(1); });
+        document.getElementById('subjectMoreVersions').addEventListener('click', function () { loadContexts(false); });
+        loadContexts(false);
+    }
     loadSubjects(1);
 }());

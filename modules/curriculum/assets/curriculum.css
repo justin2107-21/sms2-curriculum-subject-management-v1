@@ -726,3 +726,44 @@ body.curriculum-modal-open { overflow: hidden; }
   #curriculumModal .modal-dialog { overflow-y: auto; }
   .program-combobox-options { max-height: 160px; }
 }
+
+/* Selected-version hierarchy: existing card/table language, native keyboard toggles. */
+.placement-groups { min-width: 0; }
+.placement-year, .placement-semester {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  margin: 12px 0;
+  overflow: hidden;
+}
+.placement-year > summary, .placement-semester > summary {
+  cursor: pointer;
+  padding: 12px 16px;
+  color: var(--sms2-sidebar-blue, #1a3a8c);
+  background: #f8fafc;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.placement-year > summary:focus-visible, .placement-semester > summary:focus-visible {
+  outline: 2px solid var(--sms2-sidebar-blue, #1a3a8c);
+  outline-offset: -3px;
+}
+.placement-year-body { padding: 0 12px; }
+.placement-group-total { display: inline-block; margin-left: 16px; font-weight: 500; }
+.placement-semester .placement-table { min-width: 520px; }
+.subject-context-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  padding: 0 20px 16px;
+}
+.subject-context-toolbar .form-field { flex: 1 1 180px; min-width: 0; margin: 0; }
+.subject-context-toolbar .form-field:first-child { flex-basis: 280px; }
+.subject-context-toolbar select { width: 100%; max-width: 100%; }
+.subject-context-toolbar p { flex-basis: 100%; margin: 0; }
+@media (max-width: 600px) {
+  .placement-group-total { display: block; margin: 4px 0 0; }
+  .placement-year-body { padding: 0 8px; }
+  .subject-context-toolbar { padding: 0 14px 14px; }
+  .subject-context-toolbar .form-field { flex-basis: 100%; }
+}

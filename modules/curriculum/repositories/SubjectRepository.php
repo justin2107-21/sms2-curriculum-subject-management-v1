@@ -52,6 +52,18 @@ class SubjectRepository
             $params[] = $query['status'];
         }
 
+        $placementConditions = ['p.subject_id = subjects.id'];
+        foreach (['curriculum_version_id' => 'i', 'year_level' => 's', 'semester' => 's'] as $field => $type) {
+            if (($query[$field] ?? null) !== null) {
+                $placementConditions[] = 'p.' . $field . ' = ?';
+                $types .= $type;
+                $params[] = $query[$field];
+            }
+        }
+        if (count($placementConditions) > 1) {
+            // EXISTS keeps Subject Master unique even when a subject occurs in many versions.
+            $conditions[] = 'EXISTS (SELECT 1 FROM curriculum_version_subjects p WHERE ' . implode(' AND ', $placementConditions) . ')';
+        }
         $where = $conditions ? ' WHERE ' . implode(' AND ', $conditions) : '';
         $countStmt = RepositoryQuery::execute(
             $this->db,
@@ -79,6 +91,31 @@ class SubjectRepository
         $stmt->close();
         unset($pagination['offset']);
 
+        return ['records' => $rows, 'pagination' => $pagination];
+    }
+
+    public function placementVersions(array $query): array
+    {
+        $where = '';
+        $params = [];
+        $types = '';
+        if ($query['search'] !== null) {
+            $where = " WHERE (c.curriculum_code LIKE ? ESCAPE '=' OR c.curriculum_name LIKE ? ESCAPE '=' OR v.version_label LIKE ? ESCAPE '=')";
+            $params = array_fill(0, 3, RepositoryQuery::likePattern($query['search']));
+            $types = 'sss';
+        }
+        $joins = ' FROM curriculum_versions v JOIN curricula c ON c.id=v.curriculum_id';
+        $stmt = RepositoryQuery::execute($this->db, 'SELECT COUNT(*) AS total' . $joins . $where, $types, $params);
+        $total = (int)$stmt->get_result()->fetch_assoc()['total'];
+        $stmt->close();
+        $pagination = RepositoryQuery::pagination($total, $query['page'], $query['per_page']);
+        $stmt = RepositoryQuery::execute($this->db,
+            'SELECT v.id, v.version_label, c.curriculum_code, c.curriculum_name' . $joins . $where .
+            ' ORDER BY c.curriculum_code, v.version_label, v.id LIMIT ? OFFSET ?',
+            $types . 'ii', array_merge($params, [$pagination['per_page'], $pagination['offset']]));
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        unset($pagination['offset']);
         return ['records' => $rows, 'pagination' => $pagination];
     }
 

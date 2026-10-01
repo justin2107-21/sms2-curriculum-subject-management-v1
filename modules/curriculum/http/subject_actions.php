@@ -10,7 +10,18 @@ try {
     switch ($action) {
         case 'list':
             curriculum_require_read('subject.view');
+            foreach (['curriculum_version_id', 'year_level', 'semester'] as $filter) {
+                if (isset($_GET[$filter]) && $_GET[$filter] !== '') {
+                    curriculum_require_read('curriculum.view');
+                    break;
+                }
+            }
             json_response(true, 'Subjects loaded.', $service->list($_GET));
+
+        case 'contexts':
+            curriculum_require_read('subject.view');
+            curriculum_require_read('curriculum.view');
+            json_response(true, 'Placement contexts loaded.', $service->contexts($_GET));
 
         case 'get':
             curriculum_require_read('subject.view');

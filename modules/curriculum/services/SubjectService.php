@@ -2,6 +2,8 @@
 
 require_once __DIR__ . '/../validators/DomainValidator.php';
 require_once __DIR__ . '/../repositories/SubjectRepository.php';
+require_once __DIR__ . '/../repositories/CurriculumVersionSubjectRepository.php';
+require_once __DIR__ . '/../repositories/CurriculumVersionRepository.php';
 require_once __DIR__ . '/../../../shared/audit.php';
 
 class SubjectService
@@ -25,8 +27,26 @@ class SubjectService
     public function list(array $input): array
     {
         $query = DomainValidator::listQuery($input, ['active', 'inactive']);
+        $query['curriculum_version_id'] = DomainValidator::optionalPositiveId($input['curriculum_version_id'] ?? null, 'Curriculum version');
+        $query['year_level'] = DomainValidator::optionalString($input, 'year_level', 'Year level', 50);
+        $query['semester'] = DomainValidator::optionalString($input, 'semester', 'Semester', 50);
+        if ($query['curriculum_version_id'] !== null && !(new CurriculumVersionRepository($this->db))->findById($query['curriculum_version_id'])) {
+            throw new DomainNotFoundException('Curriculum version not found.');
+        }
         $result = $this->subjects->paginate($query);
         return ['subjects' => $result['records'], 'pagination' => $result['pagination']];
+    }
+
+    public function contexts(array $input): array
+    {
+        $query = DomainValidator::listQuery($input);
+        $filters = DomainValidator::subjectMappingQuery($input);
+        if ($filters['curriculum_version_id'] !== null && !(new CurriculumVersionRepository($this->db))->findById($filters['curriculum_version_id'])) {
+            throw new DomainNotFoundException('Curriculum version not found.');
+        }
+        $result = $this->subjects->placementVersions($query);
+        return ['versions' => $result['records'], 'pagination' => $result['pagination'],
+            'filter_values' => (new CurriculumVersionSubjectRepository($this->db))->mappingFilterValues($filters)];
     }
 
     public function create(array $input, int $createdBy): array
