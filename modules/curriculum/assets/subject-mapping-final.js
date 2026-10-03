@@ -283,11 +283,12 @@
         el('mappingYearTabs').innerHTML = ['', ...yearChoices()].map(year => '<button type="button" data-map-year="' + esc(year) + '" aria-pressed="' + (year === state.year) + '" class="' + (year === state.year ? 'is-active' : '') + '">' + esc(year || (isShs() ? 'All Grades' : 'All Years')) + '</button>').join('');
         const query = el('mappingSubjectSearch').value.trim().toLowerCase();
         const semester = el('mappingSemesterFilter').value, placement = el('mappingPlacementFilter').value;
-        const rows = state.allMappings.filter(row => (!state.year || row.year_level === state.year) && (!semester || row.semester === semester) && (!placement || String(row.is_required) === placement) && (!query || (row.subject_code + ' ' + row.subject_title).toLowerCase().includes(query)));
+        const rows = ui.searchRecords(state.allMappings,query,row=>[row.subject_code,row.subject_title]).filter(row => (!state.year || row.year_level === state.year) && (!semester || row.semester === semester) && (!placement || String(row.is_required) === placement));
         el('mappingCount').textContent = rows.length + ' placements'; renderMap(rows);
     }
 
     function renderMap(mappings) {
+        const query = el('mappingSubjectSearch').value;
         if (!mappings.length) {
             showPanelState(mapTarget, el('mappingSubjectSearch').value.trim() || state.year || el('mappingSemesterFilter').value || el('mappingPlacementFilter').value
                 ? 'No subject placements match these filters.' : 'This curriculum version has no subject placements yet.');
@@ -306,7 +307,7 @@
             const yearMappings = [...semesters.values()].flat();
             const yearUnits = model.unitCents(yearMappings) / 100;
             const semesterPanels = [...semesters.entries()].sort((a, b) => sortLabel(a[0], b[0])).map(([semester, items]) => {
-                items.sort((a, b) => sortLabel(a.subject_code, b.subject_code));
+                items = ui.searchRecords(items,query,row=>[row.subject_code,row.subject_title]);
                 const units = model.unitCents(items) / 100;
                 return '<section class="mapping-semester-panel"><header><div><h3>' + esc(semester) + '</h3><span>' + items.length + ' Subjects \u00b7 ' + ui.formatUnits(units) + ' Units</span></div></header><div class="mapping-subject-list">' +
                     items.map(mappingCard).join('') + '</div></section>';

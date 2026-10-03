@@ -56,8 +56,8 @@ class CurriculumRepository
         $params = [];
 
         if ($query['search'] !== null) {
-            $conditions[] = "(curricula.curriculum_code LIKE ? ESCAPE '='
-                              OR curricula.curriculum_name LIKE ? ESCAPE '=')";
+            $conditions[] = "(" . RepositoryQuery::searchColumn('curricula.curriculum_code') . " LIKE ? ESCAPE '='
+                              OR " . RepositoryQuery::searchColumn('curricula.curriculum_name') . " LIKE ? ESCAPE '=')";
             $pattern = RepositoryQuery::likePattern($query['search']);
             $types .= 'ss';
             $params[] = $pattern;
@@ -85,7 +85,9 @@ class CurriculumRepository
         $countStmt->close();
 
         $pagination = RepositoryQuery::pagination($total, $query['page'], $query['per_page']);
-        $listParams = $params;
+        $rankParams = [];
+        $searchOrder = RepositoryQuery::searchOrder(['curricula.curriculum_code', 'curricula.curriculum_name'], $query['search'] ?? null, $rankParams);
+        $listParams = array_merge($params, $rankParams);
         $listParams[] = $pagination['per_page'];
         $listParams[] = $pagination['offset'];
         $stmt = RepositoryQuery::execute(
@@ -93,11 +95,15 @@ class CurriculumRepository
             'SELECT curricula.id, curricula.curriculum_code, curricula.curriculum_name,
                     curricula.academic_program_id, curricula.status, curricula.created_at,
                     curricula.updated_at, academic_programs.program_code,
-                    academic_programs.program_name
+                    academic_programs.program_name,
+                    (SELECT COUNT(*) FROM curriculum_versions cv WHERE cv.curriculum_id = curricula.id) AS version_count,
+                    (SELECT COUNT(*) FROM curriculum_version_subjects cvs
+                     INNER JOIN curriculum_versions cv ON cv.id = cvs.curriculum_version_id
+                     WHERE cv.curriculum_id = curricula.id) AS subject_count
              FROM curricula
              INNER JOIN academic_programs ON academic_programs.id = curricula.academic_program_id' . $where . '
-             ORDER BY curricula.curriculum_code ASC, curricula.id ASC LIMIT ? OFFSET ?',
-            $types . 'ii',
+             ORDER BY ' . $searchOrder . 'curricula.curriculum_code ASC, curricula.id ASC LIMIT ? OFFSET ?',
+            $types . str_repeat('s', count($rankParams)) . 'ii',
             $listParams
         );
         $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);

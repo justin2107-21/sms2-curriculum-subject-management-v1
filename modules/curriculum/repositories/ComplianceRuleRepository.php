@@ -73,9 +73,9 @@ class ComplianceRuleRepository
         $types = '';
         $params = [];
         if ($query['search'] !== null) {
-            $conditions[] = "(rules.rule_name LIKE ? ESCAPE '='
-                              OR references_table.reference_code LIKE ? ESCAPE '='
-                              OR references_table.title LIKE ? ESCAPE '=')";
+            $conditions[] = "(" . RepositoryQuery::searchColumn('rules.rule_name') . " LIKE ? ESCAPE '='
+                              OR " . RepositoryQuery::searchColumn('references_table.reference_code') . " LIKE ? ESCAPE '='
+                              OR " . RepositoryQuery::searchColumn('references_table.title') . " LIKE ? ESCAPE '=')";
             $pattern = RepositoryQuery::likePattern($query['search']);
             $types .= 'sss';
             array_push($params, $pattern, $pattern, $pattern);
@@ -103,14 +103,16 @@ class ComplianceRuleRepository
         $total = (int)$countStmt->get_result()->fetch_assoc()['total'];
         $countStmt->close();
         $pagination = RepositoryQuery::pagination($total, $query['page'], $query['per_page']);
-        $listParams = $params;
+        $rankParams = [];
+        $searchOrder = RepositoryQuery::searchOrder(['rules.rule_name', 'references_table.reference_code', 'references_table.title'], $query['search'] ?? null, $rankParams);
+        $listParams = array_merge($params, $rankParams);
         $listParams[] = $pagination['per_page'];
         $listParams[] = $pagination['offset'];
         $stmt = RepositoryQuery::execute(
             $this->db,
             $this->detailSelect() . $where .
-            ' ORDER BY rules.updated_at DESC, rules.id DESC LIMIT ? OFFSET ?',
-            $types . 'ii',
+            ' ORDER BY ' . $searchOrder . 'rules.updated_at DESC, rules.id DESC LIMIT ? OFFSET ?',
+            $types . str_repeat('s', count($rankParams)) . 'ii',
             $listParams
         );
         $records = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);

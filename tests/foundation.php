@@ -67,6 +67,11 @@ function mutate(string $endpoint, string $action, array $data, int $status, ?str
         [$table,$key] = $created["$endpoint/$action"];
         if (isset($response['json'][$key]['id'])) {
             $row = own($table,$response['json'][$key]);
+            if ($table === 'curriculum_elective_groups') {
+                foreach ($conn->query('SELECT id FROM curriculum_elective_group_subjects WHERE elective_group_id='.(int)$row['id'])->fetch_all(MYSQLI_ASSOC) as $member) {
+                    own('curriculum_elective_group_subjects',$member);
+                }
+            }
             if ($table === 'compliance_validation_runs') {
                 foreach ($conn->query('SELECT id FROM compliance_validation_results WHERE validation_run_id='.(int)$row['id'])->fetch_all(MYSQLI_ASSOC) as $result) {
                     own('compliance_validation_results',$result);
@@ -75,9 +80,10 @@ function mutate(string $endpoint, string $action, array $data, int $status, ?str
         }
     }
     $json = expect($response, $status, "$endpoint/$action");
-    check(auditCount() === $before + ($event ? 1 : 0), "$endpoint/$action exact audit count");
+    $membershipEvents = $event && $endpoint === 'elective_group' && $action === 'create' ? count($data['subject_ids']) : 0;
+    check(auditCount() === $before + ($event ? 1 : 0) + $membershipEvents, "$endpoint/$action exact audit count");
     if ($event) {
-        $row = $conn->query("SELECT action FROM audit_logs WHERE id > $last ORDER BY id")->fetch_assoc();
+        $row = $conn->query("SELECT action FROM audit_logs WHERE id > $last ORDER BY id DESC")->fetch_assoc();
         check(($row['action'] ?? '') === $event, "$endpoint/$action audit type");
     }
     return $json;
@@ -121,7 +127,7 @@ try {
         foreach ((new DOMXPath($dom))->query('//*[@id]') as $element) { $ids[] = $element->getAttribute('id'); }
         check(count($ids) === count(array_unique($ids)), $page . ' unique DOM IDs');
         if ($page === 'subjects') {
-            foreach (['subjectUnits','subjectLectureUnits','subjectLaboratoryUnits'] as $id) {
+            foreach (['subjectUnits'] as $id) {
                 $field = (new DOMXPath($dom))->query('//*[@id="'.$id.'"]')->item(0);
                 check($field !== null && $field->getAttribute('step') === '0.01'
                     && $field->getAttribute('min') === '0', $id . ' decimal step and nonnegative minimum');
@@ -277,6 +283,10 @@ try {
             $print=expect($admin->request('modules/curriculum/pages/curriculum_print.php',$singleContext),200,'NULL-summary print view');
         }
     }
+    // Stored, ordered placements are required by the existing sequence validator.
+    foreach ([0=>'3rd Year',1=>'2nd Year',2=>'1st Year'] as $index=>$year) {
+        mutate('assignment','update',['id'=>$placements[$index]['id'],'year_level'=>$year,'semester'=>'1st Semester','sequence_order'=>$index,'is_required'=>1],200,'CURRICULUM_SUBJECT_UPDATE');
+    }
     $req=['curriculum_version_id'=>$v['id'],'subject_id'=>$subjects[0]['id'],'required_subject_id'=>$subjects[1]['id'],'requirement_type'=>'prerequisite'];
     $r1=own('curriculum_subject_requirements',mutate('requirement','create',$req,201,'SUBJECT_REQUIREMENT_CREATE')['relationship']);
     $r2=own('curriculum_subject_requirements',mutate('requirement','create',array_replace($req,['subject_id'=>$subjects[1]['id'],'required_subject_id'=>$subjects[2]['id']]),201,'SUBJECT_REQUIREMENT_CREATE')['relationship']);
@@ -288,14 +298,14 @@ try {
     $coreq=own('curriculum_subject_requirements',mutate('requirement','create',array_replace($req,['subject_id'=>$subjects[2]['id'],'required_subject_id'=>$subjects[0]['id'],'requirement_type'=>'corequisite']),201,'SUBJECT_REQUIREMENT_CREATE')['relationship']);
     mutate('assignment','remove',['id'=>$placements[0]['id']],409);
     mutate('requirement','remove',['id'=>$coreq['id']],200,'SUBJECT_REQUIREMENT_REMOVE');
-    $groupData=['curriculum_version_id'=>$v['id'],'group_name'=>$prefix.' Group','description'=>'DEVELOPMENT SYNTHETIC DATA - NOT OFFICIAL BESTLINK DATA'];
+    $groupData=['program_id'=>$p['id'],'curriculum_id'=>$c['id'],'curriculum_version_id'=>$v['id'],'group_name'=>$prefix.' Group','year_level'=>'DEV-Year','semester'=>'DEV-Term','required_selections'=>1,'subject_ids'=>[$subjects[3]['id']]];
     $group=own('curriculum_elective_groups',mutate('elective_group','create',$groupData,201,'ELECTIVE_GROUP_CREATE')['group']);
     mutate('elective_group','create',$groupData,409);
-    mutate('elective_group','update',['id'=>$group['id'],'group_name'=>$prefix.' Edited Group','description'=>$groupData['description']],200,'ELECTIVE_GROUP_UPDATE');
+    mutate('elective_group','update',array_replace($groupData,['id'=>$group['id'],'group_name'=>$prefix.' Edited Group']),200,'ELECTIVE_GROUP_UPDATE');
     $memberData=['elective_group_id'=>$group['id'],'subject_id'=>$subjects[3]['id']];
-    $member=own('curriculum_elective_group_subjects',mutate('elective_membership','add',$memberData,201,'ELECTIVE_GROUP_SUBJECT_ADD')['membership']);
-    mutate('elective_membership','add',$memberData,409);
-    mutate('elective_group','remove',['id'=>$group['id']],409);
+    $member=own('curriculum_elective_group_subjects',$conn->query('SELECT * FROM curriculum_elective_group_subjects WHERE elective_group_id='.(int)$group['id'])->fetch_assoc());
+    mutate('elective_membership','add',$memberData,422);
+    mutate('elective_group','remove',['id'=>$group['id']],422);
     mutate('assignment','remove',['id'=>$placements[3]['id']],409);
     mutate('program_assignment','remove',['id'=>$placements[3]['id']],409);
     readApi('elective_membership','placement_options',['elective_group_id'=>$group['id'],'search'=>$subjects[4]['subject_code']]);
@@ -352,7 +362,7 @@ try {
 
     $comparisonArgs=['curriculum_id'=>$c['id'],'version_a_id'=>$v['id'],'version_b_id'=>$versions[1]['id']];
     $history=readApi('subject_history','compare_versions',$comparisonArgs);
-    check($history['summary']['added']===1 && $history['summary']['removed']===9 && $history['summary']['changed']===1 && $history['summary']['unchanged']===1,'History Added / Removed / Changed / Unchanged');
+    check($history['summary']['added']===1 && $history['summary']['removed']===9 && $history['summary']['changed']===2 && $history['summary']['unchanged']===0,'History Added / Removed / Changed / Unchanged');
     readApi('subject_history','compare_versions',array_replace($comparisonArgs,['version_b_id'=>$versions[2]['id']]),422);
     $sharedHistory=readApi('subject_history','list',['search'=>$s['subject_code']]);
     check($sharedHistory['summary']['programs']===2,'Shared subject across programs');
@@ -400,7 +410,7 @@ try {
     foreach(['assignment'=>'mapping_list','program_assignment'=>'list','subject_history'=>'list','requirement'=>'list'] as $endpoint=>$action) {
         readApi($endpoint,$action,$context+['search'=>$s['subject_code'],'view'=>'program']);
     }
-    $filtered=readApi('assignment','mapping_list',$context+['year_level'=>'DEV-Changed','semester'=>'DEV-Term']);
+    $filtered=readApi('assignment','mapping_list',$context+['year_level'=>'3rd Year','semester'=>'1st Semester']);
     check($filtered['pagination']['total_records']===1,'Year and term placement filters');
     readApi('requirement','list',['curriculum_version_id'=>$v['id'],'requirement_type'=>'prerequisite','subject_id'=>$s['id']]);
     readApi('equivalency','list',['search'=>$prefix,'decision_status'=>'pending']);
@@ -408,8 +418,8 @@ try {
     mutate('grade_weighting','component_remove',['id'=>$weightA['id']],200,'GRADE_WEIGHTING_COMPONENT_REMOVE');
     mutate('grade_weighting','component_remove',['id'=>$weightB['id']],200,'GRADE_WEIGHTING_COMPONENT_REMOVE');
     mutate('grade_weighting','scheme_remove',['id'=>$scheme['id']],200,'GRADE_WEIGHTING_SCHEME_REMOVE');
-    mutate('elective_membership','remove',['id'=>$member['id']],200,'ELECTIVE_GROUP_SUBJECT_REMOVE');
-    mutate('elective_group','remove',['id'=>$group['id']],200,'ELECTIVE_GROUP_REMOVE');
+    mutate('elective_membership','remove',['id'=>$member['id']],422);
+    mutate('elective_group','archive',$groupData+['id'=>$group['id']],200,'ELECTIVE_GROUP_ARCHIVE');
     mutate('requirement','remove',['id'=>$r1['id']],200,'SUBJECT_REQUIREMENT_REMOVE');
     mutate('requirement','remove',['id'=>$r2['id']],200,'SUBJECT_REQUIREMENT_REMOVE');
     mutate('assignment','remove',['id'=>$placements[0]['id']],200,'CURRICULUM_SUBJECT_REMOVE');

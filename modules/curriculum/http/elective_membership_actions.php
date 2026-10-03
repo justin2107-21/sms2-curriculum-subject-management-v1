@@ -4,6 +4,11 @@ require_once __DIR__ . '/support.php';
 require_once __DIR__ . '/../services/CurriculumElectiveGroupSubjectService.php';
 
 $action = curriculum_http_action();
+// Membership is now saved atomically with the group and selection rule.
+if (in_array($action, ['add', 'remove'], true)) {
+    curriculum_require_mutation('elective.manage');
+    json_response(false, 'Edit the elective group to change eligible subjects and validate its selection rule.', [], 422);
+}
 $service = new CurriculumElectiveGroupSubjectService($conn);
 
 try {

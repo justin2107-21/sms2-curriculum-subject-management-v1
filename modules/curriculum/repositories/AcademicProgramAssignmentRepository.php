@@ -34,7 +34,9 @@ class AcademicProgramAssignmentRepository
         $countStmt->close();
 
         $pagination = RepositoryQuery::pagination($total, $query['page'], $query['per_page']);
-        $listParams = $params;
+        $rankParams = [];
+        $searchOrder = RepositoryQuery::searchOrder(['subjects.subject_code', 'subjects.subject_title'], $query['search'] ?? null, $rankParams);
+        $listParams = array_merge($params, $rankParams);
         $listParams[] = $pagination['per_page'];
         $listParams[] = $pagination['offset'];
         $orderBy = $view === 'subject'
@@ -77,8 +79,8 @@ class AcademicProgramAssignmentRepository
                           AND elective_usage.subject_id = cvs.subject_id
                     ) AS has_elective_dependencies'
             . $joins . $where .
-            ' ORDER BY ' . $orderBy . ' LIMIT ? OFFSET ?',
-            $types . 'ii',
+            ' ORDER BY ' . $searchOrder . $orderBy . ' LIMIT ? OFFSET ?',
+            $types . str_repeat('s', count($rankParams)) . 'ii',
             $listParams
         );
         $records = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -117,8 +119,8 @@ class AcademicProgramAssignmentRepository
         $params = [$versionId];
 
         if ($query['search'] !== null) {
-            $conditions[] = "(subjects.subject_code LIKE ? ESCAPE '='
-                              OR subjects.subject_title LIKE ? ESCAPE '=')";
+            $conditions[] = "(" . RepositoryQuery::searchColumn('subjects.subject_code') . " LIKE ? ESCAPE '='
+                              OR " . RepositoryQuery::searchColumn('subjects.subject_title') . " LIKE ? ESCAPE '=')";
             $pattern = RepositoryQuery::likePattern($query['search']);
             $types .= 'ss';
             $params[] = $pattern;
@@ -136,7 +138,9 @@ class AcademicProgramAssignmentRepository
         $countStmt->close();
         $pagination = RepositoryQuery::pagination($total, $query['page'], $query['per_page']);
 
-        $listParams = $params;
+        $rankParams = [];
+        $searchOrder = RepositoryQuery::searchOrder(['subjects.subject_code', 'subjects.subject_title'], $query['search'] ?? null, $rankParams);
+        $listParams = array_merge($params, $rankParams);
         $listParams[] = $pagination['per_page'];
         $listParams[] = $pagination['offset'];
         $stmt = RepositoryQuery::execute(
@@ -144,9 +148,9 @@ class AcademicProgramAssignmentRepository
             'SELECT subjects.id, subjects.subject_code, subjects.subject_title,
                     subjects.units, subjects.status
              FROM subjects' . $where . '
-             ORDER BY subjects.subject_code ASC, subjects.id ASC
+             ORDER BY ' . $searchOrder . 'subjects.subject_code ASC, subjects.id ASC
              LIMIT ? OFFSET ?',
-            $types . 'ii',
+            $types . str_repeat('s', count($rankParams)) . 'ii',
             $listParams
         );
         $records = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -174,8 +178,8 @@ class AcademicProgramAssignmentRepository
             }
         }
         if ($query['search'] !== null) {
-            $conditions[] = "(subjects.subject_code LIKE ? ESCAPE '='
-                              OR subjects.subject_title LIKE ? ESCAPE '=')";
+            $conditions[] = "(" . RepositoryQuery::searchColumn('subjects.subject_code') . " LIKE ? ESCAPE '='
+                              OR " . RepositoryQuery::searchColumn('subjects.subject_title') . " LIKE ? ESCAPE '=')";
             $pattern = RepositoryQuery::likePattern($query['search']);
             $types .= 'ss';
             $params[] = $pattern;

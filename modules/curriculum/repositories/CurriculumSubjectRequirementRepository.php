@@ -78,13 +78,15 @@ class CurriculumSubjectRequirementRepository
         $countStmt->close();
 
         $pagination = RepositoryQuery::pagination($total, $query['page'], $query['per_page']);
-        $listParams = $params;
+        $rankParams = [];
+        $searchOrder = RepositoryQuery::searchOrder(['target_subjects.subject_code', 'target_subjects.subject_title'], $query['search'] ?? null, $rankParams);
+        $listParams = array_merge($params, $rankParams);
         $listParams[] = $pagination['per_page'];
         $listParams[] = $pagination['offset'];
         $stmt = RepositoryQuery::execute(
             $this->db,
             $this->detailSelect() . $where .
-            ' ORDER BY academic_programs.program_code ASC,
+            ' ORDER BY ' . $searchOrder . 'academic_programs.program_code ASC,
                        curricula.curriculum_code ASC,
                        curriculum_versions.version_label ASC,
                        target_subjects.subject_code ASC,
@@ -92,7 +94,7 @@ class CurriculumSubjectRequirementRepository
                        required_subjects.subject_code ASC,
                        requirements.id ASC
               LIMIT ? OFFSET ?',
-            $types . 'ii',
+            $types . str_repeat('s', count($rankParams)) . 'ii',
             $listParams
         );
         $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -109,8 +111,8 @@ class CurriculumSubjectRequirementRepository
         $params = [$versionId];
 
         if ($query['search'] !== null) {
-            $conditions[] = "(subjects.subject_code LIKE ? ESCAPE '='
-                              OR subjects.subject_title LIKE ? ESCAPE '=')";
+            $conditions[] = "(" . RepositoryQuery::searchColumn('subjects.subject_code') . " LIKE ? ESCAPE '='
+                              OR " . RepositoryQuery::searchColumn('subjects.subject_title') . " LIKE ? ESCAPE '=')";
             $pattern = RepositoryQuery::likePattern($query['search']);
             $types .= 'ss';
             $params[] = $pattern;
@@ -130,7 +132,9 @@ class CurriculumSubjectRequirementRepository
         $countStmt->close();
 
         $pagination = RepositoryQuery::pagination($total, $query['page'], $query['per_page']);
-        $listParams = $params;
+        $rankParams = [];
+        $searchOrder = RepositoryQuery::searchOrder(['subjects.subject_code', 'subjects.subject_title'], $query['search'] ?? null, $rankParams);
+        $listParams = array_merge($params, $rankParams);
         $listParams[] = $pagination['per_page'];
         $listParams[] = $pagination['offset'];
         $stmt = RepositoryQuery::execute(
@@ -139,12 +143,12 @@ class CurriculumSubjectRequirementRepository
                     placements.subject_id, placements.year_level, placements.semester,
                     placements.sequence_order, subjects.subject_code, subjects.subject_title
              ' . $joins . $where . '
-             ORDER BY placements.sequence_order IS NULL,
+             ORDER BY ' . $searchOrder . 'placements.sequence_order IS NULL,
                       placements.sequence_order ASC,
                       subjects.subject_code ASC,
                       placements.id ASC
              LIMIT ? OFFSET ?',
-            $types . 'ii',
+            $types . str_repeat('s', count($rankParams)) . 'ii',
             $listParams
         );
         $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -258,8 +262,8 @@ class CurriculumSubjectRequirementRepository
             $params[] = $query['curriculum_version_id'];
         }
         if ($query['search'] !== null) {
-            $conditions[] = "(target_subjects.subject_code LIKE ? ESCAPE '='
-                              OR target_subjects.subject_title LIKE ? ESCAPE '=')";
+            $conditions[] = "(" . RepositoryQuery::searchColumn('target_subjects.subject_code') . " LIKE ? ESCAPE '='
+                              OR " . RepositoryQuery::searchColumn('target_subjects.subject_title') . " LIKE ? ESCAPE '=')";
             $pattern = RepositoryQuery::likePattern($query['search']);
             $types .= 'ss';
             $params[] = $pattern;

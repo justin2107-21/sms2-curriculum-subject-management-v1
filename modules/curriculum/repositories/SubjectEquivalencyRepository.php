@@ -54,10 +54,10 @@ class SubjectEquivalencyRepository
         $types = '';
         $params = [];
         if ($query['search'] !== null) {
-            $conditions[] = "(subject_a.subject_code LIKE ? ESCAPE '='
-                              OR subject_a.subject_title LIKE ? ESCAPE '='
-                              OR subject_b.subject_code LIKE ? ESCAPE '='
-                              OR subject_b.subject_title LIKE ? ESCAPE '=')";
+            $conditions[] = "(" . RepositoryQuery::searchColumn('subject_a.subject_code') . " LIKE ? ESCAPE '='
+                              OR " . RepositoryQuery::searchColumn('subject_a.subject_title') . " LIKE ? ESCAPE '='
+                              OR " . RepositoryQuery::searchColumn('subject_b.subject_code') . " LIKE ? ESCAPE '='
+                              OR " . RepositoryQuery::searchColumn('subject_b.subject_title') . " LIKE ? ESCAPE '=')";
             $pattern = RepositoryQuery::likePattern($query['search']);
             $types .= 'ssss';
             array_push($params, $pattern, $pattern, $pattern, $pattern);
@@ -79,14 +79,16 @@ class SubjectEquivalencyRepository
         $countStmt->close();
         $pagination = RepositoryQuery::pagination($total, $query['page'], $query['per_page']);
 
-        $listParams = $params;
+        $rankParams = [];
+        $searchOrder = RepositoryQuery::searchOrder(['subject_a.subject_code', 'subject_a.subject_title', 'subject_b.subject_code', 'subject_b.subject_title'], $query['search'] ?? null, $rankParams);
+        $listParams = array_merge($params, $rankParams);
         $listParams[] = $pagination['per_page'];
         $listParams[] = $pagination['offset'];
         $stmt = RepositoryQuery::execute(
             $this->db,
             $this->detailSelect() . $where .
-            ' ORDER BY equivalencies.updated_at DESC, equivalencies.id DESC LIMIT ? OFFSET ?',
-            $types . 'ii',
+            ' ORDER BY ' . $searchOrder . 'equivalencies.updated_at DESC, equivalencies.id DESC LIMIT ? OFFSET ?',
+            $types . str_repeat('s', count($rankParams)) . 'ii',
             $listParams
         );
         $records = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);

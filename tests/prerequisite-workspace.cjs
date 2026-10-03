@@ -18,7 +18,7 @@ const e=(id,t,r)=>({id,subject_id:t,required_subject_id:r});
 let placements=Array.from({length:105},(_,i)=>p(i+1)),edges=[e(1,3,1),e(2,3,2),e(3,4,3)],review={cycles:[],duplicates:[],sequencing:[],missing:[]};
 const programs=[{id:1,program_code:'BSIT',program_name:'College IT',program_type:'College'},{id:2,program_code:'SHS',program_name:'Senior High',program_type:'SHS'}],curriculum={id:3,academic_program_id:1,curriculum_code:'DEMO'},version={id:4,curriculum_id:3,version_label:'TEST'};
 const requests=[],posts=[],autocomplete={},modals={},errors=[],toasts=[];let cascade,docClick;
-const ui={escapeHtml:v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;'),debounce:fn=>fn,showToast:(m,t)=>toasts.push([m,t]),clearFormError:()=>{},showFormError:(f,m)=>errors.push(m),
+const ui={...require('./search-ranking.cjs'),escapeHtml:v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;'),debounce:fn=>fn,showToast:(m,t)=>toasts.push([m,t]),clearFormError:()=>{},showFormError:(f,m)=>errors.push(m),
  createModal:element=>element?(modals[element.id]={open(){element.hidden=false;},close(){element.hidden=true;}}):null,
  createAutocomplete(options){const c={...options,clear(notify){options.input.value='';options.valueInput.value='';if(notify!==false)options.onClear?.();},setSelected(p,notify){options.valueInput.value=String(options.getId(p));options.input.value=options.format(p).label;if(notify!==false)options.onSelect?.(p);}};autocomplete[options.input.id]=c;return c;},
  createCascadingAutocomplete(config){cascade=config;const controls=config.levels.map(o=>this.createAutocomplete(o));return{get:i=>controls[i]};},
@@ -40,7 +40,7 @@ async function context(program=programs[0]){[program,curriculum,version].forEach
  el('yearFilter').value='2nd Year';await el('yearFilter').emit('change');assert(el('ruleCards').innerHTML.includes('No subjects match'));
  el('yearFilter').value='';el('ruleSearch').value='';el('stateFilter').value='without';await el('stateFilter').emit('change');assert.equal((el('ruleCards').innerHTML.match(/<article/g)||[]).length,103);
  el('semesterFilter').value='2nd Semester';await el('semesterFilter').emit('change');assert(el('ruleCards').innerHTML.includes('No subjects match'));el('semesterFilter').value='';
- assert.equal((await autocomplete.focusSearch.search('Subject')).length,3,'Maximum three suggestions');
+ assert.equal((await autocomplete.focusSearch.search('Subject')).length,105,'All matching candidates reach the shared ranking and suggestion limit');
  await autocomplete.curriculumSearch.search('DEMO');assert.equal(requests.at(-1)[1].academic_program_id,'1');assert.equal(requests.at(-1)[1].per_page,10);
  await autocomplete.versionSearch.search('TEST');assert.equal(requests.at(-1)[1].curriculum_id,'3');
  await click({details:'3'});assert(el('detailsBody').innerHTML.includes('CC1'));assert(el('detailsBody').innerHTML.includes('CC2'));assert(el('detailsBody').innerHTML.includes('CC4'));

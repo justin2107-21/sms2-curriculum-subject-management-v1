@@ -226,10 +226,18 @@ require __DIR__ . '/../../../shared/sidebar.php';
       <input type="hidden" name="curriculum_version_id" id="addProgramAssignmentVersionId"/>
       <div class="form-error" role="alert" hidden></div>
       <div class="form-grid">
-        <label class="form-field form-field-wide"><span>Find Subject</span><input type="search" id="programAssignmentSubjectSearch" maxlength="100" placeholder="Search by subject code or title"/></label>
-        <label class="form-field form-field-wide"><span>Subject <strong>*</strong></span><select name="subject_id" id="programAssignmentSubjectId" required><option value="">Select an available Subject Master record</option></select></label>
-        <label class="form-field"><span>Year Level</span><input name="year_level" maxlength="50" placeholder="Flexible stored label"/></label>
-        <label class="form-field"><span>Semester / Term</span><input name="semester" maxlength="50" placeholder="Flexible stored label"/></label>
+        <div class="form-field form-field-wide">
+          <label for="programAssignmentSubjectSearch">Subject <strong>*</strong></label>
+          <div class="record-autocomplete">
+            <input type="search" id="programAssignmentSubjectSearch" maxlength="100" placeholder="Search all subjects by code or title" required/>
+            <input type="hidden" name="subject_id" id="programAssignmentSubjectId"/>
+            <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear subject" title="Clear selection" hidden><i class="fa-solid fa-xmark"></i></button>
+            <div class="record-autocomplete-options" id="programAssignmentSubjectOptions" role="listbox" aria-label="Available subject suggestions" hidden></div>
+          </div>
+          <small id="programAssignmentSubjectHint" role="status">Only subjects available for this curriculum version are shown.</small>
+        </div>
+        <label class="form-field"><span>Year Level</span><select name="year_level" id="addProgramAssignmentYear"><option value="">Not set</option></select></label>
+        <label class="form-field"><span>Semester / Term</span><select name="semester" id="addProgramAssignmentSemester"><option value="">Not set</option></select></label>
         <label class="form-field"><span>Sequence Order</span><input type="number" name="sequence_order" min="0" step="1"/></label>
         <label class="form-field"><span>Placement Indicator <strong>*</strong></span><select name="is_required" required><option value="1">Required Placement</option><option value="0">Optional Placement</option></select><small>This does not add the subject to an elective group.</small></label>
       </div>
@@ -250,8 +258,8 @@ require __DIR__ . '/../../../shared/sidebar.php';
       <div class="form-error" role="alert" hidden></div>
       <div class="mapping-fixed-context" role="note"><div><span>Subject</span><strong id="editProgramAssignmentSubject"></strong></div><div><span>Curriculum Version</span><strong id="editProgramAssignmentVersion"></strong></div></div>
       <div class="form-grid">
-        <label class="form-field"><span>Year Level</span><input name="year_level" id="editProgramAssignmentYear" maxlength="50"/></label>
-        <label class="form-field"><span>Semester / Term</span><input name="semester" id="editProgramAssignmentSemester" maxlength="50"/></label>
+        <label class="form-field"><span>Year Level</span><select name="year_level" id="editProgramAssignmentYear"><option value="">Not set</option></select></label>
+        <label class="form-field"><span>Semester / Term</span><select name="semester" id="editProgramAssignmentSemester"><option value="">Not set</option></select></label>
         <label class="form-field"><span>Sequence Order</span><input type="number" name="sequence_order" id="editProgramAssignmentSequence" min="0" step="1"/></label>
         <label class="form-field"><span>Placement Indicator <strong>*</strong></span><select name="is_required" id="editProgramAssignmentRequired" required><option value="1">Required Placement</option><option value="0">Optional Placement</option></select></label>
       </div>

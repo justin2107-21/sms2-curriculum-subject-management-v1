@@ -52,16 +52,11 @@ require_once __DIR__ . '/../shared/sidebar.php';
     </button>
     <span class="topbar-spacer"></span>
     <div class="topbar-right">
-      <div class="search-wrap">
-        <input type="text" placeholder="Search..."/>
-        <i class="fa-solid fa-magnifying-glass"></i>
-      </div>
       <a href="../dashboard/account.php" class="avatar" id="avatarBtn" title="Account Settings">
         <?= $sess_initial ?>
       </a>
     </div>
   </div>
-
   <!-- Content -->
   <div class="content">
 

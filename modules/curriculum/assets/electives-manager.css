@@ -1,154 +1,36 @@
-.electives-content {
-  min-width: 0;
-}
-
-.elective-filter-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.elective-group-table {
-  min-width: 1080px;
-}
-
-.elective-membership-table {
-  min-width: 860px;
-}
-
-.elective-group-table tbody tr[data-group-id] {
-  cursor: pointer;
-}
-
-.elective-group-table tbody tr[data-group-id]:hover td {
-  background: #f8fafc;
-}
-
-.elective-group-table tbody tr.is-selected td {
-  background: #eef3ff;
-  box-shadow: inset 0 1px 0 #d5dff8, inset 0 -1px 0 #d5dff8;
-}
-
-.elective-group-table tbody tr.is-selected td:first-child {
-  box-shadow: inset 3px 0 0 var(--sms2-sidebar-blue),
-              inset 0 1px 0 #d5dff8,
-              inset 0 -1px 0 #d5dff8;
-}
-
-.elective-group-name {
-  color: #172554;
-  display: block;
-  font-size: .76rem;
-  font-weight: 800;
-  min-width: 155px;
-}
-
-.elective-description {
-  color: #475569;
-  display: block;
-  font-size: .69rem;
-  line-height: 1.45;
-  max-width: 270px;
-  overflow-wrap: anywhere;
-}
-
-.elective-subject-count {
-  align-items: center;
-  background: #e8eefc;
-  border: 1px solid #c4d2f5;
-  border-radius: 999px;
-  color: var(--sms2-sidebar-blue);
-  display: inline-flex;
-  font-size: .66rem;
-  font-weight: 800;
-  gap: 5px;
-  padding: 5px 8px;
-  white-space: nowrap;
-}
-
-.elective-group-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.elective-group-actions button:disabled {
-  cursor: not-allowed;
-  opacity: .45;
-}
-
-.elective-membership-card {
-  margin-bottom: 24px;
-}
-
-.elective-membership-toolbar {
-  align-items: flex-end;
-}
-
-.elective-subject-search {
-  flex: 1;
-  max-width: 380px;
-}
-
-.elective-subject-search input:disabled {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
-  color: #94a3b8;
-  cursor: not-allowed;
-  opacity: 1;
-}
-
-.elective-subject-search input:disabled::placeholder {
-  color: #94a3b8;
-  opacity: 1;
-}
-
-.elective-membership-table .record-name {
-  color: #334155;
-  display: block;
-  font-size: .7rem;
-  min-width: 190px;
-}
-
-.elective-context-stack {
-  display: block;
-  min-width: 145px;
-}
-
-.elective-context-stack strong {
-  color: #1e293b;
-  display: block;
-  font-size: .72rem;
-}
-
-.elective-context-stack span {
-  color: #64748b;
-  display: block;
-  font-family: Consolas, monospace;
-  font-size: .66rem;
-  margin-top: 3px;
-}
-
-.elective-empty-note {
-  color: #64748b;
-  font-size: .68rem;
-  line-height: 1.45;
-}
-
-@media (max-width: 1100px) {
-  .elective-filter-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 700px) {
-  .elective-filter-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .elective-membership-toolbar {
-    align-items: stretch;
-  }
-
-  .elective-subject-search {
-    max-width: none;
-  }
-}
+.electives-content [hidden], .curriculum-modal [hidden] { display: none !important; }
+.elective-context { position: relative; z-index: 5; overflow: visible; }
+#groupFormModal .record-autocomplete-options { max-height: 194px; overflow-y: auto; }
+#groupFormModal .record-autocomplete-option { min-height: 64px; }
+.elective-tabs { margin-bottom: 20px; }
+.elective-empty { padding: 80px 24px; text-align: center; border: 1px dashed #cbdcf4; border-radius: 12px; background: #fafcff; color: #64748b; }
+.elective-empty i { font-size: 26px; color: #2563eb; margin-bottom: 16px; }
+.elective-empty h2 { font-size: 16px; margin: 0 0 10px; }
+.elective-empty p { margin: 0; }
+.elective-filters { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+.elective-filters input, .elective-filters select { padding: 10px 12px; border: 1px solid #dce4ef; border-radius: 8px; background: white; color: #475569; font: inherit; min-width: 140px; }
+.elective-filters input { flex: 1; max-width: 420px; }
+.elective-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; }
+.elective-card { background: #fff; border: 1px solid #e0e7f1; border-radius: 12px; padding: 20px; min-width: 0; box-shadow: 0 5px 20px #1e3a5f06; }
+.elective-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.elective-placement { font-size: 11px; color: #1d5ed0; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.elective-card h2 { font-size: 17px; margin: 12px 0 18px; overflow-wrap: anywhere; }
+.elective-rule { background: #f2f6fe; border-radius: 8px; padding: 12px; margin: 12px 0 18px; color: #64748b; }
+.elective-rule strong { color: #1d5ed0; }
+.elective-label { text-transform: uppercase; letter-spacing: .06em; color: #8190a5; font-size: 10px; font-weight: 700; }
+.elective-subject { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #edf1f7; align-items: flex-start; overflow-wrap: anywhere; }
+.elective-subject > strong { color: #1d5ed0; min-width: 45px; }
+.elective-subject > div { flex: 1; min-width: 0; }
+.elective-subject small { display: block; color: #7b8ba2; margin-top: 5px; }
+.elective-card-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.elective-card-actions button, .elective-subject button { padding: 6px 10px; font-size: 12px; }
+.elective-review-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; margin-bottom: 18px; }
+.elective-counter { background: white; border: 1px solid #dce4ef; border-radius: 12px; padding: 18px; color: #738399; }
+.elective-counter strong { display: block; color: #234c7b; font-size: 28px; margin: 18px 0 10px; }
+.elective-issue { padding: 16px 0; border-bottom: 1px solid #e8eef7; display: flex; gap: 16px; justify-content: space-between; align-items: center; }
+.elective-issue p { color: #738399; margin: 6px 0; }
+.elective-issue a { white-space: nowrap; }
+.elective-modal-body { padding: 0 24px 20px; }
+.elective-warning { padding: 14px; border: 1px solid #efcf87; background: #fffbeb; border-radius: 8px; margin-top: 12px; }
+#groupFormModal .modal-dialog, #viewGroupModal .modal-dialog { max-width: 700px; }
+@media(max-width:750px) { .elective-grid,.elective-review-grid { grid-template-columns: 1fr; } .elective-issue { flex-direction: column; align-items: flex-start; } .elective-filters > * { flex: 1; } }

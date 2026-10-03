@@ -66,6 +66,7 @@ function autocomplete(config) {
 const paginated = (key, rows, params) => ({ [key]: rows.slice((Number(params.page || 1) - 1) * 50, Number(params.page || 1) * 50),
     pagination: { page: Number(params.page || 1), total_records: rows.length, total_pages: Math.ceil(rows.length / 50) || 1 } });
 const ui = {
+    ...require('./search-ranking.cjs'),
     escapeHtml: value => String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;'),
     formatUnits: value => String(Number(value)), debounce: fn => fn,
     createModal: element => ({ open() { element.hidden = false; }, close() { element.hidden = true; } }),

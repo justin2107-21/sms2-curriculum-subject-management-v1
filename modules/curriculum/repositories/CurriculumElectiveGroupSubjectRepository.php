@@ -71,8 +71,8 @@ class CurriculumElectiveGroupSubjectRepository
         $types = 'i';
         $params = [$groupId];
         if ($query['search'] !== null) {
-            $conditions[] = "(subjects.subject_code LIKE ? ESCAPE '='
-                              OR subjects.subject_title LIKE ? ESCAPE '=')";
+            $conditions[] = "(" . RepositoryQuery::searchColumn('subjects.subject_code') . " LIKE ? ESCAPE '='
+                              OR " . RepositoryQuery::searchColumn('subjects.subject_title') . " LIKE ? ESCAPE '=')";
             $pattern = RepositoryQuery::likePattern($query['search']);
             $types .= 'ss';
             $params[] = $pattern;
@@ -97,7 +97,9 @@ class CurriculumElectiveGroupSubjectRepository
         $countStmt->close();
         $pagination = RepositoryQuery::pagination($total, $query['page'], $query['per_page']);
 
-        $listParams = $params;
+        $rankParams = [];
+        $searchOrder = RepositoryQuery::searchOrder(['subjects.subject_code', 'subjects.subject_title'], $query['search'] ?? null, $rankParams);
+        $listParams = array_merge($params, $rankParams);
         $listParams[] = $pagination['per_page'];
         $listParams[] = $pagination['offset'];
         $stmt = RepositoryQuery::execute(
@@ -110,12 +112,12 @@ class CurriculumElectiveGroupSubjectRepository
                     placements.year_level, placements.semester,
                     placements.sequence_order, placements.is_required'
             . $joins . $where .
-            ' ORDER BY placements.sequence_order IS NULL,
+            ' ORDER BY ' . $searchOrder . 'placements.sequence_order IS NULL,
                        placements.sequence_order ASC,
                        subjects.subject_code ASC,
                        memberships.id ASC
               LIMIT ? OFFSET ?',
-            $types . 'ii',
+            $types . str_repeat('s', count($rankParams)) . 'ii',
             $listParams
         );
         $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -135,9 +137,14 @@ class CurriculumElectiveGroupSubjectRepository
         ];
         $types = 'ii';
         $params = [$groupId, $versionId];
+        $conditions[] = "subjects.status = 'active'";
+        $conditions[] = 'placements.year_level = (SELECT year_level FROM curriculum_elective_groups WHERE id=?)';
+        $conditions[] = 'placements.semester = (SELECT semester FROM curriculum_elective_groups WHERE id=?)';
+        $types .= 'ii';
+        array_push($params, $groupId, $groupId);
         if ($query['search'] !== null) {
-            $conditions[] = "(subjects.subject_code LIKE ? ESCAPE '='
-                              OR subjects.subject_title LIKE ? ESCAPE '=')";
+            $conditions[] = "(" . RepositoryQuery::searchColumn('subjects.subject_code') . " LIKE ? ESCAPE '='
+                              OR " . RepositoryQuery::searchColumn('subjects.subject_title') . " LIKE ? ESCAPE '=')";
             $pattern = RepositoryQuery::likePattern($query['search']);
             $types .= 'ss';
             $params[] = $pattern;
@@ -161,7 +168,9 @@ class CurriculumElectiveGroupSubjectRepository
         $countStmt->close();
         $pagination = RepositoryQuery::pagination($total, $query['page'], $query['per_page']);
 
-        $listParams = $params;
+        $rankParams = [];
+        $searchOrder = RepositoryQuery::searchOrder(['subjects.subject_code', 'subjects.subject_title'], $query['search'] ?? null, $rankParams);
+        $listParams = array_merge($params, $rankParams);
         $listParams[] = $pagination['per_page'];
         $listParams[] = $pagination['offset'];
         $stmt = RepositoryQuery::execute(
@@ -172,12 +181,12 @@ class CurriculumElectiveGroupSubjectRepository
                     placements.sequence_order, placements.is_required,
                     subjects.subject_code, subjects.subject_title, subjects.units'
             . $joins . $where .
-            ' ORDER BY placements.sequence_order IS NULL,
+            ' ORDER BY ' . $searchOrder . 'placements.sequence_order IS NULL,
                        placements.sequence_order ASC,
                        subjects.subject_code ASC,
                        placements.id ASC
               LIMIT ? OFFSET ?',
-            $types . 'ii',
+            $types . str_repeat('s', count($rankParams)) . 'ii',
             $listParams
         );
         $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);

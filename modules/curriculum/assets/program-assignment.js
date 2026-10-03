@@ -11,7 +11,6 @@
     const columnCounts = { program: canManage ? 12 : 11, subject: canManage ? 10 : 9 };
     const state = {
         activeView: activeView,
-        optionRequest: 0,
         program: { page: 1, request: 0, records: new Map(), loaded: false },
         subject: { page: 1, request: 0, records: new Map(), loaded: false },
         pendingRemoval: null
@@ -50,6 +49,29 @@
     const addModal = ui.createModal(document.getElementById('addProgramAssignmentModal'));
     const editModal = ui.createModal(document.getElementById('editProgramAssignmentModal'));
     const removeModal = ui.createModal(removeElement);
+    const assignmentSubjectAutocomplete = ui.createAutocomplete({
+        input: document.getElementById('programAssignmentSubjectSearch'),
+        valueInput: document.getElementById('programAssignmentSubjectId'),
+        list: document.getElementById('programAssignmentSubjectOptions'),
+        status: document.getElementById('programAssignmentSubjectHint'),
+        helpText: 'Only subjects available for this curriculum version are shown.',
+        selectedText: 'Subject selected.',
+        loadingText: 'Searching available subjects…',
+        noResultsText: 'No available subjects match this search.',
+        errorText: 'Subject Master records could not be loaded.',
+        search: async function (query) {
+            const payload = await ui.fetchJson(endpoint, {
+                action: 'subject_options',
+                curriculum_version_id: controls.program.version.value,
+                page: 1, per_page: 20, search: query
+            });
+            return payload.subjects;
+        },
+        getId: subject => subject.id,
+        format: subject => ({ label: subject.subject_code + ' — ' + subject.subject_title,
+            code: subject.subject_code, title: subject.subject_title }),
+        onError: error => ui.showFormError(addForm, error.message || 'Subject Master records could not be loaded.')
+    });
 
     function tableState(view, message, isError) {
         const control = controls[view];
@@ -341,50 +363,30 @@
             state.program.records.get(Number(id)) || state.subject.records.get(Number(id));
     }
 
-    async function loadSubjectOptions(searchValue) {
-        const select = document.getElementById('programAssignmentSubjectId');
-        const submit = addForm?.querySelector('[type="submit"]');
-        if (!select || !submit) return;
-        const sequence = ++state.optionRequest;
-        select.disabled = true;
-        submit.disabled = true;
-        select.innerHTML = '<option value="">Loading available subjects…</option>';
-        try {
-            const payload = await ui.fetchJson(endpoint, {
-                action: 'subject_options',
-                curriculum_version_id: controls.program.version.value,
-                page: 1, per_page: 50, search: String(searchValue || '').trim()
-            });
-            if (sequence !== state.optionRequest) return;
-            select.innerHTML = '<option value="">Select an available Subject Master record</option>' +
-                payload.subjects.map(function (subject) {
-                    return optionMarkup(subject.id, subject.subject_code + ' — ' + subject.subject_title);
-                }).join('');
-            select.disabled = payload.subjects.length === 0;
-            submit.disabled = payload.subjects.length === 0;
-            if (!payload.subjects.length) {
-                ui.showFormError(
-                    addForm,
-                    searchValue
-                        ? 'No available Subject Master records match this search.'
-                        : 'All available Subject Master records are already assigned, or no subjects exist.'
-                );
-            }
-        } catch (error) {
-            if (sequence !== state.optionRequest) return;
-            select.innerHTML = '<option value="">Subjects unavailable</option>';
-            ui.showFormError(addForm, error.message || 'Subject Master records could not be loaded.');
-        }
+    function setPlacementOptions(prefix, record = {}) {
+        const fields = [
+            ['Year', 'year_level', ['1st Year', '2nd Year', '3rd Year', '4th Year', 'Grade 11', 'Grade 12'], controls.program.year],
+            ['Semester', 'semester', ['1st Semester', '2nd Semester'], controls.program.semester]
+        ];
+        fields.forEach(([suffix, field, defaults, filter]) => {
+            const select = document.getElementById(prefix + suffix);
+            if (!select) return;
+            const values = [...new Set([...defaults, ...Array.from(filter?.options || [], option => option.value), record[field]].filter(Boolean))];
+            select.replaceChildren(new Option('Not set', ''));
+            values.forEach(value => select.add(new Option(value, value)));
+            select.value = record[field] || '';
+        });
     }
 
     async function openAddAssignment() {
         if (!canManage || !controls.program.version.value || !addForm || !addModal) return;
         addForm.reset();
+        setPlacementOptions('addProgramAssignment');
+        assignmentSubjectAutocomplete?.clear();
         ui.clearFormError(addForm);
         document.getElementById('addProgramAssignmentVersionId').value = controls.program.version.value;
         document.getElementById('addProgramAssignmentContext').textContent = contextParts('program').join(' → ');
         addModal.open();
-        await loadSubjectOptions('');
         document.getElementById('programAssignmentSubjectSearch').focus();
     }
 
@@ -400,8 +402,7 @@
             record.subject_code + ' — ' + record.subject_title;
         document.getElementById('editProgramAssignmentVersion').textContent =
             record.curriculum_code + ' — ' + record.version_label;
-        document.getElementById('editProgramAssignmentYear').value = record.year_level || '';
-        document.getElementById('editProgramAssignmentSemester').value = record.semester || '';
+        setPlacementOptions('editProgramAssignment', record);
         document.getElementById('editProgramAssignmentSequence').value = record.sequence_order ?? '';
         document.getElementById('editProgramAssignmentRequired').value = Number(record.is_required) === 1 ? '1' : '0';
         editModal.open();
@@ -441,6 +442,11 @@
     if (addForm) {
         addForm.addEventListener('submit', async function (event) {
             event.preventDefault();
+            if (!assignmentSubjectAutocomplete?.hasSelection()) {
+                ui.showFormError(addForm, 'Please select a valid subject.');
+                document.getElementById('programAssignmentSubjectSearch').focus();
+                return;
+            }
             if (!addForm.reportValidity()) return;
             ui.clearFormError(addForm);
             const formData = new FormData(addForm);
@@ -450,6 +456,7 @@
                 const payload = await ui.postForm(endpoint, formData);
                 addModal.close();
                 addForm.reset();
+                assignmentSubjectAutocomplete?.clear();
                 ui.showToast(payload.message, 'success');
                 await refreshLoadedViews();
             } catch (error) {
@@ -569,13 +576,9 @@
     });
 
     document.getElementById('addProgramAssignmentButton')?.addEventListener('click', openAddAssignment);
-    document.getElementById('programAssignmentSubjectSearch')?.addEventListener(
-        'input',
-        ui.debounce(function () {
-            ui.clearFormError(addForm);
-            loadSubjectOptions(this.value);
-        }, 300)
-    );
+    document.getElementById('programAssignmentSubjectSearch')?.addEventListener('input', function () {
+        ui.clearFormError(addForm);
+    });
 
     bindRowActions(activeView);
 

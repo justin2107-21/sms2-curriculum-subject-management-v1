@@ -60,9 +60,9 @@ class ComplianceReferenceRepository
         $types = '';
         $params = [];
         if ($query['search'] !== null) {
-            $conditions[] = "(references_table.reference_code LIKE ? ESCAPE '='
-                              OR references_table.title LIKE ? ESCAPE '='
-                              OR references_table.issuing_body LIKE ? ESCAPE '=')";
+            $conditions[] = "(" . RepositoryQuery::searchColumn('references_table.reference_code') . " LIKE ? ESCAPE '='
+                              OR " . RepositoryQuery::searchColumn('references_table.title') . " LIKE ? ESCAPE '='
+                              OR " . RepositoryQuery::searchColumn('references_table.issuing_body') . " LIKE ? ESCAPE '=')";
             $pattern = RepositoryQuery::likePattern($query['search']);
             $types .= 'sss';
             array_push($params, $pattern, $pattern, $pattern);
@@ -87,14 +87,16 @@ class ComplianceReferenceRepository
         $total = (int)$countStmt->get_result()->fetch_assoc()['total'];
         $countStmt->close();
         $pagination = RepositoryQuery::pagination($total, $query['page'], $query['per_page']);
-        $listParams = $params;
+        $rankParams = [];
+        $searchOrder = RepositoryQuery::searchOrder(['references_table.reference_code', 'references_table.title', 'references_table.issuing_body'], $query['search'] ?? null, $rankParams);
+        $listParams = array_merge($params, $rankParams);
         $listParams[] = $pagination['per_page'];
         $listParams[] = $pagination['offset'];
         $stmt = RepositoryQuery::execute(
             $this->db,
             $this->detailSelect() . $where .
-            ' ORDER BY references_table.updated_at DESC, references_table.id DESC LIMIT ? OFFSET ?',
-            $types . 'ii',
+            ' ORDER BY ' . $searchOrder . 'references_table.updated_at DESC, references_table.id DESC LIMIT ? OFFSET ?',
+            $types . str_repeat('s', count($rankParams)) . 'ii',
             $listParams
         );
         $records = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);

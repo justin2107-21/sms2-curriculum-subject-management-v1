@@ -42,7 +42,7 @@ class AcademicProgramRepository
         $params = [];
 
         if ($query['search'] !== null) {
-            $conditions[] = "(program_code LIKE ? ESCAPE '=' OR program_name LIKE ? ESCAPE '=')";
+            $conditions[] = "(" . RepositoryQuery::searchColumn('program_code') . " LIKE ? ESCAPE '=' OR " . RepositoryQuery::searchColumn('program_name') . " LIKE ? ESCAPE '=')";
             $pattern = RepositoryQuery::likePattern($query['search']);
             $types .= 'ss';
             $params[] = $pattern;
@@ -52,6 +52,25 @@ class AcademicProgramRepository
             $conditions[] = 'status = ?';
             $types .= 's';
             $params[] = $query['status'];
+        }
+        // Match the existing Subject Master category normalization: Senior High,
+        // SHS, and strand labels are SHS; other explicitly stored types are college.
+        $isShsClassification = "(LOWER(TRIM(program_type)) LIKE '%senior high%' OR LOWER(TRIM(program_type)) = 'shs' OR LOWER(TRIM(program_type)) LIKE '%strand%')";
+        if (($query['program_category'] ?? null) === 'shs') {
+            $conditions[] = $isShsClassification;
+        } elseif (($query['program_category'] ?? null) === 'college') {
+            $conditions[] = "program_type IS NOT NULL AND TRIM(program_type) <> '' AND NOT " . $isShsClassification;
+        }
+        if (!empty($query['program_type'])) {
+            if ($query['program_type'] === 'Other') {
+                $conditions[] = "program_type IS NOT NULL AND program_type NOT IN (?, ?, ?, ?)";
+                $types .= 'ssss';
+                array_push($params, "Bachelor's Degree", 'Associate Degree', 'Diploma / Certificate', 'Senior High School');
+            } else {
+                $conditions[] = 'program_type = ?';
+                $types .= 's';
+                $params[] = $query['program_type'];
+            }
         }
 
         $where = $conditions ? ' WHERE ' . implode(' AND ', $conditions) : '';
@@ -65,15 +84,18 @@ class AcademicProgramRepository
         $countStmt->close();
 
         $pagination = RepositoryQuery::pagination($total, $query['page'], $query['per_page']);
-        $listParams = $params;
+        $rankParams = [];
+        $searchOrder = RepositoryQuery::searchOrder(['program_code', 'program_name'], $query['search'] ?? null, $rankParams);
+        $listParams = array_merge($params, $rankParams);
         $listParams[] = $pagination['per_page'];
         $listParams[] = $pagination['offset'];
         $stmt = RepositoryQuery::execute(
             $this->db,
-            'SELECT id, program_code, program_name, program_type, status, created_at, updated_at
+            'SELECT id, program_code, program_name, program_type, status, created_at, updated_at,
+                    (SELECT COUNT(*) FROM curricula c WHERE c.academic_program_id = academic_programs.id) AS curriculum_count
              FROM academic_programs' . $where . '
-             ORDER BY program_code ASC, id ASC LIMIT ? OFFSET ?',
-            $types . 'ii',
+             ORDER BY ' . $searchOrder . 'program_code ASC, id ASC LIMIT ? OFFSET ?',
+            $types . str_repeat('s', count($rankParams)) . 'ii',
             $listParams
         );
         $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);

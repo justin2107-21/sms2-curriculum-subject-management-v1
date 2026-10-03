@@ -31,7 +31,9 @@ class SubjectOfferingHistoryRepository
         $countStmt->close();
         $pagination = RepositoryQuery::pagination($total, $query['page'], $query['per_page']);
 
-        $listParams = $params;
+        $rankParams = [];
+        $searchOrder = RepositoryQuery::searchOrder(['subjects.subject_code', 'subjects.subject_title'], $query['search'] ?? null, $rankParams);
+        $listParams = array_merge($params, $rankParams);
         $listParams[] = $pagination['per_page'];
         $listParams[] = $pagination['offset'];
         $stmt = RepositoryQuery::execute(
@@ -53,13 +55,13 @@ class SubjectOfferingHistoryRepository
                     academic_programs.program_code, academic_programs.program_name,
                     academic_programs.program_type'
             . $joins . $where .
-            " ORDER BY subjects.subject_code ASC,
+            " ORDER BY " . $searchOrder . "subjects.subject_code ASC,
                        curriculum_versions.created_at ASC,
                        academic_programs.program_code ASC,
                        curricula.curriculum_code ASC,
                        curriculum_versions.version_label ASC,
                        cvs.id ASC LIMIT ? OFFSET ?",
-            $types . 'ii',
+            $types . str_repeat('s', count($rankParams)) . 'ii',
             $listParams
         );
         $records = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -193,8 +195,8 @@ class SubjectOfferingHistoryRepository
             }
         }
         if ($query['search'] !== null) {
-            $conditions[] = "(subjects.subject_code LIKE ? ESCAPE '='
-                              OR subjects.subject_title LIKE ? ESCAPE '=')";
+            $conditions[] = "(" . RepositoryQuery::searchColumn('subjects.subject_code') . " LIKE ? ESCAPE '='
+                              OR " . RepositoryQuery::searchColumn('subjects.subject_title') . " LIKE ? ESCAPE '=')";
             $pattern = RepositoryQuery::likePattern($query['search']);
             $types .= 'ss';
             $params[] = $pattern;

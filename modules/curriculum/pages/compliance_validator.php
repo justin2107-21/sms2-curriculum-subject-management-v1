@@ -202,13 +202,37 @@ require __DIR__ . '/../../../shared/sidebar.php';
       <p class="compliance-history-lock" id="complianceRuleHistoryNotice" hidden><i class="fa-solid fa-lock"></i> This rule has history. Its reference, scope, type, subject, and threshold are locked to preserve traceability.</p>
       <div class="form-grid">
         <label class="form-field form-field-wide"><span>Rule Name <strong>*</strong></span><input type="text" name="rule_name" id="complianceRuleName" maxlength="180" required/></label>
-        <label class="form-field"><span>Reference <strong>*</strong></span><select name="compliance_reference_id" id="complianceRuleReference" required><option value="">Loading references...</option></select></label>
+        <div class="form-field">
+          <label for="complianceRuleReferenceInput">Reference <strong>*</strong></label>
+          <div class="record-autocomplete">
+            <input type="search" id="complianceRuleReferenceInput" maxlength="100" placeholder="Search reference code or title" required/>
+            <input type="hidden" name="compliance_reference_id" id="complianceRuleReference"/>
+            <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear compliance reference" title="Clear selection" hidden><i class="fa-solid fa-xmark"></i></button>
+            <div class="record-autocomplete-options" id="complianceRuleReferenceOptions" role="listbox" aria-label="Compliance reference suggestions" hidden></div>
+          </div>
+        </div>
         <label class="form-field"><span>Technical Status <strong>*</strong></span><select name="technical_status" id="complianceRuleStatus" required><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
         <label class="form-field"><span>Scope Type <strong>*</strong></span><select name="scope_type" id="complianceRuleScopeType" required><option value="program">Academic Program</option><option value="curriculum">Curriculum</option></select></label>
-        <label class="form-field"><span>Scope Record <strong>*</strong></span><select name="scope_id" id="complianceRuleScope" required><option value="">Select a scope type</option></select></label>
+        <div class="form-field">
+          <label for="complianceRuleScopeInput">Scope Record <strong>*</strong></label>
+          <div class="record-autocomplete">
+            <input type="search" id="complianceRuleScopeInput" maxlength="100" placeholder="Select scope type first" required disabled/>
+            <input type="hidden" name="scope_id" id="complianceRuleScope"/>
+            <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear scope record" title="Clear selection" hidden><i class="fa-solid fa-xmark"></i></button>
+            <div class="record-autocomplete-options" id="complianceRuleScopeOptions" role="listbox" aria-label="Scope record suggestions" hidden></div>
+          </div>
+        </div>
         <label class="form-field"><span>Rule Type <strong>*</strong></span><select name="rule_type" id="complianceRuleType" required><option value="MIN_TOTAL_UNITS">Minimum total units</option><option value="MAX_TOTAL_UNITS">Maximum total units</option><option value="REQUIRED_SUBJECT">Required subject</option><option value="MIN_SUBJECT_UNITS">Minimum subject units</option><option value="MAX_SUBJECT_UNITS">Maximum subject units</option></select></label>
         <label class="form-field" id="complianceNumericField"><span>Numeric Threshold <strong>*</strong></span><input type="number" name="numeric_value" id="complianceRuleNumeric" min="0" step="0.01" inputmode="decimal" required/></label>
-        <label class="form-field form-field-wide" id="complianceSubjectField" hidden><span>Configured Subject <strong>*</strong></span><select name="subject_id" id="complianceRuleSubject"><option value="">Select a Subject Master record</option></select></label>
+        <div class="form-field form-field-wide" id="complianceSubjectField" hidden>
+          <label for="complianceRuleSubjectInput">Configured Subject <strong>*</strong></label>
+          <div class="record-autocomplete">
+            <input type="search" id="complianceRuleSubjectInput" maxlength="100" placeholder="Search all subjects by code or title"/>
+            <input type="hidden" name="subject_id" id="complianceRuleSubject"/>
+            <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear configured subject" title="Clear selection" hidden><i class="fa-solid fa-xmark"></i></button>
+            <div class="record-autocomplete-options" id="complianceRuleSubjectOptions" role="listbox" aria-label="Configured subject suggestions" hidden></div>
+          </div>
+        </div>
         <label class="form-field form-field-wide"><span>Description</span><textarea name="description" id="complianceRuleDescription" rows="3" placeholder="Optional explanation of this configured check"></textarea></label>
       </div>
       <div class="modal-actions"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="submit" class="button-primary" id="saveComplianceRule">Create Rule</button></div>
@@ -217,11 +241,12 @@ require __DIR__ . '/../../../shared/sidebar.php';
 </div>
 <?php endif; ?>
 
-<div class="curriculum-modal" id="complianceRunModal" hidden>
+<div class="curriculum-modal record-details-modal" id="complianceRunModal" hidden>
   <div class="modal-backdrop" data-modal-close></div>
   <section class="modal-dialog modal-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="complianceRunModalTitle">
-    <div class="modal-header"><div><h2 id="complianceRunModalTitle">Validation Run Results</h2><p class="modal-context" id="complianceRunModalContext"></p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close validation results"><i class="fa-solid fa-xmark"></i></button></div>
-    <div class="domain-form compliance-run-detail"><div class="compliance-summary" id="historyRunSummary"></div><div class="table-scroll" tabindex="0" aria-label="Scrollable historical compliance results"><table class="domain-table compliance-results-table"><thead><tr><th>Rule</th><th>Reference</th><th>Requirement</th><th>Actual</th><th>Result</th><th>Explanation</th></tr></thead><tbody id="historyRunResultRows"></tbody></table></div><div class="modal-actions"><button type="button" class="button-muted" data-modal-close>Close</button></div></div>
+    <div class="modal-header"><div><p class="modal-kicker">Compliance Validation History</p><h2 id="complianceRunModalTitle">Validation Run Results</h2><p class="modal-context" id="complianceRunModalContext"></p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close validation results"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="modal-body"><div class="compliance-run-detail"><div class="compliance-summary" id="historyRunSummary"></div><div class="table-scroll" tabindex="0" aria-label="Scrollable historical compliance results"><table class="domain-table compliance-results-table"><thead><tr><th>Rule</th><th>Reference</th><th>Requirement</th><th>Actual</th><th>Result</th><th>Explanation</th></tr></thead><tbody id="historyRunResultRows"></tbody></table></div></div></div>
+    <div class="modal-footer"><button type="button" class="button-muted" data-modal-close>Close</button></div>
   </section>
 </div>
 

@@ -38,8 +38,8 @@ class CurriculumVersionSubjectRepository
         $params = [$versionId];
 
         if ($query['search'] !== null) {
-            $conditions[] = "(subjects.subject_code LIKE ? ESCAPE '='
-                              OR subjects.subject_title LIKE ? ESCAPE '=')";
+            $conditions[] = "(" . RepositoryQuery::searchColumn('subjects.subject_code') . " LIKE ? ESCAPE '='
+                              OR " . RepositoryQuery::searchColumn('subjects.subject_title') . " LIKE ? ESCAPE '=')";
             $pattern = RepositoryQuery::likePattern($query['search']);
             $types .= 'ss';
             $params[] = $pattern;
@@ -59,7 +59,9 @@ class CurriculumVersionSubjectRepository
         $countStmt->close();
 
         $pagination = RepositoryQuery::pagination($total, $query['page'], $query['per_page']);
-        $listParams = $params;
+        $rankParams = [];
+        $searchOrder = RepositoryQuery::searchOrder(['subjects.subject_code', 'subjects.subject_title'], $query['search'] ?? null, $rankParams);
+        $listParams = array_merge($params, $rankParams);
         $listParams[] = $pagination['per_page'];
         $listParams[] = $pagination['offset'];
         $stmt = RepositoryQuery::execute(
@@ -69,11 +71,11 @@ class CurriculumVersionSubjectRepository
              FROM curriculum_version_subjects
              INNER JOIN subjects ON subjects.id = curriculum_version_subjects.subject_id
              ' . $where . '
-             ORDER BY curriculum_version_subjects.sequence_order IS NULL,
+             ORDER BY ' . $searchOrder . 'curriculum_version_subjects.sequence_order IS NULL,
                       curriculum_version_subjects.sequence_order,
                       subjects.subject_code, curriculum_version_subjects.id
              LIMIT ? OFFSET ?',
-            $types . 'ii',
+            $types . str_repeat('s', count($rankParams)) . 'ii',
             $listParams
         );
         $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -130,7 +132,9 @@ class CurriculumVersionSubjectRepository
         $countStmt->close();
 
         $pagination = RepositoryQuery::pagination($total, $query['page'], $query['per_page']);
-        $listParams = $params;
+        $rankParams = [];
+        $searchOrder = RepositoryQuery::searchOrder(['subjects.subject_code', 'subjects.subject_title'], $query['search'] ?? null, $rankParams);
+        $listParams = array_merge($params, $rankParams);
         $listParams[] = $pagination['per_page'];
         $listParams[] = $pagination['offset'];
         $stmt = RepositoryQuery::execute(
@@ -146,7 +150,7 @@ class CurriculumVersionSubjectRepository
                     academic_programs.id AS academic_program_id,
                     academic_programs.program_code, academic_programs.program_name'
             . $joins . $where .
-            ' ORDER BY academic_programs.program_code ASC,
+            ' ORDER BY ' . $searchOrder . 'academic_programs.program_code ASC,
                        curricula.curriculum_code ASC,
                        curriculum_versions.version_label ASC,
                        COALESCE(cvs.year_level, \'\') ASC,
@@ -156,7 +160,7 @@ class CurriculumVersionSubjectRepository
                        subjects.subject_code ASC,
                        cvs.id ASC
               LIMIT ? OFFSET ?',
-            $types . 'ii',
+            $types . str_repeat('s', count($rankParams)) . 'ii',
             $listParams
         );
         $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -273,8 +277,8 @@ class CurriculumVersionSubjectRepository
             $params[] = $query['curriculum_version_id'];
         }
         if ($query['search'] !== null) {
-            $conditions[] = "(subjects.subject_code LIKE ? ESCAPE '='
-                              OR subjects.subject_title LIKE ? ESCAPE '=')";
+            $conditions[] = "(" . RepositoryQuery::searchColumn('subjects.subject_code') . " LIKE ? ESCAPE '='
+                              OR " . RepositoryQuery::searchColumn('subjects.subject_title') . " LIKE ? ESCAPE '=')";
             $pattern = RepositoryQuery::likePattern($query['search']);
             $types .= 'ss';
             $params[] = $pattern;

@@ -161,7 +161,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
         <div class="form-field form-field-wide">
           <label for="mappingSubjectSelectorSearch">Subject <strong>*</strong></label>
           <div class="record-autocomplete">
-            <input type="search" id="mappingSubjectSelectorSearch" maxlength="100" placeholder="Search by subject code or title" required/>
+            <input type="search" id="mappingSubjectSelectorSearch" maxlength="100" placeholder="Search all subjects by code or title" required/>
             <input type="hidden" name="subject_id" id="mappingSubjectId"/>
             <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear subject" title="Clear selection" hidden><i class="fa-solid fa-xmark"></i></button>
             <div class="record-autocomplete-options" id="mappingSubjectOptions" role="listbox" aria-label="Subject suggestions" hidden></div>

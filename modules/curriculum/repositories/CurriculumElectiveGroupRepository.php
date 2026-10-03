@@ -98,7 +98,7 @@ class CurriculumElectiveGroupRepository
         $types = 'i';
         $params = [$versionId];
         if ($query['search'] !== null) {
-            $conditions[] = "groups.group_name LIKE ? ESCAPE '='";
+            $conditions[] = RepositoryQuery::searchColumn('groups.group_name') . " LIKE ? ESCAPE '='";
             $types .= 's';
             $params[] = RepositoryQuery::likePattern($query['search']);
         }
@@ -114,7 +114,9 @@ class CurriculumElectiveGroupRepository
         $countStmt->close();
         $pagination = RepositoryQuery::pagination($total, $query['page'], $query['per_page']);
 
-        $listParams = $params;
+        $rankParams = [];
+        $searchOrder = RepositoryQuery::searchOrder(['groups.group_name'], $query['search'] ?? null, $rankParams);
+        $listParams = array_merge($params, $rankParams);
         $listParams[] = $pagination['per_page'];
         $listParams[] = $pagination['offset'];
         $stmt = RepositoryQuery::execute(
@@ -137,9 +139,9 @@ class CurriculumElectiveGroupRepository
              INNER JOIN academic_programs
                 ON academic_programs.id = curricula.academic_program_id'
             . $where .
-            ' ORDER BY groups.group_name ASC, groups.id ASC
+            ' ORDER BY ' . $searchOrder . 'groups.group_name ASC, groups.id ASC
               LIMIT ? OFFSET ?',
-            $types . 'ii',
+            $types . str_repeat('s', count($rankParams)) . 'ii',
             $listParams
         );
         $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);

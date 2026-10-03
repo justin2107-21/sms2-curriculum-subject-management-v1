@@ -104,7 +104,7 @@ class GradeWeightingRepository
         $types = 'i';
         $params = [$schemeId];
         if ($query['search'] !== null) {
-            $conditions[] = "component_name LIKE ? ESCAPE '='";
+            $conditions[] = RepositoryQuery::searchColumn('component_name') . " LIKE ? ESCAPE '='";
             $types .= 's';
             $params[] = RepositoryQuery::likePattern($query['search']);
         }
@@ -118,7 +118,9 @@ class GradeWeightingRepository
         $total = (int)$countStmt->get_result()->fetch_assoc()['total'];
         $countStmt->close();
         $pagination = RepositoryQuery::pagination($total, $query['page'], $query['per_page']);
-        $listParams = $params;
+        $rankParams = [];
+        $searchOrder = RepositoryQuery::searchOrder(['component_name'], $query['search'] ?? null, $rankParams);
+        $listParams = array_merge($params, $rankParams);
         $listParams[] = $pagination['per_page'];
         $listParams[] = $pagination['offset'];
         $stmt = RepositoryQuery::execute(
@@ -126,9 +128,9 @@ class GradeWeightingRepository
             'SELECT id, scheme_id, component_name, weight_percentage,
                     sequence_order, created_at, updated_at
              FROM grade_weighting_components' . $where . '
-             ORDER BY sequence_order IS NULL, sequence_order ASC,
+             ORDER BY ' . $searchOrder . 'sequence_order IS NULL, sequence_order ASC,
                       component_name ASC, id ASC LIMIT ? OFFSET ?',
-            $types . 'ii',
+            $types . str_repeat('s', count($rankParams)) . 'ii',
             $listParams
         );
         $records = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);

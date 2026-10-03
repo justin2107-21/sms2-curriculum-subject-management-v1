@@ -1,5 +1,29 @@
 # Foundation regression (CLI only)
 
+## Deterministic search and final electives checks
+
+Run `php tests/search-ranking.php` and `node tests/search-ranking.cjs` for the
+SQL/JavaScript relevance matrix, explicit fields, normalization, literal wildcards,
+pagination and context isolation. The PHP test uses connection-local temporary
+tables. `node tests/curriculum-cascade.cjs` also exercises real shared autocomplete
+ranking, three/five-result caps, stale responses and empty states.
+
+The finalized suite `php tests/electives-http.php --foundation` passes against a
+disposable local server/schema. See [the final audit](../docs/search-electives-finalization.md)
+for the full inventory, results and remaining visual checks.
+
+## Electives Manager
+
+Run `php tests/electives-service.php`, `php tests/electives-http.php`, and
+`node tests/electives-workspace.cjs`. Service fixtures use connection-local temporary
+tables; HTTP fixtures use a disposable local database/server and random credentials.
+Both remove their fixtures. The service test can exercise migration 014 on its
+temporary group table when the local schema has not yet been upgraded.
+
+`php tests/electives-http.php --foundation` also runs the full foundation suite
+against the disposable server. See the final audit above for results and remaining
+browser verification.
+
 ## BSIT pre-oral dataset checks
 
 `php tests/bsit_manifest.php` validates the single confirmed-unit manifest without

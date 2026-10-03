@@ -37,8 +37,8 @@ class CurriculumVersionRepository
         $params = [$curriculumId];
 
         if ($query['search'] !== null) {
-            $conditions[] = "(version_label LIKE ? ESCAPE '='
-                              OR effective_academic_year LIKE ? ESCAPE '=')";
+            $conditions[] = "(" . RepositoryQuery::searchColumn('version_label') . " LIKE ? ESCAPE '='
+                              OR " . RepositoryQuery::searchColumn('effective_academic_year') . " LIKE ? ESCAPE '=')";
             $pattern = RepositoryQuery::likePattern($query['search']);
             $types .= 'ss';
             $params[] = $pattern;
@@ -61,7 +61,9 @@ class CurriculumVersionRepository
         $countStmt->close();
 
         $pagination = RepositoryQuery::pagination($total, $query['page'], $query['per_page']);
-        $listParams = $params;
+        $rankParams = [];
+        $searchOrder = RepositoryQuery::searchOrder(['version_label', 'effective_academic_year'], $query['search'] ?? null, $rankParams);
+        $listParams = array_merge($params, $rankParams);
         $listParams[] = $pagination['per_page'];
         $listParams[] = $pagination['offset'];
         $stmt = RepositoryQuery::execute(
@@ -69,8 +71,8 @@ class CurriculumVersionRepository
             'SELECT id, curriculum_id, version_label, effective_academic_year,
                     description, status, created_at, updated_at
              FROM curriculum_versions' . $where . '
-             ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?',
-            $types . 'ii',
+             ORDER BY ' . $searchOrder . 'created_at DESC, id DESC LIMIT ? OFFSET ?',
+            $types . str_repeat('s', count($rankParams)) . 'ii',
             $listParams
         );
         $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);

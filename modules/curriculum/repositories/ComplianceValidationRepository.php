@@ -164,11 +164,11 @@ class ComplianceValidationRepository
         $types = '';
         $params = [];
         if ($query['search'] !== null) {
-            $conditions[] = "(programs.program_code LIKE ? ESCAPE '='
-                              OR programs.program_name LIKE ? ESCAPE '='
-                              OR curricula.curriculum_code LIKE ? ESCAPE '='
-                              OR curricula.curriculum_name LIKE ? ESCAPE '='
-                              OR versions.version_label LIKE ? ESCAPE '=')";
+            $conditions[] = "(" . RepositoryQuery::searchColumn('programs.program_code') . " LIKE ? ESCAPE '='
+                              OR " . RepositoryQuery::searchColumn('programs.program_name') . " LIKE ? ESCAPE '='
+                              OR " . RepositoryQuery::searchColumn('curricula.curriculum_code') . " LIKE ? ESCAPE '='
+                              OR " . RepositoryQuery::searchColumn('curricula.curriculum_name') . " LIKE ? ESCAPE '='
+                              OR " . RepositoryQuery::searchColumn('versions.version_label') . " LIKE ? ESCAPE '=')";
             $pattern = RepositoryQuery::likePattern($query['search']);
             $types .= 'sssss';
             array_push($params, $pattern, $pattern, $pattern, $pattern, $pattern);
@@ -195,14 +195,16 @@ class ComplianceValidationRepository
         $total = (int)$countStmt->get_result()->fetch_assoc()['total'];
         $countStmt->close();
         $pagination = RepositoryQuery::pagination($total, $query['page'], $query['per_page']);
-        $listParams = $params;
+        $rankParams = [];
+        $searchOrder = RepositoryQuery::searchOrder(['programs.program_code', 'programs.program_name', 'curricula.curriculum_code', 'curricula.curriculum_name', 'versions.version_label'], $query['search'] ?? null, $rankParams);
+        $listParams = array_merge($params, $rankParams);
         $listParams[] = $pagination['per_page'];
         $listParams[] = $pagination['offset'];
         $stmt = RepositoryQuery::execute(
             $this->db,
             $this->runSelect() . $where .
-            ' ORDER BY runs.created_at DESC, runs.id DESC LIMIT ? OFFSET ?',
-            $types . 'ii',
+            ' ORDER BY ' . $searchOrder . 'runs.created_at DESC, runs.id DESC LIMIT ? OFFSET ?',
+            $types . str_repeat('s', count($rankParams)) . 'ii',
             $listParams
         );
         $records = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);

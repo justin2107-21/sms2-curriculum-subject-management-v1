@@ -375,7 +375,17 @@
             try {
                 const results = await options.search(query);
                 if (sequence !== requestSequence) return;
-                render(results);
+                const ranked = searchRecords(Array.isArray(results) ? results : [], query, options.searchFields || (item => {
+                    if ('subject_code' in item) return [item.subject_code, item.subject_title];
+                    if ('reference_code' in item) return [item.reference_code, item.title, item.issuing_body];
+                    if ('version_label' in item) return [item.version_label, item.effective_academic_year];
+                    if ('curriculum_code' in item) return [item.curriculum_code, item.curriculum_name];
+                    if ('program_code' in item) return [item.program_code, item.program_name];
+                    const display = format(item);
+                    return display.code || display.title ? [display.code, display.title] : [display.label];
+                }));
+                const contextEntity = ranked[0] && !('subject_code' in ranked[0]) && ['program_code','curriculum_code','version_label'].some(key => key in ranked[0]);
+                render(ranked.slice(0, options.maxSuggestions || (contextEntity ? 3 : 5)));
             } catch (error) {
                 if (sequence !== requestSequence) return;
                 showState(options.errorText || 'Matching records could not be loaded.', 'error');
@@ -531,6 +541,7 @@
             }
             const selector = createAutocomplete({
                 ...level,
+                maxSuggestions: 3,
                 onSelect: function (item, id) {
                     clearFollowing(index);
                     syncAvailability(index);
@@ -641,7 +652,29 @@
         };
     }
 
+    function normalizeSearch(value) { return String(value ?? '').trim().replace(/\s+/gu, ' ').toLowerCase(); }
+    function searchRank(fields, query) {
+        const q = normalizeSearch(query);
+        if (!q) return 0;
+        return Math.min(...fields.map(value => {
+            const field = normalizeSearch(value);
+            if (field === q) return 0;
+            if (field.startsWith(q)) return 1;
+            for (let index = field.indexOf(q); index >= 0; index = field.indexOf(q, index + 1)) {
+                if (index === 0 || !/[\p{L}\p{N}_]/u.test(field[index - 1])) return 2;
+            }
+            return field.includes(q) ? 3 : Infinity;
+        }));
+    }
+    function searchRecords(records, query, fields) {
+        const compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+        return records.map(item => ({ item, values: fields(item).map(normalizeSearch), rank: searchRank(fields(item), query) }))
+            .filter(row => Number.isFinite(row.rank))
+            .sort((a, b) => a.rank - b.rank || searchRank([a.values[0]], query) - searchRank([b.values[0]], query) || a.values.reduce((result, value, index) => result || compare(value, b.values[index]), 0) || compare(String(a.item.id ?? a.item.subject_id ?? ''), String(b.item.id ?? b.item.subject_id ?? '')))
+            .map(row => row.item);
+    }
     window.CurriculumUI = {
+        normalizeSearch, searchRank, searchRecords,
         escapeHtml,
         fetchJson,
         postForm,

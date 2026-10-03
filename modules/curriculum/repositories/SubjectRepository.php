@@ -40,7 +40,7 @@ class SubjectRepository
         $params = [];
 
         if ($query['search'] !== null) {
-            $conditions[] = "(subject_code LIKE ? ESCAPE '=' OR subject_title LIKE ? ESCAPE '=')";
+            $conditions[] = "(" . RepositoryQuery::searchColumn('subject_code') . " LIKE ? ESCAPE '=' OR " . RepositoryQuery::searchColumn('subject_title') . " LIKE ? ESCAPE '=')";
             $pattern = RepositoryQuery::likePattern($query['search']);
             $types .= 'ss';
             $params[] = $pattern;
@@ -91,7 +91,9 @@ class SubjectRepository
         $countStmt->close();
 
         $pagination = RepositoryQuery::pagination($total, $query['page'], $query['per_page']);
-        $listParams = $params;
+        $rankParams = [];
+        $searchOrder = RepositoryQuery::searchOrder(['subject_code', 'subject_title'], $query['search'] ?? null, $rankParams);
+        $listParams = array_merge($params, $rankParams);
         $listParams[] = $pagination['per_page'];
         $listParams[] = $pagination['offset'];
         $stmt = RepositoryQuery::execute(
@@ -99,8 +101,8 @@ class SubjectRepository
             'SELECT id, subject_code, subject_title, description, units, lecture_units,
                     laboratory_units, status, created_at, updated_at
              FROM subjects' . $where . '
-             ORDER BY subject_code ASC, id ASC LIMIT ? OFFSET ?',
-            $types . 'ii',
+             ORDER BY ' . $searchOrder . 'subject_code ASC, id ASC LIMIT ? OFFSET ?',
+            $types . str_repeat('s', count($rankParams)) . 'ii',
             $listParams
         );
         $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -174,7 +176,7 @@ class SubjectRepository
             }
         }
         if ($query['search'] !== null) {
-            $conditions[] = "(c.curriculum_code LIKE ? ESCAPE '=' OR c.curriculum_name LIKE ? ESCAPE '=' OR v.version_label LIKE ? ESCAPE '=')";
+            $conditions[] = "(" . RepositoryQuery::searchColumn('c.curriculum_code') . " LIKE ? ESCAPE '=' OR " . RepositoryQuery::searchColumn('c.curriculum_name') . " LIKE ? ESCAPE '=' OR " . RepositoryQuery::searchColumn('v.version_label') . " LIKE ? ESCAPE '=')";
             array_push($params, ...array_fill(0, 3, RepositoryQuery::likePattern($query['search'])));
             $types .= 'sss';
         }
@@ -184,10 +186,12 @@ class SubjectRepository
         $total = (int)$stmt->get_result()->fetch_assoc()['total'];
         $stmt->close();
         $pagination = RepositoryQuery::pagination($total, $query['page'], $query['per_page']);
+        $rankParams = [];
+        $searchOrder = RepositoryQuery::searchOrder(['c.curriculum_code','c.curriculum_name','v.version_label'], $query['search'] ?? null, $rankParams);
         $stmt = RepositoryQuery::execute($this->db,
             'SELECT v.id, v.version_label, c.curriculum_code, c.curriculum_name' . $joins . $where .
-            ' ORDER BY c.curriculum_code, v.version_label, v.id LIMIT ? OFFSET ?',
-            $types . 'ii', array_merge($params, [$pagination['per_page'], $pagination['offset']]));
+            ' ORDER BY ' . $searchOrder . 'c.curriculum_code, v.version_label, v.id LIMIT ? OFFSET ?',
+            $types . str_repeat('s', count($rankParams)) . 'ii', array_merge($params, $rankParams, [$pagination['per_page'], $pagination['offset']]));
         $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
         unset($pagination['offset']);

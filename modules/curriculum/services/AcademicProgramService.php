@@ -25,6 +25,12 @@ class AcademicProgramService
     public function list(array $input): array
     {
         $query = DomainValidator::listQuery($input, ['active', 'inactive']);
+        $query['program_type'] = DomainValidator::optionalString($input, 'program_type', 'Degree level', 100);
+        $category = DomainValidator::optionalString($input, 'program_category', 'Program category', 20);
+        if ($category !== null && !in_array($category, ['college', 'shs'], true)) {
+            throw new DomainValidationException('Program category is invalid.');
+        }
+        $query['program_category'] = $category;
         $result = $this->programs->paginate($query);
         return ['programs' => $result['records'], 'pagination' => $result['pagination']];
     }

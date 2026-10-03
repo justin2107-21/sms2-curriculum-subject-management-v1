@@ -14,6 +14,9 @@
         rulePage: 1,
         referencePage: 1,
         historyPage: 1,
+        ruleRequest: 0,
+        referenceRequest: 0,
+        historyRequest: 0,
         rules: new Map(),
         references: new Map(),
         lockedRule: null,
@@ -31,6 +34,76 @@
     const ruleModal = ui.createModal(document.getElementById('complianceRuleModal'));
     const referenceModal = ui.createModal(document.getElementById('complianceReferenceModal'));
     const runModal = ui.createModal(document.getElementById('complianceRunModal'));
+    const referenceAutocomplete = ui.createAutocomplete({
+        input: document.getElementById('complianceRuleReferenceInput'),
+        valueInput: document.getElementById('complianceRuleReference'),
+        list: document.getElementById('complianceRuleReferenceOptions'),
+        helpText: 'Search registered compliance references.',
+        selectedText: 'Compliance reference selected.',
+        loadingText: 'Searching compliance references…',
+        noResultsText: 'No matching compliance references found.',
+        search: async function (query) {
+            const payload = await ui.fetchJson(endpoint, {
+                action: 'reference_list', page: 1, per_page: 20, search: query
+            });
+            return payload.references;
+        },
+        getId: reference => reference.id,
+        format: reference => ({
+            label: '[' + reference.reference_type + '] ' +
+                (reference.reference_code || reference.title || 'Reference') + ' — ' + reference.issuing_body,
+            code: '[' + reference.reference_type + '] ' + (reference.reference_code || 'Reference'),
+            title: reference.title || reference.issuing_body,
+            meta: reference.issuing_body
+        }),
+        onError: error => ui.showFormError(ruleForm, error.message || 'Compliance references could not be loaded.')
+    });
+    const scopeInput = document.getElementById('complianceRuleScopeInput');
+    const scopeAutocomplete = ui.createAutocomplete({
+        input: scopeInput,
+        valueInput: document.getElementById('complianceRuleScope'),
+        list: document.getElementById('complianceRuleScopeOptions'),
+        helpText: 'Search the selected scope type.',
+        selectedText: 'Scope record selected.',
+        loadingText: 'Searching scope records…',
+        noResultsText: 'No matching scope records found.',
+        search: async function (query) {
+            const isProgram = document.getElementById('complianceRuleScopeType').value === 'program';
+            const payload = await ui.fetchJson(endpoint, {
+                action: isProgram ? 'program_options' : 'curriculum_options',
+                page: 1, per_page: 20, search: query
+            });
+            return isProgram ? payload.programs : payload.curricula;
+        },
+        getId: record => record.id,
+        format: function (record) {
+            const isProgram = document.getElementById('complianceRuleScopeType').value === 'program';
+            const code = isProgram ? record.program_code : record.curriculum_code;
+            const title = isProgram ? record.program_name : record.curriculum_name;
+            return { label: code + ' — ' + title, code: code, title: title };
+        },
+        onError: error => ui.showFormError(ruleForm, error.message || 'Scope records could not be loaded.')
+    });
+    const complianceSubjectInput = document.getElementById('complianceRuleSubjectInput');
+    const complianceSubjectAutocomplete = ui.createAutocomplete({
+        input: complianceSubjectInput,
+        valueInput: document.getElementById('complianceRuleSubject'),
+        list: document.getElementById('complianceRuleSubjectOptions'),
+        helpText: 'Search for a Subject Master record.',
+        selectedText: 'Configured subject selected.',
+        loadingText: 'Searching subjects…',
+        noResultsText: 'No matching subjects found.',
+        errorText: 'Subject Master records could not be loaded.',
+        search: async function (query) {
+            const payload = await ui.fetchJson(endpoint, {
+                action: 'subject_options', page: 1, per_page: 20, search: query
+            });
+            return payload.subjects;
+        },
+        getId: subject => subject.id,
+        format: subject => ({ label: subject.subject_code + ' — ' + subject.subject_title,
+            code: subject.subject_code, title: subject.subject_title })
+    });
 
     function optionMarkup(value, label) {
         return '<option value="' + ui.escapeHtml(value) + '">' + ui.escapeHtml(label) + '</option>';
@@ -222,6 +295,7 @@
     }
 
     async function loadRules(page) {
+        const requestId = ++state.ruleRequest;
         state.rulePage = Number(page) || 1;
         tableState(ruleRows, ruleColumns, 'Loading compliance rules...', false);
         try {
@@ -231,12 +305,14 @@
                 rule_type: document.getElementById('ruleTypeFilter').value,
                 technical_status: document.getElementById('ruleStatusFilter').value
             });
+            if (requestId !== state.ruleRequest) return;
             state.rulePage = Number(payload.pagination.page);
             state.rules.clear();
             payload.rules.forEach(function (item) { state.rules.set(Number(item.id), item); });
             ruleRows.innerHTML = payload.rules.length ? payload.rules.map(ruleRow).join('') : '<tr><td colspan="' + ruleColumns + '" class="empty-cell">No compliance rules found.</td></tr>';
             ui.renderPagination(document.getElementById('rulePagination'), payload.pagination, loadRules);
         } catch (error) {
+            if (requestId !== state.ruleRequest) return;
             tableState(ruleRows, ruleColumns, error.message, true);
             ui.showToast(error.message, 'error');
         }
@@ -252,6 +328,7 @@
     }
 
     async function loadReferences(page) {
+        const requestId = ++state.referenceRequest;
         state.referencePage = Number(page) || 1;
         tableState(referenceRows, referenceColumns, 'Loading compliance references...', false);
         try {
@@ -261,12 +338,14 @@
                 reference_type: document.getElementById('referenceTypeFilter').value,
                 verification_status: document.getElementById('referenceStatusFilter').value
             });
+            if (requestId !== state.referenceRequest) return;
             state.referencePage = Number(payload.pagination.page);
             state.references.clear();
             payload.references.forEach(function (item) { state.references.set(Number(item.id), item); });
             referenceRows.innerHTML = payload.references.length ? payload.references.map(referenceRow).join('') : '<tr><td colspan="' + referenceColumns + '" class="empty-cell">No compliance references found.</td></tr>';
             ui.renderPagination(document.getElementById('referencePagination'), payload.pagination, loadReferences);
         } catch (error) {
+            if (requestId !== state.referenceRequest) return;
             tableState(referenceRows, referenceColumns, error.message, true);
             ui.showToast(error.message, 'error');
         }
@@ -274,13 +353,14 @@
 
     function historyRow(run) {
         const runner = [run.run_by_first_name, run.run_by_last_name].filter(Boolean).join(' ') || run.run_by_username || 'Unknown user';
-        return '<tr><td>' + ui.escapeHtml(formatDateTime(run.created_at)) + '</td><td><span class="compliance-name">' + ui.escapeHtml(run.program_code) + '</span><span class="compliance-subtext">' + ui.escapeHtml(run.program_name) + '</span></td>' +
+        return '<tr data-record-view="' + Number(run.id) + '" tabindex="0" aria-label="View validation run on ' + ui.escapeHtml(formatDateTime(run.created_at)) + '"><td>' + ui.escapeHtml(formatDateTime(run.created_at)) + '</td><td><span class="compliance-name">' + ui.escapeHtml(run.program_code) + '</span><span class="compliance-subtext">' + ui.escapeHtml(run.program_name) + '</span></td>' +
             '<td><span class="compliance-name">' + ui.escapeHtml(run.curriculum_code) + '</span><span class="compliance-subtext">' + ui.escapeHtml(run.curriculum_name) + '</span></td><td>' + ui.escapeHtml(run.version_label) + '</td>' +
             '<td>' + Number(run.rules_evaluated) + '</td><td>' + Number(run.passed_count) + '</td><td>' + Number(run.failed_count) + '</td><td>' + Number(run.not_evaluated_count) + '</td><td>' + ui.escapeHtml(runner) + '</td>' +
             '<td><button type="button" class="row-action-button" data-view-compliance-run="' + Number(run.id) + '"><i class="fa-solid fa-eye"></i> View</button></td></tr>';
     }
 
     async function loadHistory(page) {
+        const requestId = ++state.historyRequest;
         state.historyPage = Number(page) || 1;
         tableState(historyRows, 10, 'Loading validation history...', false);
         try {
@@ -288,10 +368,12 @@
                 action: 'history_list', page: state.historyPage, per_page: document.getElementById('historyPerPage').value,
                 search: document.getElementById('historySearch').value.trim()
             });
+            if (requestId !== state.historyRequest) return;
             state.historyPage = Number(payload.pagination.page);
             historyRows.innerHTML = payload.runs.length ? payload.runs.map(historyRow).join('') : '<tr><td colspan="10" class="empty-cell">No validation runs found.</td></tr>';
             ui.renderPagination(document.getElementById('historyPagination'), payload.pagination, loadHistory);
         } catch (error) {
+            if (requestId !== state.historyRequest) return;
             tableState(historyRows, 10, error.message, true);
             ui.showToast(error.message, 'error');
         }
@@ -310,40 +392,18 @@
         }
     }
 
-    async function optionData(action, extra) {
-        return ui.fetchJson(endpoint, Object.assign({ action: action, page: 1, per_page: 50 }, extra || {}));
-    }
-
-    async function fillRuleOptions() {
-        const referenceSelect = document.getElementById('complianceRuleReference');
-        const subjectSelect = document.getElementById('complianceRuleSubject');
-        const [referencePayload, subjectPayload] = await Promise.all([
-            optionData('reference_list'), optionData('subject_options')
-        ]);
-        referenceSelect.innerHTML = optionMarkup('', 'Select a compliance reference') + referencePayload.references.map(function (item) {
-            return optionMarkup(item.id, '[' + item.reference_type + '] ' + (item.reference_code || item.title || 'Reference') + ' - ' + item.issuing_body);
-        }).join('');
-        subjectSelect.innerHTML = optionMarkup('', 'Select a Subject Master record') + subjectPayload.subjects.map(function (item) {
-            return optionMarkup(item.id, item.subject_code + ' - ' + item.subject_title + ' (' + ui.formatUnits(item.units) + ' units)');
-        }).join('');
-    }
-
-    async function fillScopeOptions(selected) {
+    function fillScopeOptions(rule) {
         const scopeType = document.getElementById('complianceRuleScopeType').value;
-        const scope = document.getElementById('complianceRuleScope');
-        resetSelect(scope, 'Loading scope records...', true);
-        try {
-            const payload = await optionData(scopeType === 'program' ? 'program_options' : 'curriculum_options');
-            const records = scopeType === 'program' ? payload.programs : payload.curricula;
-            scope.innerHTML = optionMarkup('', scopeType === 'program' ? 'Select an academic program' : 'Select a curriculum') + records.map(function (item) {
-                return optionMarkup(item.id, scopeType === 'program' ? item.program_code + ' - ' + item.program_name : item.curriculum_code + ' - ' + item.curriculum_name);
-            }).join('');
-            scope.disabled = false;
-            if (selected) scope.value = String(selected);
-        } catch (error) {
-            resetSelect(scope, 'Scope records unavailable', true);
-            ui.showToast(error.message, 'error');
-        }
+        scopeAutocomplete?.clear();
+        scopeInput.disabled = false;
+        scopeInput.placeholder = scopeType === 'program'
+            ? 'Search academic program code or name'
+            : 'Search curriculum code or name';
+        if (!rule) return;
+        const record = scopeType === 'program'
+            ? { id: rule.academic_program_id, program_code: rule.program_code, program_name: rule.program_name }
+            : { id: rule.curriculum_id, curriculum_code: rule.curriculum_code, curriculum_name: rule.curriculum_name };
+        if (record.id) scopeAutocomplete?.setSelected(record);
     }
 
     function updateRuleFields() {
@@ -353,13 +413,21 @@
         document.getElementById('complianceNumericField').hidden = !numeric;
         document.getElementById('complianceRuleNumeric').required = numeric;
         document.getElementById('complianceSubjectField').hidden = !subject;
-        document.getElementById('complianceRuleSubject').required = subject;
+        complianceSubjectInput.required = subject && !state.lockedRule;
+        document.getElementById('complianceRuleSubject').required = false;
     }
 
     function setSemanticLock(locked) {
-        ['complianceRuleReference', 'complianceRuleScopeType', 'complianceRuleScope', 'complianceRuleType', 'complianceRuleNumeric', 'complianceRuleSubject'].forEach(function (id) {
+        ['complianceRuleReference', 'complianceRuleScopeType', 'complianceRuleScope', 'complianceRuleType', 'complianceRuleNumeric', 'complianceRuleSubject', 'complianceRuleSubjectInput'].forEach(function (id) {
             const field = document.getElementById(id);
             if (field) field.disabled = locked;
+        });
+        [document.getElementById('complianceRuleReferenceInput'), scopeInput, complianceSubjectInput]
+            .forEach(function (input) {
+                if (input) input.disabled = locked;
+            });
+        document.querySelectorAll('#complianceRuleModal [data-autocomplete-clear]').forEach(function (button) {
+            button.disabled = locked;
         });
         document.getElementById('complianceRuleHistoryNotice').hidden = !locked;
     }
@@ -367,20 +435,36 @@
     async function openRuleForm(rule) {
         if (!canManage || !ruleForm || !ruleModal) return;
         ruleForm.reset();
+        referenceAutocomplete?.clear();
+        scopeAutocomplete?.clear();
+        complianceSubjectAutocomplete?.clear();
         ui.clearFormError(ruleForm);
         setSemanticLock(false);
         state.lockedRule = rule && Number(rule.has_history) ? rule : null;
         try {
-            await fillRuleOptions();
             document.getElementById('complianceRuleId').value = rule ? rule.id : '';
             document.getElementById('complianceRuleName').value = rule ? rule.rule_name : '';
-            document.getElementById('complianceRuleReference').value = rule ? rule.compliance_reference_id : '';
             document.getElementById('complianceRuleStatus').value = rule ? rule.technical_status : 'active';
             document.getElementById('complianceRuleScopeType').value = rule && rule.curriculum_id ? 'curriculum' : 'program';
-            await fillScopeOptions(rule ? (rule.curriculum_id || rule.academic_program_id) : null);
+            fillScopeOptions(rule);
+            if (rule?.compliance_reference_id) {
+                referenceAutocomplete?.setSelected({
+                    id: rule.compliance_reference_id,
+                    reference_type: rule.reference_type,
+                    reference_code: rule.reference_code,
+                    title: rule.reference_title,
+                    issuing_body: rule.issuing_body
+                });
+            }
             document.getElementById('complianceRuleType').value = rule ? rule.rule_type : 'MIN_TOTAL_UNITS';
             document.getElementById('complianceRuleNumeric').value = rule?.numeric_value ?? '';
-            document.getElementById('complianceRuleSubject').value = rule?.subject_id ?? '';
+            if (rule?.subject_id) {
+                complianceSubjectAutocomplete?.setSelected({
+                    id: rule.subject_id,
+                    subject_code: rule.subject_code || '',
+                    subject_title: rule.subject_title || ''
+                });
+            }
             document.getElementById('complianceRuleDescription').value = rule?.description ?? '';
             updateRuleFields();
             setSemanticLock(Boolean(state.lockedRule));
@@ -435,6 +519,23 @@
 
     async function submitRule(event) {
         event.preventDefault();
+        const ruleType = document.getElementById('complianceRuleType').value;
+        const subjectRequired = ['REQUIRED_SUBJECT', 'MIN_SUBJECT_UNITS', 'MAX_SUBJECT_UNITS'].includes(ruleType);
+        if (!state.lockedRule && !referenceAutocomplete?.hasSelection()) {
+            ui.showFormError(ruleForm, 'Please select a valid compliance reference.');
+            document.getElementById('complianceRuleReferenceInput').focus();
+            return;
+        }
+        if (!state.lockedRule && !scopeAutocomplete?.hasSelection()) {
+            ui.showFormError(ruleForm, 'Please select a valid scope record.');
+            scopeInput?.focus();
+            return;
+        }
+        if (subjectRequired && !state.lockedRule && !complianceSubjectAutocomplete?.hasSelection()) {
+            ui.showFormError(ruleForm, 'Please select a valid subject.');
+            complianceSubjectInput?.focus();
+            return;
+        }
         if (!ruleForm.reportValidity()) return;
         ui.clearFormError(ruleForm);
         const data = new FormData(ruleForm);
@@ -492,7 +593,20 @@
     });
     historyRows?.addEventListener('click', function (event) {
         const button = event.target.closest('[data-view-compliance-run]');
-        if (button) viewRun(Number(button.dataset.viewComplianceRun));
+        if (button) {
+            event.stopPropagation();
+            viewRun(Number(button.dataset.viewComplianceRun));
+            return;
+        }
+        const row = event.target.closest('tr[data-record-view]');
+        if (row) viewRun(Number(row.dataset.recordView));
+    });
+    historyRows?.addEventListener('keydown', function (event) {
+        const row = event.target.closest('tr[data-record-view]');
+        if (row && event.target === row && (event.key === 'Enter' || event.key === ' ')) {
+            event.preventDefault();
+            viewRun(Number(row.dataset.recordView));
+        }
     });
 
     if (canManage) {
