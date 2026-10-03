@@ -18,13 +18,15 @@
         manage: workspace.dataset.canManageMappings === '1',
         add: workspace.dataset.canAddMappings === '1'
     };
-    const columnCount = permissions.manage ? 10 : 9;
+    const columnCount = permissions.manage ? 6 : 5;
     const state = {
         page: 1,
         request: 0,
-        subjectRequest: 0,
         mappings: new Map(),
-        pendingRemoval: null
+        pendingRemoval: null,
+        viewingMapping: null,
+        clearingFilters: false,
+        resettingContext: false
     };
 
     const programFilter = document.getElementById('mappingProgramFilter');
@@ -42,112 +44,123 @@
     const addModal = ui.createModal(document.getElementById('addMappingModal'));
     const editModal = ui.createModal(document.getElementById('editMappingModal'));
     const removeModal = ui.createModal(removeElement);
+    const detailsModal = ui.createModal(document.getElementById('mappingDetailsModal'));
+    const programInput = document.getElementById('mappingProgramInput');
+    const curriculumInput = document.getElementById('mappingCurriculumInput');
+    const versionInput = document.getElementById('mappingVersionInput');
+    let curriculumAutocomplete;
+    let versionAutocomplete;
+    const programAutocomplete = ui.createAutocomplete({
+        input: programInput, valueInput: programFilter,
+        list: document.getElementById('mappingProgramOptions'),
+        helpText: 'All available programs', selectedText: 'Program context selected.',
+        loadingText: 'Searching programs…', noResultsText: 'No matching programs found.',
+        search: async function (query) {
+            const payload = await ui.fetchJson(endpoints.programs, {
+                action: 'list', page: 1, per_page: 20, search: query, status: ''
+            });
+            return payload.programs;
+        },
+        getId: item => item.id,
+        format: item => ({ label: item.program_code + ' — ' + item.program_name,
+            code: item.program_code, title: item.program_name, meta: item.program_type || '' }),
+        onSelect: function () { resetMappingContext(); if (!state.clearingFilters && !state.resettingContext) loadMappings(1); },
+        onClear: function () { resetMappingContext(); if (!state.clearingFilters && !state.resettingContext) loadMappings(1); }
+    });
+    curriculumAutocomplete = ui.createAutocomplete({
+        input: curriculumInput, valueInput: curriculumFilter,
+        list: document.getElementById('mappingCurriculumOptions'),
+        helpText: 'All available curricula', selectedText: 'Curriculum context selected.',
+        loadingText: 'Searching curricula…', noResultsText: 'No matching curricula found.',
+        search: async function (query) {
+            const payload = await ui.fetchJson(endpoints.curricula, {
+                action: 'list', page: 1, per_page: 20, search: query, status: '',
+                academic_program_id: programFilter.value
+            });
+            return payload.curricula;
+        },
+        getId: item => item.id,
+        format: item => ({ label: item.curriculum_code + ' — ' + item.curriculum_name,
+            code: item.curriculum_code, title: item.curriculum_name }),
+        onSelect: function () { resetMappingVersion(); if (!state.clearingFilters && !state.resettingContext) loadMappings(1); },
+        onClear: function () { resetMappingVersion(); if (!state.clearingFilters && !state.resettingContext) loadMappings(1); }
+    });
+    versionAutocomplete = ui.createAutocomplete({
+        input: versionInput, valueInput: versionFilter,
+        list: document.getElementById('mappingVersionOptions'),
+        helpText: 'Select a curriculum first', selectedText: 'Version context selected.',
+        loadingText: 'Searching versions…', noResultsText: 'No matching versions found.',
+        search: async function (query) {
+            if (!curriculumFilter.value) return [];
+            const payload = await ui.fetchJson(endpoints.versions, {
+                action: 'list', curriculum_id: curriculumFilter.value,
+                page: 1, per_page: 20, search: query
+            });
+            return payload.versions;
+        },
+        getId: item => item.id,
+        format: item => ({ label: item.version_label +
+            (item.effective_academic_year ? ' — ' + item.effective_academic_year : ''),
+            code: item.version_label, title: item.effective_academic_year || item.status }),
+        onSelect: function () { if (!state.clearingFilters && !state.resettingContext) loadMappings(1); },
+        onClear: function () { if (!state.clearingFilters && !state.resettingContext) loadMappings(1); }
+    });
+    const subjectAutocomplete = ui.createAutocomplete({
+        input: document.getElementById('mappingSubjectSelectorSearch'),
+        valueInput: document.getElementById('mappingSubjectId'),
+        list: document.getElementById('mappingSubjectOptions'),
+        status: document.getElementById('mappingSubjectHint'),
+        helpText: 'Type a code or title and select a Subject Master record.',
+        selectedText: 'Subject selected.',
+        loadingText: 'Searching subjects…',
+        noResultsText: 'No matching subjects found.',
+        errorText: 'Subject Master records could not be loaded.',
+        search: async function (query) {
+            const payload = await ui.fetchJson(endpoints.subjects, {
+                action: 'list', page: 1, per_page: 20, search: query, status: ''
+            });
+            return payload.subjects;
+        },
+        getId: subject => subject.id,
+        format: subject => ({ label: subject.subject_code + ' — ' + subject.subject_title,
+            code: subject.subject_code, title: subject.subject_title }),
+        onError: error => ui.showFormError(addForm, error.message || 'Subject Master records could not be loaded.')
+    });
 
     function tableState(message, isError) {
         rows.innerHTML = '<tr class="state-row"><td colspan="' + columnCount + '" class="state-cell' +
             (isError ? ' error-state' : '') + '">' + ui.escapeHtml(message) + '</td></tr>';
     }
 
-    function selectedText(select) {
-        const option = select?.selectedOptions?.[0];
-        return option && option.value ? option.textContent.trim() : '';
-    }
-
-    function optionMarkup(value, label, selectedValue) {
-        return '<option value="' + Number(value) + '"' +
-            (Number(value) === Number(selectedValue) ? ' selected' : '') + '>' +
-            ui.escapeHtml(label) + '</option>';
-    }
-
     function updateContextState() {
         const addButton = document.getElementById('addMappingButton');
         const hasVersion = Number(versionFilter.value) > 0;
         if (addButton) addButton.disabled = !hasVersion;
-        const parts = [selectedText(programFilter), selectedText(curriculumFilter), selectedText(versionFilter)]
+        const parts = [programAutocomplete?.getSelectedLabel(), curriculumAutocomplete?.getSelectedLabel(), versionAutocomplete?.getSelectedLabel()]
             .filter(Boolean);
         document.getElementById('mappingContextMessage').textContent = parts.length
             ? 'Current context: ' + parts.join(' → ')
             : 'Showing all available subject placements.';
     }
 
-    async function loadPrograms() {
-        if (!permissions.viewPrograms) return;
-        programFilter.disabled = true;
-        programFilter.innerHTML = '<option value="">Loading programs…</option>';
-        try {
-            const payload = await ui.fetchJson(endpoints.programs, {
-                action: 'list', page: 1, per_page: 50, search: '', status: ''
-            });
-            programFilter.innerHTML = '<option value="">All available programs</option>' +
-                payload.programs.map(function (program) {
-                    return optionMarkup(
-                        program.id,
-                        program.program_code + ' — ' + program.program_name,
-                        null
-                    );
-                }).join('');
-            programFilter.disabled = false;
-        } catch (error) {
-            programFilter.innerHTML = '<option value="">Programs unavailable</option>';
-            ui.showToast(error.message || 'Academic programs could not be loaded.', 'error');
-        }
-    }
-
-    async function loadCurricula(selectedId) {
-        curriculumFilter.disabled = true;
-        curriculumFilter.innerHTML = '<option value="">Loading curricula…</option>';
-        versionFilter.disabled = true;
-        versionFilter.innerHTML = '<option value="">Select a curriculum first</option>';
-        try {
-            const payload = await ui.fetchJson(endpoints.curricula, {
-                action: 'list',
-                page: 1,
-                per_page: 50,
-                search: '',
-                status: '',
-                academic_program_id: programFilter.value
-            });
-            curriculumFilter.innerHTML = '<option value="">All available curricula</option>' +
-                payload.curricula.map(function (curriculum) {
-                    return optionMarkup(
-                        curriculum.id,
-                        curriculum.curriculum_code + ' — ' + curriculum.curriculum_name,
-                        selectedId
-                    );
-                }).join('');
-            curriculumFilter.disabled = payload.curricula.length === 0;
-        } catch (error) {
-            curriculumFilter.innerHTML = '<option value="">Curricula unavailable</option>';
-            ui.showToast(error.message || 'Curricula could not be loaded.', 'error');
-        }
+    function resetMappingVersion() {
+        const wasResetting = state.resettingContext;
+        state.resettingContext = true;
+        versionAutocomplete?.clear();
+        versionInput.disabled = !curriculumFilter.value;
+        versionInput.placeholder = curriculumFilter.value
+            ? 'Search version label or year' : 'Select a curriculum first';
+        state.resettingContext = wasResetting;
         updateContextState();
     }
 
-    async function loadVersions(selectedId) {
-        const curriculumId = Number(curriculumFilter.value);
-        versionFilter.disabled = true;
-        if (!curriculumId) {
-            versionFilter.innerHTML = '<option value="">Select a curriculum first</option>';
-            updateContextState();
-            return;
-        }
-        versionFilter.innerHTML = '<option value="">Loading versions…</option>';
-        try {
-            const payload = await ui.fetchJson(endpoints.versions, {
-                action: 'list', curriculum_id: curriculumId, page: 1, per_page: 50
-            });
-            versionFilter.innerHTML = '<option value="">All curriculum versions</option>' +
-                payload.versions.map(function (version) {
-                    const year = version.effective_academic_year
-                        ? ' — ' + version.effective_academic_year
-                        : '';
-                    return optionMarkup(version.id, version.version_label + year, selectedId);
-                }).join('');
-            versionFilter.disabled = payload.versions.length === 0;
-        } catch (error) {
-            versionFilter.innerHTML = '<option value="">Versions unavailable</option>';
-            ui.showToast(error.message || 'Curriculum versions could not be loaded.', 'error');
-        }
+    function resetMappingContext() {
+        const wasResetting = state.resettingContext;
+        state.resettingContext = true;
+        curriculumAutocomplete?.clear();
+        curriculumInput.placeholder = 'All available curricula';
+        resetMappingVersion();
+        state.resettingContext = wasResetting;
         updateContextState();
     }
 
@@ -170,21 +183,48 @@
                 '<button type="button" class="remove-action-button" data-remove-mapping="' + Number(mapping.id) +
                 '"><i class="fa-solid fa-link-slash"></i> Remove</button></div></td>'
             : '';
-        return '<tr>' +
-            '<td><span class="record-code">' + ui.escapeHtml(mapping.subject_code) + '</span></td>' +
-            '<td><span class="record-name">' + ui.escapeHtml(mapping.subject_title) + '</span></td>' +
-            '<td><span class="mapping-context-stack"><strong>' + ui.escapeHtml(mapping.program_name) +
-                '</strong><span>' + ui.escapeHtml(mapping.program_code) + '</span></span></td>' +
-            '<td><span class="mapping-context-stack"><strong>' + ui.escapeHtml(mapping.curriculum_name) +
-                '</strong><span>' + ui.escapeHtml(mapping.curriculum_code) + '</span></span></td>' +
-            '<td><span class="record-code">' + ui.escapeHtml(mapping.version_label) + '</span></td>' +
+        return '<tr data-record-view="' + Number(mapping.id) + '" tabindex="0" aria-label="View mapping for ' +
+            ui.escapeHtml(mapping.subject_code + ' ' + mapping.subject_title) + '">' +
+            '<td><span class="mapping-subject-cell"><span class="record-code">' + ui.escapeHtml(mapping.subject_code) +
+                '</span><span class="record-name">' + ui.escapeHtml(mapping.subject_title) + '</span></span></td>' +
             '<td>' + ui.escapeHtml(mapping.year_level || '—') + '</td>' +
             '<td>' + ui.escapeHtml(mapping.semester || '—') + '</td>' +
-            '<td>' + ui.escapeHtml(mapping.sequence_order ?? '—') + '</td>' +
             '<td><span class="placement-indicator ' +
                 (required ? 'placement-required' : 'placement-optional') + '">' +
                 (required ? 'Required' : 'Optional') + '</span></td>' +
+            '<td>' + ui.escapeHtml(ui.formatUnits(mapping.units)) + '</td>' +
             actions + '</tr>';
+    }
+
+    function openMappingDetails(id) {
+        const mapping = state.mappings.get(Number(id));
+        if (!mapping || !detailsModal) return;
+        state.viewingMapping = mapping;
+        document.getElementById('mappingDetailsTitle').textContent = mapping.subject_title || 'Mapping Details';
+        document.getElementById('mappingDetailsCode').textContent = mapping.subject_code || '';
+        document.getElementById('mappingDetailsSubject').textContent = mapping.subject_title || '—';
+        document.getElementById('mappingDetailsCurriculum').textContent =
+            mapping.curriculum_code + ' — ' + mapping.curriculum_name;
+        document.getElementById('mappingDetailsVersion').textContent = mapping.version_label || '—';
+        document.getElementById('mappingDetailsYear').textContent = mapping.year_level || '—';
+        document.getElementById('mappingDetailsSemester').textContent = mapping.semester || '—';
+        document.getElementById('mappingDetailsPlacement').textContent =
+            Number(mapping.is_required) === 1 ? 'Required' : 'Optional';
+        document.getElementById('mappingDetailsUnits').textContent = ui.formatUnits(mapping.units);
+        detailsModal.open();
+    }
+
+    function requestMappingRemoval(mapping) {
+        if (!mapping || !permissions.manage || !removeModal) return;
+        state.pendingRemoval = { id: mapping.id };
+        ui.clearFormError(removeElement);
+        document.getElementById('removeMappingMessage').textContent =
+            'Remove ' + mapping.subject_code + ' — ' + mapping.subject_title +
+            ' from ' + mapping.curriculum_code + ' / ' + mapping.version_label +
+            '? Only this placement will be deleted.';
+        detailsModal?.close();
+        removeModal.open();
+        document.getElementById('confirmRemoveMapping').focus();
     }
 
     async function loadMappings(page) {
@@ -234,50 +274,16 @@
         }
     }
 
-    async function loadSubjectOptions(searchValue) {
-        const select = document.getElementById('mappingSubjectId');
-        if (!select) return 0;
-        const sequence = ++state.subjectRequest;
-        const submit = addForm.querySelector('[type="submit"]');
-        select.disabled = true;
-        submit.disabled = true;
-        select.innerHTML = '<option value="">Loading subjects…</option>';
-        try {
-            const payload = await ui.fetchJson(endpoints.subjects, {
-                action: 'list', page: 1, per_page: 50, search: String(searchValue || '').trim(), status: ''
-            });
-            if (sequence !== state.subjectRequest) return 0;
-            select.innerHTML = '<option value="">Select a Subject Master record</option>' +
-                payload.subjects.map(function (subject) {
-                    return optionMarkup(
-                        subject.id,
-                        subject.subject_code + ' — ' + subject.subject_title,
-                        null
-                    );
-                }).join('');
-            select.disabled = payload.subjects.length === 0;
-            submit.disabled = payload.subjects.length === 0;
-            return Number(payload.pagination.total_records);
-        } catch (error) {
-            if (sequence !== state.subjectRequest) return 0;
-            select.innerHTML = '<option value="">Subjects unavailable</option>';
-            ui.showFormError(addForm, error.message || 'Subject Master records could not be loaded.');
-            return 0;
-        }
-    }
-
     async function openAddMapping() {
         if (!permissions.add || !versionFilter.value || !addForm || !addModal) return;
         addForm.reset();
         ui.clearFormError(addForm);
         document.getElementById('addMappingVersionId').value = versionFilter.value;
-        document.getElementById('mappingSubjectSelectorSearch').value = '';
+        subjectAutocomplete?.clear();
         document.getElementById('addMappingContext').textContent =
-            [selectedText(programFilter), selectedText(curriculumFilter), selectedText(versionFilter)]
+            [programAutocomplete?.getSelectedLabel(), curriculumAutocomplete?.getSelectedLabel(), versionAutocomplete?.getSelectedLabel()]
                 .filter(Boolean).join(' → ');
         addModal.open();
-        const total = await loadSubjectOptions('');
-        if (!total) ui.showFormError(addForm, 'No Subject Master records are available.');
         document.getElementById('mappingSubjectSelectorSearch').focus();
     }
 
@@ -297,6 +303,7 @@
         document.getElementById('editMappingSemester').value = mapping.semester || '';
         document.getElementById('editMappingSequence').value = mapping.sequence_order ?? '';
         document.getElementById('editMappingRequired').value = Number(mapping.is_required) === 1 ? '1' : '0';
+        detailsModal?.close();
         editModal.open();
         document.getElementById('editMappingYear').focus();
     }
@@ -304,6 +311,11 @@
     if (addForm) {
         addForm.addEventListener('submit', async function (event) {
             event.preventDefault();
+            if (!subjectAutocomplete?.hasSelection()) {
+                ui.showFormError(addForm, 'Please select a valid subject.');
+                document.getElementById('mappingSubjectSelectorSearch').focus();
+                return;
+            }
             if (!addForm.reportValidity()) return;
             ui.clearFormError(addForm);
             const formData = new FormData(addForm);
@@ -313,6 +325,7 @@
                 const payload = await ui.postForm(endpoints.assignments, formData);
                 addModal.close();
                 addForm.reset();
+                subjectAutocomplete?.clear();
                 ui.showToast(payload.message, 'success');
                 await loadMappings(1);
             } catch (error) {
@@ -368,59 +381,97 @@
         }
     });
 
-    programFilter.addEventListener('change', async function () {
-        await loadCurricula();
-        await loadMappings(1);
-    });
-    curriculumFilter.addEventListener('change', async function () {
-        await loadVersions();
-        await loadMappings(1);
-    });
-    versionFilter.addEventListener('change', function () { loadMappings(1); });
     yearFilter.addEventListener('change', function () { loadMappings(1); });
     semesterFilter.addEventListener('change', function () { loadMappings(1); });
     perPage.addEventListener('change', function () { loadMappings(1); });
     subjectSearch.addEventListener('input', ui.debounce(function () { loadMappings(1); }, 300));
 
     document.getElementById('clearMappingFilters').addEventListener('click', async function () {
-        programFilter.value = '';
+        state.clearingFilters = true;
+        programAutocomplete?.clear();
+        curriculumAutocomplete?.clear();
+        versionAutocomplete?.clear();
         subjectSearch.value = '';
         yearFilter.value = '';
         semesterFilter.value = '';
-        await loadCurricula();
+        versionInput.disabled = true;
+        versionInput.placeholder = 'Select a curriculum first';
+        state.clearingFilters = false;
         await loadMappings(1);
     });
 
     document.getElementById('addMappingButton')?.addEventListener('click', openAddMapping);
-    document.getElementById('mappingSubjectSelectorSearch')?.addEventListener(
-        'input',
-        ui.debounce(function () {
-            ui.clearFormError(addForm);
-            loadSubjectOptions(document.getElementById('mappingSubjectSelectorSearch').value);
-        }, 300)
-    );
+    document.getElementById('mappingSubjectSelectorSearch')?.addEventListener('input', function () {
+        ui.clearFormError(addForm);
+    });
 
     rows.addEventListener('click', function (event) {
         const editButton = event.target.closest('[data-edit-mapping]');
         const removeButton = event.target.closest('[data-remove-mapping]');
-        if (editButton) openEditMapping(editButton.dataset.editMapping);
-        if (removeButton && permissions.manage && removeModal) {
-            const mapping = state.mappings.get(Number(removeButton.dataset.removeMapping));
-            if (!mapping) return;
-            state.pendingRemoval = { id: mapping.id };
-            ui.clearFormError(removeElement);
-            document.getElementById('removeMappingMessage').textContent =
-                'Remove ' + mapping.subject_code + ' — ' + mapping.subject_title +
-                ' from ' + mapping.curriculum_code + ' / ' + mapping.version_label +
-                '? Only this placement will be deleted.';
-            removeModal.open();
-            document.getElementById('confirmRemoveMapping').focus();
+        if (editButton) {
+            event.stopPropagation();
+            openEditMapping(editButton.dataset.editMapping);
+            return;
+        }
+        if (removeButton) {
+            event.stopPropagation();
+            requestMappingRemoval(state.mappings.get(Number(removeButton.dataset.removeMapping)));
+            return;
+        }
+        const row = event.target.closest('tr[data-record-view]');
+        if (row) openMappingDetails(row.dataset.recordView);
+    });
+    rows.addEventListener('keydown', function (event) {
+        const row = event.target.closest('tr[data-record-view]');
+        if (row && event.target === row && (event.key === 'Enter' || event.key === ' ')) {
+            event.preventDefault();
+            openMappingDetails(row.dataset.recordView);
         }
     });
 
+    document.getElementById('mappingDetailsEdit')?.addEventListener('click', function () {
+        if (state.viewingMapping && permissions.manage) openEditMapping(state.viewingMapping.id);
+    });
+    document.getElementById('mappingDetailsRemove')?.addEventListener('click', function () {
+        if (state.viewingMapping && permissions.manage) requestMappingRemoval(state.viewingMapping);
+    });
+
     async function initialize() {
-        await loadPrograms();
-        await loadCurricula();
+        if (permissions.viewPrograms) {
+            try {
+                const programs = await ui.fetchJson(endpoints.programs, {
+                    action: 'list', page: 1, per_page: 50, search: '', status: ''
+                });
+                const program = programs.programs.find(function (item) {
+                    return String(item.status).toLowerCase() === 'active';
+                }) || programs.programs[0];
+                if (program) {
+                    programAutocomplete?.setSelected(program, false);
+                    const curricula = await ui.fetchJson(endpoints.curricula, {
+                        action: 'list', page: 1, per_page: 50, search: '', status: '',
+                        academic_program_id: program.id
+                    });
+                    const curriculum = curricula.curricula.find(function (item) {
+                        return String(item.status).toLowerCase() === 'active';
+                    }) || curricula.curricula[0];
+                    if (curriculum) {
+                        curriculumAutocomplete?.setSelected(curriculum, false);
+                        versionInput.disabled = false;
+                        versionInput.placeholder = 'Search version label or year';
+                        const versions = await ui.fetchJson(endpoints.versions, {
+                            action: 'list', curriculum_id: curriculum.id, page: 1, per_page: 50
+                        });
+                        const version = versions.versions.find(function (item) {
+                            return String(item.status).toLowerCase() === 'active';
+                        }) || versions.versions[0];
+                        if (version) versionAutocomplete?.setSelected(version, false);
+                    }
+                }
+            } catch (error) {
+                ui.showToast(error.message || 'Current curriculum context could not be loaded.', 'warning');
+            }
+        }
+        updateContextState();
         await loadMappings(1);
     }
 

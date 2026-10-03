@@ -68,9 +68,11 @@ class CurriculumService
         $data = DomainValidator::curriculum($input);
         $this->db->begin_transaction();
         try {
-            if (!$this->curricula->findById($id)) {
+            $existing = $this->curricula->findById($id);
+            if (!$existing) {
                 throw new DomainNotFoundException('Curriculum not found.');
             }
+            if ($existing['archived_at'] !== null) throw new DomainConflictException('Restore this curriculum from Settings > Archives before editing.');
             if (!$this->programs->findById($data['academic_program_id'])) {
                 throw new DomainNotFoundException('Academic program not found.');
             }

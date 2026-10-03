@@ -1,5 +1,15 @@
 # Foundation regression (CLI only)
 
+## Settings Archives
+
+Apply migration 015 before using the feature. `php tests/archives-http.php` runs
+RBAC, CSRF, archive, search, detail, restore, invalid-ID and audit checks in a
+disposable schema and local HTTP server. `php tests/archives.php` requires a
+separate schema named exactly `sms_db_archive_test` created with
+`php database/bootstrap.php --database=sms_db_archive_test --confirm-empty` and
+selected with `SMS_DB_NAME`; it tests dependencies, retained relationships,
+ranking, dates and pagination. See [the archive center notes](../docs/archive-center.md).
+
 ## Deterministic search and final electives checks
 
 Run `php tests/search-ranking.php` and `node tests/search-ranking.cjs` for the

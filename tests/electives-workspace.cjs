@@ -24,11 +24,11 @@ const base={groups:[{id:10,group_name:'<b>Group</b>',status:'active',year_level:
  for(const [i,key]of ['program','curriculum','version'].entries()){assert.equal(cascade.levels[i].minimumLength,0);el(key+'Id').value=String(i+1);}
  response=base;selected=true;cascade.onChange();await tick();
  assert.equal(requests[0].program_id,'1');assert.equal(requests[0].curriculum_version_id,'3');assert.equal(el('createElectiveGroupButton').disabled,false);
- assert.match(el('groupCards').innerHTML,/&lt;b>Group/);assert.doesNotMatch(el('groupCards').innerHTML,/<script>/);assert.match(el('reviewIssues').innerHTML,/No elective group issues detected/);
+ assert.match(el('groupCards').innerHTML,/&lt;b>Group/);assert.doesNotMatch(el('groupCards').innerHTML,/<script>/);assert.match(el('reviewIssues').innerHTML,/No elective configuration issues detected/);
  el('reviewTab').handlers.click();assert.equal(el('reviewPanel').hidden,false);assert.equal(el('groupsPanel').hidden,true);
  el('groupsTab').handlers.click();el('groupSearch').value='not present';el('groupSearch').handlers.input();assert.match(el('groupCards').innerHTML,/No elective groups match/);el('groupSearch').value='';el('groupSearch').handlers.input();
- const click=(kind,id)=>root.handlers.click({target:{closest:()=>({dataset:{[kind]:String(id)}})}});
- click('view',10);assert.match(el('viewGroupBody').innerHTML,/Prerequisite: S1/);assert.equal((el('viewGroupBody').innerHTML.match(/prerequisite_configuration.php/g)||[]).length,1);assert.doesNotMatch(el('viewGroupBody').innerHTML,/Manage in Pre-requisite Configuration/);
+ const click=(kind,id)=>root.handlers.click({target:{closest:selector=>selector==='[data-create-group]'?null:({dataset:{[kind]:String(id)}})}});
+ click('view',10);assert.match(el('viewGroupBody').innerHTML,/Prerequisite: S1/);assert.equal((el('viewGroupBody').innerHTML.match(/prerequisite_configuration.php/g)||[]).length,1);assert.match(el('viewGroupBody').innerHTML,/Manage in Pre-requisite Configuration/);
  el('createElectiveGroupButton').handlers.click();assert.equal(el('groupFormTitle').textContent,'Create Elective Group');
  form.elements.year_level.value='3rd Year';form.elements.semester.value='2nd Semester';form.elements.group_name.value='New';form.elements.status.value='active';
  const autocomplete=selectors[0];assert.equal((await autocomplete.search('S1')).length,1);autocomplete.onSelect(s(1));assert.equal((await autocomplete.search('S1')).length,0);
@@ -38,8 +38,9 @@ const base={groups:[{id:10,group_name:'<b>Group</b>',status:'active',year_level:
  autocomplete.onSelect(s(1));assert.equal((el('selectedSubjects').innerHTML.match(/data-remove=/g)||[]).length,1);
  autocomplete.onSelect(s(3,'4th Year'));assert.equal(el('placementWarning').hidden,false);assert.match(el('mappingLink').href,/subject_mapping.php\?program_id=1&curriculum_id=2&curriculum_version_id=3&version_id=3&subject_id=3/);
  el('selectedSubjects').handlers.click({target:{closest:()=>({dataset:{remove:'3'}})}});assert.equal(el('placementWarning').hidden,true);
- form.elements.required_selections.value='2';await form.handlers.submit({preventDefault(){}});assert.match(form.error,/cannot exceed/);assert.equal(writes.length,0);
- form.elements.required_selections.value='1';await form.handlers.submit({preventDefault(){}});assert.equal(writes[0].values.action,'create');assert.deepEqual(writes[0].values['subject_ids[]'],[1]);assert.equal(writes[0].values.program_id,'1');
+ form.elements.required_selections.value='2';await form.handlers.submit({preventDefault(){}});assert.match(form.error,/at least two/);assert.equal(writes.length,0);
+ autocomplete.onSelect(s(2));form.elements.required_selections.value='2';form.elements.required_selections.handlers.input();assert.equal(el('allRequiredWarning').hidden,false);
+ form.elements.required_selections.value='1';await form.handlers.submit({preventDefault(){}});assert.equal(writes[0].values.action,'create');assert.deepEqual(writes[0].values['subject_ids[]'],[1,2]);assert.equal(writes[0].values.program_id,'1');
  click('edit',10);assert.equal(form.elements.group_name.value,'<b>Group</b>');assert.equal(form.elements.required_selections.value,1);
  click('archive',10);assert.equal(writes.length,1);assert.equal(el('archiveGroupModal').hidden,false);await el('confirmArchive').handlers.click();assert.equal(writes[1].values.action,'archive');assert.equal(writes[1].values.id,10);
  // A stale response cannot resurrect cards after a context reset.

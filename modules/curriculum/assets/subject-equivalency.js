@@ -9,9 +9,8 @@
     const canManage = workspace.dataset.canManageEquivalency === '1';
     const recordColumnCount = Number(workspace.dataset.recordColumnCount || 6);
     const state = {
-        subjectARequest: 0, subjectBRequest: 0, comparisonRequest: 0,
-        recordRequest: 0, recordPage: 1,
-        subjectOptions: new Map(), records: new Map(), comparison: null,
+        comparisonRequest: 0, recordRequest: 0, recordPage: 1,
+        records: new Map(), comparison: null,
     };
     const elements = {
         comparisonPanel: document.getElementById('comparisonPanel'),
@@ -42,10 +41,43 @@
     const isComparisonView = Boolean(elements.comparisonPanel);
     const reviewForm = document.getElementById('equivalencyReviewForm');
     const reviewModal = ui.createModal(document.getElementById('equivalencyReviewModal'));
-
-    function optionMarkup(value, label) {
-        return '<option value="' + ui.escapeHtml(value) + '">' + ui.escapeHtml(label) + '</option>';
+    let subjectAAutocomplete;
+    let subjectBAutocomplete;
+    function autocompleteOptions(side) {
+        const isA = side === 'a';
+        const input = isA ? elements.subjectASearch : elements.subjectBSearch;
+        const valueInput = isA ? elements.subjectASelect : elements.subjectBSelect;
+        const list = document.getElementById(isA ? 'subjectAOptions' : 'subjectBOptions');
+        const other = isA ? () => subjectBAutocomplete : () => subjectAAutocomplete;
+        return {
+            input,
+            valueInput,
+            list,
+            helpText: isA ? 'Choose the first subject to compare.' : 'Choose a different subject to compare.',
+            selectedText: 'Subject selected.',
+            loadingText: 'Searching Subject Master…',
+            noResultsText: 'No matching subjects found.',
+            errorText: 'Subject Master records could not be loaded.',
+            search: async function (query) {
+                const payload = await ui.fetchJson(endpoint, {
+                    action: 'subject_search', page: 1, per_page: 20, search: query
+                });
+                return (payload.subjects || []).filter(function (subject) {
+                    return Number(subject.id) !== Number(other()?.getSelectedId() || 0);
+                });
+            },
+            getId: subject => subject.id,
+            format: subject => ({ label: subjectLabel(subject), code: subject.subject_code,
+                title: subject.subject_title }),
+            onError: error => ui.showToast(error.message || 'Subject Master records could not be loaded.', 'error'),
+            onSelect: function (subject, id) {
+                if (other()?.getSelectedId() === id) other().clear();
+                synchronizeSelectors();
+            }
+        };
     }
+    subjectAAutocomplete = ui.createAutocomplete(autocompleteOptions('a'));
+    subjectBAutocomplete = ui.createAutocomplete(autocompleteOptions('b'));
 
     function subjectLabel(subject) {
         return String(subject.subject_code || '') + ' - ' + String(subject.subject_title || '');
@@ -56,56 +88,15 @@
             (isError ? ' error-cell' : '') + '">' + ui.escapeHtml(message) + '</td></tr>';
     }
 
-    function renderSubjectOptions(select, subjects, placeholder, excludedId) {
-        const selectedId = Number(select.value || 0);
-        const records = subjects.slice();
-        const selectedRecord = state.subjectOptions.get(selectedId);
-        if (selectedRecord && !records.some(function (item) { return Number(item.id) === selectedId; })) {
-            records.unshift(selectedRecord);
-        }
-        select.innerHTML = optionMarkup('', placeholder) + records
-            .filter(function (subject) { return Number(subject.id) !== Number(excludedId || 0); })
-            .map(function (subject) {
-                state.subjectOptions.set(Number(subject.id), subject);
-                return optionMarkup(subject.id, subjectLabel(subject));
-            }).join('');
-        if (selectedId && selectedId !== Number(excludedId || 0)) select.value = String(selectedId);
-    }
-
-    async function loadSubjectOptions(side) {
-        const isA = side === 'a';
-        const search = isA ? elements.subjectASearch : elements.subjectBSearch;
-        const select = isA ? elements.subjectASelect : elements.subjectBSelect;
-        const other = isA ? elements.subjectBSelect : elements.subjectASelect;
-        const requestKey = isA ? 'subjectARequest' : 'subjectBRequest';
-        const requestId = ++state[requestKey];
-        try {
-            const payload = await ui.fetchJson(endpoint, {
-                action: 'subject_search', page: 1, per_page: 50, search: search.value.trim(),
-            });
-            if (requestId !== state[requestKey]) return;
-            renderSubjectOptions(select, payload.subjects || [],
-                isA ? 'Select Subject A' : 'Select Subject B', other.value);
-            updateCompareButton();
-        } catch (error) {
-            if (requestId !== state[requestKey]) return;
-            select.innerHTML = optionMarkup('', 'Unable to load subjects');
-            ui.showToast(error.message, 'error');
-        }
-    }
-
-    function synchronizeSelectors(changedSide) {
-        const changed = changedSide === 'a' ? elements.subjectASelect : elements.subjectBSelect;
-        const other = changedSide === 'a' ? elements.subjectBSelect : elements.subjectASelect;
-        if (changed.value && changed.value === other.value) other.value = '';
-        loadSubjectOptions(changedSide === 'a' ? 'b' : 'a');
+    function synchronizeSelectors() {
         updateCompareButton();
         clearRenderedComparison('Select Compare Subjects to review the selected pair.');
     }
 
     function updateCompareButton() {
-        elements.compareButton.disabled = !(elements.subjectASelect.value &&
-            elements.subjectBSelect.value && elements.subjectASelect.value !== elements.subjectBSelect.value);
+        const subjectAId = subjectAAutocomplete?.getSelectedId();
+        const subjectBId = subjectBAutocomplete?.getSelectedId();
+        elements.compareButton.disabled = !(subjectAId && subjectBId && subjectAId !== subjectBId);
     }
 
     function clearRenderedComparison(message) {
@@ -188,8 +179,8 @@
     }
 
     async function compareSubjects() {
-        const subjectAId = elements.subjectASelect.value;
-        const subjectBId = elements.subjectBSelect.value;
+        const subjectAId = subjectAAutocomplete?.getSelectedId();
+        const subjectBId = subjectBAutocomplete?.getSelectedId();
         if (!subjectAId || !subjectBId || subjectAId === subjectBId) return;
         const requestId = ++state.comparisonRequest;
         elements.compareButton.disabled = true;
@@ -352,23 +343,13 @@
         }
     }
 
-    elements.subjectASearch?.addEventListener('input', ui.debounce(function () {
-        loadSubjectOptions('a');
-    }, 280));
-    elements.subjectBSearch?.addEventListener('input', ui.debounce(function () {
-        loadSubjectOptions('b');
-    }, 280));
-    elements.subjectASelect?.addEventListener('change', function () { synchronizeSelectors('a'); });
-    elements.subjectBSelect?.addEventListener('change', function () { synchronizeSelectors('b'); });
+    elements.subjectASearch?.addEventListener('input', synchronizeSelectors);
+    elements.subjectBSearch?.addEventListener('input', synchronizeSelectors);
     elements.compareButton?.addEventListener('click', compareSubjects);
     elements.clearComparison?.addEventListener('click', function () {
-        elements.subjectASearch.value = '';
-        elements.subjectBSearch.value = '';
-        elements.subjectASelect.value = '';
-        elements.subjectBSelect.value = '';
+        subjectAAutocomplete?.clear();
+        subjectBAutocomplete?.clear();
         clearRenderedComparison();
-        loadSubjectOptions('a');
-        loadSubjectOptions('b');
         updateCompareButton();
     });
     elements.reviewPair?.addEventListener('click', function () { openReview(null); });
@@ -394,8 +375,6 @@
 
     if (isComparisonView) {
         clearRenderedComparison();
-        loadSubjectOptions('a');
-        loadSubjectOptions('b');
     } else {
         loadRecords(1);
     }

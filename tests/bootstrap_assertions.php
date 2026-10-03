@@ -29,7 +29,7 @@ if ($mode==='nonadmin-collision') { $conn->begin_transaction();$conn->query('DEL
 if ($mode==='restore-admin') { $conn->begin_transaction();$conn->query("UPDATE users SET role='admin'");$conn->query("INSERT INTO user_roles(user_id,role_id) SELECT users.id,roles.id FROM users JOIN roles ON roles.name='admin'");$conn->commit();exit; }
 if ($mode==='schema') {
     bootCheck($conn->query('SHOW TABLES')->num_rows===23,'Bootstrap creates expected 23 tables');
-    bootCheck((int)$conn->query("SELECT COUNT(*) FROM schema_migrations WHERE status='applied'")->fetch_row()[0]===14,'All 13 migrations plus baseline journaled');
+    bootCheck((int)$conn->query("SELECT COUNT(*) FROM schema_migrations WHERE status='applied'")->fetch_row()[0]===16,'All 15 migrations plus baseline journaled');
     bootCheck((int)$conn->query('SELECT COUNT(*) FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=DATABASE()')->fetch_row()[0]===41,'All 41 FKs present');
     foreach (['users','user_roles','audit_logs','students','academic_programs','subjects','curricula'] as $table) {
         bootCheck((int)$conn->query("SELECT COUNT(*) FROM `$table`")->fetch_row()[0]===0,'Schema/failed provisioning has no rows: '.$table);

@@ -13,6 +13,8 @@
         comparisonPage: 1,
         comparisonRequest: 0,
         comparisonLoaded: false,
+        clearingFilters: false,
+        resettingVersions: false,
     };
 
     const history = {
@@ -42,12 +44,82 @@
         count: document.getElementById('comparisonCount'),
         context: document.getElementById('comparisonContext'),
     };
+    const historyVersionInput = document.getElementById('historyVersionSearch');
+    const compareVersionAInput = document.getElementById('compareVersionASearch');
+    const compareVersionBInput = document.getElementById('compareVersionBSearch');
+    let compareVersionBAutocomplete;
+    let compareVersionAAutocomplete;
+    const historyVersionAutocomplete = ui.createAutocomplete({
+        input: historyVersionInput, valueInput: history.version,
+        list: document.getElementById('historyVersionOptions'),
+        helpText: 'Choose a version to narrow stored subject history.',
+        selectedText: 'Curriculum version selected.',
+        loadingText: 'Searching curriculum versions…',
+        noResultsText: 'No matching curriculum versions found.',
+        search: async function (query) {
+            const payload = await ui.fetchJson(endpoint, {
+                action: 'version_options', curriculum_id: history.curriculum.value,
+                page: 1, per_page: 20, search: query
+            });
+            return payload.versions;
+        },
+        getId: item => item.id,
+        format: item => ({ label: item.version_label + (item.effective_academic_year
+            ? ' — ' + item.effective_academic_year : ''), code: item.version_label,
+            title: item.effective_academic_year || item.status }),
+        onSelect: function () {
+            if (!state.clearingFilters && !state.resettingVersions) loadHistory(1);
+        },
+        onClear: function () {
+            if (!state.clearingFilters && !state.resettingVersions) loadHistory(1);
+        }
+    });
+    function versionAutocompleteOptions(input, valueInput, list, otherSelector) {
+        return {
+            input, valueInput, list,
+            helpText: 'Choose two different versions to compare.',
+            selectedText: 'Curriculum version selected.',
+            loadingText: 'Searching curriculum versions…',
+            noResultsText: 'No matching curriculum versions found.',
+            search: async function (query) {
+                const payload = await ui.fetchJson(endpoint, {
+                    action: 'version_options', curriculum_id: comparison.curriculum.value,
+                    page: 1, per_page: 20, search: query
+                });
+                return payload.versions.filter(function (item) {
+                    return Number(item.id) !== Number(otherSelector()?.getSelectedId() || 0);
+                });
+            },
+            getId: item => item.id,
+            format: item => ({ label: item.version_label + (item.effective_academic_year
+                ? ' — ' + item.effective_academic_year : ''), code: item.version_label,
+                title: item.effective_academic_year || item.status }),
+            onSelect: function (item, id) {
+                if (otherSelector()?.getSelectedId() === id) otherSelector().clear();
+                state.comparisonLoaded = false;
+                updateCompareButton();
+            },
+            onClear: function () {
+                state.comparisonLoaded = false;
+                updateCompareButton();
+            }
+        };
+    }
+    compareVersionAAutocomplete = ui.createAutocomplete(versionAutocompleteOptions(
+        compareVersionAInput, comparison.versionA, document.getElementById('compareVersionAOptions'),
+        () => compareVersionBAutocomplete
+    ));
+    compareVersionBAutocomplete = ui.createAutocomplete(versionAutocompleteOptions(
+        compareVersionBInput, comparison.versionB, document.getElementById('compareVersionBOptions'),
+        () => compareVersionAAutocomplete
+    ));
 
     function optionMarkup(value, label) {
         return '<option value="' + ui.escapeHtml(value) + '">' + ui.escapeHtml(label) + '</option>';
     }
 
     function selectLabel(select) {
+        if (select === history.version) return historyVersionAutocomplete?.getSelectedLabel() || '';
         return select.value ? select.options[select.selectedIndex]?.textContent.trim() || '' : '';
     }
 
@@ -91,7 +163,11 @@
             : 'Select an academic program first';
         resetSelect(controls.curriculum, curriculumLabel, true);
         if (scope === 'history') {
-            resetSelect(history.version, 'Select a curriculum to narrow versions', true);
+            state.resettingVersions = true;
+            historyVersionAutocomplete?.clear();
+            state.resettingVersions = false;
+            historyVersionInput.disabled = true;
+            historyVersionInput.placeholder = 'Select a curriculum to narrow versions';
         } else {
             resetComparisonVersions('Select a curriculum first');
         }
@@ -115,43 +191,35 @@
     }
 
     function resetComparisonVersions(label) {
-        resetSelect(comparison.versionA, label, true);
-        resetSelect(comparison.versionB, label, true);
+        compareVersionAAutocomplete?.clear();
+        compareVersionBAutocomplete?.clear();
+        compareVersionAInput.disabled = true;
+        compareVersionBInput.disabled = true;
+        compareVersionAInput.placeholder = label;
+        compareVersionBInput.placeholder = label;
         updateCompareButton();
     }
 
     async function loadVersions(scope) {
         const curriculum = scope === 'history' ? history.curriculum : comparison.curriculum;
         if (scope === 'history') {
-            resetSelect(history.version, 'Select a curriculum to narrow versions', true);
+            state.resettingVersions = true;
+            historyVersionAutocomplete?.clear();
+            state.resettingVersions = false;
+            historyVersionInput.disabled = true;
+            historyVersionInput.placeholder = 'Select a curriculum to narrow versions';
         } else {
             resetComparisonVersions('Select a curriculum first');
         }
         if (!curriculum.value) return;
-
-        const payload = await ui.fetchJson(endpoint, {
-            action: 'version_options',
-            curriculum_id: curriculum.value,
-            page: 1,
-            per_page: 50,
-        });
-        const options = payload.versions.map(function (version) {
-            const year = version.effective_academic_year
-                ? ' / ' + version.effective_academic_year
-                : '';
-            return optionMarkup(
-                version.id,
-                version.version_label + year + ' (' + version.status + ')'
-            );
-        }).join('');
         if (scope === 'history') {
-            history.version.innerHTML = optionMarkup('', 'All versions in this curriculum') + options;
-            history.version.disabled = false;
+            historyVersionInput.disabled = false;
+            historyVersionInput.placeholder = 'Search version label or academic year';
         } else {
-            comparison.versionA.innerHTML = optionMarkup('', 'Select Version A') + options;
-            comparison.versionB.innerHTML = optionMarkup('', 'Select Version B') + options;
-            comparison.versionA.disabled = false;
-            comparison.versionB.disabled = false;
+            compareVersionAInput.disabled = false;
+            compareVersionBInput.disabled = false;
+            compareVersionAInput.placeholder = 'Search Version A';
+            compareVersionBInput.placeholder = 'Search Version B';
             updateCompareButton();
         }
     }
@@ -394,7 +462,6 @@
         await loadVersions('history');
         await loadHistory(1);
     });
-    history.version?.addEventListener('change', function () { loadHistory(1); });
     history.year?.addEventListener('change', function () { loadHistory(1); });
     history.semester?.addEventListener('change', function () { loadHistory(1); });
     history.versionStatus?.addEventListener('change', function () { loadHistory(1); });
@@ -402,14 +469,18 @@
     history.search?.addEventListener('input', ui.debounce(function () { loadHistory(1); }, 300));
 
     document.getElementById('clearSubjectHistoryFilters')?.addEventListener('click', async function () {
+        state.clearingFilters = true;
         history.search.value = '';
         history.program.value = '';
         resetSelect(history.curriculum, 'Select a program to narrow curricula', true);
-        resetSelect(history.version, 'Select a curriculum to narrow versions', true);
+        historyVersionAutocomplete?.clear();
+        historyVersionInput.disabled = true;
+        historyVersionInput.placeholder = 'Select a curriculum to narrow versions';
         history.year.value = '';
         history.semester.value = '';
         history.versionStatus.value = '';
         history.perPage.value = '20';
+        state.clearingFilters = false;
         await loadHistory(1);
     });
 
@@ -420,14 +491,6 @@
     comparison.curriculum?.addEventListener('change', async function () {
         await loadVersions('comparison');
         clearComparisonResult('Select two curriculum versions to compare their subject placements.');
-    });
-    comparison.versionA?.addEventListener('change', function () {
-        state.comparisonLoaded = false;
-        updateCompareButton();
-    });
-    comparison.versionB?.addEventListener('change', function () {
-        state.comparisonLoaded = false;
-        updateCompareButton();
     });
     comparison.perPage?.addEventListener('change', function () {
         if (state.comparisonLoaded) loadComparison(1);

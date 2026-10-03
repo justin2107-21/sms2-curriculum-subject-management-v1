@@ -35,7 +35,7 @@ class SubjectRepository
 
     public function paginate(array $query): array
     {
-        $conditions = [];
+        $conditions = ['archived_at IS NULL'];
         $types = '';
         $params = [];
 

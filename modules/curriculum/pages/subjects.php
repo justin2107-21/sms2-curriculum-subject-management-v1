@@ -183,12 +183,21 @@ require __DIR__ . '/../../../shared/sidebar.php';
     </div>
     <div class="modal-footer">
       <button type="button" class="button-muted" data-modal-close>Close</button>
-      <?php if ($canUpdateSubjects): ?><button type="button" class="button-primary" id="subjectDetailsEdit"><i class="fa-solid fa-pen"></i> Edit Subject</button><?php endif; ?>
+      <?php if ($canUpdateSubjects): ?><button type="button" class="button-primary" id="subjectDetailsEdit"><i class="fa-solid fa-pen"></i> Edit Subject</button><button type="button" class="button-danger" id="subjectDetailsArchive" hidden><i class="fa-solid fa-box-archive"></i> Archive</button><?php endif; ?>
     </div>
   </section>
 </div>
 
 <?php if ($canAssignCreatedSubject || $canUpdateSubjects): ?>
+<?php if ($canUpdateSubjects): ?>
+<div class="curriculum-modal" id="subjectArchiveModal" hidden><div class="modal-backdrop" data-modal-close></div>
+  <section class="modal-dialog modal-dialog-small" role="alertdialog" aria-modal="true" aria-labelledby="subjectArchiveTitle">
+    <div class="modal-header"><h2 id="subjectArchiveTitle">Archive Record</h2><button class="modal-close-button" type="button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="confirmation-body"><p>Are you sure you want to archive this subject?</p><p>The record will be removed from active views but retained in Archives.</p><strong id="subjectArchiveName"></strong><div class="form-error" role="alert" hidden></div></div>
+    <div class="modal-actions modal-actions-padded"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="button" class="button-danger" id="confirmSubjectArchive">Archive</button></div>
+  </section>
+</div>
+<?php endif; ?>
 <div class="curriculum-modal" id="subjectModal" hidden>
   <div class="modal-backdrop" data-modal-close></div>
   <section class="modal-dialog modal-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="subjectModalTitle">

@@ -9,12 +9,12 @@ for(const q of ['GE','ge',' Ge ']) assert.deepEqual(search(q),['GE1','GE2','GE3'
 assert.deepEqual(search('BPM'),['BPM101']);assert.deepEqual(search('CAP'),['CAP101','CAP102']);
 assert.deepEqual(search('CC101'),['CC101']);assert.deepEqual(search('ZZZZ'),[]);
 assert.deepEqual(search(' Business  Process   Management in IT '),['BPM101']);
-assert.equal(ui.searchRank(['CC101','Introduction to Computing'],'Computing'),2);
-assert.equal(ui.searchRank(['CC101','Introduction to Computing'],'put'),3);
+assert.equal(ui.searchRank(['CC101','Introduction to Computing'],'Computing'),4);
+assert.equal(ui.searchRank(['CC101','Introduction to Computing'],'put'),4);
 assert.equal(ui.searchRank(['X','a-b'],'a b'),Infinity);
 assert.deepEqual(search('%'),[]);assert.deepEqual(search('_'),[]);
 records.push({id:99,subject_code:'AAA',subject_title:'General elective'});
 assert.deepEqual(search('GE'),['GE1','GE2','GE3','AAA','BPM101'],'Code prefixes outrank title prefixes at equal tier');
 assert.deepEqual(search('General elective'),['AAA'],'Exact title');
 module.exports=ui;
-if(require.main===module)console.log('PASS: JS exact/prefix/token/contains, explicit fields, stable order, GE/BPM/CAP/CC101, empty results, whitespace, literal wildcard checks.');
+if(require.main===module)console.log('PASS: JS exact/prefix/contains, explicit fields, stable order, GE/BPM/CAP/CC101, empty results, whitespace, literal wildcard checks.');

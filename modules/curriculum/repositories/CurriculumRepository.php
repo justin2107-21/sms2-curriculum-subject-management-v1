@@ -51,7 +51,7 @@ class CurriculumRepository
 
     public function paginate(array $query): array
     {
-        $conditions = [];
+        $conditions = ['curricula.archived_at IS NULL'];
         $types = '';
         $params = [];
 

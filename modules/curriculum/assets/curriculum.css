@@ -1116,6 +1116,14 @@ body.curriculum-modal-open { overflow: hidden; }
 .subject-assignment-section legend { font-size: .77rem; font-weight: 750; }
 .subject-form-section .form-grid, .subject-assignment-section .form-grid { gap: 13px 16px; }
 
+/* Shared Academic Programs and Subject Master card icon colors. */
+:root {
+  --academic-college-icon-bg: #edf4ff;
+  --academic-college-icon-color: #1a3a8c;
+  --academic-shs-icon-bg: #edf7f7;
+  --academic-shs-icon-color: #43849a;
+}
+
 /* Subject Master program cards follow the Inter based reference styling. */
 .subject-page { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 .subject-page button,
@@ -1131,8 +1139,8 @@ body.curriculum-modal-open { overflow: hidden; }
   min-height: 242px;
   padding: 23px 22px 20px;
 }
-.subject-program-card .subject-program-icon { background: #edf4ff; border-radius: 11px; color: #1f5fbf; height: 45px; margin-bottom: 25px; width: 45px; }
-.subject-program-section[data-program-category="shs"] .subject-program-card .subject-program-icon { background: #edf6f8; color: #47779f; }
+.subject-program-card .subject-program-icon { background: var(--academic-college-icon-bg); border-radius: 11px; color: var(--academic-college-icon-color); height: 45px; margin-bottom: 25px; width: 45px; }
+.subject-program-section[data-program-category="shs"] .subject-program-card .subject-program-icon { background: var(--academic-shs-icon-bg); color: var(--academic-shs-icon-color); }
 .subject-program-icon i { font-size: 20px; }
 .subject-program-card > strong.program-code-pill {
   color: #1f5fbf;
@@ -1342,19 +1350,19 @@ body.curriculum-modal-open { overflow: hidden; }
 .program-category-icon {
   align-self: start;
   align-items: center;
-  background: #edf4ff;
+  background: var(--academic-college-icon-bg);
   border-radius: 16px;
-  color: #1a3a8c;
+  color: var(--academic-college-icon-color);
   display: inline-flex;
   font-size: 23px;
   height: 64px;
   justify-content: center;
   width: 64px;
 }
-.program-category-card-shs .program-category-icon { background: #edf7f7; color: #43849a; }
+.program-category-card-shs .program-category-icon { background: var(--academic-shs-icon-bg); color: var(--academic-shs-icon-color); }
 .program-category-kicker { color: #8497b2; font-size: 11px; margin-top: 28px; }
 .program-category-copy { display: grid; gap: 10px; margin-top: 18px; min-width: 0; }
-.program-category-copy strong { color: #063469; font-size: 25px; line-height: 1.3; }
+.program-category-copy strong { color: #063469; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 25px; font-weight: 800; letter-spacing: -.02em; line-height: 1.3; }
 .program-category-copy > span { color: #647b9d; font-size: 14px; line-height: 1.5; }
 .program-category-footer { align-items: center; display: flex; justify-content: space-between; margin-top: auto; min-height: 40px; padding-top: 16px; }
 .program-category-footer small { color: #155ac4; font-size: 14px; font-weight: 700; }
@@ -1601,3 +1609,4 @@ body.curriculum-modal-open { overflow: hidden; }
   .version-workspace > #placementRows,
   .version-workspace > #placementPagination { margin-left: 16px; margin-right: 16px; }
 }
+.curriculum-content button[hidden]{display:none!important}

@@ -159,6 +159,20 @@ a.sidebar-item > i {
   margin: 3px 12px;
 }
 
+/* An expanded menu keeps its parent on the sidebar background. The selected
+   child gets the full-width highlight, with its label aligned to the parent. */
+.sidebar-builder-group.is-open > .sidebar-builder-toggle,
+.sidebar-builder-group.is-open > .sidebar-builder-toggle:hover {
+  background: transparent;
+  color: #fff;
+}
+
+.sidebar-builder-group .sidebar-submenu-item {
+  margin-left: 0;
+  margin-right: 0;
+  padding-left: calc(var(--sms2-sidebar-nav-padding-x) + var(--sms2-sidebar-icon-column-size) + var(--sms2-sidebar-icon-gap) + 5px);
+}
+
 .dropdown-item { font-size: var(--sms2-text-sm); }
 
 /* Shared topbar */
@@ -407,4 +421,76 @@ a.sidebar-item > i {
   .topbar-right { gap: 10px; }
   .local-time-display { font-size: .75rem; }
   .local-time-display i { display: none; }
+}
+
+/* Shared compact table rhythm for curriculum, dashboard and system-admin lists. */
+.domain-table th,
+.system-admin-table th,
+.activity-table th,
+.audit-table th {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+  padding: 14px 16px;
+}
+.domain-table td,
+.system-admin-table td,
+.activity-table td,
+.audit-table td {
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 16px;
+}
+.domain-table tbody tr:hover:not(.state-row),
+.system-admin-table tbody tr:hover,
+.activity-table tbody tr:hover,
+.audit-table tbody tr:hover { background: #f8fbff; }
+.domain-table tbody tr[data-record-view]:focus-visible,
+.domain-table tbody tr[data-version-view]:focus-visible {
+  outline: 2px solid var(--sms2-sidebar-blue, #1a3a8c);
+  outline-offset: -2px;
+}
+.row-actions,
+.compliance-row-actions { align-items: center; gap: 6px; }
+.row-action-button,
+.view-button,
+.remove-action-button {
+  font-size: 13px;
+  min-height: 34px;
+  padding: 6px 10px;
+}
+.row-action-button i,
+.view-button i,
+.remove-action-button i { font-size: 12px; }
+
+/* Keep long user names and audit values inside their scrollable table regions. */
+.system-admin-table-wrap,
+.audit-table-wrap { max-width: 100%; min-width: 0; }
+.system-admin-table td,
+.audit-table td { overflow-wrap: anywhere; }
+.system-admin-name,
+.system-admin-description,
+.audit-action { overflow-wrap: anywhere; }
+
+/* Shared page separation and surface colors used across the system. */
+.content { background: #e8edf4; }
+.page-title-bar {
+  background: #fff;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 28px;
+}
+.domain-card,
+.detail-shell,
+.dashboard-card,
+.system-admin-card,
+.summary-card,
+.subject-program-card,
+.curriculum-record-card,
+.program-category-card {
+  background-color: #fff;
+  border-color: #dbe3ee;
+}
+
+@media (max-width: 600px) {
+  .page-title-bar { margin-bottom: 16px; }
 }

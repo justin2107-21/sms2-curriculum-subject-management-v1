@@ -181,7 +181,7 @@ work: it does not mean tables/users exist. An empty database causes login to fai
    existing `deploy.php --status`, `deploy.php --apply --confirm-database=...`, and
    `inspect.php`. It never creates/drops the database or loads development data.
 4. Verify successful startup messages, 23 tables (22 application + journal),
-   14 applied journal entries (baseline + 13 migrations), and admin login using
+   16 applied journal entries (baseline + 15 migrations), and admin login using
    your chosen credentials. Check dashboard, curriculum pages and logout. Expected
    safe messages include `Startup migrations: completed and verified.` and
    `First administrator provisioned; disable and remove bootstrap variables now.`

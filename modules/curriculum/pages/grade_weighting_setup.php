@@ -70,7 +70,15 @@ require __DIR__ . '/../../../shared/sidebar.php';
         <label class="mapping-filter-field"><span>Academic Program</span><select id="weightingProgram"><option value="">Loading programs...</option></select></label>
         <label class="mapping-filter-field"><span>Curriculum</span><select id="weightingCurriculum" disabled><option value="">Select a program first</option></select></label>
         <label class="mapping-filter-field"><span>Curriculum Version</span><select id="weightingVersion" disabled><option value="">Select a curriculum first</option></select></label>
-        <label class="mapping-filter-field"><span>Mapped Subject</span><select id="weightingPlacement" disabled><option value="">Select a version first</option></select></label>
+        <div class="mapping-filter-field">
+          <label for="weightingPlacementSearch">Mapped Subject</label>
+          <div class="record-autocomplete">
+            <input type="search" id="weightingPlacementSearch" placeholder="Search subject code or title" disabled/>
+            <input type="hidden" id="weightingPlacement"/>
+            <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear mapped subject" title="Clear selection" hidden><i class="fa-solid fa-xmark"></i></button>
+            <div class="record-autocomplete-options" id="weightingPlacementOptions" role="listbox" aria-label="Mapped subject suggestions" hidden></div>
+          </div>
+        </div>
       </div>
     </section>
 

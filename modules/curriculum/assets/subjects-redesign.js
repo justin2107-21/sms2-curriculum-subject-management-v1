@@ -16,6 +16,7 @@
     const canUpdate = root.dataset.canUpdateSubjects === '1';
     const sections = document.getElementById('subjectProgramSections');
     const detailsModal = ui.createModal(document.getElementById('subjectDetailsModal'));
+    const archiveModal = ui.createModal(document.getElementById('subjectArchiveModal'));
     const subjectModal = ui.createModal(document.getElementById('subjectModal'));
     const form = document.getElementById('subjectForm');
 
@@ -34,6 +35,7 @@
     let currentVersions = [];
     let currentSubjects = [];
     let viewingSubjectId = null;
+    let viewingSubject = null;
     let currentMode = 'create';
     let legacyLectureUnits = '';
     let legacyLaboratoryUnits = '';
@@ -468,6 +470,9 @@
             const result = await ui.fetchJson(subjectApi, { action: 'get', id });
             if (sequence !== detailSequence) return;
             const subject = result.subject;
+            viewingSubject = subject;
+            const archiveButton = document.getElementById('subjectDetailsArchive');
+            if (archiveButton) archiveButton.hidden = subject.status !== 'active';
             document.getElementById('subjectDetailsTitle').textContent = subject.subject_code || 'Subject';
             document.getElementById('subjectDetailsCode').textContent = subject.subject_title || '';
             document.getElementById('subjectDetailsName').textContent = subject.description || 'No description provided.';
@@ -564,6 +569,23 @@
         if (!canUpdate || !viewingSubjectId) return;
         detailsModal.close();
         openEditSubject(viewingSubjectId);
+    });
+    document.getElementById('subjectDetailsArchive')?.addEventListener('click', function () {
+        if (!canUpdate || viewingSubject?.status !== 'active') return;
+        document.getElementById('subjectArchiveName').textContent = viewingSubject.subject_code;
+        detailsModal.close(); archiveModal?.open();
+    });
+    document.getElementById('confirmSubjectArchive')?.addEventListener('click', async function () {
+        if (!viewingSubjectId || !archiveModal) return;
+        this.disabled = true;
+        const data = new FormData(); data.set('action','archive'); data.set('id',String(viewingSubjectId));
+        try {
+            await ui.postForm(subjectApi,data);
+            archiveModal.close();
+            ui.showToast('Subject archived.','success');
+            if (programView) await loadVersionSubjects(); else await loadPrograms();
+        } catch (error) { ui.showFormError(document.getElementById('subjectArchiveModal'),error.message); }
+        finally { this.disabled = false; }
     });
     document.getElementById('subjectCardSearch')?.addEventListener('input', ui.debounce(renderCards, 300));
     document.querySelectorAll('[data-category]').forEach(button => button.addEventListener('click', function () {

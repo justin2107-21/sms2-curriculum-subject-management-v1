@@ -83,9 +83,11 @@ class SubjectService
         $data = DomainValidator::subject($input);
         $this->db->begin_transaction();
         try {
-            if (!$this->subjects->findById($id)) {
+            $existing = $this->subjects->findById($id);
+            if (!$existing) {
                 throw new DomainNotFoundException('Subject not found.');
             }
+            if ($existing['archived_at'] !== null) throw new DomainConflictException('Restore this subject from Settings > Archives before editing.');
             if ($this->subjects->codeExists($data['subject_code'], $id)) {
                 throw new DomainConflictException('Subject code already exists.');
             }

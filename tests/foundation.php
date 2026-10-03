@@ -298,7 +298,7 @@ try {
     $coreq=own('curriculum_subject_requirements',mutate('requirement','create',array_replace($req,['subject_id'=>$subjects[2]['id'],'required_subject_id'=>$subjects[0]['id'],'requirement_type'=>'corequisite']),201,'SUBJECT_REQUIREMENT_CREATE')['relationship']);
     mutate('assignment','remove',['id'=>$placements[0]['id']],409);
     mutate('requirement','remove',['id'=>$coreq['id']],200,'SUBJECT_REQUIREMENT_REMOVE');
-    $groupData=['program_id'=>$p['id'],'curriculum_id'=>$c['id'],'curriculum_version_id'=>$v['id'],'group_name'=>$prefix.' Group','year_level'=>'DEV-Year','semester'=>'DEV-Term','required_selections'=>1,'subject_ids'=>[$subjects[3]['id']]];
+    $groupData=['program_id'=>$p['id'],'curriculum_id'=>$c['id'],'curriculum_version_id'=>$v['id'],'group_name'=>$prefix.' Group','year_level'=>'DEV-Year','semester'=>'DEV-Term','required_selections'=>1,'subject_ids'=>[$subjects[3]['id'],$subjects[4]['id']]];
     $group=own('curriculum_elective_groups',mutate('elective_group','create',$groupData,201,'ELECTIVE_GROUP_CREATE')['group']);
     mutate('elective_group','create',$groupData,409);
     mutate('elective_group','update',array_replace($groupData,['id'=>$group['id'],'group_name'=>$prefix.' Edited Group']),200,'ELECTIVE_GROUP_UPDATE');

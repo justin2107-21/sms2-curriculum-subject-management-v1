@@ -99,6 +99,11 @@ $curriculumBuilderVersion = (int)filemtime(__DIR__ . '/../assets/curriculum-buil
   <link rel="stylesheet" href="../../../css/dashboard.css"/>
   <link rel="stylesheet" href="../assets/curriculum.css?v=<?= $curriculumCssVersion ?>"/>
   <link rel="stylesheet" href="../../../css/csms-typography.css?v=<?= $typographyCssVersion ?>"/>
+  <?php if ($isProgramPage): ?>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@800&display=swap" rel="stylesheet"/>
+  <?php endif; ?>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
 </head>
 <body>
@@ -147,7 +152,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
     <?php elseif ($isCurriculumWorkspaceView): ?>
     <div class="page-title-bar curriculum-title-bar curriculum-workspace-title-bar">
       <div><a class="program-back-link" id="backToProgramCurricula" href="curricula.php"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Back to <span id="backProgramCurriculaLabel">Program Curricula</span></a><h1 class="page-title" id="workspaceCurriculumName">Loading curriculum...</h1><p class="page-subtitle"><span id="curriculumHeaderCode"></span> <span id="workspaceCurriculumStatus"></span></p></div>
-      <div class="curriculum-header-actions"><?php if ($canUpdateCurricula): ?><button type="button" class="secondary-action-button" id="editCurriculumButton"><i class="fa-solid fa-pen"></i> Edit Curriculum</button><?php endif; ?><?php if ($canCreateVersions): ?><button type="button" class="primary-action-button manuscript-primary" id="newVersionButton" disabled><i class="fa-solid fa-plus"></i> New Version</button><?php endif; ?></div>
+      <div class="curriculum-header-actions"><?php if ($canUpdateCurricula): ?><button type="button" class="secondary-action-button" id="editCurriculumButton"><i class="fa-solid fa-pen"></i> Edit Curriculum</button><button type="button" class="button-danger" id="archiveCurriculumButton" hidden><i class="fa-solid fa-box-archive"></i> Archive</button><?php endif; ?><?php if ($canCreateVersions): ?><button type="button" class="primary-action-button manuscript-primary" id="newVersionButton" disabled><i class="fa-solid fa-plus"></i> New Version</button><?php endif; ?></div>
     </div>
     <?php else: ?>
     <div class="page-title-bar curriculum-title-bar">
@@ -282,9 +287,9 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <div class="curriculum-modal" id="programArchiveModal" hidden aria-hidden="true">
   <div class="modal-backdrop" data-modal-close></div>
   <section class="modal-dialog program-archive-dialog" role="dialog" aria-modal="true" aria-labelledby="programArchiveTitle">
-    <div class="modal-header"><div><h2 id="programArchiveTitle">Archive Academic Program?</h2></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close archive confirmation"><i class="fa-solid fa-xmark"></i></button></div>
-    <div class="confirmation-body"><p id="programArchiveMessage">Are you sure you want to archive this academic program?</p><p class="program-archive-note">Existing related curriculum records will be preserved.</p></div>
-    <div class="modal-actions modal-actions-padded"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="button" class="button-danger" id="confirmProgramArchive">Archive Program</button></div>
+    <div class="modal-header"><div><h2 id="programArchiveTitle">Archive Record</h2></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close archive confirmation"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="confirmation-body"><p id="programArchiveMessage">Are you sure you want to archive this academic program?</p><p class="program-archive-note">The record will be removed from active views but retained in Archives. Existing related curriculum records will be preserved.</p></div>
+    <div class="modal-actions modal-actions-padded"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="button" class="button-danger" id="confirmProgramArchive">Archive</button></div>
   </section>
 </div>
 <?php endif; ?>
@@ -325,6 +330,15 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <?php endif; ?>
 
 <?php if ($isCurriculaPage && ($canCreateCurricula || $canUpdateCurricula)): ?>
+<?php if ($canUpdateCurricula): ?>
+<div class="curriculum-modal" id="curriculumArchiveModal" hidden><div class="modal-backdrop" data-modal-close></div>
+  <section class="modal-dialog modal-dialog-small" role="alertdialog" aria-modal="true" aria-labelledby="curriculumArchiveTitle">
+    <div class="modal-header"><h2 id="curriculumArchiveTitle">Archive Record</h2><button type="button" class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="confirmation-body"><p>Are you sure you want to archive this curriculum?</p><p>The record will be removed from active views but retained in Archives.</p><strong id="curriculumArchiveName"></strong><div class="form-error" role="alert" hidden></div></div>
+    <div class="modal-actions modal-actions-padded"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="button" class="button-danger" id="confirmCurriculumArchive">Archive</button></div>
+  </section>
+</div>
+<?php endif; ?>
 <div class="curriculum-modal" id="curriculumModal" hidden>
   <div class="modal-backdrop" data-modal-close></div>
   <section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="curriculumModalTitle">

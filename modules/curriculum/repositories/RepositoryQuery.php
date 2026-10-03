@@ -47,17 +47,16 @@ class RepositoryQuery
         $query = self::normalizeSearch($query ?? '');
         if ($query === '') return '';
         $prefix = substr(self::likePattern($query), 1);
-        $token = '(^|[^[:alnum:]_])' . preg_quote($query, '/');
+        $contains = self::likePattern($query);
         $ranks = [];
-        foreach ($fields as $field) {
+        foreach ($fields as $index => $field) {
             $column = self::searchColumn($field);
-            $ranks[] = "CASE WHEN $column = ? THEN 0 WHEN $column LIKE ? ESCAPE '=' THEN 1 WHEN $column REGEXP ? THEN 2 ELSE 3 END";
-            array_push($params, $query, $prefix, $token);
+            $rank = $index === 0 ? [0,1,3] : [2,2,4];
+            $ranks[] = "CASE WHEN $column = ? THEN {$rank[0]} WHEN $column LIKE ? ESCAPE '=' THEN {$rank[1]} WHEN $column LIKE ? ESCAPE '=' THEN {$rank[2]} ELSE 9 END";
+            array_push($params, $query, $prefix, $contains);
         }
         $rank = count($ranks) === 1 ? $ranks[0] : 'LEAST(' . implode(',', $ranks) . ')';
-        // At equal relevance prefer the entity's code/name field to secondary title matches.
-        array_push($params, $query, $prefix, $token);
-        return $rank . ', ' . $ranks[0] . ', ' . implode(', ', array_map([self::class, 'searchColumn'], $fields)) . ', ';
+        return $rank . ', ' . implode(', ', array_map([self::class, 'searchColumn'], $fields)) . ', ';
     }
 
     public static function pagination(int $totalRecords, int $requestedPage, int $perPage): array

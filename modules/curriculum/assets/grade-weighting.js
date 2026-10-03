@@ -22,6 +22,7 @@
     const curriculum = document.getElementById('weightingCurriculum');
     const version = document.getElementById('weightingVersion');
     const placement = document.getElementById('weightingPlacement');
+    const placementInput = document.getElementById('weightingPlacementSearch');
     const rows = document.getElementById('weightingComponentRows');
     const pagination = document.getElementById('weightingComponentPagination');
     const search = document.getElementById('weightingComponentSearch');
@@ -37,6 +38,31 @@
     const componentModal = ui.createModal(document.getElementById('weightingComponentModal'));
     const removeComponentModal = ui.createModal(document.getElementById('removeWeightingComponentModal'));
     const removeSchemeModal = ui.createModal(document.getElementById('removeWeightingSchemeModal'));
+    const placementAutocomplete = ui.createAutocomplete({
+        input: placementInput,
+        valueInput: placement,
+        list: document.getElementById('weightingPlacementOptions'),
+        helpText: 'Search mapped subject placements for this version.',
+        selectedText: 'Mapped subject selected.',
+        loadingText: 'Searching mapped subjects…',
+        noResultsText: 'No mapped subjects match this search.',
+        search: async function (query) {
+            const payload = await ui.fetchJson(endpoint, {
+                action: 'placement_options', curriculum_version_id: version.value,
+                page: 1, per_page: 20, search: query
+            });
+            return payload.placements;
+        },
+        getId: item => item.id,
+        format: item => ({
+            label: item.subject_code + ' — ' + item.subject_title,
+            code: item.subject_code,
+            title: item.subject_title,
+            meta: [item.year_level, item.semester].filter(Boolean).join(' / ')
+        }),
+        onSelect: function () { loadScheme(); },
+        onClear: function () { loadScheme(); }
+    });
 
     function optionMarkup(value, label) {
         return '<option value="' + ui.escapeHtml(value) + '">' + ui.escapeHtml(label) + '</option>';
@@ -48,6 +74,7 @@
     }
 
     function selectedLabel(select) {
+        if (select === placement) return placementAutocomplete?.getSelectedLabel() || '';
         return select.value ? (select.options[select.selectedIndex]?.textContent.trim() || '') : '';
     }
 
@@ -81,7 +108,9 @@
     async function loadCurricula() {
         resetSelect(curriculum, program.value ? 'Loading curricula...' : 'Select a program first', true);
         resetSelect(version, 'Select a curriculum first', true);
-        resetSelect(placement, 'Select a version first', true);
+        placementAutocomplete?.clear();
+        placementInput.disabled = true;
+        placementInput.placeholder = 'Select a version first';
         clearSchemeState('Select a curriculum version and subject to configure grade weighting.');
         if (!program.value) return;
         try {
@@ -102,7 +131,9 @@
 
     async function loadVersions() {
         resetSelect(version, curriculum.value ? 'Loading versions...' : 'Select a curriculum first', true);
-        resetSelect(placement, 'Select a version first', true);
+        placementAutocomplete?.clear();
+        placementInput.disabled = true;
+        placementInput.placeholder = 'Select a version first';
         clearSchemeState('Select a curriculum version and subject to configure grade weighting.');
         if (!curriculum.value) return;
         try {
@@ -123,25 +154,12 @@
     }
 
     async function loadPlacements() {
-        resetSelect(placement, version.value ? 'Loading mapped subjects...' : 'Select a version first', true);
+        placementAutocomplete?.clear();
+        placementInput.disabled = !version.value;
+        placementInput.placeholder = version.value
+            ? 'Search subject code or title'
+            : 'Select a version first';
         clearSchemeState('Select a curriculum version and subject to configure grade weighting.');
-        if (!version.value) return;
-        try {
-            const payload = await ui.fetchJson(endpoint, {
-                action: 'placement_options', curriculum_version_id: version.value,
-                page: 1, per_page: 50
-            });
-            placement.innerHTML = optionMarkup('', 'Select a mapped subject') +
-                payload.placements.map(function (item) {
-                    const storedContext = [item.year_level, item.semester].filter(Boolean).join(' / ');
-                    return optionMarkup(item.id, item.subject_code + ' - ' + item.subject_title +
-                        (storedContext ? ' (' + storedContext + ')' : ''));
-                }).join('');
-            placement.disabled = payload.placements.length === 0;
-        } catch (error) {
-            resetSelect(placement, 'Mapped subjects unavailable', true);
-            ui.showToast(error.message, 'error');
-        }
     }
 
     function clearSchemeState(message) {
@@ -415,12 +433,13 @@
     program.addEventListener('change', loadCurricula);
     curriculum.addEventListener('change', loadVersions);
     version.addEventListener('change', loadPlacements);
-    placement.addEventListener('change', loadScheme);
     document.getElementById('clearWeightingContext').addEventListener('click', function () {
         program.value = '';
         resetSelect(curriculum, 'Select a program first', true);
         resetSelect(version, 'Select a curriculum first', true);
-        resetSelect(placement, 'Select a version first', true);
+        placementAutocomplete?.clear();
+        placementInput.disabled = true;
+        placementInput.placeholder = 'Select a version first';
         clearSchemeState('Select a curriculum version and subject to configure grade weighting.');
     });
 

@@ -37,6 +37,8 @@
 
 .system-admin-table-wrap {
   -ms-overflow-style: none;
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -69,10 +71,10 @@
 
 .system-admin-table tbody tr:last-child td { border-bottom: 0; }
 .system-admin-table tbody tr:hover { background: #f8fbff; }
-.system-admin-name { color: #1e293b; font-weight: 700; }
+.system-admin-name { color: #1e293b; font-weight: 700; overflow-wrap: anywhere; }
 .system-admin-code { color: #1a3a8c; font-family: Consolas, monospace; font-weight: 700; }
 .system-admin-muted { color: #94a3b8; }
-.system-admin-description { color: #475569; line-height: 1.45; max-width: 340px; }
+.system-admin-description { color: #475569; line-height: 1.45; max-width: 340px; overflow-wrap: anywhere; }
 
 .system-admin-empty {
   color: #64748b;

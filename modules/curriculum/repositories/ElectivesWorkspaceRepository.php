@@ -53,6 +53,16 @@ class ElectivesWorkspaceRepository
         return array_map('intval',array_column($this->rows('SELECT subject_id FROM curriculum_elective_group_subjects WHERE elective_group_id=?','i',[$id]),'subject_id'));
     }
 
+    public function hasPlacement(int $version, string $year, string $term): bool
+    {
+        return (bool)$this->rows('SELECT id FROM curriculum_version_subjects WHERE curriculum_version_id=? AND year_level=? AND semester=? LIMIT 1', 'iss', [$version,$year,$term]);
+    }
+
+    public function duplicateGroup(int $version, string $name, string $year, string $term, ?int $excludeId): bool
+    {
+        return (bool)$this->rows('SELECT id FROM curriculum_elective_groups WHERE curriculum_version_id=? AND LOWER(TRIM(group_name))=LOWER(TRIM(?)) AND year_level=? AND semester=? AND id<>? LIMIT 1', 'isssi', [$version,$name,$year,$term,$excludeId ?? 0]);
+    }
+
     public function saveGroup(?int $id, array $data, int $actor): int
     {
         $values = [$data['group_name'],$data['year_level'],$data['semester'],$data['required_selections'],$data['status']];
@@ -74,9 +84,9 @@ class ElectivesWorkspaceRepository
         $this->execute('INSERT INTO curriculum_elective_group_subjects(elective_group_id,curriculum_version_id,subject_id,created_by) VALUES(?,?,?,?)','iiii',[$group,$version,$subject,$actor]);
     }
 
-    public function archive(int $id): void
+    public function archive(int $id, ?int $actor, string $previousStatus): void
     {
-        $this->execute("UPDATE curriculum_elective_groups SET status='archived' WHERE id=?",'i',[$id]);
+        $this->execute("UPDATE curriculum_elective_groups SET status='archived', archived_at=UTC_TIMESTAMP(), archived_by=?, archive_previous_status=? WHERE id=?",'isi',[$actor,$previousStatus,$id]);
     }
 
     public function groups(int $version): array

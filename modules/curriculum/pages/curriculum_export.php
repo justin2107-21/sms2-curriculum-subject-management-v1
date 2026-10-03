@@ -11,7 +11,7 @@ $avatarInitial = strtoupper(substr((string)($_SESSION['first_name'] ?? 'U'), 0, 
 $curriculumCssVersion = (int)filemtime(__DIR__ . '/../assets/curriculum.css');
 $typographyCssVersion = (int)filemtime(__DIR__ . '/../../../css/csms-typography.css');
 $exportCssVersion = (int)filemtime(__DIR__ . '/../assets/curriculum-export.css');
-$commonJsVersion = (int)filemtime(__DIR__ . '/../assets/curriculum-common.js');
+$commonJsVersion = substr(hash_file('sha256', __DIR__ . '/../assets/curriculum-common.js'), 0, 16);
 $exportJsVersion = (int)filemtime(__DIR__ . '/../assets/curriculum-export.js');
 ?>
 <!DOCTYPE html>
@@ -60,9 +60,9 @@ require __DIR__ . '/../../../shared/sidebar.php';
         <div><p class="eyebrow">Report context</p><h2 id="exportContextTitle">Select a curriculum version</h2></div>
       </div>
       <div class="export-context-grid">
-        <label class="mapping-filter-field"><span>Academic Program</span><select id="exportProgram"><option value="">Loading programs...</option></select></label>
-        <label class="mapping-filter-field"><span>Curriculum</span><select id="exportCurriculum" disabled><option value="">Select a program first</option></select></label>
-        <label class="mapping-filter-field"><span>Curriculum Version</span><select id="exportVersion" disabled><option value="">Select a curriculum first</option></select></label>
+        <div class="mapping-filter-field"><label for="exportProgramSearch">Academic Program</label><div class="record-autocomplete"><input type="search" id="exportProgramSearch" placeholder="Search code or program name"/><input type="hidden" id="exportProgram"/><button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear academic program" title="Clear selection" hidden><i class="fa-solid fa-xmark"></i></button><div class="record-autocomplete-options" id="exportProgramOptions" role="listbox" aria-label="Academic program suggestions" hidden></div></div></div>
+        <div class="mapping-filter-field"><label for="exportCurriculumSearch">Curriculum</label><div class="record-autocomplete"><input type="search" id="exportCurriculumSearch" placeholder="Select a program first" disabled/><input type="hidden" id="exportCurriculum"/><button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear curriculum" title="Clear selection" hidden><i class="fa-solid fa-xmark"></i></button><div class="record-autocomplete-options" id="exportCurriculumOptions" role="listbox" aria-label="Curriculum suggestions" hidden></div></div></div>
+        <div class="mapping-filter-field"><label for="exportVersionSearch">Curriculum Version</label><div class="record-autocomplete"><input type="search" id="exportVersionSearch" placeholder="Select a curriculum first" disabled/><input type="hidden" id="exportVersion"/><button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear curriculum version" title="Clear selection" hidden><i class="fa-solid fa-xmark"></i></button><div class="record-autocomplete-options" id="exportVersionOptions" role="listbox" aria-label="Curriculum version suggestions" hidden></div></div></div>
       </div>
     </section>
 

@@ -56,12 +56,12 @@ try{
  status($admin->api('elective_group','create',$input,'POST'),409,'Duplicate group name');
  foreach([['subject_ids'=>[1,1]],['required_selections'=>3],['required_selections'=>0],['required_selections'=>'bad'],['curriculum_version_id'=>0],['program_id'=>999],['subject_ids'=>[999]],['year_level'=>'4th Year']]as $bad)status($admin->api('elective_group','create',array_replace($input,$bad),'POST'),422,'Invalid write blocked');
  status($admin->api('elective_group','workspace',array_replace($context,['curriculum_id'=>999])),422,'Invalid read context');
- status($admin->api('elective_group','update',array_replace($input,['id'=>$id,'group_name'=>'Updated','subject_ids'=>[1]]),'POST'),200,'Edit atomic membership');
- $workspace=status($admin->api('elective_group','workspace',$context),200,'Workspace review');checkHttp(count($workspace['groups'][0]['members'])===1&&array_sum($workspace['review']['counts'])===0,'Membership and review agree');
+ status($admin->api('elective_group','update',array_replace($input,['id'=>$id,'group_name'=>'Updated','subject_ids'=>[2,3]]),'POST'),200,'Edit atomic membership');
+ $workspace=status($admin->api('elective_group','workspace',$context),200,'Workspace review');checkHttp(count($workspace['groups'][0]['members'])===2&&array_sum($workspace['review']['counts'])===0,'Membership and review agree');
  status($admin->api('elective_group','remove',$context+['id'=>$id],'POST'),422,'Hard delete disabled');
  status($admin->api('elective_group','archive',$context+['id'=>$id],'POST'),200,'Archive group');
  checkHttp($db->query("SELECT status FROM curriculum_elective_groups WHERE id=$id")->fetch_row()[0]==='archived','Archived row preserved');
- checkHttp((int)$db->query('SELECT COUNT(*) FROM curriculum_elective_group_subjects')->fetch_row()[0]===1,'Archive preserves membership');
+ checkHttp((int)$db->query('SELECT COUNT(*) FROM curriculum_elective_group_subjects')->fetch_row()[0]===2,'Archive preserves membership');
  checkHttp((int)$db->query('SELECT COUNT(*) FROM subjects')->fetch_row()[0]===4,'Subject Master unchanged');
  checkHttp((int)$db->query('SELECT COUNT(*) FROM curriculum_version_subjects')->fetch_row()[0]===4,'Subject Mapping unchanged');
  foreach(['ELECTIVE_GROUP_CREATE','ELECTIVE_GROUP_UPDATE','ELECTIVE_GROUP_ARCHIVE','ELECTIVE_GROUP_SUBJECT_ADD','ELECTIVE_GROUP_SUBJECT_REMOVE']as $action)checkHttp((int)$db->query("SELECT COUNT(*) FROM audit_logs WHERE action='$action'")->fetch_row()[0]>0,'HTTP audit '.$action);

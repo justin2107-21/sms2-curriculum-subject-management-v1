@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/support.php';
 require_once __DIR__ . '/../services/AcademicProgramService.php';
+require_once __DIR__ . '/../services/ArchiveCenterService.php';
 
 $action = curriculum_http_action();
 $service = new AcademicProgramService($conn);
@@ -27,6 +28,12 @@ try {
             $id = DomainValidator::positiveId($_POST['id'] ?? null, 'Academic program');
             $program = $service->update($id, $_POST);
             json_response(true, 'Academic program updated.', ['program' => $program]);
+
+        case 'archive':
+            curriculum_require_mutation('program.update');
+            $id = DomainValidator::positiveId($_POST['id'] ?? null, 'Academic program');
+            (new ArchiveCenterService($conn))->archive('program', $id, curriculum_actor_id());
+            json_response(true, 'Academic program archived.', ['program' => $service->get($id)]);
 
         default:
             json_response(false, 'Unknown action.', [], 400);

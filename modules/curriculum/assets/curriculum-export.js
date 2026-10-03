@@ -10,6 +10,9 @@
     const program = document.getElementById('exportProgram');
     const curriculum = document.getElementById('exportCurriculum');
     const version = document.getElementById('exportVersion');
+    const programInput = document.getElementById('exportProgramSearch');
+    const curriculumInput = document.getElementById('exportCurriculumSearch');
+    const versionInput = document.getElementById('exportVersionSearch');
     const previewButton = document.getElementById('previewCurriculumExport');
     const printButton = document.getElementById('printCurriculumExport');
     const csvButton = document.getElementById('downloadCurriculumCsv');
@@ -21,15 +24,43 @@
         include_grade_weighting: document.getElementById('includeGradeWeighting'),
         include_compliance: document.getElementById('includeCompliance')
     };
-
-    function optionMarkup(value, label) {
-        return '<option value="' + ui.escapeHtml(value) + '">' + ui.escapeHtml(label) + '</option>';
-    }
-
-    function resetSelect(select, label, disabled) {
-        select.innerHTML = optionMarkup('', label);
-        select.disabled = disabled;
-    }
+    const exportContextCascade = ui.createCascadingAutocomplete({
+        levels: [
+            {
+                input: programInput, valueInput: program, list: document.getElementById('exportProgramOptions'),
+                helpText: 'Choose an academic program.', selectedText: 'Academic program selected.',
+                loadingText: 'Searching academic programs…', noResultsText: 'No matching academic programs found.',
+                placeholder: 'Search code or program name',
+                search: async query => (await ui.fetchJson(endpoint, { action: 'program_options', page: 1, per_page: 20, search: query })).programs,
+                getId: item => item.id,
+                format: item => ({ label: item.program_code + ' — ' + item.program_name, code: item.program_code, title: item.program_name, meta: item.program_type || '' })
+            },
+            {
+                input: curriculumInput, valueInput: curriculum, list: document.getElementById('exportCurriculumOptions'),
+                helpText: 'Choose a curriculum for this program.', selectedText: 'Curriculum selected.',
+                loadingText: 'Searching curricula…', noResultsText: 'No curricula found for this program.',
+                placeholder: 'Search curriculum code or name', disabledPlaceholder: 'Select a program first', minimumLength: 0, showSuggestionsOnEnable: true,
+                search: async query => (await ui.fetchJson(endpoint, { action: 'curriculum_options', academic_program_id: program.value, page: 1, per_page: 20, search: query })).curricula,
+                getId: item => item.id,
+                format: item => ({ label: item.curriculum_code + ' — ' + item.curriculum_name, code: item.curriculum_code, title: item.curriculum_name })
+            },
+            {
+                input: versionInput, valueInput: version, list: document.getElementById('exportVersionOptions'),
+                helpText: 'Choose a curriculum version.', selectedText: 'Curriculum version selected.',
+                loadingText: 'Searching curriculum versions…', noResultsText: 'No curriculum versions found.',
+                placeholder: 'Search version label or academic year', disabledPlaceholder: 'Select a curriculum first', minimumLength: 0, showSuggestionsOnEnable: true,
+                search: async query => (await ui.fetchJson(endpoint, { action: 'version_options', curriculum_id: curriculum.value, page: 1, per_page: 20, search: query })).versions,
+                getId: item => item.id,
+                format: item => ({ label: item.version_label + (item.effective_academic_year ? ' — ' + item.effective_academic_year : ''), code: item.version_label, title: item.effective_academic_year || 'Academic year not specified' })
+            }
+        ],
+        onChange: function (index, item, id, action) {
+            setActionsEnabled(index === 2 && action === 'select');
+        }
+    });
+    const programAutocomplete = exportContextCascade?.get(0);
+    const curriculumAutocomplete = exportContextCascade?.get(1);
+    const versionAutocomplete = exportContextCascade?.get(2);
 
     function contextParameters() {
         return {
@@ -178,57 +209,6 @@
             '<p class="export-report-notice">' + ui.escapeHtml(data.disclaimer) + '</p><p class="export-generated-at">Generated ' + value(data.generated_at) + '</p></article>';
     }
 
-    async function loadPrograms() {
-        resetSelect(program, 'Loading programs...', true);
-        try {
-            const payload = await ui.fetchJson(endpoint, { action: 'program_options', page: 1, per_page: 50 });
-            program.innerHTML = optionMarkup('', 'Select an academic program') + payload.programs.map(function (item) {
-                return optionMarkup(item.id, item.program_code + ' — ' + item.program_name);
-            }).join('');
-            program.disabled = payload.programs.length === 0;
-            if (!payload.programs.length) status.textContent = 'No academic programs are available.';
-        } catch (error) {
-            resetSelect(program, 'Programs unavailable', true);
-            ui.showToast(error.message, 'error');
-        }
-    }
-
-    async function loadCurricula() {
-        resetSelect(curriculum, program.value ? 'Loading curricula...' : 'Select a program first', true);
-        resetSelect(version, 'Select a curriculum first', true);
-        setActionsEnabled(false);
-        if (!program.value) return;
-        try {
-            const payload = await ui.fetchJson(endpoint, { action: 'curriculum_options', academic_program_id: program.value, page: 1, per_page: 50 });
-            curriculum.innerHTML = optionMarkup('', 'Select a curriculum') + payload.curricula.map(function (item) {
-                return optionMarkup(item.id, item.curriculum_code + ' — ' + item.curriculum_name);
-            }).join('');
-            curriculum.disabled = payload.curricula.length === 0;
-            if (!payload.curricula.length) status.textContent = 'No curricula are available for the selected program.';
-        } catch (error) {
-            resetSelect(curriculum, 'Curricula unavailable', true);
-            ui.showToast(error.message, 'error');
-        }
-    }
-
-    async function loadVersions() {
-        resetSelect(version, curriculum.value ? 'Loading versions...' : 'Select a curriculum first', true);
-        setActionsEnabled(false);
-        if (!curriculum.value) return;
-        try {
-            const payload = await ui.fetchJson(endpoint, { action: 'version_options', curriculum_id: curriculum.value, page: 1, per_page: 50 });
-            version.innerHTML = optionMarkup('', 'Select a curriculum version') + payload.versions.map(function (item) {
-                const year = item.effective_academic_year ? ' / ' + item.effective_academic_year : '';
-                return optionMarkup(item.id, item.version_label + year);
-            }).join('');
-            version.disabled = payload.versions.length === 0;
-            if (!payload.versions.length) status.textContent = 'No curriculum versions are available.';
-        } catch (error) {
-            resetSelect(version, 'Versions unavailable', true);
-            ui.showToast(error.message, 'error');
-        }
-    }
-
     async function previewReport() {
         previewButton.disabled = true;
         status.textContent = 'Loading report preview…';
@@ -290,9 +270,9 @@
         if (!printWindow) ui.showToast('Allow pop-ups to open the print view.', 'warning');
     }
 
-    program.addEventListener('change', loadCurricula);
-    curriculum.addEventListener('change', loadVersions);
-    version.addEventListener('change', function () { setActionsEnabled(Boolean(version.value)); });
+    programInput.addEventListener('input', function () { setActionsEnabled(false); });
+    curriculumInput.addEventListener('input', function () { setActionsEnabled(false); });
+    versionInput.addEventListener('input', function () { setActionsEnabled(false); });
     Object.values(optionInputs).forEach(function (input) {
         input.addEventListener('change', function () {
             if (version.value) status.textContent = 'Report options changed. Preview again to refresh the report.';
@@ -303,5 +283,6 @@
     printButton.addEventListener('click', openPrintView);
 
     setActionsEnabled(false);
-    loadPrograms();
+    curriculumInput.disabled = true;
+    versionInput.disabled = true;
 }());

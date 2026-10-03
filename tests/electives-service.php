@@ -17,45 +17,52 @@ try {
  $conn->query("INSERT INTO academic_programs(id,program_code,program_name,program_type) VALUES(1,'COL','College','College'),(2,'SHS','SHS','SHS')");
  $conn->query("INSERT INTO curricula(id,curriculum_code,curriculum_name,academic_program_id) VALUES(1,'C','College',1),(2,'S','SHS',2)");
  $conn->query("INSERT INTO curriculum_versions(id,curriculum_id,version_label) VALUES(1,1,'College'),(2,2,'SHS'),(3,1,'Other')");
- foreach(range(1,5) as $id)$conn->query("INSERT INTO subjects(id,subject_code,subject_title,units) VALUES($id,'S$id','Subject $id',3)");
- $conn->query("INSERT INTO curriculum_version_subjects(curriculum_version_id,subject_id,year_level,semester) VALUES(1,1,'3rd Year','2nd Semester'),(1,2,'3rd Year','2nd Semester'),(1,3,'4th Year','1st Semester'),(2,4,'Grade 11','1st Semester'),(2,5,'Grade 12','2nd Semester')");
+ foreach(range(1,9) as $id)$conn->query("INSERT INTO subjects(id,subject_code,subject_title,units) VALUES($id,'S$id','Subject $id',3)");
+ $conn->query("INSERT INTO curriculum_version_subjects(curriculum_version_id,subject_id,year_level,semester) VALUES(1,1,'3rd Year','2nd Semester'),(1,2,'3rd Year','2nd Semester'),(1,3,'4th Year','1st Semester'),(2,4,'Grade 11','1st Semester'),(2,5,'Grade 12','2nd Semester'),(2,6,'Grade 11','1st Semester'),(2,7,'Grade 12','2nd Semester'),(1,8,'3rd Year','2nd Semester'),(1,9,'3rd Year','2nd Semester')");
+ $conn->query("INSERT INTO subjects(id,subject_code,subject_title,units) VALUES(10,'S10','Subject 10',3),(11,'S11','Subject 11',3)");
+ $conn->query("INSERT INTO curriculum_version_subjects(curriculum_version_id,subject_id,year_level,semester) VALUES(1,10,'2nd Year','1st Semester'),(1,11,'1st Year','1st Semester')");
  $conn->query("INSERT INTO curriculum_subject_requirements(curriculum_version_id,subject_id,required_subject_id,requirement_type) VALUES(1,2,1,'prerequisite')");
  $service=new ElectivesWorkspaceService($conn);
  $ctx=['program_id'=>1,'curriculum_id'=>1,'curriculum_version_id'=>1];
  $input=$ctx+['group_name'=>'Professional Elective','year_level'=>'3rd Year','semester'=>'2nd Semester','required_selections'=>1,'subject_ids'=>[1,2],'status'=>'active'];
  $academic=fingerprint($conn,array_slice($tables,0,6));
  $reject=function(callable $fn,string $message)use($conn){$before=fingerprint($conn,['curriculum_elective_groups','curriculum_elective_group_subjects','audit_logs']);try{$fn();throw new RuntimeException('Expected rejection: '.$message);}catch(DomainValidationException|DomainConflictException|DomainNotFoundException $e){check(str_contains($e->getMessage(),$message),'Expected message: '.$message.'; got '.$e->getMessage());}check($before===fingerprint($conn,['curriculum_elective_groups','curriculum_elective_group_subjects','audit_logs']),'Rejected operation is atomic');};
- check(count($service->workspace($ctx)['placements'])===3,'Candidates scoped to selected version');
+ check(count($service->workspace($ctx)['placements'])===7,'Candidates scoped to selected version');
  check(count($service->workspace($ctx)['prerequisites'])===1,'Read-only prerequisite integration');
- check($service->workspace($ctx)['years']===['3rd Year','4th Year'],'Year choices come from stored placements only');
+ check($service->workspace($ctx)['years']===['1st Year','2nd Year','3rd Year','4th Year'],'Year choices follow natural stored order');
+ check($service->workspace($ctx)['terms']===['1st Semester','2nd Semester'],'Terms follow natural stored order');
+ check($service->workspace($ctx)['terms_by_year']['3rd Year']===['2nd Semester'],'Term options narrow to selected year');
  check(count($service->contextOptions(['level'=>'curriculum','program_id'=>2])['options'])===1,'Curriculum scoped to program');
  check($service->contextOptions(['level'=>'version','program_id'=>2,'curriculum_id'=>1])['options']===[],'Unrelated versions not exposed');
  $reject(fn()=>$service->workspace(array_replace($ctx,['program_id'=>2])),'belonging');
  $reject(fn()=>$service->save(array_replace($input,['curriculum_version_id'=>0]),1),'positive');
- $reject(fn()=>$service->save(array_replace($input,['subject_ids'=>[4]]),1),'no valid placement');
+ $reject(fn()=>$service->save(array_replace($input,['subject_ids'=>[1,4]]),1),'no valid placement');
  $reject(fn()=>$service->save(array_replace($input,['subject_ids'=>[1,1]]),1),'Duplicate');
  foreach([0,-1,'abc',1.5] as $bad)$reject(fn()=>$service->save(array_replace($input,['required_selections'=>$bad]),1),'positive');
  $reject(fn()=>$service->save(array_replace($input,['required_selections'=>3]),1),'cannot exceed');
- $reject(fn()=>$service->save(array_replace($input,['subject_ids'=>[]]),1),'cannot exceed');
- $reject(fn()=>$service->save(array_replace($input,['subject_ids'=>[3]]),1),'Placement mismatch');
+ $reject(fn()=>$service->save(array_replace($input,['subject_ids'=>[]]),1),'at least two');
+ $reject(fn()=>$service->save(array_replace($input,['subject_ids'=>[1]]),1),'at least two');
+ $reject(fn()=>$service->save(array_replace($input,['subject_ids'=>[1,3]]),1),'Placement mismatch');
  $id=$service->save($input,1)['id'];
- $conn->query("INSERT INTO subjects(id,subject_code,subject_title,units) VALUES(6,'S6','Subject 6',3)");
- $conn->query("INSERT INTO curriculum_version_subjects(curriculum_version_id,subject_id,year_level,semester) VALUES(1,6,'3rd Year','2nd Semester')");
- $service->save(array_replace($input,['subject_ids'=>[1,2,6]]),1,$id);
+ $service->save(array_replace($input,['subject_ids'=>[1,2,8]]),1,$id);
  check(count($service->workspace($ctx)['groups'][0]['members'])===3 && array_sum($service->workspace($ctx)['review']['counts'])===0,'Choose one of three compatible subjects is valid');
  $service->save($input,1,$id);
- $conn->query('DELETE FROM curriculum_version_subjects WHERE curriculum_version_id=1 AND subject_id=6');
- $conn->query('DELETE FROM subjects WHERE id=6');
+ $service->save(array_replace($input,['required_selections'=>2,'subject_ids'=>[1,2,8,9]]),1,$id);
+ check(count($service->workspace($ctx)['groups'][0]['members'])===4,'Choose two of four is valid');
+ $service->save(array_replace($input,['required_selections'=>4,'subject_ids'=>[1,2,8,9]]),1,$id);
+ check(count($service->workspace($ctx)['groups'][0]['members'])===4,'Choose all four is allowed with UI warning');
+ $reject(fn()=>$service->save(array_replace($input,['required_selections'=>5,'subject_ids'=>[1,2,8,9]]),1,$id),'cannot exceed');
+ $service->save($input,1,$id);
  check(count($service->workspace($ctx)['groups'][0]['members'])===2,'Atomic College creation');
  check(array_sum($service->workspace($ctx)['review']['counts'])===0,'Valid group success state');
  $reject(fn()=>$service->save($input,1),'already exists');
  try{$conn->query("INSERT INTO curriculum_elective_group_subjects(elective_group_id,curriculum_version_id,subject_id) VALUES($id,1,1)");throw new RuntimeException('Unique constraint missing');}catch(mysqli_sql_exception $e){check($e->getCode()===1062,'DB uniqueness enforced');}
- $service->save(array_replace($input,['group_name'=>'Updated','subject_ids'=>[1]]),1,$id);
- check(count($service->workspace($ctx)['groups'][0]['members'])===1,'Edit removes membership atomically');
+ $service->save(array_replace($input,['group_name'=>'Updated','subject_ids'=>[1,2]]),1,$id);
+ check(count($service->workspace($ctx)['groups'][0]['members'])===2,'Edit removes membership atomically');
  $reject(fn()=>$service->save(array_replace($input,['curriculum_version_id'=>3]),1,$id),'not found');
  $service->archive($ctx+['id'=>$id]);
- $g=$service->workspace($ctx)['groups'][0];check($g['status']==='archived'&&count($g['members'])===1,'Archive preserves records and members');
- foreach([4=>'Grade 11',5=>'Grade 12']as $subject=>$year){$service->save(['program_id'=>2,'curriculum_id'=>2,'curriculum_version_id'=>2,'group_name'=>$year,'year_level'=>$year,'semester'=>$subject===4?'1st Semester':'2nd Semester','required_selections'=>1,'subject_ids'=>[$subject]],1);}
+ $g=$service->workspace($ctx)['groups'][0];check($g['status']==='archived'&&count($g['members'])===2,'Archive preserves records and members');
+ foreach([4=>'Grade 11',5=>'Grade 12']as $subject=>$year){$service->save(['program_id'=>2,'curriculum_id'=>2,'curriculum_version_id'=>2,'group_name'=>$year,'year_level'=>$year,'semester'=>$subject===4?'1st Semester':'2nd Semester','required_selections'=>1,'subject_ids'=>[$subject,$subject+2]],1);}
  check(count($service->workspace(['program_id'=>2,'curriculum_id'=>2,'curriculum_version_id'=>2])['groups'])===2,'SHS Grade 11 and 12 work');
  check($academic===fingerprint($conn,array_slice($tables,0,6)),'Electives mutations do not modify subject identity, mapping, or prerequisites');
  $conn->query("UPDATE curriculum_elective_groups SET status='active' WHERE id=$id");
@@ -72,7 +79,7 @@ try {
  $conn->query('DELETE FROM audit_logs');
  $conn->query("ALTER TABLE audit_logs ADD CONSTRAINT audit_fail CHECK(action='IMPOSSIBLE')");
  $beforeFailure=fingerprint($conn,['curriculum_elective_groups','curriculum_elective_group_subjects']);
- try {$service->save(['program_id'=>2,'curriculum_id'=>2,'curriculum_version_id'=>2,'group_name'=>'Audit rollback','year_level'=>'Grade 11','semester'=>'1st Semester','required_selections'=>1,'subject_ids'=>[4]],1);throw new RuntimeException('Audit failure expected');}
+ try {$service->save(['program_id'=>2,'curriculum_id'=>2,'curriculum_version_id'=>2,'group_name'=>'Audit rollback','year_level'=>'Grade 11','semester'=>'1st Semester','required_selections'=>1,'subject_ids'=>[4,6]],1);throw new RuntimeException('Audit failure expected');}
  catch(mysqli_sql_exception $e){check($e->getCode()===4025,'Audit failure propagated');}
  check($beforeFailure===fingerprint($conn,['curriculum_elective_groups','curriculum_elective_group_subjects']),'Audit failure rolls back group and membership together');
 } finally {
@@ -84,5 +91,5 @@ check(ElectivesWorkspaceService::review([$g])['counts']['duplicate']===1,'Legacy
 $g['year_level']=null;
 check(ElectivesWorkspaceService::review([$g])['counts']['context']===1,'Missing group placement detected');
 $g['year_level']='3rd Year';$g['status']='archived';$g['members'][0]['subject_status']='inactive';
-check(ElectivesWorkspaceService::review([$g])['counts']['inactive']===1,'Archived groups retain inactive-reference review');
+check(ElectivesWorkspaceService::review([$g])['counts']['inactive']===0,'Archived groups are excluded from active-subject warning');
 echo "PASS: $checks electives service checks; permanent data unchanged.\n";

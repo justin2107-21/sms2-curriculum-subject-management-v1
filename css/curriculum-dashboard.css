@@ -86,6 +86,19 @@
   min-width: 0;
   padding: 15px;
 }
+.summary-card-link {
+  color: inherit;
+  text-decoration: none;
+  transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease;
+}
+.summary-card-link:hover,
+.summary-card-link:focus-visible {
+  background: #fbfdff;
+  border-color: #93b4ec;
+  box-shadow: 0 5px 16px rgba(15, 47, 105, .11);
+  outline: none;
+}
+.summary-card-link:focus-visible { box-shadow: 0 0 0 3px rgba(37, 99, 235, .2); }
 
 .summary-card-icon {
   align-items: center;
@@ -151,6 +164,44 @@
   line-height: 1.45;
   margin-top: 4px;
 }
+.current-snapshot { margin-bottom: 20px; }
+.snapshot-content {
+  color: #64748b;
+  font-size: .75rem;
+  line-height: 1.5;
+  padding: 16px 18px;
+}
+.snapshot-grid {
+  align-items: center;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+.snapshot-identity { display: grid; gap: 4px; min-width: 0; }
+.snapshot-program {
+  color: #1d4ed8;
+  font-family: Consolas, monospace;
+  font-size: .72rem;
+  font-weight: 700;
+}
+.snapshot-identity > strong {
+  color: #172554;
+  font-size: .96rem;
+  overflow-wrap: anywhere;
+}
+.snapshot-stat {
+  align-items: baseline;
+  border-left: 1px solid #e2e8f0;
+  display: flex;
+  gap: 8px;
+  padding-left: 16px;
+}
+.snapshot-stat strong {
+  color: #172554;
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+}
+.snapshot-stat span { color: #64748b; font-size: .68rem; }
 
 .status-summary {
   display: grid;
@@ -326,6 +377,10 @@
   .curriculum-dashboard > *:not(.page-title-bar) { padding-left: 0; padding-right: 0; }
   .dashboard-section,
   .dashboard-grid { margin-left: 12px; margin-right: 12px; }
+  .current-snapshot { margin-left: 12px; margin-right: 12px; }
+  .snapshot-grid { align-items: flex-start; grid-template-columns: 1fr 1fr; }
+  .snapshot-identity { grid-column: 1 / -1; }
+  .snapshot-stat { border-left: 0; padding-left: 0; }
   .quick-actions { grid-template-columns: 1fr; }
 }
 

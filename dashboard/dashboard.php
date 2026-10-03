@@ -11,14 +11,14 @@ $dashboardService = new CurriculumDashboardService(authorization_connection());
 $dashboard = $dashboardService->overview($canViewAudit);
 
 $summaryDefinitions = [
-    ['key' => 'academic_programs', 'label' => 'Academic Programs', 'icon' => 'fa-graduation-cap', 'permission' => 'program.view'],
-    ['key' => 'subjects', 'label' => 'Subject Master', 'icon' => 'fa-book', 'permission' => 'subject.view'],
-    ['key' => 'curricula', 'label' => 'Curricula', 'icon' => 'fa-table-list', 'permission' => 'curriculum.view'],
-    ['key' => 'curriculum_versions', 'label' => 'Curriculum Versions', 'icon' => 'fa-code-branch', 'permission' => 'curriculum.view'],
-    ['key' => 'subject_mappings', 'label' => 'Subject Mappings', 'icon' => 'fa-diagram-project', 'permission' => 'curriculum.view'],
-    ['key' => 'subject_requirements', 'label' => 'Prerequisite / Corequisite', 'icon' => 'fa-link', 'permission' => 'prerequisite.view'],
-    ['key' => 'elective_groups', 'label' => 'Elective Groups', 'icon' => 'fa-layer-group', 'permission' => 'elective.view'],
-    ['key' => 'subject_equivalencies', 'label' => 'Equivalency Records', 'icon' => 'fa-right-left', 'permission' => 'equivalency.view'],
+  ['key' => 'academic_programs', 'label' => 'Academic Programs', 'icon' => 'fa-graduation-cap', 'permission' => 'program.view', 'href' => '../modules/curriculum/pages/academic_programs.php'],
+  ['key' => 'subjects', 'label' => 'Subjects', 'icon' => 'fa-book', 'permission' => 'subject.view', 'href' => '../modules/curriculum/pages/subjects.php'],
+  ['key' => 'curricula', 'label' => 'Curricula', 'icon' => 'fa-table-list', 'permission' => 'curriculum.view', 'href' => '../modules/curriculum/pages/curricula.php'],
+  ['key' => 'curriculum_versions', 'label' => 'Curriculum Versions', 'icon' => 'fa-code-branch', 'permission' => 'curriculum.view', 'href' => '../modules/curriculum/pages/curricula.php'],
+  ['key' => 'subject_mappings', 'label' => 'Subject Placements', 'icon' => 'fa-diagram-project', 'permission' => 'curriculum.view', 'href' => '../modules/curriculum/pages/subject_mapping.php'],
+  ['key' => 'subject_requirements', 'label' => 'Prerequisite / Corequisite', 'icon' => 'fa-link', 'permission' => 'prerequisite.view', 'href' => '../modules/curriculum/pages/prerequisite_configuration.php'],
+  ['key' => 'elective_groups', 'label' => 'Elective Groups', 'icon' => 'fa-layer-group', 'permission' => 'elective.view', 'href' => '../modules/curriculum/pages/electives_manager.php'],
+  ['key' => 'subject_equivalencies', 'label' => 'Equivalency Records', 'icon' => 'fa-right-left', 'permission' => 'equivalency.view', 'href' => '../modules/curriculum/pages/subject_equivalency.php'],
 ];
 $visibleSummaries = array_values(array_filter(
     $summaryDefinitions,
@@ -42,6 +42,7 @@ $quickActions = array_values(array_filter(
 $dashboardCssVersion = (string)filemtime(__DIR__ . '/../css/curriculum-dashboard.css');
 $typographyCssVersion = (string)filemtime(__DIR__ . '/../css/csms-typography.css');
 $dashboardScriptVersion = (string)filemtime(__DIR__ . '/../js/dashboard.js');
+$curriculumDashboardScriptVersion = (string)filemtime(__DIR__ . '/../js/curriculum-dashboard.js');
 
 function dashboard_escape(string $value): string
 {
@@ -76,10 +77,14 @@ require __DIR__ . '/../shared/sidebar.php';
 <div class="main">
   <?php require __DIR__ . '/../shared/topbar.php'; ?>
 
-  <main class="content curriculum-dashboard">
+    <main class="content curriculum-dashboard" id="curriculumDashboard"
+      data-curriculum-api="../modules/curriculum/http/curriculum_actions.php"
+      data-version-api="../modules/curriculum/http/version_actions.php"
+      data-assignment-api="../modules/curriculum/http/assignment_actions.php"
+      data-can-view-curriculum="<?= $canViewCurriculum ? '1' : '0' ?>">
     <div class="page-title-bar dashboard-title-bar">
       <div>
-        <h1 class="page-title"><i class="fa-solid fa-gauge"></i> Dashboard</h1>
+        <h1 class="page-title">Dashboard</h1>
         <p class="dashboard-subtitle">Overview of curriculum, subject, configuration, and recent system activity.</p>
       </div>
     </div>
@@ -94,14 +99,20 @@ require __DIR__ . '/../shared/sidebar.php';
       </div>
       <div class="summary-grid">
         <?php foreach ($visibleSummaries as $definition): ?>
-        <article class="summary-card">
+        <a class="summary-card summary-card-link" href="<?= dashboard_escape($definition['href']) ?>">
           <span class="summary-card-icon"><i class="fa-solid <?= dashboard_escape($definition['icon']) ?>" aria-hidden="true"></i></span>
           <div>
             <span class="summary-card-label"><?= dashboard_escape($definition['label']) ?></span>
             <strong class="summary-card-value"><?= number_format((int)($dashboard['counts'][$definition['key']] ?? 0)) ?></strong>
           </div>
-        </article>
+        </a>
         <?php endforeach; ?>
+        <?php if ($canViewCurriculum): ?>
+        <a class="summary-card summary-card-link" href="../modules/curriculum/pages/curricula.php">
+          <span class="summary-card-icon"><i class="fa-solid fa-calculator" aria-hidden="true"></i></span>
+          <div><span class="summary-card-label">Total Units</span><strong class="summary-card-value" id="dashboardTotalUnits" aria-live="polite">—</strong></div>
+        </a>
+        <?php endif; ?>
       </div>
     </section>
     <?php else: ?>
@@ -109,6 +120,22 @@ require __DIR__ . '/../shared/sidebar.php';
       <div class="dashboard-empty">
         <i class="fa-solid fa-lock" aria-hidden="true"></i>
         Curriculum summary data is shown only when your assigned permissions allow it.
+      </div>
+    </section>
+    <?php endif; ?>
+
+    <?php if ($canViewCurriculum): ?>
+    <section class="dashboard-section dashboard-card current-snapshot" aria-labelledby="snapshotHeading">
+      <div class="dashboard-card-header">
+        <div><p class="eyebrow">Stored curriculum data</p><h2 id="snapshotHeading">Current Curriculum Snapshot</h2></div>
+        <a class="dashboard-link" id="openSnapshotCurriculum" href="../modules/curriculum/pages/curricula.php" hidden>Open Curriculum</a>
+      </div>
+      <div class="snapshot-content" id="snapshotLoading" role="status">Loading curriculum snapshot…</div>
+      <div class="snapshot-content" id="snapshotUnavailable" role="status" hidden></div>
+      <div class="snapshot-content snapshot-grid" id="snapshotDetails" hidden>
+        <div class="snapshot-identity"><span class="snapshot-program" id="snapshotProgram"></span><strong id="snapshotCurriculum"></strong><span class="record-code" id="snapshotVersion"></span></div>
+        <div class="snapshot-stat"><strong id="snapshotSubjectCount">—</strong><span>Subjects</span></div>
+        <div class="snapshot-stat"><strong id="snapshotUnits">—</strong><span>Units</span></div>
       </div>
     </section>
     <?php endif; ?>
@@ -215,5 +242,6 @@ require __DIR__ . '/../shared/sidebar.php';
 
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 <script src="../js/dashboard.js?v=<?= $dashboardScriptVersion ?>"></script>
+<?php if ($canViewCurriculum): ?><script src="../js/curriculum-dashboard.js?v=<?= $curriculumDashboardScriptVersion ?>"></script><?php endif; ?>
 </body>
 </html>

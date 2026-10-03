@@ -75,6 +75,7 @@
     const programArchiveModal = ui.createModal(document.getElementById('programArchiveModal'));
     const curriculumModal = ui.createModal(document.getElementById('curriculumModal'));
     const curriculumDetailModal = ui.createModal(document.getElementById('curriculumDetail'));
+    const curriculumArchiveModal = ui.createModal(document.getElementById('curriculumArchiveModal'));
     const versionWorkspace = document.getElementById('versionWorkspace');
     const versionModal = ui.createModal(document.getElementById('versionModal'));
     const assignmentModal = ui.createModal(document.getElementById('assignmentModal'));
@@ -392,12 +393,8 @@
         button.disabled = true;
         button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Archiving...';
         const formData = new FormData();
-        formData.set('action', 'update');
+        formData.set('action', 'archive');
         formData.set('id', program.id);
-        formData.set('program_code', program.program_code || '');
-        formData.set('program_name', program.program_name || '');
-        formData.set('program_type', program.program_type || '');
-        formData.set('status', 'inactive');
         try {
             const payload = await ui.postForm(endpoints.programs, formData);
             programArchiveModal?.close();
@@ -638,6 +635,8 @@
             document.getElementById('workspaceCurriculumName').textContent = curriculum.curriculum_name || 'Curriculum';
             document.getElementById('curriculumHeaderCode').textContent = curriculum.curriculum_code || '';
             document.getElementById('workspaceCurriculumStatus').innerHTML = ui.statusBadge(curriculum.status);
+            const archiveButton = document.getElementById('archiveCurriculumButton');
+            if (archiveButton) archiveButton.hidden = curriculum.status !== 'active';
             document.getElementById('backToProgramCurricula').href = 'curricula.php?program_id=' + Number(curriculum.academic_program_id);
             document.getElementById('backToCurricula').href = 'curricula.php?program_id=' + Number(curriculum.academic_program_id) + '&curriculum_id=' + Number(curriculum.id);
             document.getElementById('backProgramCurriculaLabel').textContent = curriculum.program_code || 'Program Curricula';
@@ -1381,6 +1380,23 @@
     });
     document.getElementById('editCurriculumButton')?.addEventListener('click', function () {
         if (permissions.updateCurricula && state.selectedCurriculumId) openEditCurriculum(state.selectedCurriculumId);
+    });
+    document.getElementById('archiveCurriculumButton')?.addEventListener('click', function () {
+        if (!permissions.updateCurricula || state.selectedCurriculum?.status !== 'active') return;
+        document.getElementById('curriculumArchiveName').textContent = state.selectedCurriculum.curriculum_code;
+        curriculumArchiveModal?.open();
+    });
+    document.getElementById('confirmCurriculumArchive')?.addEventListener('click', async function () {
+        if (!state.selectedCurriculumId || !curriculumArchiveModal) return;
+        this.disabled = true;
+        const data = new FormData(); data.set('action', 'archive'); data.set('id', String(state.selectedCurriculumId));
+        try {
+            await ui.postForm(endpoints.curricula, data);
+            curriculumArchiveModal.close();
+            ui.showToast('Curriculum archived.', 'success');
+            window.location.href = 'curricula.php?program_id=' + Number(state.selectedCurriculum.academic_program_id);
+        } catch (error) { ui.showFormError(document.getElementById('curriculumArchiveModal'), error.message); }
+        finally { this.disabled = false; }
     });
     loadCurriculumWorkspace();
     refreshProgramAvailability();

@@ -38,7 +38,7 @@ function deploymentSnapshot(mysqli $db): string {
     ksort($tables); return hash('sha256',json_encode($tables,JSON_THROW_ON_ERROR));
 }
 $status=json_decode(deploymentRun(['--status'],0),true);
-deployCheck($status['applied']===0 && count($status['pending'])===14,'14 pending baseline/migration entries');
+deployCheck($status['applied']===0 && count($status['pending'])===16,'16 pending baseline/migration entries');
 deployCheck($conn->query('SHOW TABLES')->num_rows===0,'Status does not create a journal');
 deploymentRun(['--apply','--confirm-database=wrong-target'],1);
 deployCheck($conn->query('SHOW TABLES')->num_rows===0,'Wrong confirmation writes nothing');
@@ -59,8 +59,8 @@ deployCheck($conn->query('SHOW TABLES')->num_rows===23,'22 application tables pl
 foreach(['users','students','academic_programs','subjects','curricula'] as $table) {
     deployCheck((int)$conn->query("SELECT COUNT(*) FROM `$table`")->fetch_row()[0]===0,'No seeded records: '.$table);
 }
-deployCheck((int)$conn->query("SELECT COUNT(*) FROM schema_migrations WHERE status='applied'")->fetch_row()[0]===14,'All migrations journaled');
-deployCheck((int)$conn->query('SELECT COUNT(*) FROM permissions')->fetch_row()[0]===34,'Permissions initialized');
+deployCheck((int)$conn->query("SELECT COUNT(*) FROM schema_migrations WHERE status='applied'")->fetch_row()[0]===16,'All migrations journaled');
+deployCheck((int)$conn->query('SELECT COUNT(*) FROM permissions')->fetch_row()[0]===36,'Permissions initialized');
 $snapshot=deploymentSnapshot($conn);
 deploymentRun(['--apply','--confirm-database='.$database],0);
 deployCheck(deploymentSnapshot($conn)===$snapshot,'Second apply changes no data');
@@ -78,5 +78,5 @@ try { deploymentRun(['--apply','--confirm-database='.$database],1); }
 finally { $conn->query("DELETE FROM schema_migrations WHERE migration='999_unknown'"); }
 deployCheck(deploymentSnapshot($conn)===$snapshot,'Unknown migration refused');
 $status=json_decode(deploymentRun(['--status'],0),true);
-deployCheck($status['applied']===14 && $status['pending']===[],'No pending migrations');
+deployCheck($status['applied']===16 && $status['pending']===[],'No pending migrations');
 echo json_encode(['passed'=>true,'checks'=>$checks]).PHP_EOL;

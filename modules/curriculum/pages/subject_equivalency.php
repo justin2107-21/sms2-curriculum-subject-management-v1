@@ -94,12 +94,26 @@ require __DIR__ . '/../../../shared/sidebar.php';
         </div>
         <div class="equivalency-selector-grid">
           <div class="equivalency-subject-selector">
-            <label class="mapping-filter-field"><span>Find Subject A</span><input type="search" id="subjectASearch" maxlength="100" placeholder="Search code or title"/></label>
-            <label class="mapping-filter-field"><span>Subject A <strong>*</strong></span><select id="subjectASelect" required><option value="">Select Subject A</option></select></label>
+            <div class="mapping-filter-field">
+              <label for="subjectASearch">Subject A <strong>*</strong></label>
+              <div class="record-autocomplete">
+                <input type="search" id="subjectASearch" maxlength="100" placeholder="Search code or title" required/>
+                <input type="hidden" id="subjectASelect"/>
+                <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Subject A" title="Clear selection" hidden><i class="fa-solid fa-xmark"></i></button>
+                <div class="record-autocomplete-options" id="subjectAOptions" role="listbox" aria-label="Subject A suggestions" hidden></div>
+              </div>
+            </div>
           </div>
           <div class="equivalency-subject-selector">
-            <label class="mapping-filter-field"><span>Find Subject B</span><input type="search" id="subjectBSearch" maxlength="100" placeholder="Search code or title"/></label>
-            <label class="mapping-filter-field"><span>Subject B <strong>*</strong></span><select id="subjectBSelect" required><option value="">Select Subject B</option></select></label>
+            <div class="mapping-filter-field">
+              <label for="subjectBSearch">Subject B <strong>*</strong></label>
+              <div class="record-autocomplete">
+                <input type="search" id="subjectBSearch" maxlength="100" placeholder="Search code or title" required/>
+                <input type="hidden" id="subjectBSelect"/>
+                <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Subject B" title="Clear selection" hidden><i class="fa-solid fa-xmark"></i></button>
+                <div class="record-autocomplete-options" id="subjectBOptions" role="listbox" aria-label="Subject B suggestions" hidden></div>
+              </div>
+            </div>
           </div>
           <div class="equivalency-compare-action">
             <button type="button" class="button-primary" id="compareSubjectsButton" disabled><i class="fa-solid fa-scale-balanced"></i> Compare Subjects</button>

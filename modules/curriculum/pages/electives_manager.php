@@ -96,23 +96,24 @@ require __DIR__ . '/../../../shared/sidebar.php';
         <label class="form-field form-field-wide"><span>Group Name *</span><input name="group_name" maxlength="150" placeholder="Professional Elective 1" required/></label>
         <label class="form-field"><span>Year / Grade Level *</span><select name="year_level" required></select></label>
         <label class="form-field"><span>Semester / Term *</span><select name="semester" required></select></label>
-        <label class="form-field"><span>Required Selections *</span><input type="number" name="required_selections" min="1" step="1" value="1" required/></label>
+        <label class="form-field"><span>Number of Subjects to Choose *</span><input type="number" name="required_selections" min="1" step="1" value="1" required/><small>How many subjects must be selected from this elective group?</small></label>
         <label class="form-field"><span>Status *</span><select name="status" required><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
-        <div class="form-field form-field-wide"><label for="subjectSearch">Subjects Available for This Elective Group *</label><small>Only compatible subjects from the selected curriculum version and placement are shown.</small>
+        <div class="form-field form-field-wide"><label for="subjectSearch">Available Subjects for This Placement *</label><small>Only subjects mapped to the selected curriculum version and academic placement are shown.</small>
           <div class="record-autocomplete"><input type="search" id="subjectSearch" placeholder="Search mapped subject code or title" autocomplete="off"/><input type="hidden" id="subjectId"/><div class="record-autocomplete-options" id="subjectOptions" role="listbox" aria-label="Eligible subject suggestions" hidden></div></div>
           <div id="selectedSubjects"></div>
         </div>
       </div>
       <div id="placementWarning" class="elective-warning" hidden><strong>Placement mismatch</strong><p id="placementWarningText"></p><button type="button" class="button-muted" id="cancelPlacement">Cancel</button> <a id="mappingLink" class="button-muted">Open Subject Mapping</a></div>
+      <div id="allRequiredWarning" class="elective-warning" role="status" hidden>All available subjects are currently required. This group does not provide an alternative choice.</div>
       <div class="modal-actions"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="submit" class="button-primary">Save Elective Group</button></div>
     </form>
   </section>
 </div>
 <div class="curriculum-modal" id="archiveGroupModal" hidden><div class="modal-backdrop" data-modal-close></div>
   <section class="modal-dialog modal-dialog-small" role="alertdialog" aria-modal="true" aria-labelledby="archiveGroupTitle">
-    <div class="modal-header"><h2 id="archiveGroupTitle">Archive Elective Group?</h2><button class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button></div>
-    <div class="confirmation-body"><p>This elective group will no longer be active for regular use. Existing records will be preserved.</p><strong id="archiveGroupName"></strong><div class="form-error" role="alert" hidden></div></div>
-    <div class="modal-actions modal-actions-padded"><button class="button-muted" data-modal-close>Cancel</button><button class="button-danger" id="confirmArchive">Archive Group</button></div>
+    <div class="modal-header"><h2 id="archiveGroupTitle">Archive Record</h2><button class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="confirmation-body"><p>Are you sure you want to archive this elective group?</p><p>The record will be removed from active views but retained in Archives.</p><strong id="archiveGroupName"></strong><div class="form-error" role="alert" hidden></div></div>
+    <div class="modal-actions modal-actions-padded"><button class="button-muted" data-modal-close>Cancel</button><button class="button-danger" id="confirmArchive">Archive</button></div>
   </section>
 </div>
 <?php endif; ?>

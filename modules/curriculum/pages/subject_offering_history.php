@@ -104,7 +104,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
             <select id="historyCurriculum" disabled><option value="">Select a program to narrow curricula</option></select>
           </label>
           <label class="mapping-filter-field"><span>Curriculum Version</span>
-            <select id="historyVersion" disabled><option value="">Select a curriculum to narrow versions</option></select>
+            <div class="record-autocomplete"><input type="search" id="historyVersionSearch" placeholder="Select a curriculum to narrow versions" disabled/><input type="hidden" id="historyVersion"/><button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear curriculum version" title="Clear selection" hidden><i class="fa-solid fa-xmark"></i></button><div class="record-autocomplete-options" id="historyVersionOptions" role="listbox" aria-label="Curriculum version suggestions" hidden></div></div>
           </label>
           <label class="mapping-filter-field"><span>Year Level</span>
             <select id="historyYear"><option value="">All stored values</option></select>
@@ -168,10 +168,10 @@ require __DIR__ . '/../../../shared/sidebar.php';
             <select id="compareCurriculum" disabled required><option value="">Select an academic program first</option></select>
           </label>
           <label class="mapping-filter-field"><span>Version A <strong>*</strong></span>
-            <select id="compareVersionA" disabled required><option value="">Select a curriculum first</option></select>
+            <div class="record-autocomplete"><input type="search" id="compareVersionASearch" placeholder="Select a curriculum first" disabled required/><input type="hidden" id="compareVersionA"/><button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Version A" title="Clear selection" hidden><i class="fa-solid fa-xmark"></i></button><div class="record-autocomplete-options" id="compareVersionAOptions" role="listbox" aria-label="Version A suggestions" hidden></div></div>
           </label>
           <label class="mapping-filter-field"><span>Version B <strong>*</strong></span>
-            <select id="compareVersionB" disabled required><option value="">Select a curriculum first</option></select>
+            <div class="record-autocomplete"><input type="search" id="compareVersionBSearch" placeholder="Select a curriculum first" disabled required/><input type="hidden" id="compareVersionB"/><button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Version B" title="Clear selection" hidden><i class="fa-solid fa-xmark"></i></button><div class="record-autocomplete-options" id="compareVersionBOptions" role="listbox" aria-label="Version B suggestions" hidden></div></div>
           </label>
           <label class="mapping-filter-field"><span>Records Per Page</span>
             <select id="comparePerPage"><option value="10">10</option><option value="20" selected>20</option><option value="50">50</option></select>

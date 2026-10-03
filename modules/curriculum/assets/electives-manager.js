@@ -55,7 +55,7 @@
             (details && prerequisites.length ? '<small>Prerequisite: '+prerequisites.map(p=>esc(p.subject_code)).join(', ')+'</small>' : '')+
             '</div>'+(removable?'<button type="button" class="button-muted" data-remove="'+Number(subject.subject_id)+'" aria-label="Remove '+esc(subject.subject_code)+'">Remove</button>':'')+'</div>';
     }
-    const rule = g => '<div class="elective-rule"><strong>Choose '+Number(g.required_selections)+'</strong> of '+g.members.length+' eligible subjects</div>';
+    const rule = g => '<div class="elective-rule"><strong>Choose '+Number(g.required_selections)+'</strong> of '+g.members.length+' available subjects</div>'+(g.members.length >= 2 && Number(g.required_selections)===g.members.length?'<p class="elective-rule-warning">All available subjects are currently required. This group does not provide an alternative choice.</p>':'');
     function render() {
         const ready=!!state.data;
         $('electiveState').hidden=ready;
@@ -65,8 +65,8 @@
             $('electiveState').innerHTML='<i class="fa-solid fa-bullseye"></i><h2>Select a Program, Curriculum, and Version</h2><p>Select context to view elective groups.</p>';
             return;
         }
-        const groups=ui.searchRecords(state.data.groups,$('groupSearch').value,g=>[g.group_name]).filter(g=> (!$('yearFilter').value || g.year_level===$('yearFilter').value) && (!$('termFilter').value || g.semester===$('termFilter').value) && (!$('statusFilter').value || g.status===$('statusFilter').value));
-        $('groupCards').innerHTML=groups.length?groups.map(g=>'<article class="elective-card"><div class="elective-card-top"><span class="elective-placement">'+esc(placement(g))+'</span>'+ui.statusBadge(g.status)+'</div><h2>'+esc(g.group_name)+'</h2>'+rule(g)+'<p class="elective-label">Eligible Subjects</p>'+g.members.map(s=>subjectMarkup(s)).join('')+'<div class="elective-card-actions"><button class="button-muted" data-view="'+Number(g.id)+'">View</button>'+(canManage?'<button class="button-muted" data-edit="'+Number(g.id)+'">Edit</button>'+(g.status!=='archived'?'<button class="button-muted" data-archive="'+Number(g.id)+'">Archive</button>':''):'')+'</div></article>').join(''):'<div class="elective-empty">'+(state.data.groups.length?'No elective groups match these filters.':'No elective groups yet. Create a group to define eligible subject choices.')+'</div>';
+        const groups=ui.searchRecords(state.data.groups,$('groupSearch').value,g=>[g.group_name]).filter(g=> (!$('yearFilter').value || g.year_level===$('yearFilter').value) && (!$('termFilter').value || g.semester===$('termFilter').value) && (!$('statusFilter').value ? g.status!=='archived' : g.status===$('statusFilter').value));
+        $('groupCards').innerHTML=groups.length?groups.map(g=>'<article class="elective-card"><h2>'+esc(g.group_name)+'</h2><div class="elective-card-top"><span class="elective-placement">'+esc(placement(g))+'</span>'+ui.statusBadge(g.status)+'</div>'+rule(g)+'<p class="elective-label">Available Subjects</p>'+g.members.map(s=>subjectMarkup(s)).join('')+'<div class="elective-card-actions"><button class="button-muted" data-view="'+Number(g.id)+'">View</button>'+(canManage&&g.status!=='archived'?'<button class="button-muted" data-edit="'+Number(g.id)+'">Edit</button><button class="button-muted" data-archive="'+Number(g.id)+'">Archive</button>':'')+'</div></article>').join(''):'<div class="elective-empty"><h2>'+(state.data.groups.length?'No elective groups match these filters.':'No elective groups yet.')+'</h2>'+(state.data.groups.length?'':'<p>Create a group when this curriculum contains alternative subject choices.</p>'+(canManage?'<button class="button-primary" data-create-group>Create Elective Group</button>':''))+'</div>';
         const review=state.data.review;
         $('reviewCounters').innerHTML=Object.entries(labels).map(([key,label])=>'<div class="elective-counter">'+label+'<strong>'+Number(review.counts[key])+'</strong><small>'+(review.counts[key]?'Issues found':'No issues found')+'</small></div>').join('');
         $('reviewIssues').innerHTML=review.issues.length?'<section class="elective-card"><p class="elective-placement">Review required</p><h2>Elective group issues</h2>'+review.issues.map(issue=>{
@@ -75,29 +75,38 @@
             else if(issue.type==='inactive') action='<a href="'+esc(link('subjects.php',issue.subject_id))+'">Open Subject Master</a>';
             else action='<button class="button-muted" data-'+(canManage?'edit':'view')+'="'+issue.group_id+'">'+(canManage?'Edit':'View')+' Elective Group</button>';
             return '<div class="elective-issue"><div><strong>'+labels[issue.type]+'</strong><p>'+esc(issue.group_name)+' · '+esc(issue.message)+'</p></div>'+action+'</div>';
-        }).join('')+'</section>':'<div class="elective-empty"><h2>No elective group issues detected.</h2><p>All reviewed elective groups contain valid subject choices and selection rules.</p></div>';
+        }).join('')+'</section>':'<div class="elective-empty"><h2>No elective configuration issues detected.</h2></div>';
     }
     function openView(g) {
         state.selected=g; $('viewGroupTitle').textContent=g.group_name;
-        $('viewGroupBody').innerHTML=ui.statusBadge(g.status)+rule(g)+'<p class="elective-placement">'+esc(placement(g))+'</p><p class="elective-label">Eligible Subjects</p>'+g.members.map(s=>subjectMarkup(s,true)).join('')+'<p><a href="'+esc(link('prerequisite_configuration.php'))+'">Pre-requisite Configuration</a> · <a href="'+esc(link('subject_mapping.php'))+'">Subject Mapping</a></p>';
+        $('viewGroupBody').innerHTML=ui.statusBadge(g.status)+rule(g)+'<p class="elective-placement">'+esc(placement(g))+'</p><p class="elective-label">Available Subjects</p>'+g.members.map(s=>subjectMarkup(s,true)).join('')+'<p><a href="'+esc(link('prerequisite_configuration.php'))+'">Manage in Pre-requisite Configuration</a> · <a href="'+esc(link('subject_mapping.php'))+'">Manage in Subject Mapping</a></p>';
         if($('viewArchive')) $('viewArchive').hidden=g.status==='archived';
+        if($('viewEdit')) $('viewEdit').hidden=g.status==='archived';
         view.open();
     }
     function openEdit(g=null) {
-        if(!canManage || !state.data || state.busy) return;
+        if(!canManage || !state.data || state.busy || g?.status==='archived') return;
         view.close(); state.edit=g; state.members=g?g.members.map(s=>({...s})):[];
         form.reset(); ui.clearFormError(form);
         $('groupFormTitle').textContent=g?'Edit Elective Group':'Create Elective Group';
         form.elements.year_level.innerHTML=option('','Select year / grade')+[...new Set([...state.data.years,...(g?.year_level?[g.year_level]:[])])].map(v=>option(v)).join('');
-        form.elements.semester.innerHTML=option('','Select semester / term')+[...new Set([...state.data.terms,...(g?.semester?[g.semester]:[])])].map(v=>option(v)).join('');
+        form.elements.semester.innerHTML=option('','Select year / grade first');
         form.elements.status.innerHTML=option('active','Active')+option('inactive','Inactive')+(g?.status==='archived'?option('archived','Archived'):'');
         if(g) ['group_name','year_level','semester','required_selections','status'].forEach(key=>{ form.elements[key].value=g[key] ?? ''; });
+        updateTermOptions(g?.semester || '');
         subjectAutocomplete.clear(false); renderMembers(); editor.open();
+    }
+    function updateTermOptions(previous='') {
+        const year=form.elements.year_level.value;
+        const terms=state.data?.terms_by_year?.[year] || (state.data?.placements || []).filter(p=>p.year_level===year).map(p=>p.semester);
+        form.elements.semester.innerHTML=option('',year?'Select semester / term':'Select year / grade first')+[...new Set(terms.filter(Boolean))].map(v=>option(v)).join('');
+        if(terms.includes(previous)) form.elements.semester.value=previous;
     }
     function renderMembers() {
         $('subjectSearch').disabled=!form.elements.year_level.value || !form.elements.semester.value;
-        $('selectedSubjects').innerHTML=state.members.map(s=>subjectMarkup(s,true,true)).join('');
+        $('selectedSubjects').innerHTML=state.members.length?'<p class="elective-selected-count">Selected subjects ('+state.members.length+')</p>'+state.members.map(s=>subjectMarkup(s,true,true)).join(''):'';
         form.elements.required_selections.max=String(Math.max(1,state.members.length));
+        $('allRequiredWarning').hidden=state.members.length<2 || Number(form.elements.required_selections.value)!==state.members.length;
         const year=form.elements.year_level.value,term=form.elements.semester.value;
         const mismatch=state.members.find(s=>s.year_level!==year || s.semester!==term || !s.year_level || !s.semester);
         $('placementWarning').hidden=!mismatch || !year || !term;
@@ -105,7 +114,7 @@
             $('placementWarningText').textContent=(mismatch.subject_code || 'Subject')+' is currently placed in '+placement(mismatch)+' but this elective group is configured for '+year+' / '+term+'.';
             $('mappingLink').href=link('subject_mapping.php',mismatch.subject_id);
         }
-        form.querySelector('[type="submit"]').disabled=!!mismatch || !state.members.length;
+        form.querySelector('[type="submit"]').disabled=!!mismatch || state.members.length<2;
     }
     const subjectAutocomplete=ui.createAutocomplete({input:$('subjectSearch'),valueInput:$('subjectId'),list:$('subjectOptions'),minimumLength:0,showSuggestionsOnFocus:true,maxSuggestions:5,noResultsText:'No matching subjects found.',
         search:async query=>ui.searchRecords((state.data?.placements || []).filter(s=>s.subject_status==='active' && s.year_level && s.semester && s.year_level===form.elements.year_level.value && s.semester===form.elements.semester.value && !state.members.some(m=>Number(m.subject_id)===Number(s.subject_id))),query,s=>[s.subject_code,s.subject_title]),
@@ -114,6 +123,7 @@
     });
     function requestArchive(g) { if(!canManage || state.busy) return;view.close();state.selected=g;$('archiveGroupName').textContent=g.group_name;ui.clearFormError($('archiveGroupModal'));archive.open(); }
     root.addEventListener('click',event=>{
+        if(event.target.closest('[data-create-group]')) { openEdit(); return; }
         const button=event.target.closest('[data-view],[data-edit],[data-archive]'); if(!button || !state.data) return;
         const kind=['view','edit','archive'].find(key=>button.dataset[key]);
         const g=state.data.groups.find(item=>Number(item.id)===Number(button.dataset[kind]));if(!g)return;
@@ -127,11 +137,13 @@
     $('viewArchive')?.addEventListener('click',()=>requestArchive(state.selected));
     $('cancelPlacement')?.addEventListener('click',()=>editor.close());
     $('selectedSubjects')?.addEventListener('click',event=>{const button=event.target.closest('[data-remove]');if(!button)return;state.members=state.members.filter(s=>Number(s.subject_id)!==Number(button.dataset.remove));renderMembers();});
-    ['year_level','semester'].forEach(key=>form?.elements[key].addEventListener('change',()=>{subjectAutocomplete.clear(false);renderMembers();}));
+    form?.elements.required_selections.addEventListener('input',renderMembers);
+    ['year_level','semester'].forEach(key=>form?.elements[key].addEventListener('change',()=>{if(key==='year_level')updateTermOptions();subjectAutocomplete.clear(false);renderMembers();}));
     form?.addEventListener('submit',async event=>{
         event.preventDefault(); if(state.busy || !cascade.hasSelection())return;
         const count=Number(form.elements.required_selections.value);
-        if(!Number.isInteger(count)||count<1||count>state.members.length){ui.showFormError(form,'Required selections must be at least 1 and cannot exceed the number of eligible subjects.');return;}
+        if(state.members.length<2){ui.showFormError(form,'Choose at least two available subjects to form an elective group.');return;}
+        if(!Number.isInteger(count)||count<1||count>state.members.length){ui.showFormError(form,'Number of subjects to choose must be at least 1 and cannot exceed the available subjects.');return;}
         const data=new FormData(form);data.set('action',state.edit?'update':'create');if(state.edit)data.set('id',state.edit.id);
         Object.entries(context()).forEach(([key,value])=>data.set(key,value));state.members.forEach(s=>data.append('subject_ids[]',s.subject_id));
         state.busy=true;ui.setFormSubmitting(form,true);ui.clearFormError(form);

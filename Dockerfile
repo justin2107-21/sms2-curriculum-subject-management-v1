@@ -1,8 +1,11 @@
 FROM php:8.2-apache-bookworm
 
-# mysqli/mysqlnd is required; curl, DOM, fileinfo and core JSON/session support
-# are already provided by this official image. No GD/intl/zip/PDO driver usage.
-RUN docker-php-ext-install -j"$(nproc)" mysqli \
+# mysqli/mysqlnd and mbstring are required; curl, DOM, fileinfo and core
+# JSON/session support are already provided by this official image.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libonig-dev \
+    && docker-php-ext-install -j"$(nproc)" mysqli mbstring \
+    && rm -rf /var/lib/apt/lists/* \
     && a2enmod rewrite \
     && cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
 
@@ -16,7 +19,7 @@ RUN chmod 755 /usr/local/bin/csms-entrypoint \
     && find /var/www/html -type d -exec chmod 755 {} + \
     && find /var/www/html -type f -exec chmod 644 {} + \
     && install -d -o www-data -g www-data -m 700 /var/lib/php/csms-sessions \
-    && php -r 'foreach (["mysqli","mysqlnd","curl","dom","fileinfo","json","session","ctype","filter"] as $extension) { if (!extension_loaded($extension)) { fwrite(STDERR, "Missing required PHP extension.\n"); exit(1); } }'
+    && php -r 'foreach (["mysqli","mysqlnd","mbstring","curl","dom","fileinfo","json","session","ctype","filter"] as $extension) { if (!extension_loaded($extension)) { fwrite(STDERR, "Missing required PHP extension.\n"); exit(1); } }'
 
 # Secure cookies are correct behind HostForge HTTPS without trusting forwarded
 # headers. Override to 0 ONLY for an isolated local HTTP Docker test.

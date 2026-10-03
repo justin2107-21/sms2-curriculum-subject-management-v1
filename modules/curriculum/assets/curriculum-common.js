@@ -656,14 +656,11 @@
     function searchRank(fields, query) {
         const q = normalizeSearch(query);
         if (!q) return 0;
-        return Math.min(...fields.map(value => {
+        return Math.min(...fields.map((value, index) => {
             const field = normalizeSearch(value);
-            if (field === q) return 0;
-            if (field.startsWith(q)) return 1;
-            for (let index = field.indexOf(q); index >= 0; index = field.indexOf(q, index + 1)) {
-                if (index === 0 || !/[\p{L}\p{N}_]/u.test(field[index - 1])) return 2;
-            }
-            return field.includes(q) ? 3 : Infinity;
+            if (field === q) return index === 0 ? 0 : 2;
+            if (field.startsWith(q)) return index === 0 ? 1 : 2;
+            return field.includes(q) ? (index === 0 ? 3 : 4) : Infinity;
         }));
     }
     function searchRecords(records, query, fields) {

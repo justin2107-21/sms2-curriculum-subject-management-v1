@@ -36,12 +36,31 @@ class ElectivesWorkspaceService
         $placements = $this->repo->placements($version);
         $years = [];
         $terms = [];
-        foreach (array_merge($placements, $groups) as $placement) {
+        $termsByYear = [];
+        foreach ($placements as $placement) {
             if ($placement['year_level']) $years[] = $placement['year_level'];
             if ($placement['semester']) $terms[] = $placement['semester'];
+            if ($placement['year_level'] && $placement['semester']) $termsByYear[$placement['year_level']][] = $placement['semester'];
         }
+        $years = array_values(array_unique($years));
+        $terms = array_values(array_unique($terms));
+        usort($years, [self::class, 'academicOrder']);
+        usort($terms, [self::class, 'academicOrder']);
+        foreach ($termsByYear as &$yearTerms) {
+            $yearTerms = array_values(array_unique($yearTerms));
+            usort($yearTerms, [self::class, 'academicOrder']);
+        }
+        unset($yearTerms);
         return ['groups'=>$groups, 'placements'=>$placements, 'prerequisites'=>$this->repo->prerequisites($version),
-            'years'=>array_values(array_unique($years)), 'terms'=>array_values(array_unique($terms)), 'review'=>self::review($groups)];
+            'years'=>$years, 'terms'=>$terms, 'terms_by_year'=>$termsByYear, 'review'=>self::review($groups)];
+    }
+
+    private static function academicOrder(string $a, string $b): int
+    {
+        $number = static function (string $value): int {
+            return preg_match('/\d+/', $value, $match) ? (int)$match[0] : PHP_INT_MAX;
+        };
+        return $number($a) <=> $number($b) ?: strnatcasecmp($a, $b);
     }
 
     public static function review(array $groups): array
@@ -68,7 +87,7 @@ class ElectivesWorkspaceService
                 } elseif ($member['year_level'] !== $group['year_level'] || $member['semester'] !== $group['semester']) {
                     $add('mismatch',"$code is placed in {$member['year_level']} / {$member['semester']} while this group is configured for " . ($group['year_level'] ?: 'Unset year') . ' / ' . ($group['semester'] ?: 'Unset semester') . '.', $id);
                 }
-                if (($member['subject_status'] ?? '') !== 'active') $add('inactive',"$code is inactive or archived.",$id);
+                if ($group['status'] === 'active' && ($member['subject_status'] ?? '') !== 'active') $add('inactive',"$code is inactive or archived.",$id);
                 if (isset($member['curriculum_version_id'], $group['curriculum_version_id']) && (int)$member['curriculum_version_id'] !== (int)$group['curriculum_version_id']) $add('context',"$code has a membership belonging to another curriculum version.",$id);
             }
         }
@@ -80,13 +99,15 @@ class ElectivesWorkspaceService
         $name = DomainValidator::requiredString($input,'group_name','Group Name',150);
         $year = DomainValidator::requiredString($input,'year_level','Year / Grade',50);
         $term = DomainValidator::requiredString($input,'semester','Semester / Term',50);
-        $required = DomainValidator::positiveId($input['required_selections'] ?? null,'Required selections');
+        $required = DomainValidator::positiveId($input['required_selections'] ?? null,'Number of Subjects to Choose');
         $status = DomainValidator::status($input,['active','inactive','archived'],'active');
+        if ($status === 'archived') throw new DomainValidationException('Use Archive to archive an elective group.');
         $raw = $input['subject_ids'] ?? [];
         if (!is_array($raw)) throw new DomainValidationException('Eligible Subjects must be a list.');
         $subjects = array_map(fn($value) => DomainValidator::positiveId($value,'Subject'), $raw);
         if (count(array_unique($subjects)) !== count($subjects)) throw new DomainValidationException('Duplicate subject membership is not allowed.');
-        if ($required > count($subjects)) throw new DomainValidationException('Required selections cannot exceed the number of eligible subjects.');
+        if (count($subjects) < 2) throw new DomainValidationException('Choose at least two available subjects to form an elective group.');
+        if ($required > count($subjects)) throw new DomainValidationException('Number of subjects to choose cannot exceed the available subjects.');
         $this->db->begin_transaction();
         try {
             $context = $this->context($input,true);
@@ -95,8 +116,11 @@ class ElectivesWorkspaceService
             if ($id !== null) {
                 $old = $this->repo->lockGroup($id,$version);
                 if (!$old) throw new DomainNotFoundException('Elective group not found in the selected version.');
+                if ($old['status'] === 'archived') throw new DomainConflictException('Restore this elective group from Settings > Archives before editing.');
             }
             $placements = $this->repo->placements($version,true);
+            if (!$this->repo->hasPlacement($version, $year, $term)) throw new DomainValidationException('The selected year / grade and semester / term do not have a current placement in this curriculum version.');
+            if ($this->repo->duplicateGroup($version, $name, $year, $term, $id)) throw new DomainConflictException('An identical elective group already exists in this version and placement.');
             $bySubject = array_column($placements,null,'subject_id');
             foreach ($subjects as $subject) {
                 $p = $bySubject[$subject] ?? null;
@@ -116,7 +140,8 @@ class ElectivesWorkspaceService
                 audit_log_required('ELECTIVE_GROUP_SUBJECT_ADD','curriculum_elective_group',$id,'Subject added to elective group.',['subject_id'=>$subject]);
             }
             audit_log_required($old ? 'ELECTIVE_GROUP_UPDATE' : 'ELECTIVE_GROUP_CREATE','curriculum_elective_group',$id,'Elective group saved.',['curriculum_version_id'=>$version,'group_name'=>$name,'year_level'=>$year,'semester'=>$term,'required_selections'=>$required,'status'=>$status]);
-            if ($old && $old['status'] !== 'archived' && $status === 'archived') audit_log_required('ELECTIVE_GROUP_ARCHIVE','curriculum_elective_group',$id,'Elective group archived.');
+            if ($old && (int)$old['required_selections'] !== $required) audit_log_required('ELECTIVE_GROUP_SELECTION_CHANGE','curriculum_elective_group',$id,'Number of subjects to choose changed.',['before'=>(int)$old['required_selections'],'after'=>$required]);
+            if ($old && $old['status'] !== $status) audit_log_required('ELECTIVE_GROUP_STATUS_CHANGE','curriculum_elective_group',$id,'Elective group status changed.',['before'=>$old['status'],'after'=>$status]);
             $this->db->commit();
             return ['id'=>$id];
         } catch (Throwable $e) {
@@ -135,8 +160,8 @@ class ElectivesWorkspaceService
             $group = $this->repo->lockGroup($id,(int)$context['id']);
             if (!$group) throw new DomainNotFoundException('Elective group not found in the selected version.');
             if ($group['status'] !== 'archived') {
-                $this->repo->archive($id);
-                audit_log_required('ELECTIVE_GROUP_ARCHIVE','curriculum_elective_group',$id,'Elective group archived; membership preserved.',['curriculum_version_id'=>(int)$context['id']]);
+                $this->repo->archive($id, function_exists('current_user_id') ? current_user_id() : null, $group['status']);
+                audit_log_required('ELECTIVE_GROUP_ARCHIVE','curriculum_elective_group',$id,'Elective group archived; membership preserved.',['curriculum_version_id'=>(int)$context['id'],'group_name'=>$group['group_name'],'previous_status'=>$group['status'],'new_status'=>'archived']);
             }
             $this->db->commit();
         } catch (Throwable $e) { $this->db->rollback(); throw $e; }

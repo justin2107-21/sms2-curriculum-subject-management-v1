@@ -1,6 +1,9 @@
 <?php
 require_once __DIR__ . '/../shared/bootstrap.php';
 require_permission('account.view');
+$canViewArchives = user_can((int)current_user_id(), 'archive.view');
+$canRestoreArchives = $canViewArchives && user_can((int)current_user_id(), 'archive.restore');
+$archiveTab = $canViewArchives && (($_GET['tab'] ?? '') === 'archives');
 $first_name     = htmlspecialchars($_SESSION['first_name'] ?? '');
 $last_name      = htmlspecialchars($_SESSION['last_name']  ?? '');
 $email          = htmlspecialchars($_SESSION['email']      ?? '');
@@ -21,6 +24,7 @@ $dashboardScriptVersion = (string)filemtime(__DIR__ . '/../js/dashboard.js');
   <title>Account Settings – BCP Student Portal</title>
   <link rel="stylesheet" href="../css/dashboard.css"/>
   <link rel="stylesheet" href="../css/account.css?v=<?= $accountCssVersion ?>"/>
+  <link rel="stylesheet" href="../css/archives.css?v=<?= (int)filemtime(__DIR__ . '/../css/archives.css') ?>"/>
   <link rel="stylesheet" href="../css/csms-typography.css?v=<?= $typographyVersion ?>"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
 </head>
@@ -33,7 +37,12 @@ require __DIR__ . '/../shared/sidebar.php';
 <div class="main">
 <?php require __DIR__ . '/../shared/topbar.php'; ?>
 <main class="content account-content">
-<div class="account-wrap">
+<div class="account-wrap <?= $archiveTab ? 'archives-open' : '' ?>" id="settingsWrap">
+  <nav class="settings-tabs" aria-label="Settings sections">
+    <a href="account.php" class="<?= !$archiveTab ? 'selected' : '' ?>">Account</a>
+    <?php if ($canViewArchives): ?><a href="account.php?tab=archives" class="<?= $archiveTab ? 'selected' : '' ?>">Archives</a><?php endif; ?>
+  </nav>
+  <div id="accountPanel" <?= $archiveTab ? 'hidden' : '' ?>>
 
   <!-- Profile card -->
   <div class="settings-card">
@@ -148,10 +157,35 @@ require __DIR__ . '/../shared/sidebar.php';
     </div>
   </div>
 
+  </div>
+  <?php if ($canViewArchives): ?>
+  <section id="archivesPanel" class="archives-panel" data-can-restore="<?= $canRestoreArchives ? '1' : '0' ?>" <?= !$archiveTab ? 'hidden' : '' ?>>
+    <header class="archives-heading"><h1>Archives</h1><p>View and restore archived CSMS records.</p></header>
+    <div class="archive-summary" id="archiveSummary"></div>
+    <form id="archiveFilters" class="archive-filters" role="search">
+      <input type="search" name="search" placeholder="Search archived records..." aria-label="Search archived records" maxlength="100">
+      <select name="module" aria-label="Module"><option value="">All modules</option><option value="program">Academic Programs</option><option value="curriculum">Curricula</option><option value="subject">Subjects</option><option value="elective_group">Elective Groups</option></select>
+      <select name="date" aria-label="Date archived"><option value="all">All dates</option><option value="today">Today</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="custom">Custom range</option></select>
+      <input type="date" name="from" aria-label="From date" hidden><input type="date" name="to" aria-label="To date" hidden>
+      <select name="archived_by" aria-label="Archived by"><option value="">Anyone</option></select>
+      <select name="original_status" aria-label="Original status"><option value="">Any previous status</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="draft">Draft</option></select>
+      <input type="search" name="program" placeholder="Program / Strand" aria-label="Program or strand" maxlength="80">
+    </form>
+    <div class="archive-chips" id="archiveChips" aria-label="Archive modules"></div>
+    <div class="archive-table-wrap"><table class="archive-table"><thead><tr><th>Record</th><th>Module</th><th>Original Context</th><th>Archived On</th><th>Archived By</th><th>Status</th><th>Actions</th></tr></thead><tbody id="archiveRows"></tbody></table></div>
+    <div id="archiveEmpty" class="archive-empty" hidden></div>
+    <footer class="archive-pager"><span id="archivePageStatus"></span><div><select id="archivePageSize" aria-label="Rows per page"><option>20</option><option>50</option><option>100</option></select><button type="button" id="archivePrev">Previous</button><button type="button" id="archiveNext">Next</button></div></footer>
+  </section>
+  <?php endif; ?>
 </div>
 </main>
 </div>
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
+<?php if ($canViewArchives): ?>
+<div class="archive-modal" id="archiveDetailsModal" hidden><div class="archive-modal-backdrop" data-archive-close></div><section class="archive-dialog" role="dialog" aria-modal="true" aria-labelledby="archiveDetailsTitle"><header><h2 id="archiveDetailsTitle">Archived Record</h2><button type="button" data-archive-close aria-label="Close">&times;</button></header><div class="archive-dialog-body" id="archiveDetailsBody"></div><footer><button type="button" data-archive-close>Close</button><?php if ($canRestoreArchives): ?><button type="button" class="archive-restore" id="archiveDetailsRestore">Restore</button><?php endif; ?></footer></section></div>
+<div class="archive-modal" id="archiveConfirmModal" hidden><div class="archive-modal-backdrop" data-archive-close></div><section class="archive-dialog archive-dialog-small" role="alertdialog" aria-modal="true" aria-labelledby="archiveConfirmTitle"><header><h2 id="archiveConfirmTitle">Restore record?</h2><button type="button" data-archive-close aria-label="Close">&times;</button></header><div class="archive-dialog-body"><p>This will make the archived record available again where applicable.</p><p id="archiveConfirmName" class="archive-confirm-name"></p><p class="archive-error" id="archiveRestoreError" hidden></p></div><footer><button type="button" data-archive-close>Cancel</button><button type="button" class="archive-restore" id="archiveConfirmRestore">Restore Record</button></footer></section></div>
+<script src="../js/archives.js?v=<?= (int)filemtime(__DIR__ . '/../js/archives.js') ?>" defer></script>
+<?php endif; ?>
 <script src="../js/dashboard.js?v=<?= $dashboardScriptVersion ?>"></script>
 
 <script>

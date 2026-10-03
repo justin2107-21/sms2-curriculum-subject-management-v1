@@ -64,9 +64,11 @@ class AcademicProgramService
         $data = DomainValidator::academicProgram($input);
         $this->db->begin_transaction();
         try {
-            if (!$this->programs->findById($id)) {
+            $existing = $this->programs->findById($id);
+            if (!$existing) {
                 throw new DomainNotFoundException('Academic program not found.');
             }
+            if ($existing['archived_at'] !== null) throw new DomainConflictException('Restore this academic program from Settings > Archives before editing.');
             if ($this->programs->codeExists($data['program_code'], $id)) {
                 throw new DomainConflictException('Program code already exists.');
             }

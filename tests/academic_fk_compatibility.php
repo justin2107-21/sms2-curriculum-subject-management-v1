@@ -105,7 +105,11 @@ try {
         fkDeploy();
         fkCheck(fkRows()===$rows,'Upgrade preserves every application row');
         fkCheck($shape===$conn->query($shapeSql)->fetch_all(MYSQLI_ASSOC),'All CHECK expressions preserved');
-        fkCheck($indexes===$conn->query($indexSql)->fetch_all(MYSQLI_ASSOC),'All UNIQUE and ordinary indexes preserved');
+        $upgradedIndexes=$conn->query($indexSql)->fetch_all(MYSQLI_ASSOC);
+        $electiveIndex=array_values(array_filter($upgradedIndexes,static fn($r)=>$r['TABLE_NAME']==='curriculum_elective_groups' && $r['INDEX_NAME']==='idx_elective_version_status'));
+        fkCheck(array_column($electiveIndex,'COLUMN_NAME')===['curriculum_version_id','status'],'Electives migration adds version/status index');
+        $originalIndexes=array_values(array_filter($upgradedIndexes,static fn($r)=>!($r['TABLE_NAME']==='curriculum_elective_groups' && $r['INDEX_NAME']==='idx_elective_version_status')));
+        fkCheck($indexes===$originalIndexes,'All pre-existing UNIQUE and ordinary indexes preserved');
         fkCheck($auto===$conn->query($autoSql)->fetch_all(MYSQLI_ASSOC),'Affected AUTO_INCREMENT values preserved');
         fkCheck($constraints===$conn->query("SELECT TABLE_NAME,CONSTRAINT_NAME,CONSTRAINT_TYPE FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=DATABASE() ORDER BY TABLE_NAME,CONSTRAINT_NAME")->fetch_all(MYSQLI_ASSOC),'CHECK/UNIQUE/FK names and types preserved');
         foreach ($scripts as $name=>$sql) {
