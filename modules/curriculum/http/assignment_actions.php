@@ -8,6 +8,16 @@ $service = new CurriculumVersionSubjectService($conn);
 
 try {
     switch ($action) {
+        case 'placement_subject_options':
+            curriculum_require_read('curriculum.update');
+            require_permission('subject.view', true);
+            json_response(true, 'Available subjects loaded.', $service->placementSubjectOptions($_GET));
+
+        case 'preview_placement':
+            curriculum_require_read('curriculum.update');
+            $id = DomainValidator::positiveId($_GET['id'] ?? null, 'Subject mapping');
+            json_response(true, 'Placement sequence checked.', ['validation' => $service->previewPlacement($id, $_GET)]);
+
         case 'list':
             curriculum_require_read('curriculum.view');
             $versionId = DomainValidator::positiveId(
@@ -28,15 +38,28 @@ try {
                 $service->listMappings($_GET)
             );
 
+        case 'map_subject':
         case 'assign':
             curriculum_require_mutation('curriculum.update');
-            $assignment = $service->assign($_POST, curriculum_actor_id());
+            if ($action === 'map_subject') {
+                require_permission('subject.view', true);
+                DomainValidator::requiredString($_POST, 'year_level', 'Year / Grade level', 50);
+                DomainValidator::requiredString($_POST, 'semester', 'Semester', 50);
+                DomainValidator::requiredString($_POST, 'is_required', 'Placement', 1);
+            }
+            $assignment = $service->assign($_POST, curriculum_actor_id(), $action === 'map_subject');
             json_response(true, 'Subject assigned to curriculum version.', ['assignment' => $assignment], 201);
 
+        case 'update_mapping':
         case 'update':
             curriculum_require_mutation('curriculum.update');
+            if ($action === 'update_mapping') {
+                DomainValidator::requiredString($_POST, 'year_level', 'Year / Grade level', 50);
+                DomainValidator::requiredString($_POST, 'semester', 'Semester', 50);
+                DomainValidator::requiredString($_POST, 'is_required', 'Placement', 1);
+            }
             $id = DomainValidator::positiveId($_POST['id'] ?? null, 'Subject mapping');
-            $mapping = $service->updatePlacement($id, $_POST);
+            $mapping = $service->updatePlacement($id, $_POST, $action === 'update_mapping');
             json_response(true, 'Subject mapping updated.', ['mapping' => $mapping]);
 
         case 'remove':

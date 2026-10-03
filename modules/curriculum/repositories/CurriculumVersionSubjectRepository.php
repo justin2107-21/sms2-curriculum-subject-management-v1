@@ -251,6 +251,12 @@ class CurriculumVersionSubjectRepository
         $types = '';
         $params = [];
 
+        if (($query['subject_id'] ?? null) !== null) {
+            $conditions[] = 'cvs.subject_id = ?';
+            $types .= 'i';
+            $params[] = $query['subject_id'];
+        }
+
         if ($query['academic_program_id'] !== null) {
             $conditions[] = 'academic_programs.id = ?';
             $types .= 'i';

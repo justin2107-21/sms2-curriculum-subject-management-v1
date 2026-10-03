@@ -36,7 +36,12 @@ function curriculum_actor_id(): int
 function curriculum_handle_error(Throwable $error): void
 {
     if ($error instanceof DomainValidationException) {
-        json_response(false, $error->getMessage(), [], 422);
+        if ($error instanceof AcademicSequenceException) {
+            require_once __DIR__ . '/../../../shared/audit.php';
+            audit_log('ACADEMIC_SEQUENCE_BLOCKED', 'curriculum_subject_requirement', null,
+                'Academic sequence validation blocked a change.', ['curriculum_version_id' => $error->validation['curriculum_version_id'] ?? null, 'conflicts' => $error->validation['conflicts']]);
+        }
+        json_response(false, $error->getMessage(), $error instanceof AcademicSequenceException ? ['validation' => $error->validation] : [], 422);
     }
     if ($error instanceof DomainConflictException) {
         json_response(false, $error->getMessage(), [], 409);

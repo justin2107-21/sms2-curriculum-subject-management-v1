@@ -1,8 +1,10 @@
 <?php
 
 require_once __DIR__ . '/../validators/DomainValidator.php';
+require_once __DIR__ . '/AcademicSequenceValidator.php';
 require_once __DIR__ . '/../repositories/SubjectRepository.php';
 require_once __DIR__ . '/../repositories/CurriculumVersionRepository.php';
+require_once __DIR__ . '/../repositories/CurriculumRepository.php';
 require_once __DIR__ . '/../repositories/CurriculumVersionSubjectRepository.php';
 require_once __DIR__ . '/../repositories/CurriculumSubjectRequirementRepository.php';
 require_once __DIR__ . '/../repositories/CurriculumElectiveGroupSubjectRepository.php';
@@ -41,6 +43,7 @@ class CurriculumVersionSubjectService
     public function listMappings(array $input = []): array
     {
         $query = DomainValidator::subjectMappingQuery($input);
+        $query['subject_id'] = DomainValidator::optionalPositiveId($input['subject_id'] ?? null, 'Subject');
         $result = $this->assignments->paginateMappings($query);
         return [
             'mappings' => $result['records'],
@@ -49,14 +52,36 @@ class CurriculumVersionSubjectService
         ];
     }
 
-    public function assign(array $input, int $createdBy): array
+    public function placementSubjectOptions(array $input): array
+    {
+        $version = DomainValidator::positiveId($input['curriculum_version_id'] ?? null, 'Curriculum version');
+        $this->validatePlacementContext($version, $input);
+        $query = DomainValidator::listQuery($input, ['active', 'inactive']);
+        $query['_exclude_placement_version'] = $version;
+        $result = $this->subjects->paginate($query);
+        return ['subjects' => $result['records'], 'pagination' => $result['pagination']];
+    }
+
+    private function validatePlacementContext(int $versionId, array $input): void
+    {
+        $programId = DomainValidator::positiveId($input['academic_program_id'] ?? null, 'Academic program');
+        $curriculumId = DomainValidator::positiveId($input['curriculum_id'] ?? null, 'Curriculum');
+        $version = $this->versions->findById($versionId);
+        $curriculum = (new CurriculumRepository($this->db))->findById($curriculumId);
+        if (!$version || !$curriculum || (int)$version['curriculum_id'] !== $curriculumId || (int)$curriculum['academic_program_id'] !== $programId) {
+            throw new DomainValidationException('Select a matching Program, Curriculum, and Curriculum Version.');
+        }
+    }
+
+    public function assign(array $input, int $createdBy, bool $requireContext = false): array
     {
         $data = DomainValidator::curriculumVersionSubject($input);
         $this->db->begin_transaction();
         try {
-            if (!$this->versions->findById($data['curriculum_version_id'])) {
+            if (!$this->requirements->lockVersion($data['curriculum_version_id'])) {
                 throw new DomainNotFoundException('Curriculum version not found.');
             }
+            if ($requireContext) $this->validatePlacementContext($data['curriculum_version_id'], $input);
             if (!$this->subjects->findById($data['subject_id'])) {
                 throw new DomainNotFoundException('Subject not found.');
             }
@@ -64,8 +89,10 @@ class CurriculumVersionSubjectService
                 $data['curriculum_version_id'],
                 $data['subject_id']
             )) {
-                throw new DomainConflictException('This subject is already mapped to this curriculum version.');
+                throw new DomainConflictException('This subject is already placed in this curriculum version. Use Edit Placement to change its placement.');
             }
+            $validation = $this->placementSequence($data);
+            if (!$validation['valid']) throw new AcademicSequenceException($validation);
             $id = $this->assignments->create($data, $createdBy);
             audit_log_required(
                 'CURRICULUM_SUBJECT_ASSIGN',
@@ -73,6 +100,7 @@ class CurriculumVersionSubjectService
                 $id,
                 'Subject assigned to curriculum version.',
                 [
+                    'event' => 'placement.created',
                     'curriculum_version_id' => $data['curriculum_version_id'],
                     'subject_id' => $data['subject_id'],
                     'is_required' => $data['is_required'],
@@ -90,14 +118,22 @@ class CurriculumVersionSubjectService
         return $assignment;
     }
 
-    public function updatePlacement(int $id, array $input): array
+    public function updatePlacement(int $id, array $input, bool $placementOnly = false): array
     {
         $data = DomainValidator::curriculumVersionSubjectPlacement($input);
+        $initial = $this->assignments->findById($id);
+        if (!$initial) throw new DomainNotFoundException('Subject mapping not found.');
         $this->db->begin_transaction();
         try {
+            $this->requirements->lockVersion((int)$initial['curriculum_version_id']);
             $assignment = $this->assignments->findById($id);
             if (!$assignment) {
                 throw new DomainNotFoundException('Subject mapping not found.');
+            }
+            $validation = $this->placementSequence(array_replace($assignment, $data));
+            if (!$validation['valid']) throw new AcademicSequenceException($validation);
+            if ($placementOnly) {
+                $data['sequence_order'] = $assignment['sequence_order'];
             }
             $this->assignments->updatePlacement($id, $data);
             audit_log_required(
@@ -106,9 +142,13 @@ class CurriculumVersionSubjectService
                 $id,
                 'Curriculum subject placement details updated.',
                 [
+                    'event' => 'placement.updated',
                     'curriculum_version_id' => (int)$assignment['curriculum_version_id'],
                     'subject_id' => (int)$assignment['subject_id'],
                     'year_level' => $data['year_level'],
+                    'previous_year_level' => $assignment['year_level'],
+                    'previous_semester' => $assignment['semester'],
+                    'affected_relationships' => $validation['relationships'],
                     'semester' => $data['semester'],
                     'sequence_order' => $data['sequence_order'],
                     'is_required' => $data['is_required'],
@@ -126,14 +166,35 @@ class CurriculumVersionSubjectService
         return $updated;
     }
 
+    public function previewPlacement(int $id, array $input): array
+    {
+        $assignment = $this->assignments->findById($id);
+        if (!$assignment) throw new DomainNotFoundException('Subject mapping not found.');
+        $data = DomainValidator::curriculumVersionSubjectPlacement($input);
+        return $this->placementSequence(array_replace($assignment, $data));
+    }
+
+    private function placementSequence(array $proposed): array
+    {
+        $version = (int)$proposed['curriculum_version_id'];
+        $placements = array_values(array_filter($this->requirements->allPlacements($version), fn($p) => (int)$p['subject_id'] !== (int)$proposed['subject_id']));
+        $subject = $this->subjects->findById((int)$proposed['subject_id']);
+        $placements[] = array_replace($subject ?? [], $proposed);
+        return AcademicSequenceValidator::validate($placements, $this->requirements->allPrerequisites($version), (int)$proposed['subject_id']) + ['curriculum_version_id' => $version];
+    }
+
     public function remove(int $id): void
     {
+        $initial = $this->assignments->findById($id);
+        if (!$initial) throw new DomainNotFoundException('Subject mapping not found.');
         $this->db->begin_transaction();
         try {
+            $this->requirements->lockVersion((int)$initial['curriculum_version_id']);
             $assignment = $this->assignments->findById($id);
             if (!$assignment) {
                 throw new DomainNotFoundException('Curriculum subject assignment not found.');
             }
+            $this->requirements->lockVersion((int)$assignment['curriculum_version_id']);
             if ($this->requirements->placementHasRelationships(
                 (int)$assignment['curriculum_version_id'],
                 (int)$assignment['subject_id']
@@ -162,6 +223,7 @@ class CurriculumVersionSubjectService
                 $id,
                 'Subject removed from curriculum version.',
                 [
+                    'event' => 'placement.removed',
                     'curriculum_version_id' => (int)$assignment['curriculum_version_id'],
                     'subject_id' => (int)$assignment['subject_id'],
                 ]

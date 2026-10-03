@@ -51,178 +51,196 @@ require __DIR__ . '/../../../shared/sidebar.php';
         data-requirement-api="../http/requirement_actions.php"
         data-can-manage-requirements="<?= $canManageRequirements ? '1' : '0' ?>">
     <div class="page-title-bar curriculum-title-bar">
-      <div>
-        <h1 class="page-title"><i class="fa-solid fa-code-branch"></i> Pre-requisite Configuration</h1>
-        <p class="page-subtitle">Configure and review prerequisite and corequisite relationships within curriculum versions.</p>
-      </div>
-      <span class="read-only-pill"><i class="fa-solid fa-shield-halved"></i> Curriculum configuration only</span>
-    </div>
-
-    <section class="domain-card mapping-filter-card" aria-labelledby="requirementFiltersTitle">
-      <div class="domain-card-header">
-        <div>
-          <p class="eyebrow">Progressive filters</p>
-          <h2 id="requirementFiltersTitle">Curriculum Version Context</h2>
-        </div>
-        <button type="button" class="button-muted" id="clearRequirementFilters">
-          <i class="fa-solid fa-rotate-left"></i> Clear Filters
-        </button>
-      </div>
-      <div class="mapping-filter-grid prerequisite-filter-grid">
-        <label class="mapping-filter-field">
-          <span>Academic Program</span>
-          <select id="requirementProgramFilter">
-            <option value="">All available programs</option>
-          </select>
-        </label>
-        <label class="mapping-filter-field">
-          <span>Curriculum</span>
-          <select id="requirementCurriculumFilter">
-            <option value="">All available curricula</option>
-          </select>
-        </label>
-        <label class="mapping-filter-field">
-          <span>Curriculum Version</span>
-          <select id="requirementVersionFilter" disabled>
-            <option value="">Select a curriculum first</option>
-          </select>
-        </label>
-        <label class="mapping-filter-field mapping-search-field">
-          <span>Target Subject Search</span>
-          <span class="mapping-input-with-icon">
-            <i class="fa-solid fa-magnifying-glass"></i>
-            <input type="search" id="requirementSubjectSearch" maxlength="100" placeholder="Subject code or title"/>
-          </span>
-        </label>
-        <label class="mapping-filter-field">
-          <span>Relationship Type</span>
-          <select id="requirementTypeFilter">
-            <option value="">All relationship types</option>
-            <option value="prerequisite">Prerequisite</option>
-            <option value="corequisite">Corequisite</option>
-          </select>
-        </label>
-      </div>
-    </section>
-
-    <section class="domain-card mapping-results-card" aria-labelledby="requirementResultsTitle">
-      <div class="domain-card-header">
-        <div>
-          <p class="eyebrow">Stored subject requirements</p>
-          <h2 id="requirementResultsTitle">Prerequisite &amp; Corequisite Relationships</h2>
-          <p class="mapping-context-message" id="requirementContextMessage">Showing all configured subject requirements.</p>
-        </div>
-        <div class="card-header-actions">
-          <span class="record-count" id="requirementCount">0 records</span>
-          <?php if ($canManageRequirements): ?>
-          <button type="button" class="primary-action-button" id="addRequirementButton" disabled>
-            <i class="fa-solid fa-plus"></i> Add Requirement
-          </button>
-          <?php endif; ?>
-        </div>
-      </div>
-      <div class="mapping-results-toolbar">
-        <span class="placement-note" id="requirementHelpText">Select a curriculum version before adding a relationship. These records do not enforce enrollment eligibility.</span>
-        <label class="select-control compact-select">
-          <span>Rows</span>
-          <select id="requirementPerPage"><option>10</option><option selected>20</option><option>50</option></select>
-        </label>
-      </div>
-      <div class="table-scroll">
-        <table class="domain-table prerequisite-table">
-          <thead>
-            <tr>
-              <th>Target Subject</th>
-              <th>Relationship</th>
-              <th>Required Subject</th>
-              <th>Target Placement</th>
-              <th>Required Placement</th>
-              <th>Academic Program</th>
-              <th>Curriculum</th>
-              <th>Version</th>
-              <?php if ($canManageRequirements): ?><th>Actions</th><?php endif; ?>
-            </tr>
-          </thead>
-          <tbody id="requirementRows">
-            <tr><td colspan="<?= $columnCount ?>" class="state-cell">Loading subject requirements…</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="pagination-bar" id="requirementPagination"></div>
-    </section>
+<div>
+<h1 class="page-title">Pre-requisite Configuration</h1>
+<p class="page-subtitle">Manage subject prerequisite rules and progression requirements.</p>
+</div><?php if ($canManageRequirements): ?>
+<button class="primary-action-button" id="addRequirementButton" disabled>+ Add Prerequisite</button><?php endif; ?>
+</div>
+    <section class="pr-panel pr-selectors" aria-label="Curriculum prerequisite context">
+<label class="form-field"><span>Program / Strand</span>
+<div class="record-autocomplete">
+<input type="search" id="programSearch" placeholder="Search program / strand" />
+<input type="hidden" id="programId"/>
+<button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Program / Strand" hidden>&times;</button>
+<div class="record-autocomplete-options" id="programOptions" role="listbox" hidden>
+</div>
+</div>
+</label>
+<span class="pr-context-separator" aria-hidden="true"><i class="fa-solid fa-chevron-right"></i></span>
+<label class="form-field"><span>Curriculum</span>
+<div class="record-autocomplete">
+<input type="search" id="curriculumSearch" placeholder="Search curriculum" disabled/>
+<input type="hidden" id="curriculumId"/>
+<button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Curriculum" hidden>&times;</button>
+<div class="record-autocomplete-options" id="curriculumOptions" role="listbox" hidden>
+</div>
+</div>
+</label>
+<span class="pr-context-separator" aria-hidden="true"><i class="fa-solid fa-chevron-right"></i></span>
+<label class="form-field"><span>Curriculum Version</span>
+<div class="record-autocomplete">
+<input type="search" id="versionSearch" placeholder="Search curriculum version" disabled/>
+<input type="hidden" id="versionId"/>
+<button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Curriculum Version" hidden>&times;</button>
+<div class="record-autocomplete-options" id="versionOptions" role="listbox" hidden>
+</div>
+</div>
+</label>
+</section>
+    <nav class="pr-tabs" role="tablist" aria-label="Prerequisite workspace">
+<button role="tab" id="tab-rules" aria-controls="panel-rules" aria-selected="true" data-tab="rules">Prerequisite Rules</button>
+<button role="tab" id="tab-chain" aria-controls="panel-chain" aria-selected="false" tabindex="-1" data-tab="chain">Chain Viewer</button>
+<button role="tab" id="tab-review" aria-controls="panel-review" aria-selected="false" tabindex="-1" data-tab="review">Validation Review</button>
+</nav>
+    <p id="workspaceStatus" role="status"></p>
+    <section id="panel-rules" role="tabpanel" aria-labelledby="tab-rules">
+<div class="pr-toolbar">
+<input type="search" id="ruleSearch" aria-label="Search subjects" placeholder="Search subject code or title..."/>
+<select id="yearFilter" aria-label="Year or grade"><option value="">All Years</option></select>
+<select id="semesterFilter" aria-label="Semester"><option value="">All Semesters</option></select>
+<select id="stateFilter" aria-label="Configured state"><option value="">All Subjects</option><option value="with">With Prerequisites</option><option value="without">Without Prerequisites</option></select>
+</div>
+<div id="ruleCards" class="pr-rules">
+</div>
+</section>
+    <section id="panel-chain" role="tabpanel" aria-labelledby="tab-chain" hidden>
+<p class="eyebrow">FOCUSED DEPENDENCY INSPECTION</p>
+<h2>Prerequisite Chain</h2>
+<p class="pr-muted">View the dependency path leading to one selected subject.</p>
+<div class="pr-chain-layout">
+<aside class="pr-panel">
+<label class="form-field"><span>Select Subject</span>
+<div class="record-autocomplete">
+<input type="search" id="focusSearch" placeholder="Search select subject" />
+<input type="hidden" id="focusId"/>
+<button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Select Subject" hidden>&times;</button>
+<div class="record-autocomplete-options" id="focusOptions" role="listbox" hidden>
+</div>
+</div>
+</label>
+<p class="pr-muted">Only stored prerequisite relationships are shown. No rules are inferred from subject codes.</p>
+</aside>
+<div class="pr-panel">
+<header class="pr-chain-header"><span class="eyebrow">PREREQUISITE CHAIN</span>
+<div>
+<button type="button" class="button-muted" id="fitChain">Fit to View</button>
+<button type="button" class="button-muted" id="resetChain">Reset</button>
+</div>
+</header>
+<div id="chainViewport" tabindex="0" aria-label="Prerequisite chain. Scroll to inspect branches.">
+<div id="chainCanvas">
+</div>
+</div>
+<div id="dependents">
+</div>
+</div>
+</div>
+</section>
+    <section id="panel-review" role="tabpanel" aria-labelledby="tab-review" hidden>
+<div class="pr-review-grid" id="reviewCounts">
+</div>
+<div id="reviewIssues">
+</div>
+</section>
   </main>
 
   <div class="footer">eLearning Commons &copy; 2026</div>
 </div>
 
-<?php if ($canManageRequirements): ?>
-<div class="curriculum-modal" id="addRequirementModal" hidden>
-  <div class="modal-backdrop" data-modal-close></div>
-  <section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="addRequirementTitle">
-    <div class="modal-header">
-      <div>
-        <h2 id="addRequirementTitle">Add Subject Requirement</h2>
-        <p class="modal-context" id="addRequirementContext"></p>
-      </div>
-      <button type="button" class="modal-close-button" data-modal-close aria-label="Close add subject requirement form"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-    <form class="domain-form" id="addRequirementForm">
-      <input type="hidden" name="curriculum_version_id" id="requirementVersionId"/>
-      <div class="form-error" role="alert" hidden></div>
-      <div class="form-grid requirement-form-grid">
-        <label class="form-field">
-          <span>Find Target Subject</span>
-          <input type="search" id="targetSubjectSearch" maxlength="100" placeholder="Subject code or title"/>
-        </label>
-        <label class="form-field">
-          <span>Find Required Subject</span>
-          <input type="search" id="requiredSubjectSearch" maxlength="100" placeholder="Subject code or title"/>
-        </label>
-        <label class="form-field">
-          <span>Target Subject <strong>*</strong></span>
-          <select name="subject_id" id="targetSubjectId" required><option value="">Select a mapped subject</option></select>
-        </label>
-        <label class="form-field">
-          <span>Required Subject <strong>*</strong></span>
-          <select name="required_subject_id" id="requiredSubjectId" required><option value="">Select a mapped subject</option></select>
-        </label>
-        <label class="form-field form-field-wide">
-          <span>Relationship Type <strong>*</strong></span>
-          <select name="requirement_type" id="requirementType" required>
-            <option value="prerequisite">Prerequisite</option>
-            <option value="corequisite">Corequisite</option>
-          </select>
-          <small>This configuration records curriculum relationships only; no enrollment consequence is applied.</small>
-        </label>
-      </div>
-      <div class="modal-actions">
-        <button type="button" class="button-muted" data-modal-close>Cancel</button>
-        <button type="submit" class="button-primary">Add Requirement</button>
-      </div>
-    </form>
-  </section>
+<div class="curriculum-modal" id="detailsModal" hidden>
+<div class="modal-backdrop" data-modal-close>
 </div>
-
-<div class="curriculum-modal" id="removeRequirementModal" hidden>
-  <div class="modal-backdrop" data-modal-close></div>
-  <section class="modal-dialog modal-dialog-small" role="alertdialog" aria-modal="true" aria-labelledby="removeRequirementTitle">
-    <div class="modal-header">
-      <div><h2 id="removeRequirementTitle">Remove Subject Requirement?</h2></div>
-      <button type="button" class="modal-close-button" data-modal-close aria-label="Close removal confirmation"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-    <div class="confirmation-body">
-      <p id="removeRequirementMessage">Only this prerequisite or corequisite relationship will be removed.</p>
-      <div class="form-error" role="alert" hidden></div>
-    </div>
-    <div class="modal-actions modal-actions-padded">
-      <button type="button" class="button-muted" data-modal-close>Cancel</button>
-      <button type="button" class="button-danger" id="confirmRemoveRequirement">Remove Relationship</button>
-    </div>
-  </section>
+<section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="detailsModalTitle">
+<div class="modal-header">
+<h2 id="detailsModalTitle">Prerequisite Details</h2>
+<button type="button" class="modal-close-button" data-modal-close aria-label="Close">&times;</button>
 </div>
-<?php endif; ?>
+<div class="pr-modal-body">
+<div id="detailsBody">
+</div>
+</div>
+<div class="modal-actions modal-actions-padded">
+<button type="button" class="button-muted" data-modal-close>Close</button><?php if ($canManageRequirements): ?>
+<button class="button-muted" id="detailsEdit">Edit Rule</button>
+<button class="button-danger" id="detailsRemove">Remove Rule</button><?php endif; ?>
+</div>
+</section>
+</div><?php if ($canManageRequirements): ?>
+<div class="curriculum-modal" id="editorModal" hidden>
+<div class="modal-backdrop" data-modal-close>
+</div>
+<section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="editorModalTitle">
+<div class="modal-header">
+<h2 id="editorModalTitle">Add Prerequisite</h2>
+<button type="button" class="modal-close-button" data-modal-close aria-label="Close">&times;</button>
+</div>
+<div class="pr-modal-body">
+<form id="ruleForm" class="domain-form">
+<div class="form-error" role="alert" hidden>
+</div>
+<div id="targetField">
+<label class="form-field"><span>Target Subject *</span>
+<div class="record-autocomplete">
+<input type="search" id="targetSearch" placeholder="Search target subject *" />
+<input type="hidden" id="targetId"/>
+<button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Target Subject *" hidden>&times;</button>
+<div class="record-autocomplete-options" id="targetOptions" role="listbox" hidden>
+</div>
+</div>
+</label>
+</div>
+<div id="fixedTarget" hidden>
+</div>
+<div id="existingRequired">
+</div>
+<div id="requiredField">
+<label class="form-field"><span>Required Subject *</span>
+<div class="record-autocomplete">
+<input type="search" id="requiredSearch" placeholder="Search required subject *" />
+<input type="hidden" id="requiredId"/>
+<button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Required Subject *" hidden>&times;</button>
+<div class="record-autocomplete-options" id="requiredOptions" role="listbox" hidden>
+</div>
+</div>
+</label>
+</div>
+<button type="button" class="button-muted" id="appendRequired" hidden>+ Add another prerequisite</button>
+<div id="relationshipPreview">
+</div>
+<div id="sequenceWarning" class="form-error" role="alert" hidden></div><a id="editorMapping" href="subject_mapping.php" hidden>Review Subject Mapping</a>
+</form>
+</div>
+<div class="modal-actions modal-actions-padded">
+<button type="button" class="button-muted" data-modal-close>Cancel</button>
+<button type="submit" form="ruleForm" class="button-primary" id="saveRule">Save Prerequisite</button>
+</div>
+</section>
+</div>
+<div class="curriculum-modal" id="removeModal" hidden>
+<div class="modal-backdrop" data-modal-close>
+</div>
+<section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="removeModalTitle">
+<div class="modal-header">
+<h2 id="removeModalTitle">Remove Prerequisite Rule?</h2>
+<button type="button" class="modal-close-button" data-modal-close aria-label="Close">&times;</button>
+</div>
+<div class="pr-modal-body">
+<div class="form-error" role="alert" hidden>
+</div>
+<div id="removeMessage">
+</div>
+<p>This removes only the prerequisite relationship. It does not delete either subject or curriculum placement.</p>
+</div>
+<div class="modal-actions modal-actions-padded">
+<button type="button" class="button-muted" data-modal-close>Cancel</button>
+<button type="button" class="button-danger" id="confirmRemove">Remove Rule</button>
+</div>
+</section>
+</div><?php endif; ?>
 
-<div class="sidebar-overlay" id="sidebarOverlay"></div>
+<div class="sidebar-overlay" id="sidebarOverlay">
+</div>
 <script src="../assets/curriculum-common.js?v=<?= $curriculumCommonVersion ?>"></script>
 <script src="../assets/prerequisite-configuration.js?v=<?= $prerequisiteScriptVersion ?>"></script>
 </body>

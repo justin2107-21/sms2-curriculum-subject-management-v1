@@ -28,11 +28,14 @@ class SubjectService
     {
         $query = DomainValidator::listQuery($input, ['active', 'inactive']);
         $query['curriculum_version_id'] = DomainValidator::optionalPositiveId($input['curriculum_version_id'] ?? null, 'Curriculum version');
+        $query['academic_program_id'] = DomainValidator::optionalPositiveId($input['academic_program_id'] ?? null, 'Academic program');
+        $query['curriculum_id'] = DomainValidator::optionalPositiveId($input['curriculum_id'] ?? null, 'Curriculum');
         $query['year_level'] = DomainValidator::optionalString($input, 'year_level', 'Year level', 50);
         $query['semester'] = DomainValidator::optionalString($input, 'semester', 'Semester', 50);
         if ($query['curriculum_version_id'] !== null && !(new CurriculumVersionRepository($this->db))->findById($query['curriculum_version_id'])) {
             throw new DomainNotFoundException('Curriculum version not found.');
         }
+        $query['_include_placement_context'] = ($input['_include_placement_context'] ?? false) === true;
         $result = $this->subjects->paginate($query);
         return ['subjects' => $result['records'], 'pagination' => $result['pagination']];
     }
@@ -44,8 +47,10 @@ class SubjectService
         if ($filters['curriculum_version_id'] !== null && !(new CurriculumVersionRepository($this->db))->findById($filters['curriculum_version_id'])) {
             throw new DomainNotFoundException('Curriculum version not found.');
         }
-        $result = $this->subjects->placementVersions($query);
-        return ['versions' => $result['records'], 'pagination' => $result['pagination'],
+        $result = $this->subjects->placementVersions($query, $filters);
+        return ['programs' => $this->subjects->placementPrograms(),
+            'curricula' => $this->subjects->placementCurricula($filters['academic_program_id']),
+            'versions' => $result['records'], 'pagination' => $result['pagination'],
             'filter_values' => (new CurriculumVersionSubjectRepository($this->db))->mappingFilterValues($filters)];
     }
 

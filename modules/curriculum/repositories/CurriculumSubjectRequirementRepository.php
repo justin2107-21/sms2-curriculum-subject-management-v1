@@ -21,6 +21,25 @@ class CurriculumSubjectRequirementRepository
         return $row;
     }
 
+    public function allPrerequisites(int $versionId): array
+    {
+        $stmt = RepositoryQuery::execute($this->db, $this->detailSelect() .
+            " WHERE requirements.curriculum_version_id = ? AND requirements.requirement_type = 'prerequisite' ORDER BY requirements.id", 'i', [$versionId]);
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return $rows;
+    }
+
+    public function allPlacements(int $versionId): array
+    {
+        $stmt = RepositoryQuery::execute($this->db,
+            'SELECT p.*, s.subject_code, s.subject_title FROM curriculum_version_subjects p
+             INNER JOIN subjects s ON s.id = p.subject_id WHERE p.curriculum_version_id = ? ORDER BY s.subject_code', 'i', [$versionId]);
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return $rows;
+    }
+
     public function relationshipExists(
         int $versionId,
         int $subjectId,
@@ -263,10 +282,10 @@ class CurriculumSubjectRequirementRepository
     private function joins(): string
     {
         return ' FROM curriculum_subject_requirements AS requirements
-                 INNER JOIN curriculum_version_subjects AS target_placements
+                 LEFT JOIN curriculum_version_subjects AS target_placements
                     ON target_placements.curriculum_version_id = requirements.curriculum_version_id
                    AND target_placements.subject_id = requirements.subject_id
-                 INNER JOIN curriculum_version_subjects AS required_placements
+                 LEFT JOIN curriculum_version_subjects AS required_placements
                     ON required_placements.curriculum_version_id = requirements.curriculum_version_id
                    AND required_placements.subject_id = requirements.required_subject_id
                  INNER JOIN subjects AS target_subjects ON target_subjects.id = requirements.subject_id

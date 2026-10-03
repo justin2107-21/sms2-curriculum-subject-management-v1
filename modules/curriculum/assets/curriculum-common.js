@@ -184,6 +184,7 @@
         function open() {
             previousFocus = document.activeElement;
             element.hidden = false;
+            element.setAttribute('aria-hidden', 'false');
             document.body.classList.add('curriculum-modal-open');
             requestAnimationFrame(function () {
                 focusableElements()[0]?.focus();
@@ -192,6 +193,7 @@
 
         function close() {
             element.hidden = true;
+            element.setAttribute('aria-hidden', 'true');
             if (!document.querySelector('.curriculum-modal:not([hidden])')) {
                 document.body.classList.remove('curriculum-modal-open');
             }
@@ -201,6 +203,7 @@
         element.querySelectorAll('[data-modal-close]').forEach(function (button) {
             button.addEventListener('click', close);
         });
+        element.setAttribute('aria-hidden', 'true');
         element.addEventListener('keydown', function (event) {
             if (event.key === 'Escape') {
                 event.preventDefault();
@@ -222,6 +225,345 @@
         });
 
         return { open, close };
+    }
+
+    function createAutocomplete(options) {
+        const input = options?.input;
+        const valueInput = options?.valueInput;
+        const list = options?.list;
+        if (!input || !valueInput || !list || typeof options.search !== 'function') return null;
+
+        const root = options.root || input.parentElement;
+        const clearButton = root?.querySelector('[data-autocomplete-clear]');
+        const status = options.status || null;
+        const delay = Number.isFinite(options.delay) ? options.delay : 300;
+        const minimumLength = Number.isFinite(options.minimumLength) ? options.minimumLength : 1;
+        let timer = null;
+        let requestSequence = 0;
+        let items = [];
+        let activeIndex = -1;
+        let selectedLabel = '';
+        let pendingDirection = 0;
+
+        function setExpanded(expanded) {
+            list.hidden = !expanded;
+            input.setAttribute('aria-expanded', String(expanded));
+            if (!expanded) input.removeAttribute('aria-activedescendant');
+        }
+
+        function showState(message, kind) {
+            items = [];
+            activeIndex = -1;
+            input.removeAttribute('aria-activedescendant');
+            list.replaceChildren();
+            const row = document.createElement('div');
+            row.className = 'record-autocomplete-state' + (kind ? ' ' + kind : '');
+            row.setAttribute('role', 'status');
+            row.textContent = message;
+            list.appendChild(row);
+            setExpanded(true);
+        }
+
+        function format(item) {
+            const result = options.format ? options.format(item) : { label: String(item.label ?? '') };
+            return typeof result === 'string' ? { label: result } : result;
+        }
+
+        function select(item, notify) {
+            const id = String(options.getId ? options.getId(item) : item.id ?? '');
+            if (!id) return;
+            requestSequence += 1;
+            clearTimeout(timer);
+            const display = format(item);
+            selectedLabel = String(display.label ?? '');
+            valueInput.value = id;
+            input.value = selectedLabel;
+            input.classList.add('has-selection');
+            input.setCustomValidity('');
+            if (status) status.textContent = options.selectedText || 'Selected from matching records.';
+            if (clearButton) clearButton.hidden = false;
+            setExpanded(false);
+            if (notify !== false && options.onSelect) options.onSelect(item, id);
+        }
+
+        function clear(notify) {
+            requestSequence += 1;
+            clearTimeout(timer);
+            selectedLabel = '';
+            valueInput.value = '';
+            input.value = '';
+            input.classList.remove('has-selection');
+            input.setCustomValidity('');
+            if (clearButton) clearButton.hidden = true;
+            list.replaceChildren();
+            setExpanded(false);
+            if (status) status.textContent = options.helpText || '';
+            if (notify !== false && options.onClear) options.onClear();
+        }
+
+        function setSelected(item, notify) {
+            select(item, notify);
+        }
+
+        function close() {
+            requestSequence += 1;
+            clearTimeout(timer);
+            setExpanded(false);
+        }
+
+        function activate(index) {
+            if (!items.length) return;
+            activeIndex = (index + items.length) % items.length;
+            list.querySelectorAll('[role="option"]').forEach(function (option, optionIndex) {
+                const active = optionIndex === activeIndex;
+                option.setAttribute('aria-selected', active ? 'true' : 'false');
+                option.classList.toggle('active', active);
+                if (active) {
+                    input.setAttribute('aria-activedescendant', option.id);
+                    option.scrollIntoView({ block: 'nearest' });
+                }
+            });
+        }
+
+        function render(results) {
+            items = Array.isArray(results) ? results : [];
+            activeIndex = -1;
+            list.replaceChildren();
+            if (!items.length) {
+                pendingDirection = 0;
+                showState(options.noResultsText || 'No matching records found.', 'empty');
+                return;
+            }
+            items.forEach(function (item, index) {
+                const display = format(item);
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'record-autocomplete-option';
+                button.id = list.id + '-option-' + index;
+                button.setAttribute('role', 'option');
+                button.setAttribute('aria-selected', 'false');
+                button.dataset.optionIndex = String(index);
+                if (display.code) {
+                    const code = document.createElement('span');
+                    code.className = 'record-autocomplete-code';
+                    code.textContent = String(display.code);
+                    button.appendChild(code);
+                }
+                const label = document.createElement('span');
+                label.className = 'record-autocomplete-label';
+                label.textContent = String(display.title || display.label || '');
+                button.appendChild(label);
+                if (display.meta) {
+                    const meta = document.createElement('span');
+                    meta.className = 'record-autocomplete-meta';
+                    meta.textContent = String(display.meta);
+                    button.appendChild(meta);
+                }
+                list.appendChild(button);
+            });
+            setExpanded(true);
+            if (pendingDirection) {
+                const direction = pendingDirection;
+                pendingDirection = 0;
+                activate(direction > 0 ? 0 : items.length - 1);
+            }
+        }
+
+        async function search(query, sequence) {
+            if (query.length < minimumLength) return;
+            showState(options.loadingText || 'Searching…', 'loading');
+            try {
+                const results = await options.search(query);
+                if (sequence !== requestSequence) return;
+                render(results);
+            } catch (error) {
+                if (sequence !== requestSequence) return;
+                showState(options.errorText || 'Matching records could not be loaded.', 'error');
+                if (options.onError) options.onError(error);
+            }
+        }
+
+        function scheduleSearch(immediate) {
+            clearTimeout(timer);
+            const query = input.value.trim();
+            const sequence = ++requestSequence;
+            if (query.length < minimumLength) {
+                pendingDirection = 0;
+                items = [];
+                list.replaceChildren();
+                setExpanded(false);
+                return;
+            }
+            if (immediate) {
+                search(query, sequence);
+            } else {
+                showState(options.loadingText || 'Searching…', 'loading');
+                timer = setTimeout(function () { search(query, sequence); }, delay);
+            }
+        }
+
+        input.setAttribute('role', 'combobox');
+        input.setAttribute('aria-autocomplete', 'list');
+        input.setAttribute('aria-expanded', 'false');
+        input.setAttribute('aria-controls', list.id);
+        input.setAttribute('autocomplete', 'off');
+        if (options.placeholder) input.placeholder = options.placeholder;
+        list.setAttribute('role', 'listbox');
+        if (clearButton) clearButton.hidden = true;
+
+        input.addEventListener('input', function () {
+            pendingDirection = 0;
+            if (input.value !== selectedLabel) {
+                const hadSelection = Boolean(valueInput.value || selectedLabel);
+                selectedLabel = '';
+                valueInput.value = '';
+                input.classList.remove('has-selection');
+                if (clearButton) clearButton.hidden = true;
+                if (status) status.textContent = options.helpText || '';
+                if (hadSelection && options.onClear) options.onClear();
+            }
+            input.setCustomValidity('');
+            scheduleSearch(false);
+        });
+        input.addEventListener('focus', function () {
+            if (options.showSuggestionsOnFocus && !input.disabled && !valueInput.value) scheduleSearch(true);
+        });
+        input.addEventListener('keydown', function (event) {
+            if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                if (!items.length) {
+                    pendingDirection = 1;
+                    scheduleSearch(true);
+                }
+                else activate(activeIndex + 1);
+            } else if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                if (!items.length) {
+                    pendingDirection = -1;
+                    scheduleSearch(true);
+                }
+                else activate(activeIndex <= 0 ? items.length - 1 : activeIndex - 1);
+            } else if (event.key === 'Enter' && !list.hidden && activeIndex >= 0) {
+                event.preventDefault();
+                event.stopPropagation();
+                select(items[activeIndex]);
+            } else if (event.key === 'Escape' && !list.hidden) {
+                event.preventDefault();
+                event.stopPropagation();
+                close();
+            } else if (event.key === 'Tab') {
+                close();
+            }
+        });
+        list.addEventListener('mousedown', function (event) {
+            if (event.target.closest('[data-option-index]')) event.preventDefault();
+        });
+        list.addEventListener('click', function (event) {
+            const option = event.target.closest('[data-option-index]');
+            if (option) select(items[Number(option.dataset.optionIndex)]);
+        });
+        clearButton?.addEventListener('click', function () {
+            clear();
+            input.focus();
+        });
+        document.addEventListener('click', function (event) {
+            if (!root?.contains(event.target)) close();
+        });
+
+        return {
+            clear,
+            setSelected,
+            hasSelection: function () {
+                return Boolean(valueInput.value && selectedLabel && input.value === selectedLabel);
+            },
+            getSelectedId: function () { return valueInput.value; },
+            getSelectedLabel: function () { return selectedLabel; },
+            refresh: function () { scheduleSearch(true); },
+            close
+        };
+    }
+
+    function createCascadingAutocomplete(config) {
+        const levels = Array.isArray(config?.levels) ? config.levels : [];
+        if (levels.length < 2) return null;
+        const selectors = [];
+
+        function syncAvailability(index) {
+            levels.forEach(function (level, levelIndex) {
+                if (levelIndex === 0) return;
+                const enabled = selectors.slice(0, levelIndex).every(function (selector) {
+                    return selector && selector.hasSelection();
+                });
+                level.input.disabled = !enabled;
+                level.input.placeholder = enabled
+                    ? (level.placeholder || '')
+                    : (level.disabledPlaceholder || 'Select the previous item first');
+            });
+        }
+
+        function clearFollowing(index) {
+            for (let childIndex = index + 1; childIndex < selectors.length; childIndex += 1) {
+                selectors[childIndex]?.clear(false);
+            }
+            syncAvailability(index);
+        }
+
+        function showNextSuggestions(index) {
+            const nextIndex = index + 1;
+            const nextLevel = levels[nextIndex];
+            if (nextLevel?.showSuggestionsOnEnable && selectors[nextIndex]?.hasSelection() === false && !nextLevel.input.disabled) {
+                const parentId = selectors[index].getSelectedId();
+                // Wait for the selection click to finish bubbling: the outside-click
+                // listener would otherwise immediately dismiss the next dropdown.
+                setTimeout(function () {
+                    if (selectors[index].getSelectedId() !== parentId || nextLevel.input.disabled || selectors[nextIndex].hasSelection()) return;
+                    const searchOnFocus = nextLevel.focusOnEnable && nextLevel.showSuggestionsOnFocus && document.activeElement !== nextLevel.input;
+                    if (nextLevel.focusOnEnable) nextLevel.input.focus();
+                    if (!searchOnFocus) selectors[nextIndex].refresh();
+                }, 0);
+            }
+        }
+
+        levels.forEach(function (level, index) {
+            if (!level || !level.input || !level.valueInput || !level.list || typeof level.search !== 'function') {
+                selectors.push(null);
+                return;
+            }
+            const selector = createAutocomplete({
+                ...level,
+                onSelect: function (item, id) {
+                    clearFollowing(index);
+                    syncAvailability(index);
+                    if (level.onSelect) level.onSelect(item, id);
+                    if (config.onChange) config.onChange(index, item, id, 'select');
+                    showNextSuggestions(index);
+                },
+                onClear: function () {
+                    clearFollowing(index);
+                    syncAvailability(index);
+                    if (level.onClear) level.onClear();
+                    if (config.onChange) config.onChange(index, null, '', 'clear');
+                }
+            });
+            selectors.push(selector);
+        });
+
+        syncAvailability(-1);
+        return {
+            get: function (index) { return selectors[index] || null; },
+            clear: function (index) {
+                const start = Number.isInteger(index) ? index : 0;
+                selectors[start]?.clear(false);
+                clearFollowing(start);
+                if (config.onChange) config.onChange(start, null, '', 'reset');
+            },
+            hasSelection: function () {
+                return selectors.length === levels.length && selectors.every(function (selector) {
+                    return selector && selector.hasSelection();
+                });
+            },
+            selectors: selectors
+        };
     }
 
     function statusBadge(status) {
@@ -308,6 +650,8 @@
         clearFormError,
         setFormSubmitting,
         createModal,
+        createAutocomplete,
+        createCascadingAutocomplete,
         statusBadge,
         formatDate,
         formatUnits,

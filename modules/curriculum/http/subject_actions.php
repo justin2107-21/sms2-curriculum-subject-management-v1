@@ -10,13 +10,15 @@ try {
     switch ($action) {
         case 'list':
             curriculum_require_read('subject.view');
-            foreach (['curriculum_version_id', 'year_level', 'semester'] as $filter) {
+            foreach (['academic_program_id', 'curriculum_id', 'curriculum_version_id', 'year_level', 'semester'] as $filter) {
                 if (isset($_GET[$filter]) && $_GET[$filter] !== '') {
                     curriculum_require_read('curriculum.view');
                     break;
                 }
             }
-            json_response(true, 'Subjects loaded.', $service->list($_GET));
+            $input = $_GET;
+            $input['_include_placement_context'] = user_can(current_user_id(), 'curriculum.view');
+            json_response(true, 'Subjects loaded.', $service->list($input));
 
         case 'contexts':
             curriculum_require_read('subject.view');
