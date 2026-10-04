@@ -56,6 +56,9 @@
 **/config/*.local.php
 **/config/secrets.php
 database/seeds
+!database/seeds/
+!database/seeds/bsit_dataset.php
+!database/seeds/bsit_preoral_manifest.json
 tests
 docs
 tmp
