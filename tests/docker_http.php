@@ -30,7 +30,7 @@ if (getenv('SMS_DOCKER_EXPECT_DB_FAILURE')==='1') {
 foreach(['css/auth.css','js/page-loader.js','images/BCP_LOGO.png'] as $asset) {
     $response=$client->request($asset); dockerCheck($response['status']===200 && $response['body']!=='','Static asset '.$asset);
 }
-foreach(['.git/config','.github/workflows/php-lint.yml','.env','database/','database/deploy.php','database/seeds/development_seed.sql','database/migrations/','students.sql','sms_db_full_backup_test.sql','docs/hostforge-deployment.md','tests/foundation.php','docker/apache-vhost.conf','shared/setup.php','Dockerfile'] as $path) {
+foreach(['.git/config','.github/workflows/php-lint.yml','.env','database/','database/deploy.php','database/repair_demo_program.php','database/seeds/development_seed.sql','database/migrations/','students.sql','sms_db_full_backup_test.sql','docs/hostforge-deployment.md','tests/foundation.php','docker/apache-vhost.conf','shared/setup.php','Dockerfile'] as $path) {
     dockerCheck(in_array($client->request($path)['status'],[403,404],true),'Sensitive URL denied: '.$path);
 }
 foreach (['database/migrations/005_create_curriculum_subject_requirements.sql','database/migrations/013_mariadb_subject_fk_compatibility.sql'] as $path) {

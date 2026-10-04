@@ -145,6 +145,35 @@ Do not globally trust `X-Forwarded-Proto` or disable CSRF to accommodate a proxy
 
 ## Controlled database initialization
 
+### One-time controlled BSIT classification repair
+
+For the already-imported `DEV-BSIT-PREORAL-2026` dataset in
+`hf_db_9du6kxvk`, use the separate CLI repair only when the existing BSIT
+program has a NULL or empty `program_type`. Keep the demo import and bootstrap
+flags disabled. If HostForge has no shell, temporarily set:
+
+```text
+CSMS_RUN_DEMO_REPAIR=1
+CSMS_DEMO_REPAIR_CONFIRM_DATABASE=hf_db_9du6kxvk
+CSMS_DEMO_REPAIR_CONFIRM_DATASET=DEV-BSIT-PREORAL-2026
+CSMS_DEMO_REPAIR_CONFIRM_MODE=PROGRAM-CLASSIFICATION
+CSMS_DEMO_REPAIR_ACTOR_ID=<existing admin ID>
+```
+
+Redeploy once. The startup repair checks the original import ownership audit,
+its recorded program ID, the exact program identity, all owned academic IDs and
+counts, and the current value. It changes only that program's `program_type` to
+`Bachelor's Degree` and writes one audit event in the same transaction. A
+mismatch fails startup for manual review; an already-correct value makes no
+change. Remove **all five** temporary variables and redeploy normally. Do not
+run the demo import again.
+
+After the repair, verify College Programs lists one active BSIT program with
+one curriculum, Curricula and Subject Mapping still find BSIT, and Subjects
+still has its 50 mapped subjects. The expected counts are one academic program,
+one curriculum, one version, 50 subjects and 50 version subjects. No production
+verification should be inferred from the isolated test suite.
+
 ### First Production Database Bootstrap
 
 Use this explicit, temporary startup mechanism when HostForge has no shell/exec

@@ -8,8 +8,9 @@ function manifestCheck(bool $ok,string $label): void {
 }
 try {
     $m=BsitDataset::manifest();
+    manifestCheck($m['planned_structure']['academic_program']['program_type']==="Bachelor's Degree",'Canonical BSIT degree level');
     manifestCheck(count($m['subjects'])===50,'50 unique source subjects, 152 units, seven exact distributions, lecture/lab NULL');
-    foreach(['pending','negative','duplicate','blank','year','semester','precision','lab','total'] as $bad) {
+    foreach(['pending','negative','duplicate','blank','year','semester','precision','lab','total','program_type'] as $bad) {
         $v=$m;
         switch($bad) {
             case 'pending': $v['subjects'][0]['total_units']='PENDING';break;
@@ -21,6 +22,7 @@ try {
             case 'precision': $v['subjects'][0]['total_units']=3.001;break;
             case 'lab': $v['subjects'][0]['laboratory_units']=0;break;
             case 'total': $v['subjects'][0]['total_units']=4;break;
+            case 'program_type': $v['planned_structure']['academic_program']['program_type']=null;break;
         }
         $rejected=false;try{BsitDataset::manifest($v);}catch(RuntimeException $e){$rejected=true;}
         manifestCheck($rejected,'Reject '.$bad.' before any database connection');

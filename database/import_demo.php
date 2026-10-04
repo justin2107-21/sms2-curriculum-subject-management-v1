@@ -4,7 +4,7 @@ if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 require_once __DIR__.'/../shared/database_config.php';
 require_once __DIR__.'/seeds/bsit_dataset.php';
 
-const DEMO_MANIFEST_SHA256 = '0dba87f7ac2e1ad3022545b9a7fd551517a707ef69faa796a6d2a0c84490a3b3';
+const DEMO_MANIFEST_SHA256 = '99cb51393c64480e78be097c1fbbc63f9f0578bd22190425b6173df391f86851';
 const DEMO_TARGET_DATABASE = 'hf_db_9du6kxvk';
 const DEMO_TABLES = ['academic_programs'=>1,'subjects'=>50,'curricula'=>1,'curriculum_versions'=>1,
     'curriculum_version_subjects'=>50,'curriculum_subject_requirements'=>0,
@@ -132,7 +132,7 @@ function demoRun(array $args): string {
         $p=$manifest['planned_structure'];$ids=[];
         $ids['academic_programs'][]=$program=demoInsert($db,'academic_programs',[
             'program_code'=>$p['academic_program']['program_code'],'program_name'=>$p['academic_program']['program_name'],
-            'program_type'=>null,'status'=>'active','created_by'=>$actor]);
+            'program_type'=>$p['academic_program']['program_type'],'status'=>'active','created_by'=>$actor]);
         $subjectIds=[];
         foreach($manifest['subjects'] as $subject) {
             $id=demoInsert($db,'subjects',['subject_code'=>$subject['subject_code'],'subject_title'=>$subject['subject_name'],

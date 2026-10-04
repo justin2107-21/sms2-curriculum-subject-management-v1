@@ -8,7 +8,7 @@
     "academic_program": {
       "program_code": "BSIT",
       "program_name": "Bachelor of Science in Information Technology",
-      "program_type": null,
+      "program_type": "Bachelor's Degree",
       "status": "active"
     },
     "curriculum": {

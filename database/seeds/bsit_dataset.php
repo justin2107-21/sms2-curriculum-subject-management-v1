@@ -49,7 +49,10 @@ final class BsitDataset
         self::require($total===15200,'Source must total 152 units.');
         foreach(['CCS1102/CC102','ITSP1-A','ITSP2A','PRAC3301','ITE4'] as $code) self::require(in_array($code,array_column($m['subjects'],'subject_code'),true),'Missing exact source code.');
         $p=$m['planned_structure'];
-        self::require($p['academic_program']['program_code']==='BSIT' && $p['curriculum']['curriculum_code']==='BSIT-DEMO-2026'
+        self::require($p['academic_program']['program_code']==='BSIT'
+            && $p['academic_program']['program_name']==='Bachelor of Science in Information Technology'
+            && $p['academic_program']['program_type']==="Bachelor's Degree"
+            && $p['curriculum']['curriculum_code']==='BSIT-DEMO-2026'
             && $p['curriculum_version']['version_label']==='PREORAL-2026'
             && $p['placement_plan']['is_required']===1,'Unexpected dataset structure.');
         return $m;
@@ -102,7 +105,7 @@ final class BsitDataset
         $p=$this->manifest['planned_structure'];$ids=[];
         $ids['academic_programs'][]=$program=$this->insert('academic_programs',[
             'program_code'=>$p['academic_program']['program_code'],'program_name'=>$p['academic_program']['program_name'],
-            'program_type'=>null,'status'=>'active','created_by'=>$this->actor]);
+            'program_type'=>$p['academic_program']['program_type'],'status'=>'active','created_by'=>$this->actor]);
         foreach($this->manifest['subjects'] as $s) {
             $ids['subjects'][]=$this->insert('subjects',['subject_code'=>$s['subject_code'],'subject_title'=>$s['subject_name'],
                 'description'=>null,'units'=>$s['total_units'],'lecture_units'=>null,'laboratory_units'=>null,'status'=>'active','created_by'=>$this->actor]);

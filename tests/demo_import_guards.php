@@ -39,4 +39,23 @@ try {
     try {BsitDataset::manifest($m);throw new RuntimeException('Invalid manifest accepted.');}
     catch(RuntimeException $e) {if($e->getMessage()==='Invalid manifest accepted.')throw $e;}
     echo "PASS: Invalid manifest refused\n";
+    $socket=stream_socket_server('tcp://127.0.0.1:0',$errno,$error);
+    if($socket===false)throw new RuntimeException('HTTP guard test port unavailable.');
+    $address=stream_socket_get_name($socket,false);fclose($socket);
+    $port=(int)substr(strrchr($address,':'),1);
+    $server=proc_open([PHP_BINARY,'-S','127.0.0.1:'.$port,'-t',dirname(__DIR__)],
+        [0=>['pipe','r'],1=>['pipe','w'],2=>['pipe','w']],$serverPipes);
+    if(!is_resource($server))throw new RuntimeException('HTTP guard test server unavailable.');
+    fclose($serverPipes[0]);
+    try {
+        $status=0;
+        for($attempt=0;$attempt<30;$attempt++) {
+            $body=@file_get_contents('http://127.0.0.1:'.$port.'/database/repair_demo_program.php');
+            $headers=$http_response_header??[];
+            if($headers) {$status=(int)(preg_match('/^HTTP\/\d\.\d\s+(\d+)/',$headers[0],$match)?$match[1]:0);break;}
+            usleep(100000);
+        }
+        if($status!==404 || $body!==false && $body!=='')throw new RuntimeException('Repair HTTP access was not blocked.');
+        echo "PASS: Repair HTTP access denied before database connection.\n";
+    } finally {proc_terminate($server);fclose($serverPipes[1]);fclose($serverPipes[2]);proc_close($server);}
 } catch(Throwable $e) {fwrite(STDERR,$e->getMessage().PHP_EOL);exit(1);}

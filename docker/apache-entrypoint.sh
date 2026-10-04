@@ -28,6 +28,9 @@ if [ "${1:-}" = 'apache2-foreground' ]; then
     if [ "${CSMS_RUN_DEMO_IMPORT:-}" = '1' ]; then
         php /var/www/html/database/import_demo.php --apply --confirm-dataset=DEV-BSIT-PREORAL-2026
     fi
+    if [ "${CSMS_RUN_DEMO_REPAIR:-}" = '1' ]; then
+        php /var/www/html/database/repair_demo_program.php --apply --confirm-dataset=DEV-BSIT-PREORAL-2026
+    fi
     # Do not pass provisioning secrets into the Apache/PHP worker environment.
     # Operators must still remove them from HostForge's stored configuration.
     unset CSMS_ADMIN_PASSWORD CSMS_ADMIN_USERNAME CSMS_ADMIN_EMAIL
@@ -35,6 +38,8 @@ if [ "${1:-}" = 'apache2-foreground' ]; then
     unset CSMS_RUN_MIGRATIONS CSMS_MIGRATION_CONFIRM_DATABASE CSMS_BOOTSTRAP_ADMIN
     unset CSMS_RUN_DEMO_IMPORT CSMS_DEMO_IMPORT_CONFIRM_DATABASE CSMS_DEMO_IMPORT_CONFIRM_DATASET
     unset CSMS_DEMO_IMPORT_CONFIRM_MODE CSMS_DEMO_IMPORT_ACTOR_ID
+    unset CSMS_RUN_DEMO_REPAIR CSMS_DEMO_REPAIR_CONFIRM_DATABASE CSMS_DEMO_REPAIR_CONFIRM_DATASET
+    unset CSMS_DEMO_REPAIR_CONFIRM_MODE CSMS_DEMO_REPAIR_ACTOR_ID
 fi
 
 # Official entrypoint/foreground scripts ultimately exec Apache as PID 1.

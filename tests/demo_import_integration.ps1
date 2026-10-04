@@ -7,7 +7,9 @@ $listener=[Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,0)
 $listener.Start();$port=$listener.LocalEndpoint.Port;$listener.Stop()
 $names=@('DB_HOST','DB_PORT','DB_USER','DB_PASS','DB_NAME','APP_ENV','MYSQL_PWD',
     'CSMS_RUN_DEMO_IMPORT','CSMS_DEMO_IMPORT_CONFIRM_DATABASE','CSMS_DEMO_IMPORT_CONFIRM_DATASET',
-    'CSMS_DEMO_IMPORT_CONFIRM_MODE','CSMS_DEMO_IMPORT_ACTOR_ID','CSMS_BOOTSTRAP_ADMIN')
+    'CSMS_DEMO_IMPORT_CONFIRM_MODE','CSMS_DEMO_IMPORT_ACTOR_ID','CSMS_BOOTSTRAP_ADMIN',
+    'CSMS_RUN_DEMO_REPAIR','CSMS_DEMO_REPAIR_CONFIRM_DATABASE','CSMS_DEMO_REPAIR_CONFIRM_DATASET',
+    'CSMS_DEMO_REPAIR_CONFIRM_MODE','CSMS_DEMO_REPAIR_ACTOR_ID')
 $saved=@{};foreach($name in $names){$saved[$name]=[Environment]::GetEnvironmentVariable($name,'Process')}
 $server=$null
 try {
@@ -70,6 +72,49 @@ try {
     Write-Output 'PASS: Second import unchanged.'
     & $Php (Join-Path $PSScriptRoot 'demo_import_integration.php') verify
     if($LASTEXITCODE -ne 0){throw 'Post-rerun verification failed'}
+    $repair=Join-Path $PSScriptRoot '..\database\repair_demo_program.php'
+    $repairArgs=@('--apply','--confirm-dataset=DEV-BSIT-PREORAL-2026')
+    $env:CSMS_RUN_DEMO_REPAIR='1';$env:CSMS_DEMO_REPAIR_CONFIRM_DATABASE='hf_db_9du6kxvk'
+    $env:CSMS_DEMO_REPAIR_CONFIRM_DATASET='DEV-BSIT-PREORAL-2026'
+    $env:CSMS_DEMO_REPAIR_CONFIRM_MODE='PROGRAM-CLASSIFICATION';$env:CSMS_DEMO_REPAIR_ACTOR_ID='1'
+    & $Php (Join-Path $PSScriptRoot 'demo_import_integration.php') legacy-fixture
+    if($LASTEXITCODE -ne 0){throw 'Legacy fixture failed'}
+    $env:CSMS_DEMO_REPAIR_CONFIRM_DATABASE='wrong'
+    $ErrorActionPreference='Continue';$bad=& $Php $repair @repairArgs 2>&1;$ErrorActionPreference='Stop'
+    if($LASTEXITCODE -eq 0 -or ($bad -join "`n") -notmatch 'Database confirmation mismatch'){throw 'Wrong repair database accepted'}
+    $env:CSMS_DEMO_REPAIR_CONFIRM_DATABASE='hf_db_9du6kxvk'
+    $env:CSMS_DEMO_REPAIR_CONFIRM_DATASET='wrong'
+    $ErrorActionPreference='Continue';$bad=& $Php $repair @repairArgs 2>&1;$ErrorActionPreference='Stop'
+    if($LASTEXITCODE -eq 0 -or ($bad -join "`n") -notmatch 'confirmations are required'){throw 'Wrong repair dataset accepted'}
+    $env:CSMS_DEMO_REPAIR_CONFIRM_DATASET='DEV-BSIT-PREORAL-2026'
+    $env:CSMS_RUN_DEMO_REPAIR='0'
+    $ErrorActionPreference='Continue';$bad=& $Php $repair @repairArgs 2>&1;$ErrorActionPreference='Stop'
+    if($LASTEXITCODE -eq 0 -or ($bad -join "`n") -notmatch 'confirmations are required'){throw 'Normal startup repair gate failed'}
+    $env:CSMS_RUN_DEMO_REPAIR='1'
+    & $Php (Join-Path $PSScriptRoot 'demo_import_integration.php') repair-identity wrong
+    $ErrorActionPreference='Continue';$bad=& $Php $repair @repairArgs 2>&1;$ErrorActionPreference='Stop'
+    if($LASTEXITCODE -eq 0 -or ($bad -join "`n") -notmatch 'identity mismatch'){throw 'Unrelated BSIT identity accepted'}
+    & $Php (Join-Path $PSScriptRoot 'demo_import_integration.php') repair-identity restore
+    & $Php (Join-Path $PSScriptRoot 'demo_import_integration.php') repair-ownership wrong
+    $ErrorActionPreference='Continue';$bad=& $Php $repair @repairArgs 2>&1;$ErrorActionPreference='Stop'
+    if($LASTEXITCODE -eq 0 -or ($bad -join "`n") -notmatch 'ownership IDs mismatch'){throw 'Non-owned record ID accepted'}
+    & $Php (Join-Path $PSScriptRoot 'demo_import_integration.php') repair-ownership restore
+    & $Php (Join-Path $PSScriptRoot 'demo_import_integration.php') repair-value OTHER
+    $ErrorActionPreference='Continue';$bad=& $Php $repair @repairArgs 2>&1;$ErrorActionPreference='Stop'
+    if($LASTEXITCODE -eq 0 -or ($bad -join "`n") -notmatch 'manual review required'){throw 'Unexpected program type accepted'}
+    & $Php (Join-Path $PSScriptRoot 'demo_import_integration.php') repair-value NULL
+    $snapshot=Join-Path $testDir 'repair-snapshot.json'
+    & $Php (Join-Path $PSScriptRoot 'demo_import_integration.php') repair-snapshot $snapshot save
+    if($LASTEXITCODE -ne 0){throw 'Repair baseline failed'}
+    & $Php $repair @repairArgs
+    if($LASTEXITCODE -ne 0){throw 'Owned legacy BSIT repair failed'}
+    & $Php (Join-Path $PSScriptRoot 'demo_import_integration.php') repair-verify
+    if($LASTEXITCODE -ne 0){throw 'Repair verification failed'}
+    & $Php (Join-Path $PSScriptRoot 'demo_import_integration.php') repair-snapshot $snapshot compare
+    if($LASTEXITCODE -ne 0){throw 'Protected row comparison failed'}
+    $again=& $Php $repair @repairArgs
+    if($LASTEXITCODE -ne 0 -or ($again -join "`n") -notmatch 'already correct; no changes made'){throw 'Repair was not idempotent'}
+    Write-Output 'PASS: Repair gates, unexpected value refusal, owned update, and idempotence.'
 } finally {
     if($null -ne $server -and -not $server.HasExited){
         $env:MYSQL_PWD=$rootPass
