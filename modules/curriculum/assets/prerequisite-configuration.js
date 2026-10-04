@@ -3,6 +3,7 @@
     const ui = window.CurriculumUI, $ = id => document.getElementById(id), esc = ui.escapeHtml;
     const root = $('prerequisiteWorkspace'), api = root.dataset.requirementApi, manage = root.dataset.canManageRequirements === '1';
     const state = { placements: [], edges: [], review: {}, context: [null, null, null], request: 0, focus: null, target: null, draft: [], expected: [], editing: false, remove: null, loaded: false };
+    window.PrerequisiteCIMFContext = () => ({ versionId: $('versionId').value, revision: state.request, context: state.context, placements: state.placements, loaded: state.loaded });
     const row = id => state.placements.find(p => Number(p.subject_id) === Number(id));
     const rules = id => state.edges.filter(e => Number(e.subject_id) === Number(id));
     const dependents = id => [...new Set(state.edges.filter(e => Number(e.required_subject_id) === Number(id)).map(e => Number(e.subject_id)))];
@@ -35,6 +36,7 @@
             const data = await ui.fetchJson(api, { action: 'workspace', curriculum_version_id: version });
             if (request !== state.request) return;
             state.loaded = true; state.placements = data.placements; state.edges = data.relationships; state.review = data.review;
+            document.dispatchEvent?.(new Event('prerequisite-context-loaded'));
             const shs = /shs|senior high|strand/i.test(JSON.stringify(state.context[0])) || state.placements.some(p => /^grade /i.test(p.year_level || ''));
             options('yearFilter', [...new Set([...(shs ? ['Grade 11', 'Grade 12'] : ['1st Year', '2nd Year', '3rd Year', '4th Year']), ...state.placements.map(p => p.year_level).filter(Boolean)])], shs ? 'All Grades' : 'All Years');
             options('semesterFilter', [...new Set(state.placements.map(p => p.semester).filter(Boolean))], 'All Semesters');
@@ -51,7 +53,7 @@
     }
     function details(id) {
         state.target = id; const edges = rules(id), deps = dependents(id);
-        $('detailsBody').innerHTML = subject(id) + '<h3 class="eyebrow">REQUIRED BEFORE THIS SUBJECT</h3>' + (edges.map(e => subject(e.required_subject_id)).join('') || '<p>No prerequisite configured</p>') + '<h3 class="eyebrow">SUBJECTS THAT DEPEND ON THIS SUBJECT</h3>' + (deps.map(subject).join('') || '<p>No subjects currently depend on this subject.</p>');
+        $('detailsBody').innerHTML = subject(id) + '<h3 class="eyebrow">REQUIRED BEFORE THIS SUBJECT</h3>' + (edges.map(e => subject(e.required_subject_id)).join('') || '<p>No prerequisite configured</p>') + '<h3 class="eyebrow">SUBJECTS THAT DEPEND ON THIS SUBJECT</h3>' + (deps.map(subject).join('') || '<p>No subjects currently depend on this subject.</p>') + '<button type="button" class="button-muted" id="cimfSubjectReview" data-cimf-subject="' + id + '">AI Review</button>';
         if ($('detailsRemove')) $('detailsRemove').disabled = !edges.length;
         dialogs.details.open();
     }

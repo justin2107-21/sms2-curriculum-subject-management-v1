@@ -27,7 +27,7 @@ try{
  $db->query("INSERT INTO curriculum_versions(id,curriculum_id,version_label) VALUES(1,1,'V')");
  foreach(range(1,4)as $id){$db->query("INSERT INTO subjects(id,subject_code,subject_title) VALUES($id,'T$id','Test $id')");$db->query("INSERT INTO curriculum_version_subjects(curriculum_version_id,subject_id,year_level,semester) VALUES(1,$id,'".($id===2?'3rd Year':'1st Year')."','1st Semester')");}
  $socket=stream_socket_server('tcp://127.0.0.1:0',$errno,$errstr);$address=stream_socket_get_name($socket,false);fclose($socket);
- $env=$envBefore;$env['DB_NAME']=$name;$env['APP_ENV']='development';$env['SMS_SESSION_COOKIE_SECURE']='0';
+ $env=$envBefore;$env['DB_NAME']=$name;$env['APP_ENV']='development';$env['SMS_SESSION_COOKIE_SECURE']='0';$env['CIMF_AI_ENABLED']='false';
  $server=proc_open([PHP_BINARY,'-d','session.save_path='.$sessionDir,'-d','error_log='.$log,'-S',$address,'-t',dirname(__DIR__)],[0=>['pipe','r'],1=>['file',$log,'a'],2=>['file',$log,'a']],$pipes,dirname(__DIR__),$env,['bypass_shell'=>true,'create_new_console'=>false]);
  if(!is_resource($server))throw new RuntimeException('Test HTTP server failed');fclose($pipes[0]);
  for($i=0;$i<60;$i++){$ready=@stream_socket_client('tcp://'.$address,$errno,$errstr,.1);if($ready){fclose($ready);break;}usleep(100000);}
@@ -35,6 +35,12 @@ try{
  status($guest->api('requirement','workspace',['curriculum_version_id'=>1]),401,'Unauthenticated workspace');
  foreach([[$admin,'pradmin'],[$viewer,'prviewer']] as [$client,$username]){$client->request('auth/signin.php');status($client->request('shared/auth_actions.php',['action'=>'login','username'=>$username,'password'=>$password],'POST'),200,'Fixture login');$page=$client->request('modules/curriculum/pages/prerequisite_configuration.php');status($page,200,'Rendered PHP page');checkHttp(str_contains($page['body'],'Validation Review'),'Three-tab page served');}
  $page=$viewer->request('modules/curriculum/pages/prerequisite_configuration.php');checkHttp(!str_contains($page['body'],'id="addRequirementButton"'),'Read-only page excludes management controls');
+ checkHttp(str_contains($page['body'],'id="cimfModal"') && str_contains($page['body'],'CONFIG_DISABLED'),'Disabled CIMF modal leaves page available');
+ status($guest->api('cimf','prerequisite_review',['curriculum_version_id'=>1],'POST'),401,'CIMF requires authentication');
+ status($viewer->api('cimf','prerequisite_review',['curriculum_version_id'=>1]),405,'CIMF requires POST');
+ status($viewer->api('cimf','prerequisite_review',['curriculum_version_id'=>1],'POST',''),403,'CIMF requires CSRF');
+ $disabled=status($viewer->api('cimf','prerequisite_review',['curriculum_version_id'=>1],'POST'),503,'CIMF disabled');
+ checkHttp(($disabled['status']??'')==='CONFIG_DISABLED','CIMF disabled status');
  status($viewer->api('requirement','workspace',['curriculum_version_id'=>1]),200,'Viewer reads rules');
  $input=['curriculum_version_id'=>1,'subject_id'=>2,'required_subject_id'=>1,'requirement_type'=>'prerequisite'];
  foreach(['create','update_rule','remove']as $action){status($viewer->api('requirement',$action,$input+['id'=>1],'POST'),403,'Viewer denied '.$action);status($admin->api('requirement',$action,$input+['id'=>1],'POST',''),403,'CSRF denied '.$action);status($admin->api('requirement',$action,$input+['id'=>1]),405,'GET denied '.$action);}

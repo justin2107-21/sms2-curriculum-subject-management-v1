@@ -6,6 +6,8 @@ if (!is_authenticated()) {
     exit;
 }
 require_permission('prerequisite.view');
+require_once __DIR__ . '/../services/CIMFConfig.php';
+$cimfStatus = CIMFConfig::status(CIMFConfig::load());
 
 $userId = current_user_id();
 $canManageRequirements = $userId !== null && user_can($userId, 'prerequisite.manage');
@@ -17,6 +19,7 @@ $mappingCssVersion = (int)filemtime(__DIR__ . '/../assets/subject-mapping.css');
 $prerequisiteCssVersion = (int)filemtime(__DIR__ . '/../assets/prerequisite-configuration.css');
 $curriculumCommonVersion = (int)filemtime(__DIR__ . '/../assets/curriculum-common.js');
 $prerequisiteScriptVersion = (int)filemtime(__DIR__ . '/../assets/prerequisite-configuration.js');
+$cimfScriptVersion = (int)filemtime(__DIR__ . '/../assets/cimf-prerequisite.js');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -49,13 +52,16 @@ require __DIR__ . '/../../../shared/sidebar.php';
         data-curriculum-api="../http/curriculum_actions.php"
         data-version-api="../http/version_actions.php"
         data-requirement-api="../http/requirement_actions.php"
+        data-cimf-api="../http/cimf_actions.php"
+        data-cimf-status="<?= htmlspecialchars($cimfStatus, ENT_QUOTES, 'UTF-8') ?>"
         data-can-manage-requirements="<?= $canManageRequirements ? '1' : '0' ?>">
     <div class="page-title-bar curriculum-title-bar">
 <div>
 <h1 class="page-title">Pre-requisite Configuration</h1>
 <p class="page-subtitle">Manage subject prerequisite rules and progression requirements.</p>
-</div><?php if ($canManageRequirements): ?>
+</div><div class="pr-title-actions"><button type="button" class="button-muted" id="openCimfButton">CIMF Prerequisite Review</button><?php if ($canManageRequirements): ?>
 <button class="primary-action-button" id="addRequirementButton" disabled>+ Add Prerequisite</button><?php endif; ?>
+</div>
 </div>
     <section class="pr-panel pr-selectors" aria-label="Curriculum prerequisite context">
 <label class="form-field"><span>Program / Strand</span>
@@ -239,9 +245,28 @@ require __DIR__ . '/../../../shared/sidebar.php';
 </section>
 </div><?php endif; ?>
 
+<div class="curriculum-modal" id="cimfModal" hidden>
+<div class="modal-backdrop" data-modal-close></div>
+<section class="modal-dialog cimf-dialog" role="dialog" aria-modal="true" aria-labelledby="cimfTitle">
+<div class="modal-header"><h2 id="cimfTitle">CIMF Prerequisite Review</h2><button type="button" class="modal-close-button" data-modal-close aria-label="Close CIMF">&times;</button></div>
+<div class="pr-modal-body">
+<button type="button" class="pr-link cimf-back" id="cimfBack" hidden>&larr; Back to Prerequisite Review</button>
+<p id="cimfContext" class="pr-muted"></p><span id="cimfDemo" class="pr-badge" hidden>Demo Data</span>
+<p class="pr-muted">CIMF offers advisory suggestions for human review. Stored prerequisite rules are unchanged.</p>
+<p id="cimfStatus" role="status"></p>
+<section id="cimfMain"><button type="button" class="button-primary" id="cimfAnalyze">Analyze Prerequisites</button>
+<div class="cimf-secondary"><button type="button" class="button-muted" id="cimfAskView">Ask CIMF</button><button type="button" class="button-muted" id="cimfCompareView">Compare Subjects</button></div>
+<div id="cimfAnalysis"></div><div id="cimfSubjectAnalysis"></div></section>
+<section id="cimfAsk" hidden><label class="form-field"><span>Your curriculum question</span><textarea id="cimfQuestion" maxlength="600" rows="4" placeholder="Ask a short question about this curriculum"></textarea></label><button type="button" class="button-primary" id="cimfAskButton">Ask CIMF</button><div id="cimfAnswer"></div></section>
+<section id="cimfCompare" hidden><label class="form-field"><span>Subject A</span><select id="cimfSubjectA"></select></label><label class="form-field"><span>Subject B</span><select id="cimfSubjectB"></select></label><button type="button" class="button-primary" id="cimfCompareButton">Compare Subjects</button><div id="cimfComparison"></div></section>
+</div>
+</section>
+</div>
+
 <div class="sidebar-overlay" id="sidebarOverlay">
 </div>
 <script src="../assets/curriculum-common.js?v=<?= $curriculumCommonVersion ?>"></script>
 <script src="../assets/prerequisite-configuration.js?v=<?= $prerequisiteScriptVersion ?>"></script>
+<script src="../assets/cimf-prerequisite.js?v=<?= $cimfScriptVersion ?>"></script>
 </body>
 </html>
