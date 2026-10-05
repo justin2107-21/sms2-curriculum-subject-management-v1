@@ -3,6 +3,7 @@
     const ui = window.CurriculumUI, $ = id => document.getElementById(id), esc = ui.escapeHtml;
     const root = $('prerequisiteWorkspace'), api = root.dataset.requirementApi, manage = root.dataset.canManageRequirements === '1';
     const state = { placements: [], edges: [], review: {}, context: [null, null, null], request: 0, focus: null, target: null, draft: [], expected: [], editing: false, remove: null, loaded: false };
+    window.CSMSPageCIMFContext = () => ({academic_program_id:$('programId').value,curriculum_id:$('curriculumId').value,curriculum_version_id:$('versionId').value,subject_id:$('focusId').value});
     window.PrerequisiteCIMFContext = () => ({ versionId: $('versionId').value, revision: state.request, context: state.context, placements: state.placements, loaded: state.loaded });
     const row = id => state.placements.find(p => Number(p.subject_id) === Number(id));
     const rules = id => state.edges.filter(e => Number(e.subject_id) === Number(id));

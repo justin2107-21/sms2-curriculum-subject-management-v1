@@ -4,6 +4,8 @@
     const workspace = document.getElementById('subjectWorkspace');
     if (!workspace || !window.CurriculumUI) return;
 
+    let cimfSelectedSubjectId = '';
+    window.CSMSPageCIMFContext = () => ({subject_id:cimfSelectedSubjectId});
     const ui = window.CurriculumUI;
     const api = workspace.dataset.subjectApi;
     const assignmentApi = workspace.dataset.assignmentApi;
@@ -350,6 +352,7 @@
     }
 
     async function openEditSubject(id) {
+        cimfSelectedSubjectId = id; window.CSMSCIMF?.updateContext();
         if (!canUpdate || !form || !modal) return;
         formMode = 'update';
         resetSubjectForm();
@@ -378,6 +381,7 @@
     }
 
     async function openSubjectDetails(id) {
+        cimfSelectedSubjectId = id; window.CSMSCIMF?.updateContext();
         if (!detailsModal) return;
         const request = ++detailsRequest;
         viewingSubjectId = Number(id);

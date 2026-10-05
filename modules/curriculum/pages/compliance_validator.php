@@ -44,6 +44,7 @@ $complianceViewDescriptions = [
 $viewLabel = $complianceViewLabels[$complianceView];
 $viewDescription = $complianceViewDescriptions[$complianceView];
 $userId = current_user_id();
+$canRunCompliance = $userId !== null && user_can($userId, 'compliance.run');
 $canManageCompliance = $userId !== null && user_can($userId, 'compliance.manage');
 $avatarInitial = strtoupper(substr((string)($_SESSION['first_name'] ?? 'U'), 0, 1));
 $curriculumCssVersion = (int)filemtime(__DIR__ . '/../assets/curriculum.css');
@@ -84,6 +85,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
         id="complianceWorkspace"
         data-compliance-api="../http/compliance_actions.php"
         data-compliance-view="<?= htmlspecialchars($complianceView, ENT_QUOTES, 'UTF-8') ?>"
+        data-can-run="<?= $canRunCompliance ? '1' : '0' ?>"
         data-can-manage="<?= $canManageCompliance ? '1' : '0' ?>"
         data-rule-columns="<?= $ruleColumns ?>"
         data-reference-columns="<?= $referenceColumns ?>">
@@ -105,7 +107,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
       <section class="domain-card mapping-filter-card" aria-labelledby="validationContextTitle">
         <div class="domain-card-header">
           <div><p class="eyebrow">Validation context</p><h2 id="validationContextTitle">Select a curriculum version</h2></div>
-          <button type="button" class="primary-action-button" id="runComplianceValidation" disabled><i class="fa-solid fa-play"></i> Run Validation</button>
+          <?php if ($canRunCompliance): ?><button type="button" class="primary-action-button" id="runComplianceValidation" disabled><i class="fa-solid fa-play"></i> Run Validation</button><?php endif; ?>
         </div>
         <div class="mapping-filter-grid compliance-context-grid">
           <label class="mapping-filter-field"><span>Academic Program</span><select id="complianceProgram"><option value="">Loading programs...</option></select></label>

@@ -139,6 +139,19 @@ class GradeWeightingRepository
         return ['records' => $records, 'pagination' => $pagination];
     }
 
+    public function allComponents(int $schemeId, bool $forUpdate = false): array
+    {
+        $sql = 'SELECT id, scheme_id, component_name, weight_percentage, sequence_order,
+                       created_by, created_at, updated_at
+                FROM grade_weighting_components WHERE scheme_id = ?
+                ORDER BY sequence_order IS NULL, sequence_order ASC, id ASC';
+        if ($forUpdate) $sql .= ' FOR UPDATE';
+        $stmt = RepositoryQuery::execute($this->db, $sql, 'i', [$schemeId]);
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return $rows;
+    }
+
     public function findComponentById(int $id, bool $forUpdate = false): ?array
     {
         $sql = 'SELECT * FROM grade_weighting_components WHERE id = ? LIMIT 1';

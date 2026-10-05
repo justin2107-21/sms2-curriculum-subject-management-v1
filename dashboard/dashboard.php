@@ -9,6 +9,7 @@ $canViewCurriculum = $userId !== null && user_can($userId, 'curriculum.view');
 
 $dashboardService = new CurriculumDashboardService(authorization_connection());
 $dashboard = $dashboardService->overview($canViewAudit);
+$globalPrograms = ($userId !== null && user_can($userId, 'program.view')) ? $dashboardService->programs() : [];
 
 $summaryDefinitions = [
   ['key' => 'academic_programs', 'label' => 'Academic Programs', 'icon' => 'fa-graduation-cap', 'permission' => 'program.view', 'href' => '../modules/curriculum/pages/academic_programs.php'],
@@ -23,6 +24,10 @@ $summaryDefinitions = [
 $visibleSummaries = array_values(array_filter(
     $summaryDefinitions,
     static fn(array $definition): bool => $userId !== null && user_can($userId, $definition['permission'])
+));
+$dashboardCards = array_values(array_filter(
+    $visibleSummaries,
+    static fn(array $definition): bool => $definition['key'] !== 'subjects'
 ));
 
 $quickActionDefinitions = [
@@ -80,114 +85,24 @@ require __DIR__ . '/../shared/sidebar.php';
     <main class="content curriculum-dashboard" id="curriculumDashboard"
       data-curriculum-api="../modules/curriculum/http/curriculum_actions.php"
       data-version-api="../modules/curriculum/http/version_actions.php"
-      data-assignment-api="../modules/curriculum/http/assignment_actions.php"
+      data-assignment-api="../modules/curriculum/http/assignment_actions.php" data-program-api="../modules/curriculum/http/program_actions.php" data-analytics-api="analytics.php"
+      data-user-id="<?= (int)$userId ?>" data-can-view-prerequisite="<?= $userId !== null && user_can($userId, 'prerequisite.view') ? '1' : '0' ?>"
+      data-can-view-elective="<?= $userId !== null && user_can($userId, 'elective.view') ? '1' : '0' ?>" data-can-view-weighting="<?= $userId !== null && user_can($userId, 'grade_weighting.view') ? '1' : '0' ?>"
       data-can-view-curriculum="<?= $canViewCurriculum ? '1' : '0' ?>">
     <div class="page-title-bar dashboard-title-bar">
       <div>
         <h1 class="page-title">Dashboard</h1>
-        <p class="dashboard-subtitle">Overview of curriculum, subject, configuration, and recent system activity.</p>
+        <p class="dashboard-subtitle">Monitor curriculum structure, academic configuration, and recent system activity.</p>
       </div>
     </div>
 
-    <?php if ($visibleSummaries !== []): ?>
-    <section class="dashboard-section" aria-labelledby="summaryHeading">
-      <div class="dashboard-section-heading">
-        <div>
-          <h2 id="summaryHeading">Curriculum Records</h2>
-          <p>Current totals from the authoritative curriculum database.</p>
-        </div>
-      </div>
-      <div class="summary-grid">
-        <?php foreach ($visibleSummaries as $definition): ?>
-        <a class="summary-card summary-card-link" href="<?= dashboard_escape($definition['href']) ?>">
-          <span class="summary-card-icon"><i class="fa-solid <?= dashboard_escape($definition['icon']) ?>" aria-hidden="true"></i></span>
-          <div>
-            <span class="summary-card-label"><?= dashboard_escape($definition['label']) ?></span>
-            <strong class="summary-card-value"><?= number_format((int)($dashboard['counts'][$definition['key']] ?? 0)) ?></strong>
-          </div>
-        </a>
-        <?php endforeach; ?>
-        <?php if ($canViewCurriculum): ?>
-        <a class="summary-card summary-card-link" href="../modules/curriculum/pages/curricula.php">
-          <span class="summary-card-icon"><i class="fa-solid fa-calculator" aria-hidden="true"></i></span>
-          <div><span class="summary-card-label">Total Units</span><strong class="summary-card-value" id="dashboardTotalUnits" aria-live="polite">—</strong></div>
-        </a>
-        <?php endif; ?>
-      </div>
-    </section>
-    <?php else: ?>
-    <section class="dashboard-section dashboard-card" aria-label="Curriculum summary">
-      <div class="dashboard-empty">
-        <i class="fa-solid fa-lock" aria-hidden="true"></i>
-        Curriculum summary data is shown only when your assigned permissions allow it.
-      </div>
-    </section>
-    <?php endif; ?>
-
+    <section class="dashboard-section" aria-labelledby="globalHeading"><div class="dashboard-section-heading"><div><h2 id="globalHeading">GLOBAL ACADEMIC PROGRAMS / STRANDS</h2><p>Global catalog overview &middot; click a record to begin context selection.</p></div></div><?php if ($dashboardCards !== []): ?><div class="summary-grid global-summary-grid"><?php foreach ($dashboardCards as $definition): ?><a class="summary-card summary-card-link" href="<?= dashboard_escape($definition['href']) ?>"><span class="summary-card-icon"><i class="fa-solid <?= dashboard_escape($definition['icon']) ?>" aria-hidden="true"></i></span><div><span class="summary-card-label"><?= dashboard_escape($definition['label']) ?></span><strong class="summary-card-value"><?= number_format((int)($dashboard['counts'][$definition['key']] ?? 0)) ?></strong></div></a><?php endforeach; ?></div><?php endif; ?><div class="global-grid"><div class="dashboard-card program-card"><div class="dashboard-card-header"><div><h2>Academic Programs / Strands</h2><p>Stored program records</p></div><span class="record-count"><?= count($globalPrograms) ?> records</span></div><div class="program-list"><?php foreach($globalPrograms as $p): ?><button type="button" class="program-row" data-program-id="<?= (int)$p['id'] ?>" data-program-label="<?= dashboard_escape($p['program_code'].' &middot; '.$p['program_name']) ?>"><strong><?= dashboard_escape($p['program_code']) ?></strong><span><b><?= dashboard_escape($p['program_name']) ?></b><small><?= dashboard_escape(ucfirst((string)$p['status'])) ?> &middot; <?= (int)$p['curricula'] ?> Curricula</small></span><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button><?php endforeach; ?></div></div></div></section>
     <?php if ($canViewCurriculum): ?>
-    <section class="dashboard-section dashboard-card current-snapshot" aria-labelledby="snapshotHeading">
-      <div class="dashboard-card-header">
-        <div><p class="eyebrow">Stored curriculum data</p><h2 id="snapshotHeading">Current Curriculum Snapshot</h2></div>
-        <a class="dashboard-link" id="openSnapshotCurriculum" href="../modules/curriculum/pages/curricula.php" hidden>Open Curriculum</a>
-      </div>
-      <div class="snapshot-content" id="snapshotLoading" role="status">Loading curriculum snapshot…</div>
-      <div class="snapshot-content" id="snapshotUnavailable" role="status" hidden></div>
-      <div class="snapshot-content snapshot-grid" id="snapshotDetails" hidden>
-        <div class="snapshot-identity"><span class="snapshot-program" id="snapshotProgram"></span><strong id="snapshotCurriculum"></strong><span class="record-code" id="snapshotVersion"></span></div>
-        <div class="snapshot-stat"><strong id="snapshotSubjectCount">—</strong><span>Subjects</span></div>
-        <div class="snapshot-stat"><strong id="snapshotUnits">—</strong><span>Units</span></div>
-      </div>
-    </section>
+    <section class="dashboard-section dashboard-card context-card"><div class="dashboard-card-header"><div><h2>SELECTED CURRICULUM CONTEXT</h2><p>Program / Strand &rarr; Curriculum &rarr; Curriculum Version</p></div><span id="contextStatus" class="status-badge" hidden></span></div><div class="context-fields">
+    <?php foreach([['Program / Strand','program'],['Curriculum','curriculum'],['Curriculum Version','version']] as [$label,$key]): ?><label class="mapping-filter-field"><span><?= $label ?></span><div class="record-autocomplete"><input type="search" id="dash<?= ucfirst($key) ?>Search" placeholder="<?= $key==='program'?'Search program or strand':'Select '.($key==='curriculum'?'a program':'a curriculum').' first' ?>" <?= $key==='program'?'':'disabled' ?>><input type="hidden" id="dash<?= ucfirst($key) ?>"><button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear <?= strtolower($label) ?>" hidden><i class="fa-solid fa-xmark"></i></button><div class="record-autocomplete-options" id="dash<?= ucfirst($key) ?>Options" role="listbox" hidden></div></div></label><?php endforeach; ?></div></section>
+    <section class="dashboard-card current-snapshot" id="currentSnapshot" hidden><div class="dashboard-card-header"><div><p class="eyebrow">CURRENT CURRICULUM</p><h2 id="snapshotProgram"></h2><p id="snapshotCurriculum"></p><small id="snapshotVersion"></small></div><a class="dashboard-link" id="openSnapshotCurriculum">&rarr; Open Curriculum</a></div><div class="snapshot-chips" id="snapshotChips"></div></section>
+    <p id="dashboardError" class="dashboard-error" role="alert" hidden></p><section id="dashboardEmpty" class="dashboard-empty">Select a Program / Strand, Curriculum, and Curriculum Version to view curriculum analytics.</section><section id="dashboardResults" hidden><div class="metric-grid" id="metricGrid"></div><div class="dashboard-section-heading analytics-heading"><div><h2>CURRICULUM ANALYTICS</h2><p id="analyticsSubtitle"></p></div></div><div class="analytics-grid" id="analyticsGrid"></div></section>
     <?php endif; ?>
-
-    <div class="dashboard-grid">
-      <?php if ($canViewCurriculum): ?>
-      <section class="dashboard-card" aria-labelledby="versionStatusHeading">
-        <div class="dashboard-card-header">
-          <div>
-            <h2 id="versionStatusHeading">Technical Version Status</h2>
-            <p>Counts by the currently stored curriculum-version state.</p>
-          </div>
-        </div>
-        <div class="status-summary">
-          <?php foreach (['draft', 'active', 'archived'] as $status): ?>
-          <div>
-            <span><?= dashboard_escape($status) ?></span>
-            <strong><?= number_format((int)($dashboard['version_statuses'][$status] ?? 0)) ?></strong>
-          </div>
-          <?php endforeach; ?>
-        </div>
-        <p class="dashboard-notice" role="note">
-          <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
-          <span>These are system record states only and do not represent official institutional approval statuses.</span>
-        </p>
-      </section>
-      <?php endif; ?>
-
-      <section class="dashboard-card" aria-labelledby="quickActionsHeading">
-        <div class="dashboard-card-header">
-          <div>
-            <h2 id="quickActionsHeading">Quick Actions</h2>
-            <p>Open the curriculum tools permitted by your current RBAC assignments.</p>
-          </div>
-        </div>
-        <?php if ($quickActions !== []): ?>
-        <div class="quick-actions">
-          <?php foreach ($quickActions as $action): ?>
-          <a class="quick-action" href="<?= dashboard_escape($action['href']) ?>">
-            <i class="fa-solid <?= dashboard_escape($action['icon']) ?>" aria-hidden="true"></i>
-            <span><?= dashboard_escape($action['label']) ?></span>
-          </a>
-          <?php endforeach; ?>
-        </div>
-        <?php else: ?>
-        <div class="dashboard-empty">
-          <i class="fa-solid fa-compass" aria-hidden="true"></i>
-          No curriculum quick actions are available for your current permissions.
-        </div>
-        <?php endif; ?>
-      </section>
-    </div>
 
     <?php if ($canViewAudit): ?>
     <section class="dashboard-section dashboard-card" aria-labelledby="recentActivityHeading">

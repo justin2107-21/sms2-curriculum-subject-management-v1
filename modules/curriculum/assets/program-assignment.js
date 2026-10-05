@@ -1,592 +1,124 @@
 (function () {
     'use strict';
-
-    const workspace = document.getElementById('programAssignmentWorkspace');
-    if (!workspace || !window.CurriculumUI) return;
-
-    const ui = window.CurriculumUI;
-    const endpoint = workspace.dataset.assignmentApi;
-    const canManage = workspace.dataset.canManageAssignments === '1';
-    const activeView = document.getElementById('programCentricPanel') ? 'program' : 'subject';
-    const columnCounts = { program: canManage ? 12 : 11, subject: canManage ? 10 : 9 };
-    const state = {
-        activeView: activeView,
-        program: { page: 1, request: 0, records: new Map(), loaded: false },
-        subject: { page: 1, request: 0, records: new Map(), loaded: false },
-        pendingRemoval: null
-    };
-
-    const controls = {
-        program: {
-            program: document.getElementById('programAssignmentProgram'),
-            curriculum: document.getElementById('programAssignmentCurriculum'),
-            version: document.getElementById('programAssignmentVersion'),
-            year: document.getElementById('programAssignmentYear'),
-            semester: document.getElementById('programAssignmentSemester'),
-            search: document.getElementById('programAssignmentSearch'),
-            perPage: document.getElementById('programAssignmentPerPage'),
-            rows: document.getElementById('programAssignmentRows'),
-            pagination: document.getElementById('programAssignmentPagination'),
-            count: document.getElementById('programAssignmentCount'),
-            context: document.getElementById('programAssignmentContext')
-        },
-        subject: {
-            program: document.getElementById('subjectUsageProgram'),
-            curriculum: document.getElementById('subjectUsageCurriculum'),
-            version: document.getElementById('subjectUsageVersion'),
-            search: document.getElementById('subjectUsageSearch'),
-            perPage: document.getElementById('subjectUsagePerPage'),
-            rows: document.getElementById('subjectUsageRows'),
-            pagination: document.getElementById('subjectUsagePagination'),
-            count: document.getElementById('subjectUsageCount'),
-            context: document.getElementById('subjectUsageContext')
-        }
-    };
-
-    const addForm = document.getElementById('addProgramAssignmentForm');
-    const editForm = document.getElementById('editProgramAssignmentForm');
-    const removeElement = document.getElementById('removeProgramAssignmentModal');
-    const addModal = ui.createModal(document.getElementById('addProgramAssignmentModal'));
-    const editModal = ui.createModal(document.getElementById('editProgramAssignmentModal'));
-    const removeModal = ui.createModal(removeElement);
-    const assignmentSubjectAutocomplete = ui.createAutocomplete({
-        input: document.getElementById('programAssignmentSubjectSearch'),
-        valueInput: document.getElementById('programAssignmentSubjectId'),
-        list: document.getElementById('programAssignmentSubjectOptions'),
-        status: document.getElementById('programAssignmentSubjectHint'),
-        helpText: 'Only subjects available for this curriculum version are shown.',
-        selectedText: 'Subject selected.',
-        loadingText: 'Searching available subjects…',
-        noResultsText: 'No available subjects match this search.',
-        errorText: 'Subject Master records could not be loaded.',
-        search: async function (query) {
-            const payload = await ui.fetchJson(endpoint, {
-                action: 'subject_options',
-                curriculum_version_id: controls.program.version.value,
-                page: 1, per_page: 20, search: query
-            });
-            return payload.subjects;
-        },
-        getId: subject => subject.id,
-        format: subject => ({ label: subject.subject_code + ' — ' + subject.subject_title,
-            code: subject.subject_code, title: subject.subject_title }),
-        onError: error => ui.showFormError(addForm, error.message || 'Subject Master records could not be loaded.')
-    });
-
-    function tableState(view, message, isError) {
-        const control = controls[view];
-        control.rows.innerHTML = '<tr class="state-row"><td colspan="' + columnCounts[view] +
-            '" class="state-cell' + (isError ? ' error-state' : '') + '">' +
-            ui.escapeHtml(message) + '</td></tr>';
+    const ui = window.CurriculumUI, root = document.getElementById('programAssignmentWorkspace');
+    if (!ui || !root) return;
+    const $ = id => document.getElementById(id), esc = ui.escapeHtml;
+    const api = root.dataset.assignmentApi, view = root.dataset.view, manage = root.dataset.canManage === '1';
+    const state = { context: null, records: [], page: 1, pages: 1, total: 0, selected: [], pendingRemove: null };
+    const dialogs = { assign: ui.createModal($('assignModal')), remove: ui.createModal($('removeModal')), details: ui.createModal($('detailsModal')) };
+    window.CSMSPageCIMFContext = () => ({view, [view==='program'?'academic_program_id':'subject_id']:$('contextId').value});
+    const paramsForSearch = (type, q, context = false) => ({ action:'search', type, search:q,
+        ...(context ? {context_type:view,context_id:$('contextId').value,available:'1'} : {}) });
+    const contextType = view === 'program' ? 'program' : 'subject';
+    const otherType = view === 'program' ? 'subject' : 'program';
+    const label = (type, r) => type === 'program' ? `${r.program_code} — ${r.program_name}` : `${r.subject_code} — ${r.subject_title}`;
+    const fmt = (type, r) => type === 'program'
+        ? ({label:label(type,r),code:r.program_code,title:r.program_name,meta:r.program_type || ''})
+        : ({label:label(type,r),code:r.subject_code,title:r.subject_title,meta:`${r.units} units`});
+    const contextPicker = ui.createAutocomplete({input:$('contextSearch'),valueInput:$('contextId'),list:$('contextOptions'),minimumLength:0,maxSuggestions:3,showSuggestionsOnFocus:true,
+        search:async q=>(await ui.fetchJson(api,paramsForSearch(contextType,q))).records,getId:r=>r.id,format:r=>fmt(contextType,r),
+        onSelect:loadContext,onClear:clearContext,errorText:'Records could not be searched.'});
+    let assignPicker = null;
+    function initAssignPicker() {
+        if (!manage) return;
+        assignPicker = ui.createAutocomplete({input:$('assignSearch'),valueInput:$('assignId'),list:$('assignOptions'),minimumLength:0,maxSuggestions:3,showSuggestionsOnFocus:true,
+            search:async q=>(await ui.fetchJson(api,paramsForSearch(otherType,q,true))).records.filter(r=>!state.selected.some(x=>Number(x.id)===Number(r.id))),
+            getId:r=>r.id,format:r=>fmt(otherType,r),onSelect:r=>{if(!state.selected.some(x=>Number(x.id)===Number(r.id)))state.selected.push(r);renderSelected();assignPicker.clear(false);$('assignSearch').focus();},
+            onClear:()=>{},errorText:'Matching records could not be loaded.'});
     }
-
-    function selectedText(select) {
-        const option = select?.selectedOptions?.[0];
-        return option && option.value ? option.textContent.trim() : '';
+    function empty(message, action=false) { return `<div class="program-assignment-empty"><p>${esc(message)}</p>${action&&manage?'<button type="button" class="primary-action-button" id="emptyAssignButton">+ Assign</button>':''}</div>`; }
+    function statusBadge(status) { return `<span class="status-badge ${status==='active'?'status-active':'status-archived'}">${esc(status)}</span>`; }
+    function usageText(r) { const n=Number(r.curriculum_usage_count||0); return n ? `Used in ${n} Curriculum${n===1?'':'a'}` : 'Not Yet Mapped'; }
+    function setFiltersVisible(visible) {
+        $('assignmentFilters').hidden=!visible;
+        $('assignmentSearch').disabled=!visible;
+        $('statusFilter').disabled=!visible;
+        $('perPage').disabled=!visible;
     }
-
-    function optionMarkup(value, label, selectedValue) {
-        return '<option value="' + Number(value) + '"' +
-            (Number(value) === Number(selectedValue) ? ' selected' : '') + '>' +
-            ui.escapeHtml(label) + '</option>';
+    function renderSummary() {
+        const r=state.context, box=$('assignmentSummary');
+        if(!r){box.hidden=false;box.classList.add('assignment-summary-empty');box.innerHTML=`<div class="assignment-summary-placeholder"><strong>${view==='program'?'Program summary':'Subject summary'}</strong><span>${view==='program'?'Select a Program / Strand to view its summary.':'Select a subject to view its summary.'}</span></div>`;return;}
+        box.hidden=false;box.classList.remove('assignment-summary-empty');
+        if(view==='program') box.innerHTML=`<div class="assignment-summary-main"><strong class="assignment-summary-code">${esc(r.program_code)}</strong><strong class="assignment-summary-name">${esc(r.program_name)}</strong><span class="assignment-summary-meta">Type: ${esc(r.program_type||'—')} · Status: ${esc(r.status)}</span></div><div class="assignment-summary-metric"><strong>${esc(r.assigned_count)}</strong><span>Assigned Subjects</span>${statusBadge(r.status)}</div>`;
+        else box.innerHTML=`<div class="assignment-summary-main"><strong class="assignment-summary-code">${esc(r.subject_code)}</strong><strong class="assignment-summary-name">${esc(r.subject_title)}</strong><span class="assignment-summary-meta">${esc(r.units)} units · Status: ${esc(r.status)}</span></div><div class="assignment-summary-metric"><strong>${esc(r.assigned_count)}</strong><span>Assigned Programs / Strands</span><small>${esc(r.usage_count)} Curriculum Uses</small>${statusBadge(r.status)}</div>`;
     }
-
-    function resetCurriculumControls(view) {
-        const control = controls[view];
-        control.curriculum.disabled = true;
-        control.curriculum.innerHTML = '<option value="">Select an academic program first</option>';
-        control.version.disabled = true;
-        control.version.innerHTML = '<option value="">Select a curriculum first</option>';
+    async function loadContext(record) {
+        root.querySelector('.mapping-results-card')?.classList.remove('assignment-context-empty');
+        state.page=1;
+        state.context=null;state.records=[];renderSummary();setFiltersVisible(false);
+        $('assignButton').disabled=true;$('cimfReviewButton').disabled=true;
+        $('assignmentRows').innerHTML='<tr><td colspan="5" class="state-cell">Loading assignment context…</td></tr>';
+        try { state.context=(await ui.fetchJson(api,{action:'context',type:view,id:record.id})).record;renderSummary();
+            $('assignButton').disabled=!manage||state.context.status!=='active';$('cimfReviewButton').disabled=false;
+            $('contextStatus').textContent=view==='program'?`Showing subjects assigned to ${state.context.program_code}.`:`Showing Program / Strand assignments for ${state.context.subject_code}.`;
+            setFiltersVisible(true);await loadRows();
+        } catch(error) { state.context=null;renderSummary();$('assignButton').disabled=true;$('cimfReviewButton').disabled=true;setFiltersVisible(false);
+            $('contextStatus').textContent='The selected record could not be loaded. Choose it again to retry.';
+            $('assignmentHead').innerHTML='';$('assignmentRows').innerHTML=`<tr><td class="state-cell">${esc(view==='program'?'Select a Program / Strand to view its assigned subjects.':'Select a subject to view its Program / Strand assignments.')}</td></tr>`;$('assignmentPagination').hidden=true;ui.showToast(error.message||'Selected record could not be loaded.','error'); }
     }
-
-    function updateProgramControlState() {
-        const control = controls.program;
-        if (!control.program) return;
-        const hasProgram = Number(control.program.value) > 0;
-        control.search.disabled = !hasProgram;
-        control.search.placeholder = hasProgram
-            ? 'Subject code or title'
-            : 'Select an academic program first';
-        control.year.disabled = !hasProgram;
-        control.semester.disabled = !hasProgram;
-        const addButton = document.getElementById('addProgramAssignmentButton');
-        if (addButton) addButton.disabled = !(hasProgram && Number(control.version.value) > 0);
+    function clearContext() {
+        root.querySelector('.mapping-results-card')?.classList.add('assignment-context-empty');
+        state.context=null;state.records=[];state.page=1;renderSummary();$('assignButton').disabled=true;$('cimfReviewButton').disabled=true;
+        setFiltersVisible(false);$('assignmentSearch').value='';$('statusFilter').value='';
+        $('contextStatus').textContent=view==='program'?'Select a Program / Strand to view its assigned subjects.':'Select a subject to view its Program / Strand assignments.';
+        $('assignmentRows').innerHTML=`<tr><td class="state-cell">${esc(view==='program'?'Select a Program / Strand to view its assigned subjects.':'Select a subject to view its Program / Strand assignments.')}</td></tr>`;
+        $('assignmentHead').innerHTML='';$('assignmentCount').textContent='0 records';$('assignmentPagination').innerHTML='';$('assignmentPagination').hidden=true;
     }
-
-    async function loadPrograms() {
-        const programControls = [controls.program.program, controls.subject.program].filter(Boolean);
-        programControls.forEach(function (select) {
-            select.disabled = true;
-            select.innerHTML = '<option value="">Loading academic programs…</option>';
-        });
+    function renderHead() {
+        $('assignmentHead').innerHTML='<tr>'+(view==='program'?'<th>Subject Code</th><th>Subject Title</th><th>Units</th>':'<th>Program / Strand</th><th>Program Name</th>')+'<th>Assignment Status</th><th>Curriculum Usage</th><th>Actions</th></tr>';
+    }
+    function renderRows() {
+        renderHead();
+        const rows=state.records;
+        $('assignmentRows').innerHTML=rows.length?rows.map(r=>`<tr>${view==='program'?`<td><strong>${esc(r.subject_code)}</strong></td><td>${esc(r.subject_title)}</td><td>${esc(r.units)}</td>`:`<td><strong>${esc(r.program_code)}</strong></td><td>${esc(r.program_name)}</td>`}<td>${statusBadge(r.assignment_status)}</td><td>${esc(usageText(r))}</td><td class="assignment-actions"><button type="button" class="row-action-button" data-view="${Number(r.id)}">View</button><button type="button" class="row-action-button assignment-ai-action" data-review="${Number(r.id)}"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Review</button>${manage&&r.assignment_status==='active'?`<button type="button" class="remove-action-button" data-remove="${Number(r.id)}">Remove Assignment</button>`:''}</td></tr>`).join(''):`<tr><td colspan="5" class="state-cell">${empty(view==='program'?'No subjects have been assigned to this Program / Strand yet.':'This subject has not been assigned to any Program / Strand yet.',true)}</td></tr>`;
+        $('assignmentRows').querySelector('#emptyAssignButton')?.addEventListener('click',openAssign);
+        $('assignmentCount').textContent=`${state.total} record${state.total===1?'':'s'}`;
+        $('assignmentPagination').innerHTML=state.pages>1?`<button class="button-muted" data-page="${state.page-1}" ${state.page<=1?'disabled':''}>Previous</button><span>Page ${state.page} of ${state.pages}</span><button class="button-muted" data-page="${state.page+1}" ${state.page>=state.pages?'disabled':''}>Next</button>`:'';
+    }
+    async function loadRows() {
+        if(!state.context)return;
+        $('assignmentRows').innerHTML='<tr><td colspan="5" class="state-cell">Loading assignments…</td></tr>';
         try {
-            const payload = await ui.fetchJson(endpoint, {
-                action: 'program_options', page: 1, per_page: 50, search: '', status: ''
-            });
-            const options = payload.programs.map(function (program) {
-                const type = program.program_type ? ' • ' + program.program_type : '';
-                return optionMarkup(program.id, program.program_code + ' — ' + program.program_name + type);
-            }).join('');
-            programControls.forEach(function (select) {
-                select.innerHTML = '<option value="">All available academic programs</option>' + options;
-                select.disabled = payload.programs.length === 0;
-                if (!payload.programs.length) {
-                    select.innerHTML = '<option value="">No academic programs found</option>';
-                }
-            });
-        } catch (error) {
-            programControls.forEach(function (select) {
-                select.innerHTML = '<option value="">Academic programs unavailable</option>';
-            });
-            ui.showToast(error.message || 'Academic programs could not be loaded.', 'error');
-        }
-        updateProgramControlState();
+            const payload=await ui.fetchJson(api,{action:'list',type:view,id:$('contextId').value,search:$('assignmentSearch').value.trim(),status:$('statusFilter').value,page:state.page,per_page:$('perPage').value});
+            state.records=payload.assignments;state.page=payload.pagination.page;state.pages=payload.pagination.total_pages;state.total=payload.pagination.total_records;renderRows();
+            $('assignmentPagination').hidden=state.pages<=1;
+        } catch(error) { $('assignmentRows').innerHTML=`<tr><td colspan="5" class="state-cell">${esc(error.message||'Assignments could not be loaded.')}</td></tr>`;$('assignmentPagination').hidden=true;ui.showToast(error.message||'Assignments could not be loaded.','error'); }
     }
-
-    async function loadCurricula(view, selectedId) {
-        const control = controls[view];
-        const programId = Number(control.program.value);
-        control.curriculum.disabled = true;
-        control.version.disabled = true;
-        control.version.innerHTML = '<option value="">Select a curriculum first</option>';
-        if (!programId) {
-            control.curriculum.innerHTML = '<option value="">Select an academic program first</option>';
-            if (view === 'program') updateProgramControlState();
-            return;
-        }
-
-        control.curriculum.innerHTML = '<option value="">Loading curricula…</option>';
-        try {
-            const payload = await ui.fetchJson(endpoint, {
-                action: 'curriculum_options',
-                academic_program_id: programId,
-                page: 1, per_page: 50, search: '', status: ''
-            });
-            control.curriculum.innerHTML = '<option value="">All curricula for this program</option>' +
-                payload.curricula.map(function (curriculum) {
-                    return optionMarkup(
-                        curriculum.id,
-                        curriculum.curriculum_code + ' — ' + curriculum.curriculum_name,
-                        selectedId
-                    );
-                }).join('');
-            control.curriculum.disabled = payload.curricula.length === 0;
-            if (!payload.curricula.length) {
-                control.curriculum.innerHTML = '<option value="">No curricula are available for this program</option>';
-            }
-        } catch (error) {
-            control.curriculum.innerHTML = '<option value="">Curricula unavailable</option>';
-            ui.showToast(error.message || 'Curricula could not be loaded.', 'error');
-        }
-        if (view === 'program') updateProgramControlState();
+    async function refreshSummary() {
+        if(!state.context)return;
+        const p=await ui.fetchJson(api,{action:'context',type:view,id:$('contextId').value});state.context=p.record;renderSummary();
     }
-
-    async function loadVersions(view, selectedId) {
-        const control = controls[view];
-        const curriculumId = Number(control.curriculum.value);
-        control.version.disabled = true;
-        if (!curriculumId) {
-            control.version.innerHTML = '<option value="">Select a curriculum first</option>';
-            if (view === 'program') updateProgramControlState();
-            return;
-        }
-
-        control.version.innerHTML = '<option value="">Loading curriculum versions…</option>';
-        try {
-            const payload = await ui.fetchJson(endpoint, {
-                action: 'version_options', curriculum_id: curriculumId,
-                page: 1, per_page: 50, search: '', status: ''
-            });
-            control.version.innerHTML = '<option value="">All curriculum versions</option>' +
-                payload.versions.map(function (version) {
-                    const year = version.effective_academic_year ? ' — ' + version.effective_academic_year : '';
-                    return optionMarkup(version.id, version.version_label + year, selectedId);
-                }).join('');
-            control.version.disabled = payload.versions.length === 0;
-            if (!payload.versions.length) {
-                control.version.innerHTML = '<option value="">No curriculum versions are available</option>';
-            }
-        } catch (error) {
-            control.version.innerHTML = '<option value="">Curriculum versions unavailable</option>';
-            ui.showToast(error.message || 'Curriculum versions could not be loaded.', 'error');
-        }
-        if (view === 'program') updateProgramControlState();
+    async function openAssign() {
+        if(!manage||!state.context||state.context.status!=='active')return;
+        state.selected=[];renderSelected();ui.clearFormError($('assignForm'));
+        $('assignModalContext').textContent=view==='program'?label('program',state.context):label('subject',state.context);
+        $('assignSearch').value='';$('assignId').value='';dialogs.assign.open();$('assignSearch').focus();
     }
-
-    function updateStoredValues(select, values) {
-        const selected = select.value;
-        select.innerHTML = '<option value="">All stored values</option>' + values.map(function (value) {
-            return '<option value="' + ui.escapeHtml(value) + '"' +
-                (value === selected ? ' selected' : '') + '>' + ui.escapeHtml(value) + '</option>';
-        }).join('');
-        if (selected && !values.includes(selected)) select.value = '';
+    function renderSelected() {
+        $('selectedTitle').textContent=`Selected (${state.selected.length})`;
+        $('selectedRecords').innerHTML=state.selected.map((r,i)=>`<li><span><strong>${esc(view==='program'?r.subject_code:r.program_code)}</strong> — ${esc(view==='program'?r.subject_title:r.program_name)}</span><button type="button" class="row-action-button" data-remove-selected="${i}">Remove</button></li>`).join('')||'<li class="subtle-text">No records selected.</li>';
+        $('assignForm').querySelector('[type="submit"]').disabled=state.selected.length===0;
     }
-
-    function contextParts(view) {
-        const control = controls[view];
-        return [selectedText(control.program), selectedText(control.curriculum), selectedText(control.version)]
-            .filter(Boolean);
+    function detailsMarkup(a) {
+        const subject=`<div class="assignment-detail"><span>Subject</span><strong>${esc(a.subject_code)} — ${esc(a.subject_title)}</strong></div>`;
+        const program=`<div class="assignment-detail"><span>Program / Strand</span><strong>${esc(a.program_code)} — ${esc(a.program_name)}</strong></div>`;
+        const placement=a.placements.length?a.placements.map(p=>`<li><strong>${esc(p.curriculum_code)}</strong> / ${esc(p.version_label)}<br><span>${esc([p.year_level,p.semester].filter(Boolean).join(' · ')||'Placement not specified')}</span></li>`).join(''):'<li>Not Yet Mapped</li>';
+        return `${subject}${program}<div class="assignment-detail"><span>Units</span><strong>${esc(a.units)}</strong></div><div class="assignment-detail"><span>Assignment Status</span><strong>${statusBadge(a.assignment_status)}</strong></div><h3>Curriculum Usage — Informational</h3><ul class="placement-list">${placement}</ul><p class="subtle-text">Curriculum placement is managed in Subject Mapping and cannot be edited here.</p><a class="button-muted" href="subject_mapping.php?program_id=${encodeURIComponent(a.academic_program_id)}&subject_id=${encodeURIComponent(a.subject_id)}">View in Subject Mapping</a>`;
     }
-
-    function usageBadge(record) {
-        const count = Number(record.program_usage_count) || 0;
-        return '<span class="assignment-usage-badge"><i class="fa-solid fa-building-columns"></i> ' +
-            count + (count === 1 ? ' program' : ' programs') + '</span>';
+    async function openDetails(id) { try { const p=await ui.fetchJson(api,{action:'details',id});$('detailsBody').innerHTML=detailsMarkup(p.assignment);dialogs.details.open(); } catch(e){ui.showToast(e.message||'Assignment details could not be loaded.','error');} }
+    function openRemove(id) {
+        const r=state.records.find(x=>Number(x.id)===Number(id));if(!r||!manage)return;
+        state.pendingRemove=id;ui.clearFormError($('removeModal'));
+        $('removeMessage').textContent=`Remove ${r.subject_code} — ${r.subject_title} from ${r.program_code} — ${r.program_name}?`;
+        dialogs.remove.open();
     }
-
-    function actionCell(record) {
-        if (!canManage) return '';
-        const hasRequirement = Number(record.has_requirement_dependencies) === 1;
-        const hasElective = Number(record.has_elective_dependencies) === 1;
-        const dependencyTitle = hasRequirement || hasElective
-            ? 'Dependencies must be removed before this assignment can be removed.'
-            : 'Remove this curriculum placement.';
-        return '<td><div class="assignment-action-group">' +
-            '<button type="button" class="row-action-button" data-edit-program-assignment="' + Number(record.id) +
-            '"><i class="fa-solid fa-pen"></i> Edit</button>' +
-            '<button type="button" class="remove-action-button' +
-            (hasRequirement || hasElective ? ' has-dependency' : '') + '" data-remove-program-assignment="' + Number(record.id) +
-            '" title="' + ui.escapeHtml(dependencyTitle) + '"><i class="fa-solid fa-link-slash"></i> Remove</button>' +
-            '</div></td>';
-    }
-
-    function contextStack(primary, secondary) {
-        return '<span class="assignment-program-context"><strong>' + ui.escapeHtml(primary) +
-            '</strong><span>' + ui.escapeHtml(secondary) + '</span></span>';
-    }
-
-    function programRow(record) {
-        const required = Number(record.is_required) === 1;
-        return '<tr>' +
-            '<td><span class="record-code">' + ui.escapeHtml(record.subject_code) + '</span></td>' +
-            '<td><span class="record-name">' + ui.escapeHtml(record.subject_title) + '</span></td>' +
-            '<td>' + contextStack(record.program_name, record.program_code) + '</td>' +
-            '<td><span class="assignment-program-type">' + ui.escapeHtml(record.program_type || 'Not specified') + '</span></td>' +
-            '<td>' + contextStack(record.curriculum_name, record.curriculum_code) + '</td>' +
-            '<td><span class="record-code">' + ui.escapeHtml(record.version_label) + '</span></td>' +
-            '<td>' + ui.escapeHtml(record.year_level || '—') + '</td>' +
-            '<td>' + ui.escapeHtml(record.semester || '—') + '</td>' +
-            '<td>' + ui.escapeHtml(record.sequence_order ?? '—') + '</td>' +
-            '<td><span class="placement-indicator ' + (required ? 'placement-required' : 'placement-optional') + '">' +
-                (required ? 'Required' : 'Optional') + '</span></td>' +
-            '<td>' + usageBadge(record) + '</td>' + actionCell(record) + '</tr>';
-    }
-
-    function subjectRow(record) {
-        return '<tr>' +
-            '<td><span class="record-code">' + ui.escapeHtml(record.subject_code) + '</span></td>' +
-            '<td><span class="record-name">' + ui.escapeHtml(record.subject_title) + '</span></td>' +
-            '<td>' + contextStack(record.program_name, record.program_code) + '</td>' +
-            '<td><span class="assignment-program-type">' + ui.escapeHtml(record.program_type || 'Not specified') + '</span></td>' +
-            '<td>' + contextStack(record.curriculum_name, record.curriculum_code) + '</td>' +
-            '<td><span class="record-code">' + ui.escapeHtml(record.version_label) + '</span></td>' +
-            '<td>' + ui.escapeHtml(record.year_level || '—') + '</td>' +
-            '<td>' + ui.escapeHtml(record.semester || '—') + '</td>' +
-            '<td>' + usageBadge(record) + '</td>' + actionCell(record) + '</tr>';
-    }
-
-    function queryFor(view, page) {
-        const control = controls[view];
-        return {
-            action: 'list', view: view, page: page, per_page: control.perPage.value,
-            search: control.search.value.trim(),
-            academic_program_id: control.program.value,
-            curriculum_id: control.curriculum.value,
-            curriculum_version_id: control.version.value,
-            year_level: view === 'program' ? control.year.value : '',
-            semester: view === 'program' ? control.semester.value : ''
-        };
-    }
-
-    async function loadAssignments(view, page) {
-        const control = controls[view];
-        if (view === 'program' && !control.program.value) {
-            state.program.records.clear();
-            state.program.loaded = true;
-            ui.setCount(control.count, 0);
-            control.pagination.innerHTML = '';
-            tableState('program', 'Select an academic program to view its assigned subjects.', false);
-            control.context.textContent = 'Select an academic program to view its assigned subjects.';
-            updateProgramControlState();
-            return;
-        }
-
-        const viewState = state[view];
-        const sequence = ++viewState.request;
-        viewState.page = Number(page) || 1;
-        tableState(view, view === 'program' ? 'Loading program subject assignments…' : 'Loading subject program usage…', false);
-        try {
-            const payload = await ui.fetchJson(endpoint, queryFor(view, viewState.page));
-            if (sequence !== viewState.request) return;
-            viewState.page = Number(payload.pagination.page);
-            viewState.records.clear();
-            payload.assignments.forEach(function (record) {
-                viewState.records.set(Number(record.id), record);
-            });
-            viewState.loaded = true;
-            ui.setCount(control.count, Number(payload.pagination.total_records));
-            if (view === 'program') {
-                updateStoredValues(control.year, payload.filter_values.year_levels);
-                updateStoredValues(control.semester, payload.filter_values.semesters);
-            }
-
-            if (!payload.assignments.length) {
-                let message = view === 'program'
-                    ? 'No subjects are assigned to the selected academic-program context.'
-                    : 'No program assignments found for this subject or filter selection.';
-                if (control.search.value.trim()) {
-                    message = 'No subject assignments match the selected filters.';
-                }
-                tableState(view, message, false);
-            } else {
-                control.rows.innerHTML = payload.assignments.map(view === 'program' ? programRow : subjectRow).join('');
-            }
-            ui.renderPagination(control.pagination, payload.pagination, function (requestedPage) {
-                loadAssignments(view, requestedPage);
-            });
-            const parts = contextParts(view);
-            control.context.textContent = parts.length
-                ? 'Current context: ' + parts.join(' → ')
-                : 'Showing bounded subject assignments across all academic programs.';
-            if (view === 'program') updateProgramControlState();
-        } catch (error) {
-            if (sequence !== viewState.request) return;
-            viewState.records.clear();
-            ui.setCount(control.count, 0);
-            control.pagination.innerHTML = '';
-            tableState(view, error.message || 'Subject assignments could not be loaded.', true);
-        }
-    }
-
-    function findRecord(id) {
-        return state[state.activeView].records.get(Number(id)) ||
-            state.program.records.get(Number(id)) || state.subject.records.get(Number(id));
-    }
-
-    function setPlacementOptions(prefix, record = {}) {
-        const fields = [
-            ['Year', 'year_level', ['1st Year', '2nd Year', '3rd Year', '4th Year', 'Grade 11', 'Grade 12'], controls.program.year],
-            ['Semester', 'semester', ['1st Semester', '2nd Semester'], controls.program.semester]
-        ];
-        fields.forEach(([suffix, field, defaults, filter]) => {
-            const select = document.getElementById(prefix + suffix);
-            if (!select) return;
-            const values = [...new Set([...defaults, ...Array.from(filter?.options || [], option => option.value), record[field]].filter(Boolean))];
-            select.replaceChildren(new Option('Not set', ''));
-            values.forEach(value => select.add(new Option(value, value)));
-            select.value = record[field] || '';
-        });
-    }
-
-    async function openAddAssignment() {
-        if (!canManage || !controls.program.version.value || !addForm || !addModal) return;
-        addForm.reset();
-        setPlacementOptions('addProgramAssignment');
-        assignmentSubjectAutocomplete?.clear();
-        ui.clearFormError(addForm);
-        document.getElementById('addProgramAssignmentVersionId').value = controls.program.version.value;
-        document.getElementById('addProgramAssignmentContext').textContent = contextParts('program').join(' → ');
-        addModal.open();
-        document.getElementById('programAssignmentSubjectSearch').focus();
-    }
-
-    function openEditAssignment(id) {
-        const record = findRecord(id);
-        if (!canManage || !record || !editForm || !editModal) return;
-        editForm.reset();
-        ui.clearFormError(editForm);
-        document.getElementById('editProgramAssignmentId').value = record.id;
-        document.getElementById('editProgramAssignmentContext').textContent =
-            record.program_code + ' → ' + record.curriculum_code + ' → ' + record.version_label;
-        document.getElementById('editProgramAssignmentSubject').textContent =
-            record.subject_code + ' — ' + record.subject_title;
-        document.getElementById('editProgramAssignmentVersion').textContent =
-            record.curriculum_code + ' — ' + record.version_label;
-        setPlacementOptions('editProgramAssignment', record);
-        document.getElementById('editProgramAssignmentSequence').value = record.sequence_order ?? '';
-        document.getElementById('editProgramAssignmentRequired').value = Number(record.is_required) === 1 ? '1' : '0';
-        editModal.open();
-        document.getElementById('editProgramAssignmentYear').focus();
-    }
-
-    function openRemoveAssignment(id) {
-        const record = findRecord(id);
-        if (!canManage || !record || !removeModal || !removeElement) return;
-        state.pendingRemoval = { id: record.id };
-        ui.clearFormError(removeElement);
-        document.getElementById('removeProgramAssignmentMessage').textContent =
-            'Remove ' + record.subject_code + ' — ' + record.subject_title + ' from ' +
-            record.program_code + ' / ' + record.curriculum_code + ' / ' + record.version_label +
-            '? Only this curriculum placement will be deleted.';
-        const dependencyWarning = document.getElementById('programAssignmentDependencyWarning');
-        const messages = [];
-        if (Number(record.has_requirement_dependencies) === 1) {
-            messages.push('This assignment is used by a prerequisite or corequisite relationship.');
-        }
-        if (Number(record.has_elective_dependencies) === 1) {
-            messages.push('This assignment belongs to an elective group.');
-        }
-        dependencyWarning.hidden = messages.length === 0;
-        dependencyWarning.textContent = messages.length
-            ? messages.join(' ') + ' Removal will remain blocked until those relationships are removed.'
-            : '';
-        removeModal.open();
-        document.getElementById('confirmRemoveProgramAssignment').focus();
-    }
-
-    async function refreshLoadedViews() {
-        if (state.program.loaded) await loadAssignments('program', state.program.page);
-        if (state.subject.loaded) await loadAssignments('subject', state.subject.page);
-    }
-
-    if (addForm) {
-        addForm.addEventListener('submit', async function (event) {
-            event.preventDefault();
-            if (!assignmentSubjectAutocomplete?.hasSelection()) {
-                ui.showFormError(addForm, 'Please select a valid subject.');
-                document.getElementById('programAssignmentSubjectSearch').focus();
-                return;
-            }
-            if (!addForm.reportValidity()) return;
-            ui.clearFormError(addForm);
-            const formData = new FormData(addForm);
-            formData.set('action', 'assign');
-            ui.setFormSubmitting(addForm, true, 'Adding…');
-            try {
-                const payload = await ui.postForm(endpoint, formData);
-                addModal.close();
-                addForm.reset();
-                assignmentSubjectAutocomplete?.clear();
-                ui.showToast(payload.message, 'success');
-                await refreshLoadedViews();
-            } catch (error) {
-                const message = (error.message || 'The subject assignment could not be added.')
-                    .replace('already mapped to', 'already assigned to');
-                ui.showFormError(addForm, message);
-            } finally {
-                ui.setFormSubmitting(addForm, false);
-            }
-        });
-    }
-
-    if (editForm) {
-        editForm.addEventListener('submit', async function (event) {
-            event.preventDefault();
-            if (!editForm.reportValidity()) return;
-            ui.clearFormError(editForm);
-            const formData = new FormData(editForm);
-            formData.set('action', 'update');
-            ui.setFormSubmitting(editForm, true, 'Saving…');
-            try {
-                const payload = await ui.postForm(endpoint, formData);
-                editModal.close();
-                ui.showToast(payload.message, 'updated');
-                await refreshLoadedViews();
-            } catch (error) {
-                ui.showFormError(editForm, error.message || 'The subject assignment could not be updated.');
-            } finally {
-                ui.setFormSubmitting(editForm, false);
-            }
-        });
-    }
-
-    document.getElementById('confirmRemoveProgramAssignment')?.addEventListener('click', async function () {
-        if (!state.pendingRemoval || !removeElement) return;
-        ui.clearFormError(removeElement);
-        const button = this;
-        const original = button.innerHTML;
-        button.disabled = true;
-        button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Removing…';
-        const formData = new FormData();
-        formData.set('action', 'remove');
-        formData.set('id', state.pendingRemoval.id);
-        try {
-            const payload = await ui.postForm(endpoint, formData);
-            removeModal.close();
-            state.pendingRemoval = null;
-            ui.showToast(payload.message, 'updated');
-            await refreshLoadedViews();
-        } catch (error) {
-            ui.showFormError(removeElement, error.message || 'The subject assignment could not be removed.');
-        } finally {
-            button.disabled = false;
-            button.innerHTML = original;
-        }
-    });
-
-    function bindRowActions(view) {
-        controls[view].rows?.addEventListener('click', function (event) {
-            const edit = event.target.closest('[data-edit-program-assignment]');
-            const remove = event.target.closest('[data-remove-program-assignment]');
-            if (edit) openEditAssignment(edit.dataset.editProgramAssignment);
-            if (remove) openRemoveAssignment(remove.dataset.removeProgramAssignment);
-        });
-    }
-
-    controls.program.program?.addEventListener('change', async function () {
-        controls.program.search.value = '';
-        controls.program.year.value = '';
-        controls.program.semester.value = '';
-        resetCurriculumControls('program');
-        await loadCurricula('program');
-        updateProgramControlState();
-        await loadAssignments('program', 1);
-    });
-    controls.program.curriculum?.addEventListener('change', async function () {
-        await loadVersions('program');
-        await loadAssignments('program', 1);
-    });
-    controls.program.version?.addEventListener('change', function () {
-        updateProgramControlState();
-        loadAssignments('program', 1);
-    });
-    controls.program.year?.addEventListener('change', function () { loadAssignments('program', 1); });
-    controls.program.semester?.addEventListener('change', function () { loadAssignments('program', 1); });
-    controls.program.perPage?.addEventListener('change', function () { loadAssignments('program', 1); });
-    controls.program.search?.addEventListener('input', ui.debounce(function () { loadAssignments('program', 1); }, 300));
-
-    controls.subject.program?.addEventListener('change', async function () {
-        resetCurriculumControls('subject');
-        await loadCurricula('subject');
-        await loadAssignments('subject', 1);
-    });
-    controls.subject.curriculum?.addEventListener('change', async function () {
-        await loadVersions('subject');
-        await loadAssignments('subject', 1);
-    });
-    controls.subject.version?.addEventListener('change', function () { loadAssignments('subject', 1); });
-    controls.subject.perPage?.addEventListener('change', function () { loadAssignments('subject', 1); });
-    controls.subject.search?.addEventListener('input', ui.debounce(function () { loadAssignments('subject', 1); }, 300));
-
-    document.getElementById('clearProgramAssignmentFilters')?.addEventListener('click', async function () {
-        controls.program.program.value = '';
-        controls.program.search.value = '';
-        controls.program.year.value = '';
-        controls.program.semester.value = '';
-        resetCurriculumControls('program');
-        updateProgramControlState();
-        await loadAssignments('program', 1);
-    });
-
-    document.getElementById('clearSubjectUsageFilters')?.addEventListener('click', async function () {
-        controls.subject.program.value = '';
-        controls.subject.search.value = '';
-        resetCurriculumControls('subject');
-        await loadAssignments('subject', 1);
-    });
-
-    document.getElementById('addProgramAssignmentButton')?.addEventListener('click', openAddAssignment);
-    document.getElementById('programAssignmentSubjectSearch')?.addEventListener('input', function () {
-        ui.clearFormError(addForm);
-    });
-
-    bindRowActions(activeView);
-
-    async function initialize() {
-        resetCurriculumControls(activeView);
-        await loadPrograms();
-        await loadAssignments(activeView, 1);
-    }
-
-    initialize();
+    function showCimfReview(id) { if(state.context) window.CSMSCIMF?.open('review',id ? {assignment_id:id} : {}); }
+    $('assignmentRows').addEventListener('click',e=>{const v=e.target.closest('[data-view]'),r=e.target.closest('[data-remove]'),review=e.target.closest('[data-review]');if(v)openDetails(v.dataset.view);if(r)openRemove(r.dataset.remove);if(review)showCimfReview(review.dataset.review);});
+    $('assignmentPagination').addEventListener('click',e=>{const b=e.target.closest('[data-page]');if(b&&!b.disabled){state.page=Number(b.dataset.page);loadRows();}});
+    $('selectedRecords')?.addEventListener('click',e=>{const b=e.target.closest('[data-remove-selected]');if(b){state.selected.splice(Number(b.dataset.removeSelected),1);renderSelected();}});
+    $('assignButton').addEventListener('click',openAssign);$('cimfReviewButton').addEventListener('click',()=>showCimfReview());
+    $('assignmentSearch').addEventListener('input',ui.debounce(()=>{state.page=1;loadRows();},250));$('statusFilter').addEventListener('change',()=>{state.page=1;loadRows();});$('perPage').addEventListener('change',()=>{state.page=1;loadRows();});
+    $('assignForm')?.addEventListener('submit',async e=>{e.preventDefault();if(!state.selected.length)return;const data=new FormData();data.set('action','assign');data.set('view',view);data.set('context_id',$('contextId').value);data.set('record_ids',JSON.stringify(state.selected.map(r=>Number(r.id))));ui.setFormSubmitting(e.currentTarget,true,'Assigning…');try{const result=await ui.postForm(api,data);dialogs.assign.close();ui.showToast(result.message,'success');await refreshSummary();await loadRows();}catch(error){ui.showFormError(e.currentTarget,error.message||'Assignments could not be saved.');}finally{ui.setFormSubmitting(e.currentTarget,false);}});
+    $('confirmRemove')?.addEventListener('click',async function(){if(!state.pendingRemove)return;const data=new FormData();data.set('action','remove');data.set('id',state.pendingRemove);this.disabled=true;try{const p=await ui.postForm(api,data);dialogs.remove.close();ui.showToast(p.message,'updated');state.pendingRemove=null;await refreshSummary();await loadRows();}catch(error){ui.showFormError($('removeModal'),error.message||'Assignment could not be removed.');}finally{this.disabled=false;}});
+    initAssignPicker();clearContext();
 }());

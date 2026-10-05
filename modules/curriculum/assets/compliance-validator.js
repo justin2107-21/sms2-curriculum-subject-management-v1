@@ -7,6 +7,7 @@
 
     const endpoint = workspace.dataset.complianceApi;
     const activeView = workspace.dataset.complianceView;
+    const canRun = workspace.dataset.canRun === '1';
     const canManage = workspace.dataset.canManage === '1';
     const ruleColumns = Number(workspace.dataset.ruleColumns || 7);
     const referenceColumns = Number(workspace.dataset.referenceColumns || 6);
@@ -22,6 +23,8 @@
         lockedRule: null,
     };
 
+    let cimfRunId = '';
+    window.CSMSPageCIMFContext = () => ({academic_program_id:program?.value || '',curriculum_id:curriculum?.value || '',curriculum_version_id:version?.value || '',run_id:cimfRunId,rule_id:document.getElementById('complianceRuleId')?.value || '',reference_id:document.getElementById('complianceReferenceId')?.value || ''});
     const program = document.getElementById('complianceProgram');
     const curriculum = document.getElementById('complianceCurriculum');
     const version = document.getElementById('complianceVersion');
@@ -154,7 +157,7 @@
     async function loadCurricula() {
         resetSelect(curriculum, program.value ? 'Loading curricula...' : 'Select a program first', true);
         resetSelect(version, 'Select a curriculum first', true);
-        runButton.disabled = true;
+        if (runButton) runButton.disabled = true;
         clearValidation('Select a curriculum version to run configured checks.');
         if (!program.value) return;
         try {
@@ -173,7 +176,7 @@
 
     async function loadVersions() {
         resetSelect(version, curriculum.value ? 'Loading versions...' : 'Select a curriculum first', true);
-        runButton.disabled = true;
+        if (runButton) runButton.disabled = true;
         clearValidation('Select a curriculum version to run configured checks.');
         if (!curriculum.value) return;
         try {
@@ -196,6 +199,7 @@
     }
 
     function clearValidation(message) {
+        cimfRunId = ''; window.CSMSCIMF?.updateContext();
         document.getElementById('complianceSummary').hidden = true;
         document.getElementById('validationContextMessage').textContent = message;
         tableState(document.getElementById('complianceResultRows'), 6, 'No validation has been run in this workspace.', false);
@@ -230,8 +234,9 @@
     }
 
     async function runValidation() {
+        if (!canRun) return;
         if (!version.value) return;
-        runButton.disabled = true;
+        if (runButton) runButton.disabled = true;
         runButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Running...';
         const data = new FormData();
         data.set('action', 'validation_run');
@@ -243,12 +248,13 @@
             document.getElementById('complianceResultRows').innerHTML = payload.results.length
                 ? payload.results.map(resultRow).join('')
                 : '<tr><td colspan="6" class="empty-cell">' + ui.escapeHtml(payload.message) + '</td></tr>';
+            if (payload.run) { cimfRunId = payload.run.id; window.CSMSCIMF?.updateContext(); }
             ui.showToast(payload.message, payload.run ? 'success' : 'warning');
             if (payload.run && historyRows) loadHistory(1);
         } catch (error) {
             ui.showToast(error.message, 'error');
         } finally {
-            runButton.disabled = !version.value;
+            if (runButton) runButton.disabled = !canRun || !version.value;
             runButton.innerHTML = '<i class="fa-solid fa-play"></i> Run Validation';
         }
     }
@@ -383,6 +389,7 @@
         try {
             const payload = await ui.fetchJson(endpoint, { action: 'run_get', id: id });
             const run = payload.run;
+            cimfRunId = run.id; window.CSMSCIMF?.updateContext();
             document.getElementById('complianceRunModalContext').textContent = run.program_code + ' / ' + run.curriculum_code + ' / ' + run.version_label + ' / ' + formatDateTime(run.created_at);
             renderSummary({ rules_evaluated: run.rules_evaluated, passed: run.passed_count, failed: run.failed_count, not_evaluated: run.not_evaluated_count }, document.getElementById('historyRunSummary'));
             document.getElementById('historyRunResultRows').innerHTML = run.results.length ? run.results.map(resultRow).join('') : '<tr><td colspan="6" class="empty-cell">No stored results.</td></tr>';
@@ -566,7 +573,7 @@
 
     program?.addEventListener('change', loadCurricula);
     curriculum?.addEventListener('change', loadVersions);
-    version?.addEventListener('change', function () { runButton.disabled = !version.value; clearValidation(version.value ? 'Ready to validate ' + validationContextLabel() + '.' : 'Select a curriculum version to run configured checks.'); });
+    version?.addEventListener('change', function () { if (runButton) runButton.disabled = !canRun || !version.value; clearValidation(version.value ? 'Ready to validate ' + validationContextLabel() + '.' : 'Select a curriculum version to run configured checks.'); });
     runButton?.addEventListener('click', runValidation);
 
     const debouncedRules = ui.debounce(function () { loadRules(1); }, 300);

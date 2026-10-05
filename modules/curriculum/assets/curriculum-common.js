@@ -284,6 +284,7 @@
             if (clearButton) clearButton.hidden = false;
             setExpanded(false);
             if (notify !== false && options.onSelect) options.onSelect(item, id);
+            if (!input.closest('#csmsCimfPanel')) document.dispatchEvent(new CustomEvent('csms:context-changed'));
         }
 
         function clear(notify) {
@@ -299,6 +300,7 @@
             setExpanded(false);
             if (status) status.textContent = options.helpText || '';
             if (notify !== false && options.onClear) options.onClear();
+            if (!input.closest('#csmsCimfPanel')) document.dispatchEvent(new CustomEvent('csms:context-changed'));
         }
 
         function setSelected(item, notify) {
@@ -495,7 +497,10 @@
 
     function createCascadingAutocomplete(config) {
         const levels = Array.isArray(config?.levels) ? config.levels : [];
-        if (levels.length < 2) return null;
+        // A cascade is one component: when a role omits its form, none of its
+        // dependent inputs should be initialized or updated.
+        if (levels.length < 2 || levels.some(level =>
+            !level?.input || !level.valueInput || !level.list || typeof level.search !== 'function')) return null;
         const selectors = [];
 
         function syncAvailability(index) {
@@ -521,24 +526,22 @@
         function showNextSuggestions(index) {
             const nextIndex = index + 1;
             const nextLevel = levels[nextIndex];
-            if (nextLevel?.showSuggestionsOnEnable && selectors[nextIndex]?.hasSelection() === false && !nextLevel.input.disabled) {
-                const parentId = selectors[index].getSelectedId();
+            const currentSelector = selectors[index];
+            const nextSelector = selectors[nextIndex];
+            if (nextLevel?.showSuggestionsOnEnable && currentSelector && nextSelector && !nextSelector.hasSelection() && !nextLevel.input.disabled) {
+                const parentId = currentSelector.getSelectedId();
                 // Wait for the selection click to finish bubbling: the outside-click
                 // listener would otherwise immediately dismiss the next dropdown.
                 setTimeout(function () {
-                    if (selectors[index].getSelectedId() !== parentId || nextLevel.input.disabled || selectors[nextIndex].hasSelection()) return;
+                    if (currentSelector.getSelectedId() !== parentId || nextLevel.input.disabled || nextSelector.hasSelection()) return;
                     const searchOnFocus = nextLevel.focusOnEnable && nextLevel.showSuggestionsOnFocus && document.activeElement !== nextLevel.input;
                     if (nextLevel.focusOnEnable) nextLevel.input.focus();
-                    if (!searchOnFocus) selectors[nextIndex].refresh();
+                    if (!searchOnFocus) nextSelector.refresh();
                 }, 0);
             }
         }
 
         levels.forEach(function (level, index) {
-            if (!level || !level.input || !level.valueInput || !level.list || typeof level.search !== 'function') {
-                selectors.push(null);
-                return;
-            }
             const selector = createAutocomplete({
                 ...level,
                 maxSuggestions: 3,
@@ -547,6 +550,7 @@
                     syncAvailability(index);
                     if (level.onSelect) level.onSelect(item, id);
                     if (config.onChange) config.onChange(index, item, id, 'select');
+                    document.dispatchEvent(new CustomEvent('csms:curriculum-context-selection', { detail: { index, item, action: 'select' } }));
                     showNextSuggestions(index);
                 },
                 onClear: function () {
@@ -554,12 +558,14 @@
                     syncAvailability(index);
                     if (level.onClear) level.onClear();
                     if (config.onChange) config.onChange(index, null, '', 'clear');
+                    document.dispatchEvent(new CustomEvent('csms:curriculum-context-selection', { detail: { index, item: null, action: 'clear' } }));
                 }
             });
             selectors.push(selector);
         });
 
         syncAvailability(-1);
+        document.dispatchEvent(new CustomEvent('csms:curriculum-context-cascade-ready', { detail: { levels, selectors } }));
         return {
             get: function (index) { return selectors[index] || null; },
             clear: function (index) {
@@ -652,15 +658,18 @@
         };
     }
 
+    // New CSMS features must reuse established system components and visual patterns. Do not introduce independent styling when an equivalent system pattern exists.
     function normalizeSearch(value) { return String(value ?? '').trim().replace(/\s+/gu, ' ').toLowerCase(); }
     function searchRank(fields, query) {
         const q = normalizeSearch(query);
         if (!q) return 0;
-        return Math.min(...fields.map((value, index) => {
+        return Math.min(...fields.map(value => {
             const field = normalizeSearch(value);
-            if (field === q) return index === 0 ? 0 : 2;
-            if (field.startsWith(q)) return index === 0 ? 1 : 2;
-            return field.includes(q) ? (index === 0 ? 3 : 4) : Infinity;
+            if (field === q) return 0;
+            if (field.startsWith(q)) return 1;
+            const wordStart = field.indexOf(q);
+            if (wordStart >= 0 && (wordStart === 0 || !/[\p{L}\p{N}]/u.test(field[wordStart - 1]))) return 2;
+            return field.includes(q) ? 3 : Infinity;
         }));
     }
     function searchRecords(records, query, fields) {

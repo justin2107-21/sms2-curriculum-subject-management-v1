@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../../shared/audit.php';
 
 class CurriculumExportService
 {
+    private const UNSPECIFIED_SCOPE = '__UNSPECIFIED__';
     private AcademicProgramRepository $programs;
     private CurriculumRepository $curricula;
     private CurriculumVersionRepository $versions;
@@ -85,27 +86,99 @@ class CurriculumExportService
 
         $options = $this->exportOptions($input);
         $subjects = $this->exports->subjects($versionId);
-        $summary = $this->exports->unitSummary($versionId);
+        $scopeOptions = $this->scopeOptionsForRows($subjects);
+        $yearFilter = trim((string)($input['year_level'] ?? ''));
+        $semesterFilter = trim((string)($input['semester'] ?? ''));
+        if ($yearFilter !== '' && !in_array($yearFilter, $scopeOptions['year_values'], true)) {
+            throw new DomainValidationException('The selected year level is not available in this curriculum version.');
+        }
+        $availableSemesters = $yearFilter === ''
+            ? $scopeOptions['semester_values']
+            : ($scopeOptions['semesters_by_year'][$yearFilter] ?? []);
+        if ($semesterFilter !== '' && !in_array($semesterFilter, $availableSemesters, true)) {
+            throw new DomainValidationException('The selected semester or term is not available for this export scope.');
+        }
+        if ($yearFilter !== '' || $semesterFilter !== '') {
+            $subjects = array_values(array_filter($subjects, function (array $subject) use ($yearFilter, $semesterFilter): bool {
+                $year = $this->scopeValue($subject['year_level'] ?? null);
+                $semester = $this->scopeValue($subject['semester'] ?? null);
+                return ($yearFilter === '' || $year === $yearFilter)
+                    && ($semesterFilter === '' || $semester === $semesterFilter);
+            }));
+        }
+        // Normalize the authoritative mapping rows once. Preview, CSV and print
+        // all consume this exact structure; no browser-side sample data exists.
+        usort($subjects, function (array $left, array $right): int {
+            $year = strnatcasecmp((string)($left['year_level'] ?? ''), (string)($right['year_level'] ?? ''));
+            if ($year !== 0) return $year;
+            $semester = strnatcasecmp((string)($left['semester'] ?? ''), (string)($right['semester'] ?? ''));
+            if ($semester !== 0) return $semester;
+            $leftSequence = $left['sequence_order'] === null ? PHP_INT_MAX : (int)$left['sequence_order'];
+            $rightSequence = $right['sequence_order'] === null ? PHP_INT_MAX : (int)$right['sequence_order'];
+            return ($leftSequence <=> $rightSequence)
+                ?: strnatcasecmp((string)$left['subject_code'], (string)$right['subject_code'])
+                ?: ((int)$left['placement_id'] <=> (int)$right['placement_id']);
+        });
 
+        $years = [];
+        $totalUnitsHundredths = 0;
+        $totalSubjects = count($subjects);
+        $electiveTypes = [];
+        foreach ($this->exports->electiveRows($versionId) as $electiveRow) {
+            if ($electiveRow['membership_id'] === null || $electiveRow['subject_id'] === null) continue;
+            $subjectId = (int)$electiveRow['subject_id'];
+            $groupName = trim((string)$electiveRow['group_name']);
+            $selections = (int)$electiveRow['required_selections'];
+            $label = $groupName . ($selections > 0 ? ' · Choose ' . $selections : '');
+            $electiveTypes[$subjectId][] = $label;
+        }
+        foreach ($subjects as &$subject) {
+            $yearLabel = (string)($subject['year_level'] ?: 'Not specified');
+            $semesterLabel = (string)($subject['semester'] ?: 'Not specified');
+            $subject['year_level'] = $yearLabel;
+            $subject['semester'] = $semesterLabel;
+            $yearKey = $yearLabel;
+            $semesterKey = $semesterLabel;
+            if (!isset($years[$yearKey])) $years[$yearKey] = ['year_level' => $yearLabel, 'semesters' => [], 'total_units' => '0'];
+            if (!isset($years[$yearKey]['semesters'][$semesterKey])) {
+                $years[$yearKey]['semesters'][$semesterKey] = ['semester' => $semesterLabel, 'subjects' => [], 'total_units' => '0'];
+            }
+            $units = $this->decimalHundredths((string)$subject['units']);
+            $totalUnitsHundredths += $units;
+            $subject['placement_type'] = isset($electiveTypes[(int)$subject['subject_id']])
+                ? implode('; ', array_values(array_unique($electiveTypes[(int)$subject['subject_id']])))
+                : ((int)$subject['is_required'] === 1 ? 'Required' : 'Optional');
+            $years[$yearKey]['semesters'][$semesterKey]['subjects'][] = $subject;
+            $years[$yearKey]['semesters'][$semesterKey]['total_units'] = $this->formatHundredths(
+                $this->decimalHundredths($years[$yearKey]['semesters'][$semesterKey]['total_units']) + $units
+            );
+            $years[$yearKey]['total_units'] = $this->formatHundredths(
+                $this->decimalHundredths($years[$yearKey]['total_units']) + $units
+            );
+        }
+        unset($subject);
+        foreach ($years as &$year) {
+            $year['semesters'] = array_values($year['semesters']);
+        }
+        unset($year);
+        $yearLabel = $yearFilter === '' ? '' : $this->scopeLabel($yearFilter);
+        $semesterLabel = $semesterFilter === '' ? '' : $this->scopeLabel($semesterFilter);
+        $scopeLabel = $yearLabel === ''
+            ? ($semesterLabel === '' ? 'Entire Curriculum' : 'All Year Levels · ' . $semesterLabel)
+            : ($yearLabel . ' · ' . ($semesterLabel === '' ? 'All Semesters / Terms' : $semesterLabel));
         return [
             'context' => $context,
-            'summary' => [
-                'total_subjects' => (int)$summary['total_subjects'],
-                'total_units' => (string)$summary['total_units'],
-                'total_lecture_units' => $summary['total_lecture_units'] === null ? null : (string)$summary['total_lecture_units'],
-                'total_laboratory_units' => $summary['total_laboratory_units'] === null ? null : (string)$summary['total_laboratory_units'],
-            ],
+            'scope' => ['year_level' => $yearLabel, 'semester' => $semesterLabel, 'label' => $scopeLabel],
+            'summary' => ['total_subjects' => $totalSubjects, 'total_units' => $this->formatHundredths($totalUnitsHundredths)],
             'subjects' => $subjects,
+            'years' => array_values($years),
+            // Retain explicitly requested legacy report sections for existing API
+            // consumers. The Curriculum Export page does not select these by default.
             'options' => $options,
-            'requirements' => $options['requirements']
-                ? $this->exports->requirements($versionId) : [],
-            'elective_groups' => $options['electives']
-                ? $this->groupElectives($this->exports->electiveRows($versionId)) : [],
-            'grade_weighting' => $options['grade_weighting']
-                ? $this->groupWeighting($this->exports->gradeWeightingRows($versionId)) : [],
-            'latest_compliance_run' => $options['compliance']
-                ? $this->decorateComplianceRun($this->exports->latestComplianceRun($versionId))
-                : null,
+            'requirements' => $options['requirements'] ? $this->exports->requirements($versionId) : [],
+            'elective_groups' => $options['electives'] ? $this->groupElectives($this->exports->electiveRows($versionId)) : [],
+            'grade_weighting' => $options['grade_weighting'] ? $this->groupWeighting($this->exports->gradeWeightingRows($versionId)) : [],
+            'latest_compliance_run' => $options['compliance'] ? $this->decorateComplianceRun($this->exports->latestComplianceRun($versionId)) : null,
             'generated_at' => (new DateTimeImmutable('now'))->format('Y-m-d H:i:s P'),
             'disclaimer' => 'This report is generated from stored curriculum data in the system and does not by itself constitute official CHED, DepEd, accreditation, or institutional approval.',
         ];
@@ -114,34 +187,92 @@ class CurriculumExportService
     public function csvFilename(array $dataset): string
     {
         $context = $dataset['context'];
-        $parts = [
-            'curriculum', $context['program_code'], $context['curriculum_code'],
-            $context['version_label'],
-        ];
+        $parts = [$context['program_code'], $context['curriculum_code'], $context['version_label']];
+        if (($dataset['scope']['year_level'] ?? '') !== '') $parts[] = $dataset['scope']['year_level'];
+        if (($dataset['scope']['semester'] ?? '') !== '') $parts[] = $dataset['scope']['semester'];
         $filename = implode('_', array_map([$this, 'filenamePart'], $parts));
         return substr($filename, 0, 180) . '.csv';
     }
 
+    public function scopeOptions(array $input): array
+    {
+        $programId = DomainValidator::positiveId($input['academic_program_id'] ?? null, 'Academic program');
+        $curriculumId = DomainValidator::positiveId($input['curriculum_id'] ?? null, 'Curriculum');
+        $versionId = DomainValidator::positiveId($input['curriculum_version_id'] ?? null, 'Curriculum version');
+        $context = $this->exports->contextByVersion($versionId);
+        if (!$context) throw new DomainNotFoundException('Curriculum version not found.');
+        if ((int)$context['curriculum_id'] !== $curriculumId || (int)$context['academic_program_id'] !== $programId) {
+            throw new DomainValidationException('The selected curriculum context is invalid.');
+        }
+        $rows = $this->exports->subjects($versionId);
+        $options = $this->scopeOptionsForRows($rows);
+        $year = trim((string)($input['year_level'] ?? ''));
+        $semesters = $year === '' ? $options['semester_values'] : ($options['semesters_by_year'][$year] ?? []);
+        return [
+            'year_levels' => array_map(fn(string $value): array => ['value' => $value, 'label' => $this->scopeLabel($value)], $options['year_values']),
+            'semesters' => array_map(fn(string $value): array => ['value' => $value, 'label' => $this->scopeLabel($value)], $semesters),
+        ];
+    }
+
+    private function scopeOptionsForRows(array $rows): array
+    {
+        $years = $semesters = $byYear = [];
+        foreach ($rows as $row) {
+            $year = $this->scopeValue($row['year_level'] ?? null);
+            $semester = $this->scopeValue($row['semester'] ?? null);
+            $years[$year] = true;
+            $semesters[$semester] = true;
+            $byYear[$year][$semester] = true;
+        }
+        $sort = function (array $values): array {
+            $values = array_keys($values);
+            usort($values, fn(string $a, string $b): int => strnatcasecmp($this->scopeLabel($a), $this->scopeLabel($b)));
+            return $values;
+        };
+        foreach ($byYear as $year => $values) $byYear[$year] = $sort($values);
+        return ['year_values' => $sort($years), 'semester_values' => $sort($semesters), 'semesters_by_year' => $byYear];
+    }
+
+    private function scopeValue(mixed $value): string
+    {
+        return trim((string)($value ?? '')) === '' ? self::UNSPECIFIED_SCOPE : trim((string)$value);
+    }
+
+    private function scopeLabel(string $value): string
+    {
+        return $value === self::UNSPECIFIED_SCOPE ? 'Not specified' : $value;
+    }
+
+    private function formatHundredths(int $value): string
+    {
+        return intdiv($value, 100) . '.' . str_pad((string)($value % 100), 2, '0', STR_PAD_LEFT);
+    }
+
     public function recordCsvGeneration(array $dataset): void
     {
+        $this->recordGeneration($dataset, 'csv');
+    }
+
+    public function recordPrintGeneration(array $dataset): void
+    {
+        $this->recordGeneration($dataset, 'print_html');
+    }
+
+    private function recordGeneration(array $dataset, string $format): void
+    {
         $context = $dataset['context'];
-        $included = ['curriculum_subjects'];
-        foreach ($dataset['options'] as $section => $enabled) {
-            if ($enabled) {
-                $included[] = $section;
-            }
-        }
         audit_log_required(
             'CURRICULUM_EXPORT_GENERATE',
             'curriculum_version',
             (int)$context['curriculum_version_id'],
-            'Generic curriculum CSV export generated.',
+            'Curriculum CSV export generated.',
             [
                 'academic_program_id' => (int)$context['academic_program_id'],
                 'curriculum_id' => (int)$context['curriculum_id'],
                 'curriculum_version_id' => (int)$context['curriculum_version_id'],
-                'format' => 'csv',
-                'included_sections' => $included,
+                'format' => $format,
+                'subject_count' => (int)$dataset['summary']['total_subjects'],
+                'total_units' => (string)$dataset['summary']['total_units'],
             ]
         );
     }
@@ -153,116 +284,19 @@ class CurriculumExportService
         }
         fwrite($stream, "\xEF\xBB\xBF");
         $context = $dataset['context'];
-        $this->csvRow($stream, ['Generic SMS2 Curriculum Export']);
-        $this->csvRow($stream, ['Generated At', $dataset['generated_at']]);
-        $this->csvRow($stream, ['Academic Program Code', $context['program_code']]);
-        $this->csvRow($stream, ['Academic Program Name', $context['program_name']]);
-        $this->csvRow($stream, ['Program Type', $context['program_type'] ?? '']);
-        $this->csvRow($stream, ['Curriculum Code', $context['curriculum_code']]);
-        $this->csvRow($stream, ['Curriculum Name', $context['curriculum_name']]);
-        $this->csvRow($stream, ['Curriculum Version', $context['version_label']]);
-        $this->csvRow($stream, ['Effective Academic Year', $context['effective_academic_year'] ?? '']);
-        $this->csvRow($stream, ['Technical Version Status', $context['version_status']]);
-        $this->csvRow($stream, []);
-
-        $this->csvRow($stream, ['Section', 'Curriculum Subjects']);
         $this->csvRow($stream, [
-            'Academic Program Code', 'Academic Program Name', 'Program Type',
-            'Curriculum Code', 'Curriculum Name', 'Curriculum Version',
-            'Effective Academic Year', 'Technical Version Status',
-            'Subject Code', 'Subject Title', 'Description', 'Total Units',
-            'Lecture Units', 'Laboratory Units', 'Year Level', 'Semester / Term',
-            'Sequence Order', 'Placement',
+            'Program Code', 'Program Name', 'Curriculum Code', 'Curriculum Name',
+            'Curriculum Version', 'Year Level', 'Semester / Term', 'Subject Code',
+            'Subject Title', 'Units', 'Placement Type',
         ]);
         foreach ($dataset['subjects'] as $subject) {
             $this->csvRow($stream, [
-                $context['program_code'], $context['program_name'], $context['program_type'] ?? '',
+                $context['program_code'], $context['program_name'],
                 $context['curriculum_code'], $context['curriculum_name'], $context['version_label'],
-                $context['effective_academic_year'] ?? '', $context['version_status'],
-                $subject['subject_code'], $subject['subject_title'], $subject['description'] ?? '',
-                $subject['units'], $subject['lecture_units'] ?? '',
-                $subject['laboratory_units'] ?? '', $subject['year_level'] ?? '',
-                $subject['semester'] ?? '', $subject['sequence_order'] ?? '',
-                (int)$subject['is_required'] === 1 ? 'Required Placement' : 'Optional Placement',
+                $subject['year_level'] ?? '', $subject['semester'] ?? '',
+                $subject['subject_code'], $subject['subject_title'], $subject['units'], $subject['placement_type'],
             ]);
         }
-
-        if ($dataset['options']['requirements']) {
-            $this->csvRow($stream, []);
-            $this->csvRow($stream, ['Section', 'Prerequisite / Corequisite Relationships']);
-            $this->csvRow($stream, [
-                'Target Subject Code', 'Target Subject Title', 'Relationship Type',
-                'Required Subject Code', 'Required Subject Title',
-            ]);
-            foreach ($dataset['requirements'] as $item) {
-                $this->csvRow($stream, [
-                    $item['subject_code'], $item['subject_title'], ucfirst($item['requirement_type']),
-                    $item['required_subject_code'], $item['required_subject_title'],
-                ]);
-            }
-        }
-
-        if ($dataset['options']['electives']) {
-            $this->csvRow($stream, []);
-            $this->csvRow($stream, ['Section', 'Elective Groups']);
-            $this->csvRow($stream, ['Group Name', 'Description', 'Member Subject Code', 'Member Subject Title']);
-            foreach ($dataset['elective_groups'] as $group) {
-                if (!$group['subjects']) {
-                    $this->csvRow($stream, [$group['group_name'], $group['description'] ?? '', '', '']);
-                }
-                foreach ($group['subjects'] as $subject) {
-                    $this->csvRow($stream, [
-                        $group['group_name'], $group['description'] ?? '',
-                        $subject['subject_code'], $subject['subject_title'],
-                    ]);
-                }
-            }
-        }
-
-        if ($dataset['options']['grade_weighting']) {
-            $this->csvRow($stream, []);
-            $this->csvRow($stream, ['Section', 'Grade Weighting Configuration Summary']);
-            $this->csvRow($stream, [
-                'Subject Code', 'Subject Title', 'Component', 'Weight Percentage',
-                'Total Configuration Weight', 'Configuration Status',
-            ]);
-            foreach ($dataset['grade_weighting'] as $scheme) {
-                if (!$scheme['components']) {
-                    $this->csvRow($stream, [
-                        $scheme['subject_code'], $scheme['subject_title'], '', '',
-                        $scheme['total_weight'], ucfirst($scheme['completion_status']),
-                    ]);
-                }
-                foreach ($scheme['components'] as $component) {
-                    $this->csvRow($stream, [
-                        $scheme['subject_code'], $scheme['subject_title'],
-                        $component['component_name'], $component['weight_percentage'],
-                        $scheme['total_weight'], ucfirst($scheme['completion_status']),
-                    ]);
-                }
-            }
-        }
-
-        if ($dataset['options']['compliance']) {
-            $this->csvRow($stream, []);
-            $this->csvRow($stream, ['Section', 'Latest Stored Compliance Validation Summary']);
-            $run = $dataset['latest_compliance_run'];
-            if ($run === null) {
-                $this->csvRow($stream, ['Status', 'No stored validation run available.']);
-            } else {
-                $this->csvRow($stream, [
-                    'Run Date', 'Rules Evaluated', 'Passed', 'Failed',
-                    'Not Evaluated', 'Run By',
-                ]);
-                $this->csvRow($stream, [
-                    $run['created_at'], $run['rules_evaluated'], $run['passed_count'],
-                    $run['failed_count'], $run['not_evaluated_count'], $run['run_by_name'],
-                ]);
-            }
-        }
-
-        $this->csvRow($stream, []);
-        $this->csvRow($stream, ['Notice', $dataset['disclaimer']]);
     }
 
     private function exportOptions(array $input): array

@@ -38,45 +38,18 @@ try {
             $schemeId = DomainValidator::positiveId($_GET['scheme_id'] ?? null, 'Weighting scheme');
             json_response(true, 'Grade weighting components loaded.', $service->listComponents($schemeId, $_GET));
 
-        case 'scheme_create':
+        case 'configuration_save':
             curriculum_require_mutation('grade_weighting.manage');
-            $scheme = $service->createScheme($_POST, curriculum_actor_id());
-            json_response(true, 'Grade weighting scheme created.', ['scheme' => $scheme], 201);
-
-        case 'scheme_update':
-            curriculum_require_mutation('grade_weighting.manage');
-            $schemeId = DomainValidator::positiveId($_POST['id'] ?? null, 'Weighting scheme');
-            $scheme = $service->updateScheme($schemeId, $_POST);
-            json_response(true, 'Grade weighting scheme updated.', ['scheme' => $scheme]);
-
-        case 'scheme_remove':
-            curriculum_require_mutation('grade_weighting.manage');
-            $schemeId = DomainValidator::positiveId($_POST['id'] ?? null, 'Weighting scheme');
-            $service->removeScheme($schemeId);
-            json_response(true, 'Grade weighting scheme removed.');
-
-        case 'component_create':
-            curriculum_require_mutation('grade_weighting.manage');
-            $result = $service->createComponent($_POST, curriculum_actor_id());
-            json_response(true, 'Grade weighting component added.', $result, 201);
-
-        case 'component_update':
-            curriculum_require_mutation('grade_weighting.manage');
-            $componentId = DomainValidator::positiveId(
-                $_POST['id'] ?? null,
-                'Weighting component'
+            $placementId = DomainValidator::positiveId(
+                $_POST['curriculum_version_subject_id'] ?? null,
+                'Curriculum subject placement'
             );
-            $result = $service->updateComponent($componentId, $_POST);
-            json_response(true, 'Grade weighting component updated.', $result);
-
-        case 'component_remove':
-            curriculum_require_mutation('grade_weighting.manage');
-            $componentId = DomainValidator::positiveId(
-                $_POST['id'] ?? null,
-                'Weighting component'
+            $versionId = DomainValidator::positiveId(
+                $_POST['curriculum_version_id'] ?? null,
+                'Curriculum version'
             );
-            $scheme = $service->removeComponent($componentId);
-            json_response(true, 'Grade weighting component removed.', ['scheme' => $scheme]);
+            $result = $service->saveConfiguration($placementId, $versionId, $_POST, curriculum_actor_id());
+            json_response(true, 'Grade weighting configuration saved.', $result);
 
         default:
             json_response(false, 'Unknown action.', [], 400);

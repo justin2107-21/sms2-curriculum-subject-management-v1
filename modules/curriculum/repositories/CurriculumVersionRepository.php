@@ -18,16 +18,30 @@ class CurriculumVersionRepository
         return $row;
     }
 
-    public function labelExists(int $curriculumId, string $label): bool
+    public function labelExists(int $curriculumId, string $label, ?int $exceptVersionId = null): bool
     {
-        $stmt = $this->db->prepare(
-            'SELECT 1 FROM curriculum_versions WHERE curriculum_id = ? AND version_label = ? LIMIT 1'
-        );
-        $stmt->bind_param('is', $curriculumId, $label);
+        $sql = 'SELECT 1 FROM curriculum_versions WHERE curriculum_id = ? AND version_label = ?';
+        if ($exceptVersionId !== null) {
+            $sql .= ' AND id <> ?';
+        }
+        $stmt = $this->db->prepare($sql . ' LIMIT 1');
+        if ($exceptVersionId === null) {
+            $stmt->bind_param('is', $curriculumId, $label);
+        } else {
+            $stmt->bind_param('isi', $curriculumId, $label, $exceptVersionId);
+        }
         $stmt->execute();
         $exists = $stmt->get_result()->num_rows === 1;
         $stmt->close();
         return $exists;
+    }
+
+    public function rename(int $id, string $label): void
+    {
+        $stmt = $this->db->prepare('UPDATE curriculum_versions SET version_label = ? WHERE id = ?');
+        $stmt->bind_param('si', $label, $id);
+        $stmt->execute();
+        $stmt->close();
     }
 
     public function paginateByCurriculum(int $curriculumId, array $query): array

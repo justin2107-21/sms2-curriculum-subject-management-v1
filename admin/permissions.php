@@ -15,9 +15,11 @@ $scriptVersion = (string)filemtime(__DIR__ . '/../js/dashboard.js');
 <head>
   <?php require __DIR__ . '/../shared/favicon.php'; ?>
   <meta charset="UTF-8"/>
+  <meta name="csrf-token" content="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Permissions - BCP Curriculum &amp; Subject Management</title>
   <link rel="stylesheet" href="../css/dashboard.css"/>
+  <link rel="stylesheet" href="../modules/curriculum/assets/curriculum.css?v=<?= (int)filemtime(__DIR__.'/../modules/curriculum/assets/curriculum.css') ?>"/>
   <link rel="stylesheet" href="../css/system-admin.css?v=<?= $styleVersion ?>"/>
   <link rel="stylesheet" href="../css/csms-typography.css?v=<?= $typographyVersion ?>"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
@@ -34,13 +36,13 @@ require __DIR__ . '/../shared/sidebar.php';
     <div class="page-title-bar">
       <div>
         <h1 class="page-title"><i class="fa-solid fa-user-shield"></i> Permissions</h1>
-        <p class="system-admin-subtitle">Read-only view of database-backed permissions and their temporary role assignments.</p>
+        <p class="system-admin-subtitle">Database-backed permissions for provisional roles, subject to client validation.</p>
       </div>
     </div>
     <section class="system-admin-card" aria-label="RBAC permissions">
       <p class="system-admin-summary">
         <?= number_format($totalPermissions) ?> permission<?= $totalPermissions === 1 ? '' : 's' ?>.
-        Authorization remains authoritative in MySQL; this page does not change mappings.
+        Authorization remains authoritative in MySQL. Permission changes cannot exceed each provisional role's defined authority.
       </p>
       <?php if ($permissions !== []): ?>
       <div class="system-admin-table-wrap">
@@ -62,10 +64,12 @@ require __DIR__ . '/../shared/sidebar.php';
       <p class="system-admin-empty">No permissions found.</p>
       <?php endif; ?>
     </section>
+    <?php require __DIR__.'/role_permission_forms.php'; ?>
   </main>
   <footer class="footer">eLearning Commons &copy; 2026</footer>
 </div>
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
-<script src="../js/dashboard.js?v=<?= $scriptVersion ?>"></script>
+<script src="../modules/curriculum/assets/curriculum-common.js?v=<?= (int)filemtime(__DIR__.'/../modules/curriculum/assets/curriculum-common.js') ?>"></script>
+<script src="../js/account-administration.js?v=<?= (int)filemtime(__DIR__.'/../js/account-administration.js') ?>"></script>
 </body>
 </html>

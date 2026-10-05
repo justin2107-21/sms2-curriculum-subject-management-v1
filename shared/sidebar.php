@@ -21,6 +21,7 @@ $sidebarCanViewCompliance = $sidebarUserId !== null && user_can($sidebarUserId, 
 $sidebarCanViewCurriculumExport = $sidebarUserId !== null && user_can($sidebarUserId, 'curriculum_export.view');
 $sidebarCanManageRbac = $sidebarUserId !== null && user_can($sidebarUserId, 'rbac.manage');
 $sidebarCanViewAudit = $sidebarUserId !== null && user_can($sidebarUserId, 'audit.view');
+$sidebarCanViewSystemSettings = $sidebarUserId !== null && user_can($sidebarUserId, 'settings.view');
 $sidebarCanViewSettings = $sidebarUserId !== null && user_can($sidebarUserId, 'account.view');
 
 $sidebarHasBuilderItems = $sidebarCanViewPrograms || $sidebarCanViewCurriculum;
@@ -39,7 +40,7 @@ $sidebarHasCurriculumItems = $sidebarHasBuilderItems
     || $sidebarCanViewGradeWeighting
     || $sidebarCanViewCompliance
     || $sidebarCanViewCurriculumExport;
-$sidebarHasSystemItems = $sidebarCanManageRbac || $sidebarCanViewAudit || $sidebarCanViewSettings;
+$sidebarHasSystemItems = $sidebarCanManageRbac || $sidebarCanViewAudit || $sidebarCanViewSettings || $sidebarCanViewSystemSettings;
 ?>
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-header">
@@ -163,7 +164,7 @@ $sidebarHasSystemItems = $sidebarCanManageRbac || $sidebarCanViewAudit || $sideb
           <a href="<?= $APP_ROOT ?>modules/curriculum/pages/subject_history_view.php"
              class="sidebar-submenu-item <?= $ACTIVE_NAV === 'subject-history-subject' ? 'active' : '' ?>">Subject History View</a>
           <a href="<?= $APP_ROOT ?>modules/curriculum/pages/curriculum_history_view.php"
-             class="sidebar-submenu-item <?= $ACTIVE_NAV === 'subject-history-curriculum' ? 'active' : '' ?>">Curriculum History View</a>
+             class="sidebar-submenu-item <?= $ACTIVE_NAV === 'subject-history-curriculum' ? 'active' : '' ?>">Curriculum Version History</a>
         </div>
       </div>
     </div>
@@ -254,10 +255,11 @@ $sidebarHasSystemItems = $sidebarCanManageRbac || $sidebarCanViewAudit || $sideb
       </a>
     </div>
     <?php endif; ?>
+    <?php if ($sidebarCanViewSystemSettings): ?><div class="nav-group"><a href="<?= $APP_ROOT ?>admin/settings.php" class="sidebar-item <?= $ACTIVE_NAV === 'system-settings' ? 'active' : '' ?>"><i class="fa-solid fa-shield-halved"></i><span>System Settings</span></a></div><?php endif; ?>
     <?php if ($sidebarCanViewSettings): ?>
     <div class="nav-group">
       <a href="<?= $APP_ROOT ?>dashboard/account.php" class="sidebar-item <?= $ACTIVE_NAV === 'settings' ? 'active' : '' ?>">
-        <i class="fa-solid fa-gear"></i><span>Settings</span>
+        <i class="fa-solid fa-gear"></i><span>Account Settings</span>
       </a>
     </div>
     <?php endif; ?>

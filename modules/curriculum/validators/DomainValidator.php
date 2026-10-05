@@ -260,6 +260,7 @@ class DomainValidator
     public static function subjectHistoryQuery(array $input): array
     {
         $query = self::subjectMappingQuery($input);
+        $query['subject_id'] = self::optionalPositiveId($input['subject_id'] ?? null, 'Subject');
         $versionStatus = self::optionalString(
             $input,
             'version_status',
@@ -312,15 +313,10 @@ class DomainValidator
             'Decision',
             20
         );
-        if (!in_array($decision, ['pending', 'equivalent', 'not_equivalent'], true)) {
+        if (!in_array($decision, ['equivalent', 'not_equivalent', 'needs_review'], true)) {
             throw new DomainValidationException('Invalid equivalency review decision.');
         }
         $remarks = self::optionalString($input, 'remarks', 'Remarks', 4000);
-        if ($decision !== 'pending' && $remarks === null) {
-            throw new DomainValidationException(
-                'Remarks are required for Equivalent or Not Equivalent decisions.'
-            );
-        }
         return ['decision_status' => $decision, 'remarks' => $remarks];
     }
 
@@ -334,7 +330,7 @@ class DomainValidator
             20
         );
         if ($decision !== null
-            && !in_array($decision, ['pending', 'equivalent', 'not_equivalent'], true)) {
+            && !in_array($decision, ['equivalent', 'not_equivalent', 'needs_review'], true)) {
             throw new DomainValidationException('Invalid equivalency decision filter.');
         }
         $query['decision_status'] = $decision;

@@ -26,6 +26,7 @@
         selectedMapping: null, currentTab: 'map', mapRequest: 0,
         reviewLoaded: false, yearValues: [], semesterValues: []
     };
+    window.CSMSPageCIMFContext = () => ({academic_program_id:state.program?.id || '',curriculum_id:state.curriculum?.id || '',curriculum_version_id:state.version?.id || '',subject_id:state.selectedMapping?.subject_id || '',year_level:state.year || ''});
     const el = id => document.getElementById(id);
     const programInput = el('mappingProgramInput');
     const curriculumInput = el('mappingCurriculumInput');

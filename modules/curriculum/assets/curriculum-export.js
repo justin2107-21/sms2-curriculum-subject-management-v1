@@ -2,249 +2,191 @@
     'use strict';
 
     const workspace = document.getElementById('curriculumExportWorkspace');
-    if (!workspace || !window.CurriculumUI) return;
-
     const ui = window.CurriculumUI;
+    if (!workspace || !ui) return;
+
     const endpoint = workspace.dataset.exportApi;
     const printPage = workspace.dataset.printPage;
-    const program = document.getElementById('exportProgram');
-    const curriculum = document.getElementById('exportCurriculum');
-    const version = document.getElementById('exportVersion');
-    const programInput = document.getElementById('exportProgramSearch');
-    const curriculumInput = document.getElementById('exportCurriculumSearch');
-    const versionInput = document.getElementById('exportVersionSearch');
-    const previewButton = document.getElementById('previewCurriculumExport');
-    const printButton = document.getElementById('printCurriculumExport');
+    const ids = ['exportProgram', 'exportCurriculum', 'exportVersion'];
+    const inputIds = ['exportProgramSearch', 'exportCurriculumSearch', 'exportVersionSearch'];
+    const listIds = ['exportProgramOptions', 'exportCurriculumOptions', 'exportVersionOptions'];
+    const values = ids.map(id => document.getElementById(id));
+    const inputs = inputIds.map(id => document.getElementById(id));
+    const selections = [null, null, null];
+    const previewButton = document.getElementById('generateCurriculumPreview');
     const csvButton = document.getElementById('downloadCurriculumCsv');
+    const printButton = document.getElementById('printCurriculumExport');
     const preview = document.getElementById('curriculumExportPreview');
     const status = document.getElementById('exportActionStatus');
-    const optionInputs = {
-        include_requirements: document.getElementById('includeRequirements'),
-        include_electives: document.getElementById('includeElectives'),
-        include_grade_weighting: document.getElementById('includeGradeWeighting'),
-        include_compliance: document.getElementById('includeCompliance')
-    };
-    const exportContextCascade = ui.createCascadingAutocomplete({
-        levels: [
-            {
-                input: programInput, valueInput: program, list: document.getElementById('exportProgramOptions'),
-                helpText: 'Choose an academic program.', selectedText: 'Academic program selected.',
-                loadingText: 'Searching academic programs…', noResultsText: 'No matching academic programs found.',
-                placeholder: 'Search code or program name',
-                search: async query => (await ui.fetchJson(endpoint, { action: 'program_options', page: 1, per_page: 20, search: query })).programs,
-                getId: item => item.id,
-                format: item => ({ label: item.program_code + ' — ' + item.program_name, code: item.program_code, title: item.program_name, meta: item.program_type || '' })
-            },
-            {
-                input: curriculumInput, valueInput: curriculum, list: document.getElementById('exportCurriculumOptions'),
-                helpText: 'Choose a curriculum for this program.', selectedText: 'Curriculum selected.',
-                loadingText: 'Searching curricula…', noResultsText: 'No curricula found for this program.',
-                placeholder: 'Search curriculum code or name', disabledPlaceholder: 'Select a program first', minimumLength: 0, showSuggestionsOnEnable: true,
-                search: async query => (await ui.fetchJson(endpoint, { action: 'curriculum_options', academic_program_id: program.value, page: 1, per_page: 20, search: query })).curricula,
-                getId: item => item.id,
-                format: item => ({ label: item.curriculum_code + ' — ' + item.curriculum_name, code: item.curriculum_code, title: item.curriculum_name })
-            },
-            {
-                input: versionInput, valueInput: version, list: document.getElementById('exportVersionOptions'),
-                helpText: 'Choose a curriculum version.', selectedText: 'Curriculum version selected.',
-                loadingText: 'Searching curriculum versions…', noResultsText: 'No curriculum versions found.',
-                placeholder: 'Search version label or academic year', disabledPlaceholder: 'Select a curriculum first', minimumLength: 0, showSuggestionsOnEnable: true,
-                search: async query => (await ui.fetchJson(endpoint, { action: 'version_options', curriculum_id: curriculum.value, page: 1, per_page: 20, search: query })).versions,
-                getId: item => item.id,
-                format: item => ({ label: item.version_label + (item.effective_academic_year ? ' — ' + item.effective_academic_year : ''), code: item.version_label, title: item.effective_academic_year || 'Academic year not specified' })
-            }
-        ],
-        onChange: function (index, item, id, action) {
-            setActionsEnabled(index === 2 && action === 'select');
-        }
-    });
-    const programAutocomplete = exportContextCascade?.get(0);
-    const curriculumAutocomplete = exportContextCascade?.get(1);
-    const versionAutocomplete = exportContextCascade?.get(2);
+    const yearSelect = document.getElementById('exportYear');
+    const semesterSelect = document.getElementById('exportSemester');
+    const panels = Array.from(document.querySelectorAll('.export-tab-panel'));
+    let dataset = null;
+    let requestId = 0;
+    let scopeRequestId = 0;
 
-    function contextParameters() {
+    function params() {
         return {
-            academic_program_id: program.value,
-            curriculum_id: curriculum.value,
-            curriculum_version_id: version.value
+            academic_program_id: values[0].value,
+            curriculum_id: values[1].value,
+            curriculum_version_id: values[2].value,
+            year_level: yearSelect.value,
+            semester: semesterSelect.value
         };
     }
 
-    function exportParameters() {
-        const parameters = contextParameters();
-        Object.entries(optionInputs).forEach(function ([name, input]) {
-            parameters[name] = input.checked ? '1' : '0';
-        });
-        return parameters;
-    }
-
+    function ready() { return values.every(input => Boolean(input.value)); }
     function setActionsEnabled(enabled) {
         previewButton.disabled = !enabled;
-        printButton.disabled = !enabled;
-        csvButton.disabled = !enabled;
-        status.textContent = enabled
-            ? 'Ready to preview or generate a generic report.'
-            : 'Select a curriculum version to begin.';
+        const hasSubjects = enabled && dataset && Number(dataset.summary.total_subjects) > 0;
+        csvButton.disabled = !hasSubjects;
+        printButton.disabled = !hasSubjects;
     }
 
-    function value(value) {
-        return value === null || value === undefined || value === '' ? '&mdash;' : ui.escapeHtml(value);
+    function escape(value) {
+        return value === null || value === undefined || value === '' ? '&mdash;' : ui.escapeHtml(String(value));
     }
 
-    function units(value) {
-        if (value === null || value === undefined || value === '') return '&mdash;';
+    function displayUnits(value) {
         const number = Number(value);
         return Number.isFinite(number) ? ui.escapeHtml(number.toFixed(2).replace(/\.00$/, '')) : '&mdash;';
     }
 
-    function contextItems(context) {
-        const items = [
-            ['Academic Program', context.program_code + ' — ' + context.program_name],
-            ['Program Type', context.program_type],
-            ['Curriculum', context.curriculum_code + ' — ' + context.curriculum_name],
-            ['Curriculum Version', context.version_label],
-            ['Effective Academic Year', context.effective_academic_year],
-            ['Technical Version Status', context.version_status]
-        ];
-        return items.map(function (item) {
-            return '<div class="export-context-item"><span>' + ui.escapeHtml(item[0]) + '</span><strong>' + value(item[1]) + '</strong></div>';
-        }).join('');
+    function clearPreview(message) {
+        dataset = null;
+        document.getElementById('exportPreviewTitle').textContent = 'Curriculum Structure';
+        document.getElementById('exportPreviewSummary').textContent = '';
+        preview.innerHTML = '<div class="export-empty-state"><p>' + ui.escapeHtml(message) + '</p></div>';
     }
 
-    function groupedSubjects(subjects) {
-        const groups = new Map();
-        subjects.forEach(function (subject) {
-            const year = subject.year_level || 'Not specified';
-            const term = subject.semester || 'Not specified';
-            const key = year + '\u0000' + term;
-            if (!groups.has(key)) groups.set(key, { year, term, subjects: [] });
-            groups.get(key).subjects.push(subject);
-        });
-        return Array.from(groups.values());
+    function scopeLabel() {
+        const year = yearSelect.selectedOptions[0]?.textContent;
+        const semester = semesterSelect.selectedOptions[0]?.textContent;
+        if (!yearSelect.value && !semesterSelect.value) return 'Entire Curriculum';
+        if (!yearSelect.value) return 'All Year Levels · ' + semester;
+        return year + ' · ' + (semesterSelect.value ? semester : 'All Semesters / Terms');
     }
 
-    function subjectRows(subjects) {
-        return subjects.map(function (subject) {
-            return '<tr><td><strong>' + value(subject.subject_code) + '</strong></td>' +
-                '<td>' + value(subject.subject_title) + '</td>' +
-                '<td class="number-cell">' + units(subject.units) + '</td>' +
-                '<td class="number-cell">' + units(subject.lecture_units) + '</td>' +
-                '<td class="number-cell">' + units(subject.laboratory_units) + '</td>' +
-                '<td class="number-cell">' + value(subject.sequence_order) + '</td>' +
-                '<td>' + ((Number(subject.is_required) === 1) ? 'Required Placement' : 'Optional Placement') + '</td></tr>';
-        }).join('');
+    function updateScopeSummary() {
+        const label = scopeLabel();
+        document.getElementById('exportScopeSummary').textContent = label;
+        document.querySelectorAll('[data-scope-label]').forEach(node => { node.textContent = label; });
     }
 
-    function subjectsSection(subjects) {
-        const groups = groupedSubjects(subjects);
-        let body = '';
-        if (!groups.length) {
-            body = '<div class="export-table-scroll"><table class="export-report-table"><tbody><tr><td class="empty-report-cell">No subjects are mapped to this curriculum version.</td></tr></tbody></table></div>';
-        } else {
-            body = groups.map(function (group) {
-                return '<h3>Year Level: ' + ui.escapeHtml(group.year) + ' &nbsp;•&nbsp; Semester / Term: ' + ui.escapeHtml(group.term) + '</h3>' +
-                    '<div class="export-table-scroll"><table class="export-report-table"><thead><tr><th>Subject Code</th><th>Subject Title</th><th>Total Units</th><th>Lecture</th><th>Laboratory</th><th>Sequence</th><th>Placement</th></tr></thead><tbody>' +
-                    subjectRows(group.subjects) + '</tbody></table></div>';
-            }).join('');
+    function setSelectOptions(select, values, allLabel) {
+        select.replaceChildren(new Option(allLabel, ''));
+        values.forEach(option => select.add(new Option(option.label, option.value)));
+    }
+
+    async function loadScopeOptions(resetYear) {
+        if (!ready()) return;
+        ++requestId;
+        setActionsEnabled(false);
+        clearPreview('Updating the available export scope...');
+        const currentRequest = ++scopeRequestId;
+        const priorYear = resetYear ? '' : yearSelect.value;
+        const priorSemester = resetYear ? '' : semesterSelect.value;
+        yearSelect.disabled = true;
+        semesterSelect.disabled = true;
+        try {
+            const yearData = await ui.fetchJson(endpoint, Object.assign({ action: 'scope_options' }, params(), { year_level: '' }));
+            if (currentRequest !== scopeRequestId) return;
+            setSelectOptions(yearSelect, yearData.year_levels || [], 'All Year Levels');
+            if (priorYear && Array.from(yearSelect.options).some(option => option.value === priorYear)) yearSelect.value = priorYear;
+            const termData = await ui.fetchJson(endpoint, Object.assign({ action: 'scope_options' }, params(), { year_level: yearSelect.value }));
+            if (currentRequest !== scopeRequestId) return;
+            setSelectOptions(semesterSelect, termData.semesters || [], 'All Semesters / Terms');
+            if (priorSemester && Array.from(semesterSelect.options).some(option => option.value === priorSemester)) semesterSelect.value = priorSemester;
+            yearSelect.disabled = false;
+            semesterSelect.disabled = false;
+            updateScopeSummary();
+            await generatePreview();
+        } catch (error) {
+            if (currentRequest !== scopeRequestId) return;
+            yearSelect.disabled = false;
+            semesterSelect.disabled = false;
+            ui.showToast(error.message, 'error');
         }
-        return '<section class="export-report-section"><h2>Curriculum Subjects</h2><p class="export-section-note">Year-level and semester/term groups use the stored text values and lexical record order.</p>' + body + '</section>';
     }
 
-    function requirementsSection(items) {
-        const rows = items.length ? items.map(function (item) {
-            return '<tr><td>' + value(item.subject_code) + '</td><td>' + value(item.subject_title) + '</td><td>' +
-                ui.escapeHtml(item.requirement_type === 'corequisite' ? 'Corequisite' : 'Prerequisite') + '</td><td>' +
-                value(item.required_subject_code) + '</td><td>' + value(item.required_subject_title) + '</td></tr>';
-        }).join('') : '<tr><td colspan="5" class="empty-report-cell">No prerequisite or corequisite relationships are configured.</td></tr>';
-        return '<section class="export-report-section"><h2>Prerequisite &amp; Corequisite Relationships</h2><div class="export-table-scroll"><table class="export-report-table"><thead><tr><th>Target Subject</th><th>Target Title</th><th>Relationship</th><th>Required Subject</th><th>Required Title</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>';
-    }
-
-    function electivesSection(groups) {
-        const rows = [];
-        groups.forEach(function (group) {
-            if (!group.subjects.length) {
-                rows.push('<tr><td>' + value(group.group_name) + '</td><td>' + value(group.description) + '</td><td>&mdash;</td><td>&mdash;</td></tr>');
-            }
-            group.subjects.forEach(function (subject) {
-                rows.push('<tr><td>' + value(group.group_name) + '</td><td>' + value(group.description) + '</td><td>' + value(subject.subject_code) + '</td><td>' + value(subject.subject_title) + '</td></tr>');
-            });
+    function activateTab(name) {
+        document.querySelectorAll('[data-export-tab]').forEach(function (tab) {
+            const active = tab.dataset.exportTab === name;
+            tab.classList.toggle('is-active', active);
+            tab.setAttribute('aria-selected', active ? 'true' : 'false');
         });
-        const body = rows.length ? rows.join('') : '<tr><td colspan="4" class="empty-report-cell">No elective groups are configured for this curriculum version.</td></tr>';
-        return '<section class="export-report-section"><h2>Elective Groups</h2><p class="export-section-note">This section reports stored elective-group membership only.</p><div class="export-table-scroll"><table class="export-report-table"><thead><tr><th>Group</th><th>Description</th><th>Subject Code</th><th>Subject Title</th></tr></thead><tbody>' + body + '</tbody></table></div></section>';
-    }
-
-    function weightingSection(schemes) {
-        const rows = [];
-        schemes.forEach(function (scheme) {
-            if (!scheme.components.length) {
-                rows.push('<tr><td>' + value(scheme.subject_code) + '</td><td>' + value(scheme.subject_title) + '</td><td>&mdash;</td><td>&mdash;</td><td class="number-cell">' + units(scheme.total_weight) + '%</td><td>' + ui.escapeHtml(scheme.completion_status) + '</td></tr>');
-            }
-            scheme.components.forEach(function (component) {
-                rows.push('<tr><td>' + value(scheme.subject_code) + '</td><td>' + value(scheme.subject_title) + '</td><td>' + value(component.component_name) + '</td><td class="number-cell">' + units(component.weight_percentage) + '%</td><td class="number-cell">' + units(scheme.total_weight) + '%</td><td>' + ui.escapeHtml(scheme.completion_status) + '</td></tr>');
-            });
-        });
-        const body = rows.length ? rows.join('') : '<tr><td colspan="6" class="empty-report-cell">No grade-weighting configurations are stored for this curriculum version.</td></tr>';
-        return '<section class="export-report-section"><h2>Grade Weighting Configuration</h2><div class="export-table-scroll"><table class="export-report-table"><thead><tr><th>Subject Code</th><th>Subject Title</th><th>Component</th><th>Weight</th><th>Total</th><th>Technical Status</th></tr></thead><tbody>' + body + '</tbody></table></div></section>';
-    }
-
-    function complianceSection(run) {
-        if (!run) {
-            return '<section class="export-report-section"><h2>Latest Stored Compliance Validation Summary</h2><p class="export-section-note">No stored validation run is available for this curriculum version.</p></section>';
-        }
-        return '<section class="export-report-section"><h2>Latest Stored Compliance Validation Summary</h2><p class="export-section-note">This is stored internal decision-support output and is not an official regulatory determination.</p><div class="export-table-scroll"><table class="export-report-table"><thead><tr><th>Run Date</th><th>Rules Evaluated</th><th>Passed</th><th>Failed</th><th>Not Evaluated</th><th>Run By</th></tr></thead><tbody><tr><td>' + value(run.created_at) + '</td><td class="number-cell">' + value(run.rules_evaluated) + '</td><td class="number-cell">' + value(run.passed_count) + '</td><td class="number-cell">' + value(run.failed_count) + '</td><td class="number-cell">' + value(run.not_evaluated_count) + '</td><td>' + value(run.run_by_name) + '</td></tr></tbody></table></div></section>';
+        panels.forEach(panel => { panel.hidden = panel.id !== 'exportPanel' + name.charAt(0).toUpperCase() + name.slice(1); });
     }
 
     function renderReport(data) {
         const context = data.context;
-        let optional = '';
-        if (data.options.requirements) optional += requirementsSection(data.requirements);
-        if (data.options.electives) optional += electivesSection(data.elective_groups);
-        if (data.options.grade_weighting) optional += weightingSection(data.grade_weighting);
-        if (data.options.compliance) optional += complianceSection(data.latest_compliance_run);
-        preview.innerHTML = '<article class="export-report">' +
-            '<header class="export-report-header"><p class="export-report-kicker">Generic system report</p><h1 class="export-report-title">' + value(context.curriculum_name) + '</h1><p class="export-report-subtitle">Curriculum &amp; Subject Management</p></header>' +
-            '<div class="export-context-summary">' + contextItems(context) + '</div>' +
-            '<div class="export-unit-summary"><div><span>Subjects</span><strong>' + value(data.summary.total_subjects) + '</strong></div><div><span>Total Units</span><strong>' + units(data.summary.total_units) + '</strong></div><div><span>Lecture Units</span><strong>' + units(data.summary.total_lecture_units) + '</strong></div><div><span>Laboratory Units</span><strong>' + units(data.summary.total_laboratory_units) + '</strong></div></div>' +
-            subjectsSection(data.subjects) + optional +
-            '<p class="export-report-notice">' + ui.escapeHtml(data.disclaimer) + '</p><p class="export-generated-at">Generated ' + value(data.generated_at) + '</p></article>';
+        const count = Number(data.summary.total_subjects || 0);
+        document.getElementById('exportPreviewTitle').textContent = context.curriculum_name;
+        document.getElementById('exportPreviewSummary').textContent = context.version_label + ' · ' + count + ' Subjects · ' + displayUnits(data.summary.total_units).replace(/&mdash;/g, '0') + ' Units · ' + data.scope.label;
+        if (!count) {
+            preview.innerHTML = '<div class="export-empty-state"><p>No mapped subjects were found for the selected export scope.</p></div>';
+            return;
+        }
+
+        const yearMarkup = data.years.map(function (year) {
+            const semesterMarkup = year.semesters.map(function (semester) {
+                const rows = semester.subjects.map(function (subject) {
+                    return '<tr><td><strong>' + escape(subject.subject_code) + '</strong></td><td>' + escape(subject.subject_title) + '</td><td class="number-cell">' + displayUnits(subject.units) + '</td><td>' + escape(subject.placement_type) + '</td></tr>';
+                }).join('');
+                return '<section class="export-semester"><h4>' + escape(semester.semester) + '</h4><div class="export-table-scroll"><table class="export-report-table"><thead><tr><th>Subject Code</th><th>Subject Title</th><th>Units</th><th>Type / Placement</th></tr></thead><tbody>' + rows + '</tbody></table></div><p class="export-subtotal">Semester Units: <strong>' + displayUnits(semester.total_units) + '</strong></p></section>';
+            }).join('');
+            return '<section class="export-year"><h3>' + escape(year.year_level) + '</h3>' + semesterMarkup + '<p class="export-year-total">Year Total Units: <strong>' + displayUnits(year.total_units) + '</strong></p></section>';
+        }).join('');
+
+        preview.innerHTML = '<article class="export-report"><header class="export-document-header"><p>' + escape(context.program_name).toUpperCase() + '</p><h2>Curriculum Structure</h2><div>' + escape(context.curriculum_code) + ' · ' + escape(context.version_label) + '</div><h3>' + escape(context.curriculum_name) + '</h3><p class="export-print-summary">Export scope: ' + escape(data.scope.label) + '</p></header>' + yearMarkup + '<footer class="export-document-footer"><strong>Total Subjects: ' + count + '</strong><strong>Total Units: ' + displayUnits(data.summary.total_units) + '</strong><p>' + escape(data.disclaimer) + '</p><small>Generated from CSMS · ' + escape(data.generated_at) + '</small></footer></article>';
     }
 
-    async function previewReport() {
-        previewButton.disabled = true;
-        status.textContent = 'Loading report preview…';
+    async function generatePreview() {
+        if (!ready()) return;
+        const currentRequest = ++requestId;
+        setActionsEnabled(false);
+        clearPreview('Loading stored curriculum data...');
+        status.textContent = 'Loading curriculum preview from stored records…';
         try {
-            const payload = await ui.fetchJson(endpoint, Object.assign({ action: 'preview' }, exportParameters()));
-            renderReport(payload);
-            status.textContent = 'Preview generated from current stored data.';
+            const payload = await ui.fetchJson(endpoint, Object.assign({ action: 'preview' }, params()));
+            if (currentRequest !== requestId) return;
+            dataset = payload;
+            renderReport(dataset);
+            status.textContent = 'Preview generated from current stored curriculum data.';
         } catch (error) {
+            if (currentRequest !== requestId) return;
+            clearPreview('The curriculum preview could not be generated.');
             ui.showToast(error.message, 'error');
             status.textContent = 'The preview could not be generated.';
         } finally {
-            previewButton.disabled = !version.value;
+            if (currentRequest === requestId) setActionsEnabled(ready());
         }
     }
 
     function filenameFromHeader(header) {
+        const encoded = /filename\*=UTF-8''([^;]+)/i.exec(header || '');
+        if (encoded) return decodeURIComponent(encoded[1]).replace(/[^A-Za-z0-9._-]/g, '_');
         const match = /filename="?([^";]+)"?/i.exec(header || '');
         return match ? match[1].replace(/[^A-Za-z0-9._-]/g, '_') : 'curriculum_export.csv';
     }
 
     async function downloadCsv() {
+        if (!ready() || !dataset || Number(dataset.summary.total_subjects) === 0) return;
         csvButton.disabled = true;
-        status.textContent = 'Generating CSV…';
+        status.textContent = 'Generating CSV from stored curriculum data…';
         const form = new FormData();
-        Object.entries(Object.assign({ action: 'download_csv' }, exportParameters())).forEach(function ([key, item]) {
-            form.set(key, item);
-        });
+        form.set('action', 'download_csv');
+        Object.entries(params()).forEach(([key, value]) => form.set(key, value));
         form.set('_csrf_token', document.querySelector('meta[name="csrf-token"]')?.content || '');
         try {
             const response = await fetch(endpoint, { method: 'POST', body: form, credentials: 'same-origin' });
             if (!response.ok) {
                 let message = 'The CSV could not be generated.';
-                try { message = (await response.json()).message || message; } catch (error) { /* generic fallback */ }
+                try { message = (await response.json()).message || message; } catch (error) { /* keep generic message */ }
                 throw new Error(message);
             }
             const blob = await response.blob();
+            if (blob.size === 0 || !/^text\/csv\b/i.test(response.headers.get('Content-Type') || '')) throw new Error('The server returned an invalid CSV response.');
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
@@ -253,36 +195,83 @@
             link.click();
             link.remove();
             URL.revokeObjectURL(url);
-            status.textContent = 'CSV generated from current stored data.';
-            ui.showToast('Curriculum CSV generated.', 'success');
+            status.textContent = 'CSV generated from current stored curriculum data.';
+            ui.showToast('Curriculum CSV downloaded.', 'success');
         } catch (error) {
-            status.textContent = 'The CSV could not be generated.';
             ui.showToast(error.message, 'error');
-        } finally {
-            csvButton.disabled = !version.value;
-        }
+            status.textContent = 'The CSV could not be generated.';
+        } finally { setActionsEnabled(ready()); }
     }
 
     function openPrintView() {
+        if (!ready() || !dataset || Number(dataset.summary.total_subjects) === 0) return;
         const url = new URL(printPage, window.location.href);
-        Object.entries(exportParameters()).forEach(function ([key, item]) { url.searchParams.set(key, item); });
-        const printWindow = window.open(url.toString(), '_blank', 'noopener');
+        Object.entries(params()).forEach(([key, value]) => url.searchParams.set(key, value));
+        const printWindow = window.open(url.toString(), '_blank');
         if (!printWindow) ui.showToast('Allow pop-ups to open the print view.', 'warning');
     }
 
-    programInput.addEventListener('input', function () { setActionsEnabled(false); });
-    curriculumInput.addEventListener('input', function () { setActionsEnabled(false); });
-    versionInput.addEventListener('input', function () { setActionsEnabled(false); });
-    Object.values(optionInputs).forEach(function (input) {
-        input.addEventListener('change', function () {
-            if (version.value) status.textContent = 'Report options changed. Preview again to refresh the report.';
-        });
+    const cascade = ui.createCascadingAutocomplete({
+        levels: [
+            {
+                input: inputs[0], valueInput: values[0], list: document.getElementById(listIds[0]),
+                helpText: 'Choose a program or strand.', selectedText: 'Program selected.', loadingText: 'Searching programs…', noResultsText: 'No matching programs found.', placeholder: 'Search code or program name', minimumLength: 0, showSuggestionsOnFocus: true,
+                search: async query => (await ui.fetchJson(endpoint, { action: 'program_options', search: query, page: 1, per_page: 20 })).programs,
+                getId: item => item.id, format: item => ({ label: item.program_code + ' — ' + item.program_name, code: item.program_code, title: item.program_name, meta: item.program_type || '' })
+            },
+            {
+                input: inputs[1], valueInput: values[1], list: document.getElementById(listIds[1]),
+                helpText: 'Choose a curriculum for this program.', selectedText: 'Curriculum selected.', loadingText: 'Searching curricula…', noResultsText: 'No curricula found for this program.', placeholder: 'Search curriculum code or name', disabledPlaceholder: 'Select a program first', minimumLength: 0, showSuggestionsOnEnable: true,
+                search: async query => (await ui.fetchJson(endpoint, { action: 'curriculum_options', academic_program_id: values[0].value, search: query, page: 1, per_page: 20 })).curricula,
+                getId: item => item.id, format: item => ({ label: item.curriculum_code + ' — ' + item.curriculum_name, code: item.curriculum_code, title: item.curriculum_name })
+            },
+            {
+                input: inputs[2], valueInput: values[2], list: document.getElementById(listIds[2]),
+                helpText: 'Choose a curriculum version.', selectedText: 'Curriculum version selected.', loadingText: 'Searching versions…', noResultsText: 'No curriculum versions found.', placeholder: 'Search version label or academic year', disabledPlaceholder: 'Select a curriculum first', minimumLength: 0, showSuggestionsOnEnable: true,
+                search: async query => (await ui.fetchJson(endpoint, { action: 'version_options', curriculum_id: values[1].value, search: query, page: 1, per_page: 20 })).versions,
+                getId: item => item.id, format: item => ({ label: item.version_label + (item.effective_academic_year ? ' — ' + item.effective_academic_year : ''), code: item.version_label, title: item.effective_academic_year || '' })
+            }
+        ],
+        onChange: function (index, item, id, action) {
+            selections[index] = action === 'select' ? item : null;
+            for (let child = index + 1; child < selections.length; child++) selections[child] = null;
+            ++requestId;
+            setActionsEnabled(false);
+            clearPreview('Select a Program / Strand, Curriculum, and Curriculum Version to preview an export.');
+            status.textContent = 'Select a curriculum version to preview its stored data.';
+            if (index < 2 || action !== 'select') {
+                ++scopeRequestId;
+                yearSelect.value = '';
+                semesterSelect.value = '';
+                setSelectOptions(yearSelect, [], 'All Year Levels');
+                setSelectOptions(semesterSelect, [], 'All Semesters / Terms');
+                yearSelect.disabled = true;
+                semesterSelect.disabled = true;
+                updateScopeSummary();
+            }
+            if (index === 2 && action === 'select') loadScopeOptions(true);
+        }
     });
-    previewButton.addEventListener('click', previewReport);
+
+    document.querySelectorAll('[data-export-tab]').forEach(tab => tab.addEventListener('click', () => activateTab(tab.dataset.exportTab)));
+    yearSelect.addEventListener('change', function () {
+        semesterSelect.value = '';
+        updateScopeSummary();
+        loadScopeOptions(false);
+    });
+    semesterSelect.addEventListener('change', function () {
+        updateScopeSummary();
+        generatePreview();
+    });
+    previewButton.addEventListener('click', generatePreview);
     csvButton.addEventListener('click', downloadCsv);
     printButton.addEventListener('click', openPrintView);
-
+    inputs.forEach(input => input.addEventListener('input', function () {
+        ++requestId;
+        dataset = null;
+        setActionsEnabled(false);
+        clearPreview('The selected context changed. Complete the selection again to generate the current curriculum.');
+    }));
+    updateScopeSummary();
     setActionsEnabled(false);
-    curriculumInput.disabled = true;
-    versionInput.disabled = true;
 }());

@@ -65,4 +65,37 @@ class CurriculumVersionService
         }
         return $this->get($id);
     }
+
+    public function rename(int $id, array $input, int $actorId): array
+    {
+        $label = DomainValidator::requiredString($input, 'version_label', 'Version label', 100);
+        $this->db->begin_transaction();
+        try {
+            $existing = $this->versions->findById($id);
+            if (!$existing) {
+                throw new DomainNotFoundException('Curriculum version not found.');
+            }
+            if ($this->versions->labelExists((int)$existing['curriculum_id'], $label, $id)) {
+                throw new DomainConflictException('Version label already exists for this curriculum.');
+            }
+            $this->versions->rename($id, $label);
+            audit_log_required(
+                'CURRICULUM_VERSION_RENAME',
+                'curriculum_version',
+                $id,
+                'Curriculum version label updated.',
+                [
+                    'curriculum_id' => (int)$existing['curriculum_id'],
+                    'old_version_label' => $existing['version_label'],
+                    'version_label' => $label,
+                    'actor_id' => $actorId,
+                ]
+            );
+            $this->db->commit();
+        } catch (Throwable $error) {
+            $this->db->rollback();
+            throw $error;
+        }
+        return $this->get($id);
+    }
 }

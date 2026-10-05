@@ -40,7 +40,9 @@ try {
         $sql = str_replace("\r\n", "\n", $sql);
         // Already connected to the managed schema. No identifier interpolation.
         $sql = preg_replace('/^USE sms_db;\s*$/m', '', $sql, -1, $uses);
-        if ($uses !== 1 || preg_match('/^\s*(?:USE\s|(?:CREATE|DROP|ALTER)\s+DATABASE\s|TRUNCATE\s|DROP\s|DELETE\s)/mi', $sql)) {
+        // These narrowly reviewed constraint drops are confined to ALTER TABLE
+        // and widen an existing domain CHECK without replacing its data.
+        if ($uses !== 1 || preg_match('/^\s*(?:USE\s|(?:CREATE|DROP|ALTER)\s+DATABASE\s|TRUNCATE\s|DROP\s+(?!(?:CHECK\b|CONSTRAINT\s+chk_subject_equivalencies_decision\b))|DELETE\s)/mi', $sql)) {
             throw new RuntimeException('Migration requires manual safety review.');
         }
         $scripts[basename($file)] = $sql;

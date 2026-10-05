@@ -1,63 +1,53 @@
 <?php
-
 require_once __DIR__ . '/support.php';
-require_once __DIR__ . '/../services/AcademicProgramAssignmentService.php';
-
+require_once __DIR__ . '/../validators/DomainValidator.php';
+require_once __DIR__ . '/../services/ProgramSubjectAssignmentService.php';
+$service = new ProgramSubjectAssignmentService($conn);
 $action = curriculum_http_action();
-$service = new AcademicProgramAssignmentService($conn);
-
 try {
     switch ($action) {
+        case 'search':
+            curriculum_require_read('program_assignment.view');
+            $type = is_string($_GET['type'] ?? null) ? $_GET['type'] : '';
+            $query = is_string($_GET['search'] ?? null) ? trim($_GET['search']) : '';
+            if (mb_strlen($query) > 100) throw new DomainValidationException('Search must be 100 characters or fewer.');
+            $contextType = is_string($_GET['context_type'] ?? null) ? $_GET['context_type'] : '';
+            $contextId = $contextType === '' ? 0 : DomainValidator::positiveId($_GET['context_id'] ?? null, ucfirst($contextType));
+            json_response(true, 'Matching records loaded.', ['records' => $service->search($type, $query, $contextType, $contextId, ($_GET['available'] ?? '') === '1')]);
+        case 'context':
+            curriculum_require_read('program_assignment.view');
+            $type = is_string($_GET['type'] ?? null) ? $_GET['type'] : '';
+            $id = DomainValidator::positiveId($_GET['id'] ?? null, ucfirst($type));
+            json_response(true, 'Assignment context loaded.', ['record' => $service->context($type, $id)]);
         case 'list':
             curriculum_require_read('program_assignment.view');
-            json_response(true, 'Academic program subject assignments loaded.', $service->listAssignments($_GET));
-
-        case 'program_options':
+            $type = is_string($_GET['type'] ?? null) ? $_GET['type'] : '';
+            $id = DomainValidator::positiveId($_GET['id'] ?? null, ucfirst($type));
+            json_response(true, 'Assignments loaded.', $service->list($id, $type, $_GET));
+        case 'details':
             curriculum_require_read('program_assignment.view');
-            json_response(true, 'Academic programs loaded.', $service->listPrograms($_GET));
-
-        case 'curriculum_options':
+            $id = DomainValidator::positiveId($_GET['id'] ?? null, 'Subject assignment');
+            json_response(true, 'Assignment details loaded.', ['assignment' => $service->details($id)]);
+        case 'review':
             curriculum_require_read('program_assignment.view');
-            $programId = DomainValidator::positiveId(
-                $_GET['academic_program_id'] ?? null,
-                'Academic program'
-            );
-            json_response(true, 'Curricula loaded.', $service->listCurricula($programId, $_GET));
-
-        case 'version_options':
-            curriculum_require_read('program_assignment.view');
-            $curriculumId = DomainValidator::positiveId($_GET['curriculum_id'] ?? null, 'Curriculum');
-            json_response(true, 'Curriculum versions loaded.', $service->listVersions($curriculumId, $_GET));
-
-        case 'subject_options':
-            curriculum_require_read('program_assignment.manage');
-            $versionId = DomainValidator::positiveId(
-                $_GET['curriculum_version_id'] ?? null,
-                'Curriculum version'
-            );
-            json_response(
-                true,
-                'Available Subject Master records loaded.',
-                $service->availableSubjects($versionId, $_GET)
-            );
-
+            $type = is_string($_GET['type'] ?? null) ? $_GET['type'] : '';
+            $id = DomainValidator::positiveId($_GET['id'] ?? null, ucfirst($type));
+            json_response(true, 'Deterministic assignment review facts loaded.', ['facts' => $service->reviewFacts($type, $id)]);
         case 'assign':
             curriculum_require_mutation('program_assignment.manage');
-            $assignment = $service->assign($_POST, curriculum_actor_id());
-            json_response(true, 'Subject assigned to curriculum version.', ['assignment' => $assignment], 201);
-
-        case 'update':
-            curriculum_require_mutation('program_assignment.manage');
-            $id = DomainValidator::positiveId($_POST['id'] ?? null, 'Subject assignment');
-            $assignment = $service->update($id, $_POST);
-            json_response(true, 'Subject assignment updated.', ['assignment' => $assignment]);
-
+            $type = is_string($_POST['view'] ?? null) ? $_POST['view'] : '';
+            $contextId = DomainValidator::positiveId($_POST['context_id'] ?? null, ucfirst($type));
+            $raw = $_POST['record_ids'] ?? null;
+            $ids = is_string($raw) ? json_decode($raw, true) : null;
+            if (!is_array($ids) || array_values($ids) !== $ids) throw new DomainValidationException('Select one or more valid records.');
+            $result = $service->assign($type, $contextId, $ids, curriculum_actor_id());
+            $label = $type === 'program' ? $result['context']['program_code'] : $result['context']['subject_code'];
+            json_response(true, $result['count'] . ' subject assignment' . ($result['count'] === 1 ? '' : 's') . ' saved for ' . $label . '.', ['count' => $result['count']], 201);
         case 'remove':
             curriculum_require_mutation('program_assignment.manage');
             $id = DomainValidator::positiveId($_POST['id'] ?? null, 'Subject assignment');
             $service->remove($id);
-            json_response(true, 'Subject assignment removed from curriculum version.');
-
+            json_response(true, 'Subject assignment archived.');
         default:
             json_response(false, 'Unknown action.', [], 400);
     }

@@ -47,6 +47,9 @@ class SubjectEquivalencyService
         if (!$subjectA || !$subjectB) {
             throw new DomainNotFoundException('One or both Subject Master records were not found.');
         }
+        if (($subjectA['archived_at'] ?? null) !== null || ($subjectB['archived_at'] ?? null) !== null) {
+            throw new DomainValidationException('Archived subjects cannot be compared in the current workspace.');
+        }
         [$lowerId, $higherId] = $this->canonicalPair(
             $pair['subject_a_id'],
             $pair['subject_b_id']
@@ -75,12 +78,16 @@ class SubjectEquivalencyService
             'subject_id' => $subjectId,
             'equivalent_subject_id' => $equivalentSubjectId,
         ];
-        $isFinal = $review['decision_status'] !== 'pending';
+        $isFinal = true;
         $this->db->begin_transaction();
         try {
-            if (!$this->subjects->findById($subjectId)
-                || !$this->subjects->findById($equivalentSubjectId)) {
+            $subjectA = $this->subjects->findById($subjectId);
+            $subjectB = $this->subjects->findById($equivalentSubjectId);
+            if (!$subjectA || !$subjectB) {
                 throw new DomainNotFoundException('One or both Subject Master records were not found.');
+            }
+            if (($subjectA['archived_at'] ?? null) !== null || ($subjectB['archived_at'] ?? null) !== null) {
+                throw new DomainValidationException('Archived subjects cannot receive a current equivalency decision.');
             }
             if ($this->equivalencies->findByPair($subjectId, $equivalentSubjectId)) {
                 throw new DomainConflictException(
@@ -124,12 +131,15 @@ class SubjectEquivalencyService
     public function update(int $id, array $input, int $actorId): array
     {
         $review = DomainValidator::subjectEquivalencyReview($input);
-        $isFinal = $review['decision_status'] !== 'pending';
+        $isFinal = true;
         $this->db->begin_transaction();
         try {
             $existing = $this->equivalencies->findByIdForUpdate($id);
             if (!$existing) {
                 throw new DomainNotFoundException('Subject equivalency record not found.');
+            }
+            if (($existing['archived_at'] ?? null) !== null) {
+                throw new DomainConflictException('Archived equivalency records cannot be edited.');
             }
             $this->equivalencies->update(
                 $id,
@@ -158,6 +168,26 @@ class SubjectEquivalencyService
             throw $error;
         }
         return $record;
+    }
+
+    public function archive(int $id, int $actorId): void
+    {
+        $this->db->begin_transaction();
+        try {
+            $existing = $this->equivalencies->findByIdForUpdate($id);
+            if (!$existing) throw new DomainNotFoundException('Subject equivalency record not found.');
+            $this->equivalencies->archive($id, $actorId);
+            audit_log_required(
+                'SUBJECT_EQUIVALENCY_ARCHIVE', 'subject_equivalency', $id,
+                'Human-reviewed subject equivalency record archived.',
+                ['subject_id' => (int)$existing['subject_id'],
+                 'equivalent_subject_id' => (int)$existing['equivalent_subject_id']]
+            );
+            $this->db->commit();
+        } catch (Throwable $error) {
+            $this->db->rollback();
+            throw $error;
+        }
     }
 
     private function canonicalPair(int $subjectAId, int $subjectBId): array

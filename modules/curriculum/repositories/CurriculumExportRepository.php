@@ -114,7 +114,8 @@ class CurriculumExportRepository
         $stmt = RepositoryQuery::execute(
             $this->db,
             'SELECT groups.id AS elective_group_id, groups.group_name,
-                    groups.description, memberships.id AS membership_id,
+                    groups.required_selections, groups.description,
+                    memberships.id AS membership_id,
                     subjects.id AS subject_id, subjects.subject_code,
                     subjects.subject_title
              FROM curriculum_elective_groups AS groups
@@ -122,6 +123,7 @@ class CurriculumExportRepository
                 ON memberships.elective_group_id = groups.id
              LEFT JOIN subjects ON subjects.id = memberships.subject_id
              WHERE groups.curriculum_version_id = ?
+               AND groups.status = \'active\'
              ORDER BY groups.group_name ASC, groups.id ASC,
                       subjects.subject_code ASC, memberships.id ASC',
             'i',

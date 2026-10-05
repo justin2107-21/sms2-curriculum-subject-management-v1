@@ -13,16 +13,22 @@ try {
             curriculum_require_read('subject_history.view');
             json_response(true, 'Stored subject history loaded.', $service->listHistory($_GET));
 
+        case 'subject_options':
+            curriculum_require_read('subject_history.view');
+            json_response(true, 'Subjects loaded.', $service->listSubjects($_GET));
+
+        case 'details':
+            curriculum_require_read('subject_history.view');
+            $placementId = DomainValidator::positiveId($_GET['placement_id'] ?? null, 'Stored placement');
+            json_response(true, 'Stored placement details loaded.', $service->historyDetails($placementId));
+
         case 'program_options':
             curriculum_require_read('subject_history.view');
             json_response(true, 'Academic programs loaded.', $service->listPrograms($_GET));
 
         case 'curriculum_options':
             curriculum_require_read('subject_history.view');
-            $programId = DomainValidator::positiveId(
-                $_GET['academic_program_id'] ?? null,
-                'Academic program'
-            );
+            $programId = DomainValidator::optionalPositiveId($_GET['academic_program_id'] ?? null, 'Academic program');
             json_response(true, 'Curricula loaded.', $service->listCurricula($programId, $_GET));
 
         case 'version_options':

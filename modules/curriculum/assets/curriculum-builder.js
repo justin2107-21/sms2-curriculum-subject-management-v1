@@ -59,6 +59,7 @@
         pageProgram: null,
     };
 
+    window.CSMSPageCIMFContext = () => ({academic_program_id:state.selectedCurriculum?.academic_program_id || state.pageProgram?.id || state.viewingProgram?.id || '',curriculum_id:state.selectedCurriculumId || '',curriculum_version_id:state.selectedVersionId || ''});
     const programRows = document.getElementById('programRows');
     const curriculumProgramRows = document.getElementById('curriculumProgramRows');
     const programCurriculaCards = document.getElementById('programCurriculaCards');
@@ -69,6 +70,7 @@
     const programForm = document.getElementById('programForm');
     const curriculumForm = document.getElementById('curriculumForm');
     const versionForm = document.getElementById('versionForm');
+    const versionRenameForm = document.getElementById('versionRenameForm');
     const assignmentForm = document.getElementById('assignmentForm');
     const programModal = ui.createModal(document.getElementById('programModal'));
     const programDetailsModal = ui.createModal(document.getElementById('programDetailsModal'));
@@ -78,6 +80,7 @@
     const curriculumArchiveModal = ui.createModal(document.getElementById('curriculumArchiveModal'));
     const versionWorkspace = document.getElementById('versionWorkspace');
     const versionModal = ui.createModal(document.getElementById('versionModal'));
+    const versionRenameModal = ui.createModal(document.getElementById('versionRenameModal'));
     const assignmentModal = ui.createModal(document.getElementById('assignmentModal'));
     const removalElement = document.getElementById('removeAssignmentModal');
     const removalModal = ui.createModal(removalElement);
@@ -849,7 +852,10 @@
                         : 'Summary unavailable';
                     return '<article class="version-card"><div><strong class="record-code">' + ui.escapeHtml(version.version_label) +
                         '</strong><p class="version-card-summary">' + ui.escapeHtml(summaryText) + '</p></div><div class="version-card-actions">' +
-                        ui.statusBadge(version.status) + '<a class="view-button" data-version-id="' +
+                        ui.statusBadge(version.status) + (permissions.updateCurricula
+                            ? '<button type="button" class="view-button" data-rename-version-id="' + Number(version.id) +
+                                '" data-version-label="' + ui.escapeHtml(version.version_label) + '"><i class="fa-solid fa-pen" aria-hidden="true"></i> Edit</button>'
+                            : '') + '<a class="view-button" data-version-id="' +
                         Number(version.id) + '" data-version-label="' + ui.escapeHtml(version.version_label) +
                         '" data-version-status="' + ui.escapeHtml(version.status) + '" href="curricula.php?program_id=' +
                         Number(state.selectedCurriculum.academic_program_id) + '&amp;curriculum_id=' + Number(curriculumId) +
@@ -1215,6 +1221,27 @@
         });
     }
 
+    if (versionRenameForm) {
+        versionRenameForm.addEventListener('submit', async function (event) {
+            event.preventDefault();
+            if (!versionRenameForm.reportValidity()) return;
+            ui.clearFormError(versionRenameForm);
+            const formData = new FormData(versionRenameForm);
+            formData.set('action', 'rename');
+            ui.setFormSubmitting(versionRenameForm, true, 'Saving…');
+            try {
+                const payload = await ui.postForm(endpoints.versions, formData);
+                versionRenameModal.close();
+                ui.showToast(payload.message, 'updated');
+                await loadVersions(state.versionPage);
+            } catch (error) {
+                ui.showFormError(versionRenameForm, error.message || 'The curriculum version could not be renamed.');
+            } finally {
+                ui.setFormSubmitting(versionRenameForm, false);
+            }
+        });
+    }
+
     if (assignmentForm) {
         assignmentForm.addEventListener('submit', async function (event) {
             event.preventDefault();
@@ -1279,6 +1306,14 @@
     document.getElementById('programTypeOther')?.addEventListener('input', syncProgramDegreeLevel);
     document.getElementById('newCurriculumButton')?.addEventListener('click', openCreateCurriculum);
     document.getElementById('newVersionButton')?.addEventListener('click', openCreateVersion);
+    versionRows?.addEventListener('click', async function (event) {
+        const button = event.target.closest?.('[data-rename-version-id]');
+        if (!button || !permissions.updateCurricula) return;
+        versionRenameForm.elements.id.value = button.dataset.renameVersionId;
+        versionRenameForm.elements.version_label.value = button.dataset.versionLabel || '';
+        ui.clearFormError(versionRenameForm);
+        versionRenameModal.open();
+    });
     document.getElementById('assignSubjectButton')?.addEventListener('click', function () {
         if (!state.selectedVersionId || !state.selectedCurriculum) return;
         window.location.href = 'subject_mapping.php?' + new URLSearchParams({

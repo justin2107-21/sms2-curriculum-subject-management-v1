@@ -20,6 +20,10 @@
         subjectBSearch: document.getElementById('subjectBSearch'),
         subjectBSelect: document.getElementById('subjectBSelect'),
         compareButton: document.getElementById('compareSubjectsButton'),
+        headerRecordDecision: document.getElementById('headerRecordDecision'),
+        reviewWithCimf: document.getElementById('reviewWithCimf'),
+        summary: document.getElementById('equivalencySummary'),
+        existingPairMessage: document.getElementById('existingPairMessage'),
         clearComparison: document.getElementById('clearSubjectComparison'),
         comparisonMessage: document.getElementById('comparisonMessage'),
         comparisonRows: document.getElementById('comparisonRows'),
@@ -29,7 +33,6 @@
         subjectBUsageTitle: document.getElementById('subjectBUsageTitle'),
         subjectAUsage: document.getElementById('subjectAUsage'),
         subjectBUsage: document.getElementById('subjectBUsage'),
-        reviewPair: document.getElementById('reviewPairButton'),
         recordSearch: document.getElementById('equivalencySearch'),
         recordStatus: document.getElementById('equivalencyStatus'),
         recordPerPage: document.getElementById('equivalencyPerPage'),
@@ -41,6 +44,11 @@
     const isComparisonView = Boolean(elements.comparisonPanel);
     const reviewForm = document.getElementById('equivalencyReviewForm');
     const reviewModal = ui.createModal(document.getElementById('equivalencyReviewModal'));
+    const detailsModal = ui.createModal(document.getElementById('equivalencyDetailsModal'));
+    const archiveModal = ui.createModal(document.getElementById('equivalencyArchiveModal'));
+    window.CSMSPageCIMFContext = () => ({subject_a_id:state.comparison?.subject_a.id || elements.subjectASelect?.value || '',subject_b_id:state.comparison?.subject_b.id || elements.subjectBSelect?.value || ''});
+    window.CSMSPageCIMFStoredDecision = () => state.comparison?.existing_equivalency || null;
+    let archiveRecordId = null;
     let subjectAAutocomplete;
     let subjectBAutocomplete;
     function autocompleteOptions(side) {
@@ -80,7 +88,7 @@
     subjectBAutocomplete = ui.createAutocomplete(autocompleteOptions('b'));
 
     function subjectLabel(subject) {
-        return String(subject.subject_code || '') + ' - ' + String(subject.subject_title || '');
+        return String(subject.subject_code || '') + ' — ' + String(subject.subject_title || '');
     }
 
     function setTableMessage(rows, columns, message, isError) {
@@ -97,6 +105,9 @@
         const subjectAId = subjectAAutocomplete?.getSelectedId();
         const subjectBId = subjectBAutocomplete?.getSelectedId();
         elements.compareButton.disabled = !(subjectAId && subjectBId && subjectAId !== subjectBId);
+        if (elements.headerRecordDecision) elements.headerRecordDecision.disabled = elements.compareButton.disabled ||
+            !state.comparison || Boolean(state.comparison.existing_equivalency?.archived_at);
+        if (elements.reviewWithCimf) elements.reviewWithCimf.disabled = elements.compareButton.disabled || !state.comparison;
     }
 
     function clearRenderedComparison(message) {
@@ -109,7 +120,10 @@
         renderUsage(elements.subjectBUsage, null);
         elements.subjectAUsageTitle.textContent = 'Subject A Usage';
         elements.subjectBUsageTitle.textContent = 'Subject B Usage';
-        if (elements.reviewPair) elements.reviewPair.hidden = true;
+        if (elements.summary) elements.summary.hidden = true;
+        if (elements.existingPairMessage) elements.existingPairMessage.hidden = true;
+        if (elements.headerRecordDecision) elements.headerRecordDecision.disabled = true;
+        if (elements.reviewWithCimf) elements.reviewWithCimf.disabled = true;
     }
 
     function displayValue(field, value) {
@@ -118,12 +132,13 @@
         return String(value);
     }
 
-    function resultBadge(result) {
+    function resultBadge(result, field) {
         const labels = { same: ['fa-check', 'Same'], different: ['fa-not-equal', 'Different'],
             not_available: ['fa-minus', 'Not Available'] };
         const safe = Object.prototype.hasOwnProperty.call(labels, result) ? result : 'not_available';
+        const label = safe === 'same' && field === 'units' ? 'Same Unit Value' : labels[safe][1];
         return '<span class="equivalency-result-badge equivalency-result-' + safe.replaceAll('_', '-') +
-            '"><i class="fa-solid ' + labels[safe][0] + '"></i> ' + labels[safe][1] + '</span>';
+            '"><i class="fa-solid ' + labels[safe][0] + '"></i> ' + label + '</span>';
     }
 
     function renderUsage(container, usage) {
@@ -137,6 +152,13 @@
             '</strong><span>Programs</span></div><div><strong>' + Number(summary.curricula || 0) +
             '</strong><span>Curricula</span></div><div><strong>' + Number(summary.curriculum_versions || 0) +
             '</strong><span>Versions</span></div></div>';
+        const assignments = usage.program_assignments || [];
+        if (assignments.length) {
+            markup += '<p class="equivalency-usage-programs"><strong>Programs:</strong> ' +
+                assignments.map(function (program) {
+                    return ui.escapeHtml(program.program_code) + ' — ' + ui.escapeHtml(program.program_name);
+                }).join('; ') + '</p>';
+        }
         const records = usage.records || [];
         if (!records.length) {
             markup += '<p class="equivalency-empty-context equivalency-usage-empty">No stored curriculum placements found.</p>';
@@ -144,7 +166,9 @@
             markup += '<ul class="equivalency-usage-list">' + records.map(function (record) {
                 return '<li><strong>' + ui.escapeHtml(record.program_code) + '</strong> / ' +
                     ui.escapeHtml(record.curriculum_code) + ' / ' + ui.escapeHtml(record.version_label) +
-                    ' <span>(' + ui.escapeHtml(record.version_status) + ')</span></li>';
+                    ' <span>· ' + ui.escapeHtml(record.year_level || 'Year not recorded') + ' · ' +
+                    ui.escapeHtml(record.semester || 'Semester not recorded') + ' · ' +
+                    ui.escapeHtml(record.version_status) + '</span></li>';
             }).join('') + '</ul>';
         }
         container.innerHTML = markup;
@@ -154,6 +178,13 @@
         state.comparison = payload;
         const subjectA = payload.subject_a;
         const subjectB = payload.subject_b;
+        elements.summary.hidden = false;
+        [['A', subjectA], ['B', subjectB]].forEach(function ([side, subject]) {
+            document.getElementById('summary' + side + 'Code').textContent = subject.subject_code;
+            document.getElementById('summary' + side + 'Title').textContent = subject.subject_title;
+            document.getElementById('summary' + side + 'Units').textContent = displayValue('units', subject.units) + ' Units';
+            document.getElementById('summary' + side + 'Status').textContent = subject.status || 'Not Available';
+        });
         elements.subjectAHeader.textContent = subjectA.subject_code;
         elements.subjectBHeader.textContent = subjectB.subject_code;
         elements.comparisonMessage.textContent = subjectLabel(subjectA) + ' compared with ' + subjectLabel(subjectB) + '.';
@@ -164,17 +195,28 @@
                 ui.escapeHtml(displayValue(difference.field, difference.subject_a)) +
                 '</span></td><td><span class="equivalency-field-value' + wide + '">' +
                 ui.escapeHtml(displayValue(difference.field, difference.subject_b)) +
-                '</span></td><td>' + resultBadge(difference.result) + '</td></tr>';
+                '</span></td><td>' + resultBadge(difference.result, difference.field) + '</td></tr>';
         }).join('');
         elements.subjectAUsageTitle.textContent = subjectA.subject_code + ' Usage';
         elements.subjectBUsageTitle.textContent = subjectB.subject_code + ' Usage';
         renderUsage(elements.subjectAUsage, payload.usage?.subject_a);
         renderUsage(elements.subjectBUsage, payload.usage?.subject_b);
-        if (elements.reviewPair) {
-            elements.reviewPair.hidden = false;
-            elements.reviewPair.innerHTML = payload.existing_equivalency
-                ? '<i class="fa-solid fa-pen-to-square"></i> Edit Review Decision'
-                : '<i class="fa-solid fa-clipboard-check"></i> Create Review Record';
+        if (elements.headerRecordDecision) {
+            elements.headerRecordDecision.disabled = Boolean(payload.existing_equivalency?.archived_at);
+            elements.headerRecordDecision.title = payload.existing_equivalency?.archived_at
+                ? 'This subject pair has an archived equivalency record.' : '';
+        }
+        if (elements.reviewWithCimf) elements.reviewWithCimf.disabled = false;
+        if (elements.existingPairMessage) {
+            const existing = payload.existing_equivalency;
+            elements.existingPairMessage.hidden = !existing;
+            const view = document.getElementById('viewExistingEquivalency');
+            const edit = document.getElementById('editExistingEquivalency');
+            if (view) view.onclick = function () { showDetails(existing); };
+            if (edit) {
+                edit.hidden = Boolean(existing?.archived_at);
+                edit.onclick = function () { if (!existing?.archived_at) openReview(existing); };
+            }
         }
     }
 
@@ -211,13 +253,13 @@
     }
 
     function decisionLabel(status) {
-        return { pending: 'Pending', equivalent: 'Equivalent',
-            not_equivalent: 'Not Equivalent' }[status] || 'Pending';
+        return { pending: 'Decision Required', equivalent: 'Equivalent', not_equivalent: 'Not Equivalent',
+            needs_review: 'Needs Further Review' }[status] || 'Needs Further Review';
     }
 
     function decisionBadge(status) {
-        const safe = ['pending', 'equivalent', 'not_equivalent'].includes(status)
-            ? status : 'pending';
+        const safe = ['equivalent', 'not_equivalent', 'needs_review'].includes(status)
+            ? status : 'needs_review';
         return '<span class="equivalency-decision-badge equivalency-decision-' +
             safe.replaceAll('_', '-') + '">' + ui.escapeHtml(decisionLabel(safe)) + '</span>';
     }
@@ -238,16 +280,13 @@
     }
 
     function recordRow(record) {
-        const action = canManage
-            ? '<td><div class="equivalency-action-group"><button type="button" class="row-action-button" data-edit-equivalency="' +
-                Number(record.id) + '"><i class="fa-solid fa-pen"></i> Edit Decision</button></div></td>'
-            : '';
+        const action = '<td><div class="equivalency-action-group"><button type="button" class="row-action-button" data-view-equivalency="' + Number(record.id) + '">View</button>' +
+            (canManage ? '<button type="button" class="row-action-button" data-edit-equivalency="' + Number(record.id) + '">Edit Decision</button><button type="button" class="row-action-button danger" data-archive-equivalency="' + Number(record.id) + '">Archive</button>' : '') + '</div></td>';
         return '<tr><td>' + subjectCell(record.subject_a_code, record.subject_a_title) +
             '</td><td>' + subjectCell(record.subject_b_code, record.subject_b_title) +
             '</td><td>' + decisionBadge(record.decision_status) +
             '</td><td><span class="equivalency-reviewer">' + ui.escapeHtml(reviewerName(record)) +
-            '</span></td><td>' + ui.escapeHtml(dateTime(record.reviewed_at)) +
-            '</td><td>' + ui.escapeHtml(dateTime(record.updated_at)) + '</td>' + action + '</tr>';
+            '</span></td><td>' + ui.escapeHtml(dateTime(record.reviewed_at)) + action + '</tr>';
     }
 
     async function loadRecords(page) {
@@ -257,7 +296,7 @@
         try {
             const payload = await ui.fetchJson(endpoint, {
                 action: 'list', page: state.recordPage,
-                per_page: elements.recordPerPage.value,
+                per_page: elements.recordPerPage?.value || 20,
                 search: elements.recordSearch.value.trim(),
                 decision_status: elements.recordStatus.value,
             });
@@ -284,9 +323,7 @@
     function setReviewRequirements() {
         if (!reviewForm) return;
         const decision = document.getElementById('equivalencyDecision').value;
-        const isFinal = decision !== 'pending';
-        document.getElementById('equivalencyRemarks').required = isFinal;
-        document.getElementById('equivalencyRemarksRequired').hidden = !isFinal;
+        document.getElementById('equivalencyRemarks').required = false;
     }
 
     function openReview(record) {
@@ -312,12 +349,11 @@
         document.getElementById('equivalencyReviewContext').textContent =
             subjectALabel + ' compared with ' + subjectBLabel;
         document.getElementById('equivalencyDecision').value =
-            current ? current.decision_status : 'pending';
+            current && current.decision_status !== 'pending' ? current.decision_status : '';
         document.getElementById('equivalencyRemarks').value = current?.remarks || '';
         document.getElementById('equivalencyReviewTitle').textContent = current
-            ? 'Edit Equivalency Decision' : 'Create Equivalency Review';
-        document.getElementById('saveEquivalencyButton').textContent = current
-            ? 'Save Decision' : 'Create Review Record';
+            ? 'Edit Equivalency Decision' : 'Record Equivalency Decision';
+        document.getElementById('saveEquivalencyButton').textContent = 'Save Decision';
         setReviewRequirements();
         reviewModal.open();
     }
@@ -343,6 +379,35 @@
         }
     }
 
+    function showDetails(record) {
+        const detail = document.getElementById('equivalencyDetails');
+        const pairs = [
+            ['Subject A', record.subject_a_code + ' — ' + record.subject_a_title],
+            ['Subject B', record.subject_b_code + ' — ' + record.subject_b_title],
+            ['Decision', decisionLabel(record.decision_status)],
+            ['Review Notes', record.remarks || '—'],
+            ['Reviewed By', reviewerName(record)],
+            ['Reviewed At', dateTime(record.reviewed_at)],
+            ['Last Updated', dateTime(record.updated_at)],
+        ];
+        detail.innerHTML = pairs.map(([label, value]) => '<div><strong>' + ui.escapeHtml(label) +
+            '</strong><p>' + ui.escapeHtml(value) + '</p></div>').join('');
+        detailsModal.open();
+    }
+
+    function reviewWithCimf() { if (state.comparison) window.CSMSCIMF?.open('review'); }
+
+    async function archiveSelected() {
+        if (!archiveRecordId) return;
+        const data = new FormData();
+        data.set('action', 'archive'); data.set('id', archiveRecordId);
+        try {
+            const payload = await ui.postForm(endpoint, data);
+            archiveModal.close(); archiveRecordId = null;
+            ui.showToast(payload.message, 'success'); await loadRecords(state.recordPage);
+        } catch (error) { ui.showToast(error.message, 'error'); }
+    }
+
     elements.subjectASearch?.addEventListener('input', synchronizeSelectors);
     elements.subjectBSearch?.addEventListener('input', synchronizeSelectors);
     elements.compareButton?.addEventListener('click', compareSubjects);
@@ -352,7 +417,8 @@
         clearRenderedComparison();
         updateCompareButton();
     });
-    elements.reviewPair?.addEventListener('click', function () { openReview(null); });
+    elements.headerRecordDecision?.addEventListener('click', function () { openReview(null); });
+    elements.reviewWithCimf?.addEventListener('click', reviewWithCimf);
 
     const reloadRecords = ui.debounce(function () { loadRecords(1); }, 300);
     elements.recordSearch?.addEventListener('input', reloadRecords);
@@ -361,15 +427,17 @@
     elements.clearFilters?.addEventListener('click', function () {
         elements.recordSearch.value = '';
         elements.recordStatus.value = '';
-        elements.recordPerPage.value = '20';
         loadRecords(1);
     });
     elements.recordRows?.addEventListener('click', function (event) {
-        const button = event.target.closest('[data-edit-equivalency]');
-        if (!button) return;
-        const record = state.records.get(Number(button.dataset.editEquivalency));
-        if (record) openReview(record);
+        const viewButton = event.target.closest('[data-view-equivalency]');
+        if (viewButton) return showDetails(state.records.get(Number(viewButton.dataset.viewEquivalency)));
+        const editButton = event.target.closest('[data-edit-equivalency]');
+        if (editButton) return openReview(state.records.get(Number(editButton.dataset.editEquivalency)));
+        const archiveButton = event.target.closest('[data-archive-equivalency]');
+        if (archiveButton) { archiveRecordId = Number(archiveButton.dataset.archiveEquivalency); archiveModal.open(); }
     });
+    document.getElementById('confirmArchiveEquivalency')?.addEventListener('click', archiveSelected);
     document.getElementById('equivalencyDecision')?.addEventListener('change', setReviewRequirements);
     reviewForm?.addEventListener('submit', submitReview);
 

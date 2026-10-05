@@ -2,11 +2,9 @@
 // Append-only audit service.
 //
 // Action names use uppercase capability-style constants such as
-// AUTH_LOGIN_SUCCESS, ACCOUNT_PROFILE_UPDATE, and STUDENT_CREATE. Future
-// curriculum actions should follow the same convention, but are intentionally
-// not active in this phase. RBAC_PERMISSION_CHANGE and RBAC_ROLE_ASSIGNMENT
-// are reserved for a future RBAC administration workflow; no such UI or event
-// producer is created here.
+// AUTH_LOGIN_SUCCESS, ACCOUNT_PROFILE_UPDATE, and STUDENT_CREATE. Curriculum
+// and administration actions use the same convention. RBAC_PERMISSION_CHANGE
+// and RBAC_ROLE_ASSIGNMENT record guarded administration and local role setup.
 //
 // audit_log() is best-effort for events such as login failure and logout. It
 // never interrupts the primary workflow, but records technical failures in the

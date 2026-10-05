@@ -55,7 +55,9 @@
     const assignmentSemester = document.getElementById('subjectAssignmentSemester');
     let selectedAssignmentProgram = null;
 
-    const assignmentCascade = ui.createCascadingAutocomplete({
+    const assignmentControlsReady = canCreate && assignmentSection && assignmentYear && assignmentSemester
+        && document.getElementById('subjectAssignmentRequired');
+    const assignmentCascade = assignmentControlsReady ? ui.createCascadingAutocomplete({
         levels: [
             {
                 input: assignmentProgramInput, valueInput: document.getElementById('subjectAssignmentProgramId'),
@@ -103,7 +105,7 @@
             }
             if (index === 2 && action === 'select') loadAssignmentValues(id);
         }
-    });
+    }) : null;
     const programAutocomplete = assignmentCascade?.get(0);
     const curriculumAutocomplete = assignmentCascade?.get(1);
     const versionAutocomplete = assignmentCascade?.get(2);
@@ -393,7 +395,7 @@
         ui.clearFormError(form);
     }
     function openCreateSubject() {
-        if (!canCreate || !form || !subjectModal) {
+        if (!canCreate || !form || !subjectModal || !assignmentCascade) {
             ui.showToast('New Subject is unavailable with your current permissions.', 'warning');
             return;
         }
@@ -519,6 +521,7 @@
         event.preventDefault();
         if (!form || savedSubjectWithoutPlacement) return;
         const creating = currentMode === 'create';
+        if (creating && !assignmentCascade) { ui.showFormError(form, 'Curriculum placement controls are unavailable. Reload the page.'); return; }
         if (creating && !programAutocomplete?.hasSelection()) { ui.showFormError(form, 'Please select a valid program or strand.'); assignmentProgramInput.focus(); return; }
         if (creating && !curriculumAutocomplete?.hasSelection()) { ui.showFormError(form, 'Please select a valid curriculum.'); assignmentCurriculumInput.focus(); return; }
         if (creating && !versionAutocomplete?.hasSelection()) { ui.showFormError(form, 'Please select a valid curriculum version.'); assignmentVersionInput.focus(); return; }

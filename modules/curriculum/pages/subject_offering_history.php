@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 $subjectHistoryView = $subjectHistoryView ?? null;
 
 if ($subjectHistoryView === null) {
@@ -27,10 +27,11 @@ if (!is_authenticated()) {
 require_permission('subject_history.view');
 
 $isSubjectHistoryView = $subjectHistoryView === 'subject';
-$viewLabel = $isSubjectHistoryView ? 'Subject History View' : 'Curriculum History View';
+$canViewSubjectMapping = current_user_id() !== null && user_can(current_user_id(), 'curriculum.view');
+$viewLabel = $isSubjectHistoryView ? 'Subject History View' : 'Curriculum Version History';
 $viewDescription = $isSubjectHistoryView
-    ? 'Review stored subject usage across academic programs, curricula, and curriculum versions.'
-    : 'Compare stored subject placements between two versions of the same curriculum.';
+    ? 'Review where a subject appears across stored curricula and curriculum versions.'
+    : 'Compare stored curriculum versions and review subject placement changes over time.';
 $avatarInitial = strtoupper(substr((string)($_SESSION['first_name'] ?? 'U'), 0, 1));
 $curriculumCssVersion = (int)filemtime(__DIR__ . '/../assets/curriculum.css');
 $typographyCssVersion = (int)filemtime(__DIR__ . '/../../../css/csms-typography.css');
@@ -45,6 +46,7 @@ $historyScriptVersion = (int)filemtime(__DIR__ . '/../assets/subject-history.js'
   <?php require __DIR__ . '/../../../shared/favicon.php'; ?>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="csrf-token" content="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>"/>
   <title><?= htmlspecialchars($viewLabel, ENT_QUOTES, 'UTF-8') ?> - BCP Student Management System</title>
   <link rel="stylesheet" href="../../../css/dashboard.css"/>
   <link rel="stylesheet" href="../assets/curriculum.css?v=<?= $curriculumCssVersion ?>"/>
@@ -65,83 +67,52 @@ require __DIR__ . '/../../../shared/sidebar.php';
 
   <main class="content curriculum-content mapping-content subject-history-content"
         id="subjectHistoryWorkspace"
-        data-history-api="../http/subject_history_actions.php">
+        data-history-api="../http/subject_history_actions.php"
+        data-cimf-api="../http/history_cimf_actions.php">
     <div class="page-title-bar curriculum-title-bar">
       <div>
         <h1 class="page-title"><i class="fa-solid fa-clock-rotate-left"></i> <?= htmlspecialchars($viewLabel, ENT_QUOTES, 'UTF-8') ?></h1>
         <p class="page-subtitle"><?= htmlspecialchars($viewDescription, ENT_QUOTES, 'UTF-8') ?></p>
       </div>
-      <span class="read-only-pill"><i class="fa-solid fa-eye"></i> Read-only derived history</span>
-    </div>
-
-    <p class="curriculum-notice history-state-notice" role="note">
-      <i class="fa-solid fa-circle-info"></i>
-      Draft, active, and archived are system record states only—not official institutional approval statuses.
-    </p>
-
-    <?php if ($isSubjectHistoryView): ?>
+      <div class="history-title-actions">
+        <button type="button" class="button-muted" id="historyCimfButton"><i class="fa-solid fa-wand-magic-sparkles"></i> <?= $isSubjectHistoryView ? 'Summarize History with CIMF' : 'Explain History with CIMF' ?></button>
+        <span class="read-only-pill">Read-only derived history</span>
+      </div>
+    </div><?php if ($isSubjectHistoryView): ?>
     <section id="subjectHistoryPanel" class="subject-history-panel">
       <section class="domain-card mapping-filter-card" aria-labelledby="subjectHistoryFiltersTitle">
-        <div class="domain-card-header">
-          <div>
-            <p class="eyebrow">Stored curriculum usage</p>
-            <h2 id="subjectHistoryFiltersTitle">Where has this subject appeared?</h2>
-          </div>
-          <button type="button" class="button-muted" id="clearSubjectHistoryFilters">
-            <i class="fa-solid fa-rotate-left"></i> Clear Filters
-          </button>
+        <div class="history-filter-grid">
+          <label class="mapping-filter-field"><span>Subject Search</span>
+            <div class="record-autocomplete"><input type="search" id="historySubjectSearch" placeholder="Search subject code or title"/>
+              <input type="hidden" id="historySubjectId"/><button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear subject" hidden><i class="fa-solid fa-xmark"></i></button>
+              <div class="record-autocomplete-options" id="historySubjectOptions" role="listbox" hidden></div></div>
+          </label>
+          <label class="mapping-filter-field"><span>Program</span><select id="historyProgram"><option value="">All Programs</option></select></label>
+          <label class="mapping-filter-field"><span>Curriculum</span><select id="historyCurriculum"><option value="">All Curricula</option></select></label>
+          <button type="button" class="button-muted" id="moreHistoryFilters" aria-expanded="false" aria-controls="historyMoreFilters">More Filters <i class="fa-solid fa-chevron-down"></i></button>
         </div>
-        <div class="mapping-filter-grid subject-history-filter-grid">
-          <label class="mapping-filter-field mapping-search-field"><span>Subject Search</span>
-            <span class="mapping-input-with-icon"><i class="fa-solid fa-magnifying-glass"></i>
-              <input type="search" id="historySubjectSearch" maxlength="100" placeholder="Subject code or title"/>
-            </span>
-          </label>
-          <label class="mapping-filter-field"><span>Academic Program</span>
-            <select id="historyProgram"><option value="">All academic programs</option></select>
-          </label>
-          <label class="mapping-filter-field"><span>Curriculum</span>
-            <select id="historyCurriculum" disabled><option value="">Select a program to narrow curricula</option></select>
-          </label>
-          <label class="mapping-filter-field"><span>Curriculum Version</span>
-            <div class="record-autocomplete"><input type="search" id="historyVersionSearch" placeholder="Select a curriculum to narrow versions" disabled/><input type="hidden" id="historyVersion"/><button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear curriculum version" title="Clear selection" hidden><i class="fa-solid fa-xmark"></i></button><div class="record-autocomplete-options" id="historyVersionOptions" role="listbox" aria-label="Curriculum version suggestions" hidden></div></div>
-          </label>
-          <label class="mapping-filter-field"><span>Year Level</span>
-            <select id="historyYear"><option value="">All stored values</option></select>
-          </label>
-          <label class="mapping-filter-field"><span>Semester / Term</span>
-            <select id="historySemester"><option value="">All stored values</option></select>
-          </label>
-          <label class="mapping-filter-field"><span>Technical Version Status</span>
-            <select id="historyVersionStatus"><option value="">All stored states</option></select>
-          </label>
-          <label class="mapping-filter-field"><span>Records Per Page</span>
-            <select id="historyPerPage"><option value="10">10</option><option value="20" selected>20</option><option value="50">50</option></select>
-          </label>
+        <div class="history-more-filters" id="historyMoreFilters" hidden>
+          <label class="mapping-filter-field"><span>Curriculum Version</span><div class="record-autocomplete"><input type="search" id="historyVersionSearch" placeholder="Select a curriculum first" disabled/><input type="hidden" id="historyVersion"/><button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear curriculum version" hidden><i class="fa-solid fa-xmark"></i></button><div class="record-autocomplete-options" id="historyVersionOptions" role="listbox" hidden></div></div></label>
+          <label class="mapping-filter-field"><span>Year Level</span><select id="historyYear"><option value="">All Year Levels</option></select></label>
+          <label class="mapping-filter-field"><span>Semester / Term</span><select id="historySemester"><option value="">All Semesters / Terms</option></select></label>
+          <label class="mapping-filter-field"><span>Version Status</span><select id="historyVersionStatus"><option value="">All Version Status</option></select></label>
         </div>
       </section>
-
-      <section class="history-summary-grid" aria-label="Filtered history summary">
-        <article class="history-summary-card"><span>Stored Placements</span><strong id="historyStoredPlacements">0</strong></article>
-        <article class="history-summary-card"><span>Programs</span><strong id="historyPrograms">0</strong></article>
-        <article class="history-summary-card"><span>Curricula</span><strong id="historyCurricula">0</strong></article>
-        <article class="history-summary-card"><span>Curriculum Versions</span><strong id="historyVersions">0</strong></article>
-      </section>
-      <p class="history-date-context" id="historyDateContext">No stored curriculum-version dates are available for this result.</p>
+      <p class="curriculum-notice history-state-notice" role="note">History shows placements currently stored in curriculum versions. Removing a placement deletes its stored row, so previously removed placements cannot be reconstructed. System states and record dates are technical history only, not official institutional approval or offering dates.</p>
+      <p class="history-summary-line" id="historySummary">Search for a subject to view its stored history.</p>
 
       <section class="domain-card mapping-results-card" aria-labelledby="subjectHistoryResultsTitle">
         <div class="domain-card-header">
           <div>
-            <p class="eyebrow">Authoritative stored placements</p>
-            <h2 id="subjectHistoryResultsTitle">Subject Curriculum History</h2>
-            <p class="mapping-context-message" id="subjectHistoryContext">Showing stored subject placements across all curriculum versions.</p>
+            <h2 id="subjectHistoryResultsTitle">Stored Subject History</h2>
+            <p class="mapping-context-message">Record dates are available in View Details and are not official offering dates.</p>
           </div>
           <span class="record-count" id="subjectHistoryCount">0 records</span>
         </div>
         <div class="table-scroll" tabindex="0" aria-label="Scrollable subject history table">
           <table class="domain-table subject-history-table">
-            <thead><tr><th>Subject</th><th>Academic Program</th><th>Program Type</th><th>Curriculum</th><th>Version</th><th>Version Status</th><th>Year Level</th><th>Semester / Term</th><th>Sequence</th><th>Placement</th><th>Version Record Dates</th></tr></thead>
-            <tbody id="subjectHistoryRows"><tr><td colspan="11" class="empty-cell">Loading stored subject history…</td></tr></tbody>
+            <thead><tr><th>Subject</th><th>Program</th><th>Curriculum / Version</th><th>Year &amp; Semester</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="subjectHistoryRows"><tr><td colspan="6" class="empty-cell">Search for a subject to view its stored history.</td></tr></tbody>
           </table>
         </div>
         <div class="pagination-bar" id="subjectHistoryPagination"></div>
@@ -150,22 +121,13 @@ require __DIR__ . '/../../../shared/sidebar.php';
 
     <?php else: ?>
     <section id="curriculumHistoryPanel" class="subject-history-panel">
-      <section class="domain-card mapping-filter-card" aria-labelledby="curriculumHistoryFiltersTitle">
-        <div class="domain-card-header">
-          <div>
-            <p class="eyebrow">Same-curriculum comparison</p>
-            <h2 id="curriculumHistoryFiltersTitle">How did subject placements change between versions?</h2>
-          </div>
-          <button type="button" class="button-muted" id="clearCurriculumHistoryFilters">
-            <i class="fa-solid fa-rotate-left"></i> Clear Comparison
-          </button>
-        </div>
+      <section class="domain-card mapping-filter-card" aria-label="Curriculum version comparison context">
         <div class="mapping-filter-grid curriculum-history-filter-grid">
-          <label class="mapping-filter-field"><span>Academic Program <strong>*</strong></span>
-            <select id="compareProgram" required><option value="">Select an academic program</option></select>
+          <label class="mapping-filter-field"><span>Program / Strand <strong>*</strong></span>
+            <div class="record-autocomplete"><input type="search" id="compareProgramSearch" placeholder="Search program or strand"/><input type="hidden" id="compareProgram"/><button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear program" hidden><i class="fa-solid fa-xmark"></i></button><div class="record-autocomplete-options" id="compareProgramOptions" role="listbox" hidden></div></div>
           </label>
           <label class="mapping-filter-field"><span>Curriculum <strong>*</strong></span>
-            <select id="compareCurriculum" disabled required><option value="">Select an academic program first</option></select>
+            <div class="record-autocomplete"><input type="search" id="compareCurriculumSearch" placeholder="Select a program first" disabled/><input type="hidden" id="compareCurriculum"/><button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear curriculum" hidden><i class="fa-solid fa-xmark"></i></button><div class="record-autocomplete-options" id="compareCurriculumOptions" role="listbox" hidden></div></div>
           </label>
           <label class="mapping-filter-field"><span>Version A <strong>*</strong></span>
             <div class="record-autocomplete"><input type="search" id="compareVersionASearch" placeholder="Select a curriculum first" disabled required/><input type="hidden" id="compareVersionA"/><button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Version A" title="Clear selection" hidden><i class="fa-solid fa-xmark"></i></button><div class="record-autocomplete-options" id="compareVersionAOptions" role="listbox" aria-label="Version A suggestions" hidden></div></div>
@@ -173,45 +135,54 @@ require __DIR__ . '/../../../shared/sidebar.php';
           <label class="mapping-filter-field"><span>Version B <strong>*</strong></span>
             <div class="record-autocomplete"><input type="search" id="compareVersionBSearch" placeholder="Select a curriculum first" disabled required/><input type="hidden" id="compareVersionB"/><button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Version B" title="Clear selection" hidden><i class="fa-solid fa-xmark"></i></button><div class="record-autocomplete-options" id="compareVersionBOptions" role="listbox" aria-label="Version B suggestions" hidden></div></div>
           </label>
-          <label class="mapping-filter-field"><span>Records Per Page</span>
-            <select id="comparePerPage"><option value="10">10</option><option value="20" selected>20</option><option value="50">50</option></select>
-          </label>
-          <div class="mapping-filter-action">
-            <button type="button" class="button-primary" id="compareVersionsButton" disabled>
-              <i class="fa-solid fa-code-compare"></i> Compare Versions
-            </button>
-          </div>
         </div>
+        <p class="form-error" id="compareValidation" role="alert" hidden></p>
       </section>
 
-      <section class="history-summary-grid comparison-summary-grid" aria-label="Version comparison summary">
-        <article class="history-summary-card history-summary-added"><span>Added</span><strong id="comparisonAdded">0</strong></article>
-        <article class="history-summary-card history-summary-removed"><span>Removed</span><strong id="comparisonRemoved">0</strong></article>
-        <article class="history-summary-card history-summary-changed"><span>Placement Changed</span><strong id="comparisonChanged">0</strong></article>
-        <article class="history-summary-card"><span>Unchanged</span><strong id="comparisonUnchanged">0</strong></article>
-      </section>
+      <p class="curriculum-notice history-state-notice" role="note">System states and record dates are technical history only, not official institutional approval or offering dates.</p>
+      <p class="history-summary-line comparison-summary-line" id="comparisonSummary">Select two stored curriculum versions to compare.</p>
 
       <section class="domain-card mapping-results-card" aria-labelledby="comparisonResultsTitle">
         <div class="domain-card-header">
           <div>
-            <p class="eyebrow">Deterministic placement comparison</p>
-            <h2 id="comparisonResultsTitle">Curriculum Version Comparison</h2>
-            <p class="mapping-context-message" id="comparisonContext">Select a program, curriculum, and two versions to compare their stored subject placements.</p>
+            <h2 id="comparisonResultsTitle">Curriculum Changes</h2>
+            <p class="mapping-context-message">Change types are calculated from stored placement records.</p>
           </div>
           <span class="record-count" id="comparisonCount">0 records</span>
         </div>
-        <div class="table-scroll" tabindex="0" aria-label="Scrollable curriculum version comparison table">
+        <p class="mapping-context-message" id="comparisonEmpty">Select two curriculum versions to compare their subject placements.</p>
+        <div class="table-scroll" id="comparisonTableWrap" tabindex="0" aria-label="Scrollable curriculum version comparison table" hidden>
           <table class="domain-table subject-history-comparison-table">
-            <thead><tr><th>Subject</th><th>Change</th><th id="versionAHeader">Version A Placement</th><th id="versionBHeader">Version B Placement</th></tr></thead>
-            <tbody id="comparisonRows"><tr><td colspan="4" class="empty-cell">Select two curriculum versions to compare their subject placements.</td></tr></tbody>
+            <thead><tr><th>Subject</th><th>Change</th><th id="versionAHeader">Version A</th><th id="versionBHeader">Version B</th><th>Actions</th></tr></thead>
+            <tbody id="comparisonRows"><tr><td colspan="5" class="empty-cell">Select two curriculum versions to compare their subject placements.</td></tr></tbody>
           </table>
         </div>
-        <div class="pagination-bar" id="comparisonPagination"></div>
+        <div class="pagination-bar" id="comparisonPagination" hidden></div>
       </section>
     </section>
     <?php endif; ?>
   </main>
 </div>
+
+<div class="curriculum-modal" id="historyDetailsModal" hidden>
+  <div class="modal-backdrop" data-modal-close></div>
+  <section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="historyDetailsTitle">
+    <div class="modal-header"><div><h2 id="historyDetailsTitle">Subject History Details</h2><p class="modal-context" id="historyDetailsContext"></p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="confirmation-body"><dl class="history-details-grid" id="historyDetailsBody"></dl><div class="history-source"><strong>SOURCE</strong><p>Derived from stored Subject Mapping / Curriculum Version placement records.</p></div></div>
+    <div class="modal-actions modal-actions-padded"><button type="button" class="button-muted" data-modal-close>Close</button><a class="button-primary" id="historyMappingLink" href="subject_mapping.php" <?= $canViewSubjectMapping ? '' : 'hidden' ?>>View in Subject Mapping</a></div>
+  </section>
+</div>
+
+<div class="curriculum-modal" id="comparisonDetailsModal" hidden>
+  <div class="modal-backdrop" data-modal-close></div>
+  <section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="comparisonDetailsTitle">
+    <div class="modal-header"><div><h2 id="comparisonDetailsTitle">Curriculum Version Change Details</h2><p class="modal-context" id="comparisonDetailsContext"></p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="confirmation-body"><div class="history-version-pair" id="comparisonDetailsVersions"></div><p id="comparisonDetailsChange"></p><p id="comparisonDetailsExplanation"></p></div>
+    <div class="modal-actions modal-actions-padded"><button type="button" class="button-muted" data-modal-close>Close</button></div>
+  </section>
+</div>
+
+
 
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 <script src="../assets/curriculum-common.js?v=<?= $curriculumCommonVersion ?>"></script>

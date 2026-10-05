@@ -20,15 +20,25 @@ function respond(bool $ok, string $message, array $extra = [], int $status = 200
 }
 // Logout should remain available even if the database is temporarily down.
 if ($action === 'logout') {
-    $user = require_authenticated_user(true);
+    // Ending the caller's session does not require an active-account database lookup.
+    // Keep logout available during database outages while retaining CSRF and idle checks.
+    if (empty($_SESSION['user_id']) || expire_authenticated_session_if_idle()) {
+        respond(false, 'Authentication required.', [], 401);
+    }
+    $logoutUserId = (int)$_SESSION['user_id'];
     audit_log(
         'AUTH_LOGOUT',
         'user',
-        (int)$user['id'],
+        $logoutUserId,
         'Authenticated user logged out.'
     );
     destroy_authenticated_session();
     respond(true, 'Logged out.');
+}
+
+if ($action === 'activity') {
+    require_authenticated_user(true);
+    respond(true, 'Session activity recorded.');
 }
 
 $databaseActions = ['login', 'update_profile', 'change_password', 'delete_account'];
@@ -56,7 +66,7 @@ try {
             }
 
             $stmt = $conn->prepare(
-                'SELECT id, username, email, first_name, last_name, password_hash, role
+                'SELECT id, username, email, first_name, last_name, password_hash, is_active, must_change_password
                  FROM users WHERE username = ? LIMIT 1'
             );
             $stmt->bind_param('s', $username);
@@ -64,7 +74,7 @@ try {
             $user = $stmt->get_result()->fetch_assoc();
             $stmt->close();
 
-            if (!$user || !password_verify($password, $user['password_hash'])) {
+            if (!$user || !password_verify($password, $user['password_hash']) || !(int)$user['is_active']) {
                 audit_log(
                     'AUTH_LOGIN_FAILURE',
                     'user',
@@ -75,13 +85,23 @@ try {
                 respond(false, 'Invalid username or password.', [], 401);
             }
 
+            $roleAssignments = get_user_role_assignments((int)$user['id']);
+            $roleSlugs = array_column($roleAssignments, 'slug');
+            $primaryRole = $roleAssignments[0] ?? null;
+
             session_regenerate_id(true);
             $_SESSION['user_id'] = (int)$user['id'];
             $_SESSION['username'] = $user['username'];
             $_SESSION['email'] = $user['email'];
             $_SESSION['first_name'] = $user['first_name'];
             $_SESSION['last_name'] = $user['last_name'];
-            $_SESSION['role'] = $user['role'];
+            $_SESSION['role_id'] = $primaryRole['id'] ?? null;
+            $_SESSION['role_slug'] = $primaryRole['slug'] ?? '';
+            $_SESSION['role_slugs'] = $roleSlugs;
+            // Retain the old display slot for legacy pages, but derive it from
+            // the real normalized assignment, never users.role.
+            $_SESSION['role'] = $primaryRole['display_name'] ?? '';
+            $_SESSION['_last_activity_at'] = time();
             rotate_csrf_token();
 
             audit_log(
@@ -91,7 +111,11 @@ try {
                 'User logged in successfully.'
             );
 
-            respond(true, 'Login successful.', ['role' => $user['role']]);
+            respond(true, 'Login successful.', [
+                'must_change_password'=>(bool)$user['must_change_password'],
+                'redirect'=>$user['must_change_password'] ? '../dashboard/account.php' : '../dashboard/loading.php',
+                'role_slug'=>$primaryRole['slug'] ?? null,
+            ]);
         }
 
         case 'update_profile': {
@@ -161,6 +185,10 @@ try {
             if (strlen($new) < 6) {
                 respond(false, 'New password must be at least 6 characters.', [], 422);
             }
+            if (strlen($new) > 72 || strpos($new, "\0") !== false || ($user['must_change_password'] && strlen($new) < 12)) {
+                respond(false, 'Temporary passwords must be replaced with a password of 12–72 bytes.', [], 422);
+            }
+            if ($new === $current) respond(false, 'Choose a new password different from your temporary/current password.', [], 422);
             if ($new !== $confirm) {
                 respond(false, 'New passwords do not match.', [], 422);
             }
@@ -177,7 +205,7 @@ try {
             }
 
             $newHash = password_hash($new, PASSWORD_DEFAULT);
-            $stmt = $conn->prepare('UPDATE users SET password_hash = ? WHERE id = ?');
+            $stmt = $conn->prepare('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?');
             $conn->begin_transaction();
             try {
                 $stmt->bind_param('si', $newHash, $userId);
@@ -198,6 +226,11 @@ try {
         }
 
         case 'delete_account': {
+            require_once __DIR__.'/../database/ProvisionalRoles.php';
+            $accountUser = require_authenticated_user(true);
+            if (array_intersect(get_user_roles((int)$accountUser['id']), array_keys(ProvisionalRoles::definitions()))) {
+                respond(false, 'Prototype accounts are retained. Contact an administrator for account deactivation.', [], 403);
+            }
             require_permission('account.update', true);
             $user = current_user();
             $userId = $user['id'];

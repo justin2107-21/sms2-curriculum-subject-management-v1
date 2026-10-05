@@ -1,523 +1,251 @@
 (function () {
     'use strict';
+    const root = document.getElementById('subjectHistoryWorkspace'), ui = window.CurriculumUI;
+    if (!root || !ui) return;
+    const $ = id => document.getElementById(id), esc = ui.escapeHtml, api = root.dataset.historyApi;
+    const subjectView = Boolean($('subjectHistoryPanel'));
+    const state = { historyPage: 1, historyRequest: 0, historyRows: new Map(), compareRows: new Map(), comparisonRequest: 0, comparison: null };
+    const detailsModal = ui.createModal($('historyDetailsModal'));
+    const changeModal = ui.createModal($('comparisonDetailsModal'));
+    const subjectSearch = $('historySubjectSearch'), subjectId = $('historySubjectId');
+    const versionSearch = $('historyVersionSearch'), versionId = $('historyVersion');
+    const versionAInput = $('compareVersionASearch'), versionBInput = $('compareVersionBSearch');
+    const compareProgramInput = $('compareProgramSearch'), compareCurriculumInput = $('compareCurriculumSearch');
+    let historyVersionPicker, versionAPicker, versionBPicker;
+    let compareCurriculumPicker;
 
-    const workspace = document.getElementById('subjectHistoryWorkspace');
-    const ui = window.CurriculumUI;
-    if (!workspace || !ui) return;
+    window.CSMSPageCIMFContext = () => subjectView ? {subject_id:subjectId.value,academic_program_id:$('historyProgram').value,curriculum_id:$('historyCurriculum').value,curriculum_version_id:versionId.value,year_level:$('historyYear').value,semester:$('historySemester').value,version_status:$('historyVersionStatus').value,page:state.historyPage} : {academic_program_id:$('compareProgram').value,curriculum_id:$('compareCurriculum').value,version_a_id:$('compareVersionA').value,version_b_id:$('compareVersionB').value,page:state.comparison?.pagination.page || 1};
 
-    const endpoint = workspace.dataset.historyApi;
-    const activeView = document.getElementById('subjectHistoryPanel') ? 'subject' : 'curriculum';
-    const state = {
-        historyPage: 1,
-        historyRequest: 0,
-        comparisonPage: 1,
-        comparisonRequest: 0,
-        comparisonLoaded: false,
-        clearingFilters: false,
-        resettingVersions: false,
-    };
-
-    const history = {
-        search: document.getElementById('historySubjectSearch'),
-        program: document.getElementById('historyProgram'),
-        curriculum: document.getElementById('historyCurriculum'),
-        version: document.getElementById('historyVersion'),
-        year: document.getElementById('historyYear'),
-        semester: document.getElementById('historySemester'),
-        versionStatus: document.getElementById('historyVersionStatus'),
-        perPage: document.getElementById('historyPerPage'),
-        rows: document.getElementById('subjectHistoryRows'),
-        pagination: document.getElementById('subjectHistoryPagination'),
-        count: document.getElementById('subjectHistoryCount'),
-        context: document.getElementById('subjectHistoryContext'),
-    };
-
-    const comparison = {
-        program: document.getElementById('compareProgram'),
-        curriculum: document.getElementById('compareCurriculum'),
-        versionA: document.getElementById('compareVersionA'),
-        versionB: document.getElementById('compareVersionB'),
-        perPage: document.getElementById('comparePerPage'),
-        button: document.getElementById('compareVersionsButton'),
-        rows: document.getElementById('comparisonRows'),
-        pagination: document.getElementById('comparisonPagination'),
-        count: document.getElementById('comparisonCount'),
-        context: document.getElementById('comparisonContext'),
-    };
-    const historyVersionInput = document.getElementById('historyVersionSearch');
-    const compareVersionAInput = document.getElementById('compareVersionASearch');
-    const compareVersionBInput = document.getElementById('compareVersionBSearch');
-    let compareVersionBAutocomplete;
-    let compareVersionAAutocomplete;
-    const historyVersionAutocomplete = ui.createAutocomplete({
-        input: historyVersionInput, valueInput: history.version,
-        list: document.getElementById('historyVersionOptions'),
-        helpText: 'Choose a version to narrow stored subject history.',
-        selectedText: 'Curriculum version selected.',
-        loadingText: 'Searching curriculum versions…',
-        noResultsText: 'No matching curriculum versions found.',
-        search: async function (query) {
-            const payload = await ui.fetchJson(endpoint, {
-                action: 'version_options', curriculum_id: history.curriculum.value,
-                page: 1, per_page: 20, search: query
-            });
-            return payload.versions;
-        },
-        getId: item => item.id,
-        format: item => ({ label: item.version_label + (item.effective_academic_year
-            ? ' — ' + item.effective_academic_year : ''), code: item.version_label,
-            title: item.effective_academic_year || item.status }),
-        onSelect: function () {
-            if (!state.clearingFilters && !state.resettingVersions) loadHistory(1);
-        },
-        onClear: function () {
-            if (!state.clearingFilters && !state.resettingVersions) loadHistory(1);
-        }
+    function option(value, label) { return '<option value="' + esc(value) + '">' + esc(label) + '</option>'; }
+    function replaceOptions(select, label, items, key, text) {
+        const previous = select.value;
+        select.innerHTML = option('', label) + items.map(item => option(item[key], text(item))).join('');
+        if (Array.from(select.options).some(item => item.value === previous)) select.value = previous;
+    }
+    function setState(rows, columns, message, error) {
+        rows.innerHTML = '<tr><td colspan="' + columns + '" class="empty-cell' + (error ? ' error-cell' : '') + '">' + esc(message) + '</td></tr>';
+    }
+    function formatSubject(item) { return { label: item.subject_code + ' — ' + item.subject_title, code: item.subject_code, title: item.subject_title }; }
+    const subjectPicker = ui.createAutocomplete({
+        input: subjectSearch, valueInput: subjectId, list: $('historySubjectOptions'), minimumLength: 1, maxSuggestions: 3,
+        helpText: 'Search by subject code or title.', selectedText: 'Subject selected.', loadingText: 'Searching subjects…',
+        noResultsText: 'No matching subjects found.', errorText: 'Subjects could not be loaded.',
+        search: async query => (await ui.fetchJson(api, { action: 'subject_options', search: query, page: 1, per_page: 20 })).subjects,
+        getId: item => item.id, format: formatSubject, onSelect: () => loadHistory(1), onClear: () => clearHistory()
     });
-    function versionAutocompleteOptions(input, valueInput, list, otherSelector) {
-        return {
-            input, valueInput, list,
-            helpText: 'Choose two different versions to compare.',
-            selectedText: 'Curriculum version selected.',
-            loadingText: 'Searching curriculum versions…',
-            noResultsText: 'No matching curriculum versions found.',
-            search: async function (query) {
-                const payload = await ui.fetchJson(endpoint, {
-                    action: 'version_options', curriculum_id: comparison.curriculum.value,
-                    page: 1, per_page: 20, search: query
-                });
-                return payload.versions.filter(function (item) {
-                    return Number(item.id) !== Number(otherSelector()?.getSelectedId() || 0);
-                });
+    const compareProgramPicker = ui.createAutocomplete({
+        input: compareProgramInput, valueInput: $('compareProgram'), list: $('compareProgramOptions'), minimumLength: 1, maxSuggestions: 3,
+        helpText: 'Choose a program or strand first.', selectedText: 'Program / Strand selected.', loadingText: 'Searching programs…',
+        noResultsText: 'No matching programs found.',
+        search: async query => (await ui.fetchJson(api, { action: 'program_options', search: query, page: 1, per_page: 20 })).programs,
+        getId: item => item.id, format: item => ({ label: item.program_code + ' — ' + item.program_name, code: item.program_code, title: item.program_name }),
+        onSelect: () => { compareCurriculumPicker.clear(false); compareCurriculumInput.disabled = false; compareCurriculumInput.placeholder = 'Search curriculum'; clearCompareVersions(); },
+        onClear: () => { compareCurriculumPicker.clear(false); compareCurriculumInput.disabled = true; compareCurriculumInput.placeholder = 'Select a program first'; clearCompareVersions(); }
+    });
+    compareCurriculumPicker = ui.createAutocomplete({
+        input: compareCurriculumInput, valueInput: $('compareCurriculum'), list: $('compareCurriculumOptions'), minimumLength: 1, maxSuggestions: 3,
+        helpText: 'Choose a curriculum under the selected program.', selectedText: 'Curriculum selected.', loadingText: 'Searching curricula…',
+        noResultsText: 'No matching curricula found.',
+        search: async query => {
+            if (!$('compareProgram').value) return [];
+            return (await ui.fetchJson(api, { action: 'curriculum_options', academic_program_id: $('compareProgram').value, search: query, page: 1, per_page: 20 })).curricula;
+        },
+        getId: item => item.id, format: item => ({ label: item.curriculum_code + ' — ' + item.curriculum_name, code: item.curriculum_code, title: item.curriculum_name }),
+        onSelect: () => clearCompareVersions(), onClear: () => clearCompareVersions()
+    });
+
+    function versionPicker(input, hidden, list, curriculumSelect, otherPicker) {
+        return ui.createAutocomplete({
+            input, valueInput: hidden, list, minimumLength: 1, maxSuggestions: 3,
+            helpText: 'Choose a version in the selected curriculum.', selectedText: 'Curriculum version selected.',
+            loadingText: 'Searching versions…', noResultsText: 'No matching versions found.',
+            search: async query => {
+                if (!curriculumSelect.value) return [];
+                const data = await ui.fetchJson(api, { action: 'version_options', curriculum_id: curriculumSelect.value, search: query, page: 1, per_page: 20 });
+                return data.versions;
             },
             getId: item => item.id,
-            format: item => ({ label: item.version_label + (item.effective_academic_year
-                ? ' — ' + item.effective_academic_year : ''), code: item.version_label,
-                title: item.effective_academic_year || item.status }),
-            onSelect: function (item, id) {
-                if (otherSelector()?.getSelectedId() === id) otherSelector().clear();
-                state.comparisonLoaded = false;
-                updateCompareButton();
+            format: item => ({ label: item.version_label + (item.effective_academic_year ? ' — ' + item.effective_academic_year : ''), code: item.version_label, title: item.effective_academic_year || item.status }),
+            onSelect: () => {
+                const duplicate = Boolean(otherPicker && hidden.value === otherPicker()?.getSelectedId());
+                if (duplicate) {
+                    otherPicker().clear(false);
+                    $('compareValidation').textContent = 'Choose two different curriculum versions.';
+                    $('compareValidation').hidden = false;
+                } else if (!subjectView) $('compareValidation').hidden = true;
+                if (subjectView) loadHistory(1); else updateCompareAvailability();
             },
-            onClear: function () {
-                state.comparisonLoaded = false;
-                updateCompareButton();
-            }
-        };
-    }
-    compareVersionAAutocomplete = ui.createAutocomplete(versionAutocompleteOptions(
-        compareVersionAInput, comparison.versionA, document.getElementById('compareVersionAOptions'),
-        () => compareVersionBAutocomplete
-    ));
-    compareVersionBAutocomplete = ui.createAutocomplete(versionAutocompleteOptions(
-        compareVersionBInput, comparison.versionB, document.getElementById('compareVersionBOptions'),
-        () => compareVersionAAutocomplete
-    ));
-
-    function optionMarkup(value, label) {
-        return '<option value="' + ui.escapeHtml(value) + '">' + ui.escapeHtml(label) + '</option>';
-    }
-
-    function selectLabel(select) {
-        if (select === history.version) return historyVersionAutocomplete?.getSelectedLabel() || '';
-        return select.value ? select.options[select.selectedIndex]?.textContent.trim() || '' : '';
-    }
-
-    function resetSelect(select, label, disabled) {
-        select.innerHTML = optionMarkup('', label);
-        select.disabled = disabled;
-    }
-
-    function setTableState(rows, columnCount, message, isError) {
-        rows.innerHTML = '<tr><td colspan="' + columnCount + '" class="empty-cell' +
-            (isError ? ' error-cell' : '') + '">' + ui.escapeHtml(message) + '</td></tr>';
-    }
-
-    function updateDistinctSelect(select, values, emptyLabel) {
-        const selected = select.value;
-        select.innerHTML = optionMarkup('', emptyLabel) + values.map(function (value) {
-            return optionMarkup(value, value);
-        }).join('');
-        if (values.includes(selected)) select.value = selected;
-    }
-
-    async function loadPrograms() {
-        const payload = await ui.fetchJson(endpoint, {
-            action: 'program_options', page: 1, per_page: 50
+            onClear: () => { if (subjectView) loadHistory(1); else updateCompareAvailability(); }
         });
-        const options = payload.programs.map(function (program) {
-            return optionMarkup(program.id, program.program_code + ' — ' + program.program_name);
-        }).join('');
-        if (history.program) {
-            history.program.innerHTML = optionMarkup('', 'All academic programs') + options;
-        }
-        if (comparison.program) {
-            comparison.program.innerHTML = optionMarkup('', 'Select an academic program') + options;
-        }
     }
-
-    async function loadCurricula(scope) {
-        const controls = scope === 'history' ? history : comparison;
-        const curriculumLabel = scope === 'history'
-            ? 'Select a program to narrow curricula'
-            : 'Select an academic program first';
-        resetSelect(controls.curriculum, curriculumLabel, true);
-        if (scope === 'history') {
-            state.resettingVersions = true;
-            historyVersionAutocomplete?.clear();
-            state.resettingVersions = false;
-            historyVersionInput.disabled = true;
-            historyVersionInput.placeholder = 'Select a curriculum to narrow versions';
-        } else {
-            resetComparisonVersions('Select a curriculum first');
-        }
-        if (!controls.program.value) return;
-
-        const payload = await ui.fetchJson(endpoint, {
-            action: 'curriculum_options',
-            academic_program_id: controls.program.value,
-            page: 1,
-            per_page: 50,
-        });
-        controls.curriculum.innerHTML = optionMarkup('', scope === 'history'
-            ? 'All curricula in this program'
-            : 'Select a curriculum') + payload.curricula.map(function (curriculum) {
-            return optionMarkup(
-                curriculum.id,
-                curriculum.curriculum_code + ' — ' + curriculum.curriculum_name
-            );
-        }).join('');
-        controls.curriculum.disabled = false;
-    }
-
-    function resetComparisonVersions(label) {
-        compareVersionAAutocomplete?.clear();
-        compareVersionBAutocomplete?.clear();
-        compareVersionAInput.disabled = true;
-        compareVersionBInput.disabled = true;
-        compareVersionAInput.placeholder = label;
-        compareVersionBInput.placeholder = label;
-        updateCompareButton();
-    }
-
-    async function loadVersions(scope) {
-        const curriculum = scope === 'history' ? history.curriculum : comparison.curriculum;
-        if (scope === 'history') {
-            state.resettingVersions = true;
-            historyVersionAutocomplete?.clear();
-            state.resettingVersions = false;
-            historyVersionInput.disabled = true;
-            historyVersionInput.placeholder = 'Select a curriculum to narrow versions';
-        } else {
-            resetComparisonVersions('Select a curriculum first');
-        }
-        if (!curriculum.value) return;
-        if (scope === 'history') {
-            historyVersionInput.disabled = false;
-            historyVersionInput.placeholder = 'Search version label or academic year';
-        } else {
-            compareVersionAInput.disabled = false;
-            compareVersionBInput.disabled = false;
-            compareVersionAInput.placeholder = 'Search Version A';
-            compareVersionBInput.placeholder = 'Search Version B';
-            updateCompareButton();
-        }
-    }
+    historyVersionPicker = versionPicker(versionSearch, versionId, $('historyVersionOptions'), $('historyCurriculum'));
+    versionAPicker = versionPicker(versionAInput, $('compareVersionA'), $('compareVersionAOptions'), $('compareCurriculum'), () => versionBPicker);
+    versionBPicker = versionPicker(versionBInput, $('compareVersionB'), $('compareVersionBOptions'), $('compareCurriculum'), () => versionAPicker);
 
     function historyQuery(page) {
-        return {
-            action: 'list',
-            page,
-            per_page: history.perPage.value,
-            search: history.search.value.trim(),
-            academic_program_id: history.program.value,
-            curriculum_id: history.curriculum.value,
-            curriculum_version_id: history.version.value,
-            year_level: history.year.value,
-            semester: history.semester.value,
-            version_status: history.versionStatus.value,
-        };
+        return { action: 'list', page, per_page: 20, subject_id: subjectId.value, academic_program_id: $('historyProgram').value,
+            curriculum_id: $('historyCurriculum').value, curriculum_version_id: versionId.value, year_level: $('historyYear').value,
+            semester: $('historySemester').value, version_status: $('historyVersionStatus').value };
     }
-
-    function subjectContext(record) {
-        return '<span class="history-subject-context"><strong class="history-code">' +
-            ui.escapeHtml(record.subject_code) + '</strong><span>' +
-            ui.escapeHtml(record.subject_title) + '</span></span>';
-    }
-
-    function programContext(record) {
-        return '<span class="history-program-context"><strong>' +
-            ui.escapeHtml(record.program_name) + '</strong><span class="history-code">' +
-            ui.escapeHtml(record.program_code) + '</span></span>';
-    }
-
-    function curriculumContext(record) {
-        return '<span class="history-curriculum-context"><strong>' +
-            ui.escapeHtml(record.curriculum_name) + '</strong><span class="history-code">' +
-            ui.escapeHtml(record.curriculum_code) + '</span></span>';
-    }
-
-    function versionContext(record) {
-        return '<span class="history-version-context"><strong>' +
-            ui.escapeHtml(record.version_label) + '</strong><span>' +
-            ui.escapeHtml(record.effective_academic_year || 'Academic year not specified') +
-            '</span></span>';
-    }
-
-    function historyRow(record) {
-        return '<tr>' +
-            '<td>' + subjectContext(record) + '</td>' +
-            '<td>' + programContext(record) + '</td>' +
-            '<td><span class="history-program-type">' +
-                ui.escapeHtml(record.program_type || 'Not specified') + '</span></td>' +
-            '<td>' + curriculumContext(record) + '</td>' +
-            '<td>' + versionContext(record) + '</td>' +
-            '<td>' + ui.statusBadge(record.version_status) + '</td>' +
-            '<td>' + ui.escapeHtml(record.year_level || '—') + '</td>' +
-            '<td>' + ui.escapeHtml(record.semester || '—') + '</td>' +
-            '<td>' + ui.escapeHtml(record.sequence_order ?? '—') + '</td>' +
-            '<td><span class="history-placement-badge">' +
-                (Number(record.is_required) === 1 ? 'Required' : 'Optional') + '</span></td>' +
-            '<td><span class="history-placement">Created: ' +
-                ui.escapeHtml(ui.formatDate(record.version_created_at)) + '<br>Updated: ' +
-                ui.escapeHtml(ui.formatDate(record.version_updated_at)) + '</span></td>' +
-            '</tr>';
-    }
-
+    function plural(n, one, many) { return n + ' ' + (n === 1 ? one : (many || one + 's')); }
     function updateHistorySummary(summary) {
-        document.getElementById('historyStoredPlacements').textContent = summary.stored_placements || 0;
-        document.getElementById('historyPrograms').textContent = summary.programs || 0;
-        document.getElementById('historyCurricula').textContent = summary.curricula || 0;
-        document.getElementById('historyVersions').textContent = summary.curriculum_versions || 0;
-        const dateContext = document.getElementById('historyDateContext');
-        if (summary.earliest_record || summary.latest_record) {
-            dateContext.textContent = 'Earliest stored curriculum record: ' +
-                ui.formatDate(summary.earliest_record) + ' · Latest stored curriculum record: ' +
-                ui.formatDate(summary.latest_record) +
-                '. These are database record dates, not official offering dates.';
-        } else {
-            dateContext.textContent = 'No stored curriculum-version dates are available for this result.';
-        }
+        $('historySummary').textContent = [plural(summary.stored_placements || 0, 'stored placement'), plural(summary.programs || 0, 'program'),
+            plural(summary.curricula || 0, 'curriculum', 'curricula'), plural(summary.curriculum_versions || 0, 'curriculum version')].join(' · ');
     }
-
-    function historyContextParts() {
-        const parts = [];
-        if (history.search.value.trim()) parts.push('Subject: ' + history.search.value.trim());
-        if (history.program.value) parts.push(selectLabel(history.program));
-        if (history.curriculum.value) parts.push(selectLabel(history.curriculum));
-        if (history.version.value) parts.push(selectLabel(history.version));
-        return parts;
+    function historyRow(row, index) {
+        state.historyRows.set(String(index), row);
+        return '<tr><td><span class="history-subject-context"><strong>' + esc(row.subject_code) + '</strong><span>' + esc(row.subject_title) + '</span></span></td>' +
+            '<td><span class="history-code">' + esc(row.program_code) + '</span></td>' +
+            '<td><span class="history-curriculum-context"><strong>' + esc(row.curriculum_code) + '</strong><span>' + esc(row.version_label) + '</span></span></td>' +
+            '<td>' + esc([row.year_level, row.semester].filter(Boolean).join(' · ') || '—') + '</td><td>' + ui.statusBadge(row.version_status) + '</td>' +
+            '<td><button type="button" class="row-action-button history-link" data-history-details="' + index + '">View Details</button></td></tr>';
     }
-
     async function loadHistory(page) {
-        const sequence = ++state.historyRequest;
-        setTableState(history.rows, 11, 'Loading stored subject history…', false);
+        if (!subjectId.value) { clearHistory(); return; }
+        const request = ++state.historyRequest;
+        $('historyCimfButton').disabled = true;
+        setState($('subjectHistoryRows'), 6, 'Loading stored subject history…');
         try {
-            const payload = await ui.fetchJson(endpoint, historyQuery(page));
-            if (sequence !== state.historyRequest) return;
-            state.historyPage = Number(payload.pagination.page);
-            ui.setCount(history.count, Number(payload.pagination.total_records));
-            updateDistinctSelect(history.year, payload.filter_values.year_levels, 'All stored values');
-            updateDistinctSelect(history.semester, payload.filter_values.semesters, 'All stored values');
-            updateDistinctSelect(
-                history.versionStatus,
-                payload.filter_values.version_statuses,
-                'All stored states'
-            );
-            updateHistorySummary(payload.summary);
-            if (payload.history.length) {
-                history.rows.innerHTML = payload.history.map(historyRow).join('');
-            } else {
-                const message = history.search.value.trim()
-                    ? 'No historical subject usage matches the selected filters.'
-                    : 'No historical subject usage found.';
-                setTableState(history.rows, 11, message, false);
-            }
-            ui.renderPagination(history.pagination, payload.pagination, loadHistory);
-            const parts = historyContextParts();
-            history.context.textContent = parts.length
-                ? 'Current context: ' + parts.join(' → ')
-                : 'Showing stored subject placements across all curriculum versions.';
-        } catch (error) {
-            if (sequence !== state.historyRequest) return;
-            ui.setCount(history.count, 0);
-            history.pagination.innerHTML = '';
-            updateHistorySummary({});
-            setTableState(
-                history.rows,
-                11,
-                error.message || 'Stored subject history could not be loaded.',
-                true
-            );
-        }
+            const payload = await ui.fetchJson(api, historyQuery(page));
+            if (request !== state.historyRequest) return;
+            state.historyPage = Number(payload.pagination.page); state.historyRows.clear();
+            ui.setCount($('subjectHistoryCount'), Number(payload.pagination.total_records)); updateHistorySummary(payload.summary);
+            updateFilterOptions(payload.filter_values);
+            if (payload.history.length) $('subjectHistoryRows').innerHTML = payload.history.map(historyRow).join('');
+            else setState($('subjectHistoryRows'), 6, ( $('historyProgram').value || $('historyCurriculum').value || versionId.value || $('historyYear').value || $('historySemester').value || $('historyVersionStatus').value)
+                ? 'No stored history matches the selected filters.' : 'No stored history found for this subject.');
+            ui.renderPagination($('subjectHistoryPagination'), payload.pagination, loadHistory);
+            $('historyCimfButton').disabled = payload.history.length === 0;
+        } catch (error) { if (request === state.historyRequest) setState($('subjectHistoryRows'), 6, error.message || 'Stored subject history could not be loaded.', true); }
     }
-
-    function updateCompareButton() {
-        comparison.button.disabled = !comparison.curriculum.value ||
-            !comparison.versionA.value || !comparison.versionB.value ||
-            comparison.versionA.value === comparison.versionB.value;
+    function clearHistory() {
+        state.historyRequest++;
+        state.historyRows.clear(); $('historySummary').textContent = subjectId.value ? 'No stored history found for this subject.' : 'Search for a subject to view its stored history.';
+        ui.setCount($('subjectHistoryCount'), 0); $('subjectHistoryPagination').innerHTML = '';
+        setState($('subjectHistoryRows'), 6, subjectId.value ? 'No stored history found for this subject.' : 'Search for a subject to view its stored history.');
+        $('historyCimfButton').disabled = true;
     }
-
-    function placementMarkup(record, prefix) {
-        const placementId = record[prefix + '_placement_id'];
-        if (!placementId) return '<span class="history-placement">Not present in this version</span>';
-        return '<span class="history-placement">Year: ' +
-            ui.escapeHtml(record[prefix + '_year_level'] || '—') + '<br>Semester / Term: ' +
-            ui.escapeHtml(record[prefix + '_semester'] || '—') + '<br>Sequence: ' +
-            ui.escapeHtml(record[prefix + '_sequence_order'] ?? '—') + '<br>Placement: ' +
-            (Number(record[prefix + '_is_required']) === 1 ? 'Required' : 'Optional') + '</span>';
+    function updateFilterOptions(values) {
+        const set = (select, key, empty) => {
+            const old = select.value, vals = values[key] || [];
+            select.innerHTML = option('', empty) + vals.map(v => option(v, v)).join('');
+            if (vals.includes(old)) select.value = old;
+        };
+        set($('historyYear'), 'year_levels', 'All Year Levels'); set($('historySemester'), 'semesters', 'All Semesters / Terms');
+        set($('historyVersionStatus'), 'version_statuses', 'All Version Status');
     }
-
-    function changeLabel(type) {
-        return {
-            added: 'Added',
-            removed: 'Removed',
-            changed: 'Placement Changed',
-            unchanged: 'Unchanged',
-        }[type] || 'Unchanged';
+    async function loadPrograms() {
+        const data = await ui.fetchJson(api, { action: 'program_options', page: 1, per_page: 50 });
+        const label = p => p.program_code + ' — ' + p.program_name;
+        if ($('historyProgram')) replaceOptions($('historyProgram'), 'All Programs', data.programs, 'id', label);
+        if (subjectView) await loadCurricula($('historyProgram'), $('historyCurriculum'), false);
     }
-
-    function comparisonRow(record) {
-        const type = String(record.change_type || 'unchanged');
-        return '<tr><td>' + subjectContext(record) + '</td><td><span class="history-change-badge history-change-' +
-            ui.escapeHtml(type) + '">' + ui.escapeHtml(changeLabel(type)) + '</span></td><td>' +
-            placementMarkup(record, 'version_a') + '</td><td>' +
-            placementMarkup(record, 'version_b') + '</td></tr>';
+    async function loadCurricula(program, curriculum, required) {
+        curriculum.disabled = true; curriculum.innerHTML = option('', required ? 'Select a program first' : 'All Curricula');
+        const data = await ui.fetchJson(api, { action: 'curriculum_options', ...(program.value ? { academic_program_id: program.value } : {}), page: 1, per_page: 50 });
+        replaceOptions(curriculum, required ? 'Select a Curriculum' : 'All Curricula', data.curricula, 'id', c => c.curriculum_code + ' — ' + c.curriculum_name);
+        curriculum.disabled = false;
     }
-
-    function updateComparisonSummary(summary) {
-        document.getElementById('comparisonAdded').textContent = summary.added || 0;
-        document.getElementById('comparisonRemoved').textContent = summary.removed || 0;
-        document.getElementById('comparisonChanged').textContent = summary.changed || 0;
-        document.getElementById('comparisonUnchanged').textContent = summary.unchanged || 0;
+    function disableHistoryVersion() {
+        historyVersionPicker.clear(false); versionSearch.disabled = !$('historyCurriculum').value;
+        versionSearch.placeholder = $('historyCurriculum').value ? 'Search version label or academic year' : 'Select a curriculum first';
     }
-
+    function clearCompareVersions() {
+        versionAPicker.clear(false); versionBPicker.clear(false);
+        const enabled = Boolean($('compareCurriculum').value);
+        versionAInput.disabled = !enabled; versionBInput.disabled = !enabled;
+        versionAInput.placeholder = enabled ? 'Search Version A' : 'Select a curriculum first';
+        versionBInput.placeholder = enabled ? 'Search Version B' : 'Select a curriculum first';
+        $('compareValidation').hidden = true; updateCompareAvailability();
+    }
+    function updateCompareAvailability() {
+        const valid = Boolean($('compareCurriculum').value && $('compareVersionA').value && $('compareVersionB').value && $('compareVersionA').value !== $('compareVersionB').value);
+        if (!valid) clearComparisonResult('Select a program, curriculum, and two different versions to compare their stored placements.');
+        else loadComparison(1).catch(error => clearComparisonResult(error.message || 'Versions could not be compared.'));
+    }
+    function placement(record, prefix) {
+        if (!record[prefix + '_placement_id']) return 'Not present';
+        return [record[prefix + '_year_level'], record[prefix + '_semester']].filter(Boolean).join(' · ') || 'Placement not specified';
+    }
+    function changeName(type) { return ({ added: 'Added', removed: 'Removed', moved: 'Moved', placement_type_changed: 'Placement Type Changed', unchanged: 'Unchanged' })[type] || type; }
+    function comparisonRow(record, i) {
+        state.compareRows.set(String(i), record);
+        return '<tr><td><span class="history-subject-context"><strong>' + esc(record.subject_code) + '</strong><span>' + esc(record.subject_title) + '</span></span></td>' +
+            '<td><span class="history-change-badge history-change-' + esc(record.change_type) + '">' + esc(changeName(record.change_type)) + '</span></td>' +
+            '<td>' + esc(placement(record, 'version_a')) + '</td><td>' + esc(placement(record, 'version_b')) + '</td>' +
+            '<td><button type="button" class="row-action-button" data-change-details="' + i + '">View Details</button></td></tr>';
+    }
     function clearComparisonResult(message) {
-        state.comparisonLoaded = false;
-        comparison.pagination.innerHTML = '';
-        ui.setCount(comparison.count, 0);
-        updateComparisonSummary({});
-        setTableState(comparison.rows, 4, message, false);
-        comparison.context.textContent = message;
-        document.getElementById('versionAHeader').textContent = 'Version A Placement';
-        document.getElementById('versionBHeader').textContent = 'Version B Placement';
+        state.comparisonRequest++;
+        state.comparison = null; state.compareRows.clear(); ui.setCount($('comparisonCount'), 0);
+        $('comparisonPagination').innerHTML = ''; $('comparisonPagination').hidden = true; $('comparisonSummary').textContent = message;
+        $('comparisonEmpty').textContent = message; $('comparisonEmpty').hidden = false; $('comparisonTableWrap').hidden = true;
+        $('historyCimfButton').disabled = true;
     }
-
     async function loadComparison(page) {
-        if (comparison.button.disabled && !state.comparisonLoaded) return;
-        const sequence = ++state.comparisonRequest;
-        setTableState(comparison.rows, 4, 'Comparing stored subject placements…', false);
-        try {
-            const payload = await ui.fetchJson(endpoint, {
-                action: 'compare_versions',
-                curriculum_id: comparison.curriculum.value,
-                version_a_id: comparison.versionA.value,
-                version_b_id: comparison.versionB.value,
-                page,
-                per_page: comparison.perPage.value,
-            });
-            if (sequence !== state.comparisonRequest) return;
-            state.comparisonLoaded = true;
-            state.comparisonPage = Number(payload.pagination.page);
-            ui.setCount(comparison.count, Number(payload.pagination.total_records));
-            updateComparisonSummary(payload.summary);
-            document.getElementById('versionAHeader').textContent =
-                payload.version_a.version_label + ' Placement';
-            document.getElementById('versionBHeader').textContent =
-                payload.version_b.version_label + ' Placement';
-            if (payload.comparison.length) {
-                comparison.rows.innerHTML = payload.comparison.map(comparisonRow).join('');
-            } else {
-                setTableState(
-                    comparison.rows,
-                    4,
-                    'Neither selected curriculum version has stored subject placements.',
-                    false
-                );
-            }
-            ui.renderPagination(comparison.pagination, payload.pagination, loadComparison);
-            comparison.context.textContent = payload.curriculum.curriculum_code + ' — ' +
-                payload.curriculum.curriculum_name + ': ' + payload.version_a.version_label +
-                ' compared with ' + payload.version_b.version_label + '.';
-        } catch (error) {
-            if (sequence !== state.comparisonRequest) return;
-            state.comparisonLoaded = false;
-            ui.setCount(comparison.count, 0);
-            comparison.pagination.innerHTML = '';
-            updateComparisonSummary({});
-            setTableState(
-                comparison.rows,
-                4,
-                error.message || 'The curriculum versions could not be compared.',
-                true
-            );
-        }
-    }
-
-    history.program?.addEventListener('change', async function () {
-        await loadCurricula('history');
-        await loadHistory(1);
-    });
-    history.curriculum?.addEventListener('change', async function () {
-        await loadVersions('history');
-        await loadHistory(1);
-    });
-    history.year?.addEventListener('change', function () { loadHistory(1); });
-    history.semester?.addEventListener('change', function () { loadHistory(1); });
-    history.versionStatus?.addEventListener('change', function () { loadHistory(1); });
-    history.perPage?.addEventListener('change', function () { loadHistory(1); });
-    history.search?.addEventListener('input', ui.debounce(function () { loadHistory(1); }, 300));
-
-    document.getElementById('clearSubjectHistoryFilters')?.addEventListener('click', async function () {
-        state.clearingFilters = true;
-        history.search.value = '';
-        history.program.value = '';
-        resetSelect(history.curriculum, 'Select a program to narrow curricula', true);
-        historyVersionAutocomplete?.clear();
-        historyVersionInput.disabled = true;
-        historyVersionInput.placeholder = 'Select a curriculum to narrow versions';
-        history.year.value = '';
-        history.semester.value = '';
-        history.versionStatus.value = '';
-        history.perPage.value = '20';
-        state.clearingFilters = false;
-        await loadHistory(1);
-    });
-
-    comparison.program?.addEventListener('change', async function () {
-        await loadCurricula('comparison');
-        clearComparisonResult('Select a curriculum and two versions to compare their subject placements.');
-    });
-    comparison.curriculum?.addEventListener('change', async function () {
-        await loadVersions('comparison');
-        clearComparisonResult('Select two curriculum versions to compare their subject placements.');
-    });
-    comparison.perPage?.addEventListener('change', function () {
-        if (state.comparisonLoaded) loadComparison(1);
-    });
-    comparison.button?.addEventListener('click', function () { loadComparison(1); });
-
-    document.getElementById('clearCurriculumHistoryFilters')?.addEventListener('click', function () {
-        comparison.program.value = '';
-        resetSelect(comparison.curriculum, 'Select an academic program first', true);
-        resetComparisonVersions('Select a curriculum first');
-        comparison.perPage.value = '20';
-        clearComparisonResult('Select a program, curriculum, and two versions to compare their stored subject placements.');
-    });
-
-    async function initialize() {
-        try {
-            await loadPrograms();
-        } catch (error) {
-            if (history.program) history.program.innerHTML = optionMarkup('', 'Academic programs unavailable');
-            if (comparison.program) comparison.program.innerHTML = optionMarkup('', 'Academic programs unavailable');
-        }
-        if (activeView === 'subject') {
-            await loadHistory(1);
+        const request = ++state.comparisonRequest;
+        const data = await ui.fetchJson(api, { action: 'compare_versions', curriculum_id: $('compareCurriculum').value,
+            version_a_id: $('compareVersionA').value, version_b_id: $('compareVersionB').value, page, per_page: 20 });
+        if (request !== state.comparisonRequest) return;
+        state.comparison = data; state.compareRows.clear(); ui.setCount($('comparisonCount'), Number(data.pagination.total_records));
+        const s = data.summary, changes = Number(s.added) + Number(s.removed) + Number(s.moved) + Number(s.placement_type_changed);
+        $('comparisonSummary').textContent = 'Version A: ' + s.version_a_subjects + ' subjects · ' + ui.formatUnits(s.version_a_units) + ' units   |   Version B: ' + s.version_b_subjects + ' subjects · ' + ui.formatUnits(s.version_b_units) + ' units   |   Changes: ' + s.added + ' Added · ' + s.removed + ' Removed · ' + s.moved + ' Moved' + (s.placement_type_changed ? ' · ' + s.placement_type_changed + ' Placement Type Changed' : '');
+        $('historyCimfButton').disabled = false;
+        if (!data.comparison.length || changes === 0) {
+            $('comparisonEmpty').textContent = 'No subject placement differences were found between the selected stored versions.';
+            $('comparisonEmpty').hidden = false; $('comparisonTableWrap').hidden = true; $('comparisonPagination').hidden = true;
         } else {
-            clearComparisonResult('Select a program, curriculum, and two versions to compare their stored subject placements.');
+            $('comparisonEmpty').hidden = true; $('comparisonTableWrap').hidden = false;
+            $('comparisonRows').innerHTML = data.comparison.map(comparisonRow).join('');
+            $('comparisonPagination').hidden = Number(data.pagination.total_pages) <= 1;
         }
+        ui.renderPagination($('comparisonPagination'), data.pagination, loadComparison);
+    }
+    function explainChange(record) {
+        const a = placement(record, 'version_a'), b = placement(record, 'version_b');
+        if (record.change_type === 'removed') return 'The subject exists in Version A but is not present in Version B.';
+        if (record.change_type === 'added') return 'The subject is not present in Version A and appears in Version B.';
+        if (record.change_type === 'moved') return 'The stored placement changed from ' + a + ' to ' + b + '.';
+        if (record.change_type === 'placement_type_changed') return 'The stored placement type changed from ' + (Number(record.version_a_is_required) ? 'Required' : 'Optional') + ' to ' + (Number(record.version_b_is_required) ? 'Required' : 'Optional') + '.';
+        return 'The stored placement is the same in both selected versions.';
+    }
+    async function showHistoryDetails(index) {
+        const row = state.historyRows.get(String(index)); if (!row) return;
+        try {
+            const { record: r } = await ui.fetchJson(api, { action: 'details', placement_id: row.placement_id });
+            $('historyDetailsContext').textContent = r.subject_code + ' · ' + r.subject_title;
+            const entries = [['Subject', r.subject_code + ' — ' + r.subject_title], ['Program / Strand', r.program_code + ' — ' + r.program_name], ['Curriculum', r.curriculum_code + ' — ' + r.curriculum_name], ['Curriculum Version', r.version_label + ' · ' + r.version_status], ['Year Level', r.year_level || '—'], ['Semester / Term', r.semester || '—'], ['Placement Type', Number(r.is_required) === 1 ? 'Required' : 'Optional'], ['Stored Date', ui.formatDate(r.placement_created_at)], ['Units', ui.formatUnits(r.units)], ['Last Updated Date', ui.formatDate(r.placement_updated_at)], ['Program Type', r.program_type || '—']];
+            $('historyDetailsBody').innerHTML = entries.map(([k,v]) => '<div><dt class="eyebrow">' + esc(k) + '</dt><dd>' + esc(v) + '</dd></div>').join('');
+            $('historyMappingLink').href = 'subject_mapping.php?curriculum_version_id=' + Number(r.curriculum_version_id) + '&subject_id=' + Number(r.subject_id);
+            detailsModal.open();
+        } catch (error) { ui.showToast(error.message || 'History details could not be loaded.', 'error'); }
+    }
+    function showChangeDetails(index) {
+        const r = state.compareRows.get(String(index)); if (!r || !state.comparison) return;
+        $('comparisonDetailsContext').textContent = r.subject_code + ' · ' + r.subject_title;
+        const a = placement(r, 'version_a'), b = placement(r, 'version_b');
+        $('comparisonDetailsVersions').innerHTML = '<article><span class="eyebrow">VERSION A</span><strong>' + esc(state.comparison.version_a.version_label) + '</strong><p>Record state: ' + esc(state.comparison.version_a.status) + '<br>' + esc(a) + (r.version_a_placement_id ? '<br>' + (Number(r.version_a_is_required) ? 'Required' : 'Optional') : '') + '</p></article><article><span class="eyebrow">VERSION B</span><strong>' + esc(state.comparison.version_b.version_label) + '</strong><p>Record state: ' + esc(state.comparison.version_b.status) + '<br>' + esc(b) + (r.version_b_placement_id ? '<br>' + (Number(r.version_b_is_required) ? 'Required' : 'Optional') : '') + '</p></article>';
+        $('comparisonDetailsChange').innerHTML = '<span class="history-change-badge history-change-' + esc(r.change_type) + '">' + esc(changeName(r.change_type)) + '</span>';
+        $('comparisonDetailsExplanation').textContent = explainChange(r); changeModal.open();
     }
 
+    if (subjectView) {
+        $('moreHistoryFilters').addEventListener('click', function () {
+            const open = this.getAttribute('aria-expanded') !== 'true'; this.setAttribute('aria-expanded', String(open)); $('historyMoreFilters').hidden = !open;
+            this.innerHTML = 'More Filters <i class="fa-solid fa-chevron-' + (open ? 'up' : 'down') + '"></i>';
+        });
+        $('historyProgram').addEventListener('change', async () => { await loadCurricula($('historyProgram'), $('historyCurriculum'), false); disableHistoryVersion(); loadHistory(1); });
+        $('historyCurriculum').addEventListener('change', () => { disableHistoryVersion(); loadHistory(1); });
+        [$('historyYear'), $('historySemester'), $('historyVersionStatus')].forEach(select => select.addEventListener('change', () => loadHistory(1)));
+    }
+    $('clearSubjectHistoryFilters')?.addEventListener('click', async () => { subjectPicker.clear(false); $('historyProgram').value = ''; await loadCurricula($('historyProgram'), $('historyCurriculum'), false); $('historyYear').value = ''; $('historySemester').value = ''; $('historyVersionStatus').value = ''; $('historyMoreFilters').hidden = true; $('moreHistoryFilters').setAttribute('aria-expanded','false'); historyVersionPicker.clear(false); clearHistory(); });
+    $('subjectHistoryRows')?.addEventListener('click', e => { const b = e.target.closest('[data-history-details]'); if (b) showHistoryDetails(b.dataset.historyDetails); });
+    $('comparisonRows')?.addEventListener('click', e => { const b = e.target.closest('[data-change-details]'); if (b) showChangeDetails(b.dataset.changeDetails); });
+    $('historyCimfButton').addEventListener('click', () => window.CSMSCIMF?.open(subjectView ? 'summarize' : 'explain'));
+    async function initialize() {
+        if ($('historyCimfButton')) $('historyCimfButton').disabled = true;
+        try { await loadPrograms(); } catch (error) { if (subjectView) $('historySummary').textContent = error.message; }
+        if (subjectView) clearHistory(); else clearComparisonResult('Select a program, curriculum, and two different versions to compare their stored placements.');
+    }
     initialize();
 }());

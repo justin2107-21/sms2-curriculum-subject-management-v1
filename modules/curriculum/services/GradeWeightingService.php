@@ -80,6 +80,9 @@ class GradeWeightingService
             throw new DomainNotFoundException('Curriculum subject placement not found.');
         }
         $scheme = $this->weighting->findSchemeByPlacement($placementId);
+        $isDemoContext = stripos((string)($placement['curriculum_code'] ?? ''), 'demo') !== false
+            || stripos((string)($placement['version_label'] ?? ''), 'demo') !== false;
+        $placement['is_demo'] = $isDemoContext ? 1 : 0;
         return [
             'placement' => $placement,
             'scheme' => $scheme ? $this->decorateScheme($scheme) : null,
@@ -338,6 +341,210 @@ class GradeWeightingService
             throw $error;
         }
         return $this->decorateScheme($scheme);
+    }
+
+    public function saveConfiguration(int $placementId, int $versionId, array $input, int $actorId): array
+    {
+        $components = $this->validatedConfigurationComponents($input['components'] ?? null);
+        $total = array_sum(array_column($components, '_weight_hundredths'));
+        if ($total !== 10000) {
+            throw new DomainValidationException('Component weights must total exactly 100%.');
+        }
+
+        $this->db->begin_transaction();
+        try {
+            $placement = $this->placements->findDetailedById($placementId);
+            if (!$placement) {
+                throw new DomainNotFoundException('Curriculum subject placement not found.');
+            }
+            if ((int)$placement['curriculum_version_id'] !== $versionId) {
+                throw new DomainValidationException('The selected subject is not mapped to this curriculum version.');
+            }
+
+            $scheme = $this->weighting->findSchemeByPlacement($placementId);
+            if (!$scheme) {
+                $schemeId = $this->weighting->createScheme([
+                    'curriculum_version_subject_id' => $placementId,
+                    'description' => null,
+                ], $actorId);
+                audit_log_required(
+                    'GRADE_WEIGHTING_SCHEME_CREATE',
+                    'grade_weighting_scheme',
+                    $schemeId,
+                    'Grade weighting configuration created.',
+                    $this->weightingAuditContext($placement)
+                );
+                $existing = [];
+            } else {
+                $schemeId = (int)$scheme['id'];
+                if (!$this->weighting->findSchemeById($schemeId, true)) {
+                    throw new DomainNotFoundException('Grade weighting scheme not found.');
+                }
+                $existing = $this->weighting->allComponents($schemeId, true);
+            }
+
+            $byId = [];
+            foreach ($existing as $component) $byId[(int)$component['id']] = $component;
+            $incomingIds = [];
+            foreach ($components as $component) {
+                if ($component['id'] === null) continue;
+                if (!isset($byId[$component['id']])) {
+                    throw new DomainValidationException('A component does not belong to this configuration.');
+                }
+                $incomingIds[$component['id']] = true;
+            }
+
+            // Remove omitted rows first so their unique names can be reused in this save.
+            foreach ($byId as $componentId => $old) {
+                if (isset($incomingIds[$componentId])) continue;
+                $this->weighting->deleteComponent($componentId);
+                audit_log_required(
+                    'GRADE_WEIGHTING_COMPONENT_REMOVE',
+                    'grade_weighting_component',
+                    $componentId,
+                    'Grade weighting component removed.',
+                    $this->weightingAuditContext($placement) + [
+                        'component_name' => (string)$old['component_name'],
+                        'weight_percentage' => (string)$old['weight_percentage'],
+                    ]
+                );
+            }
+
+            // Temporary names allow two existing component names to be swapped atomically.
+            foreach ($components as $index => $component) {
+                $componentId = $component['id'];
+                if ($componentId === null) continue;
+                $old = $byId[$componentId];
+                if (trim((string)$old['component_name']) === $component['component_name']) continue;
+                $temporary = '__csms_tmp_' . $componentId . '_' . bin2hex(random_bytes(8));
+                $this->weighting->updateComponent($componentId, [
+                    'component_name' => $temporary,
+                    'weight_percentage' => (string)$old['weight_percentage'],
+                    'sequence_order' => (int)($old['sequence_order'] ?? ($index + 1)),
+                ]);
+            }
+
+            foreach ($components as $index => $component) {
+                $componentId = $component['id'];
+                $weight = $component['weight_percentage'];
+                unset($component['_weight_hundredths'], $component['id']);
+                $component['scheme_id'] = $schemeId;
+                $component['sequence_order'] = $index + 1;
+                if ($componentId !== null) {
+                    $old = $byId[$componentId];
+                    $changed = trim((string)$old['component_name']) !== $component['component_name']
+                        || $this->decimalToHundredths((string)$old['weight_percentage']) !== $this->decimalToHundredths($weight)
+                        || (int)($old['sequence_order'] ?? 0) !== $component['sequence_order'];
+                    if ($changed) {
+                        $this->weighting->updateComponent($componentId, $component);
+                        audit_log_required(
+                            'GRADE_WEIGHTING_COMPONENT_UPDATE',
+                            'grade_weighting_component',
+                            $componentId,
+                            'Grade weighting component updated.',
+                            $this->weightingAuditContext($placement) + [
+                                'component_name' => $component['component_name'],
+                                'weight_percentage' => $component['weight_percentage'],
+                            ]
+                        );
+                    }
+                } else {
+                    $componentId = $this->weighting->createComponent($component, $actorId);
+                    audit_log_required(
+                        'GRADE_WEIGHTING_COMPONENT_CREATE',
+                        'grade_weighting_component',
+                        $componentId,
+                        'Grade weighting component added.',
+                        $this->weightingAuditContext($placement) + [
+                            'component_name' => $component['component_name'],
+                            'weight_percentage' => $component['weight_percentage'],
+                        ]
+                    );
+                }
+            }
+
+            // Touch the configuration row so its last-updated timestamp tracks each save.
+            $this->weighting->updateScheme($schemeId, $scheme['description'] ?? null);
+            audit_log_required(
+                'GRADE_WEIGHTING_CONFIGURATION_SAVE',
+                'grade_weighting_scheme',
+                $schemeId,
+                'Grade weighting configuration saved at exactly 100%.',
+                $this->weightingAuditContext($placement) + ['component_count' => count($components)]
+            );
+            $savedScheme = $this->weighting->findDetailedSchemeById($schemeId);
+            $savedComponents = $this->weighting->allComponents($schemeId);
+            if (!$savedScheme) throw new RuntimeException('Saved weighting configuration could not be loaded.');
+            $this->db->commit();
+        } catch (Throwable $error) {
+            $this->db->rollback();
+            if ($error instanceof mysqli_sql_exception && (int)$error->getCode() === 1062) {
+                throw new DomainConflictException('A component with this name already exists in this configuration.');
+            }
+            throw $error;
+        }
+        return [
+            'scheme' => $this->decorateScheme($savedScheme),
+            'components' => $savedComponents,
+        ];
+    }
+
+    private function validatedConfigurationComponents(mixed $raw): array
+    {
+        if (is_string($raw)) $raw = json_decode($raw, true);
+        if (!is_array($raw) || !$raw || count($raw) > 100) {
+            throw new DomainValidationException('Add between 1 and 100 weighting components.');
+        }
+        $seen = [];
+        $seenIds = [];
+        $normalized = [];
+        foreach ($raw as $item) {
+            if (!is_array($item)) throw new DomainValidationException('Invalid weighting component data.');
+            $name = trim((string)($item['component_name'] ?? ''));
+            if ($name === '' || mb_strlen($name) > 150) {
+                throw new DomainValidationException('Component names are required and must be 150 characters or fewer.');
+            }
+            $key = mb_strtolower($name, 'UTF-8');
+            if (isset($seen[$key])) {
+                throw new DomainValidationException('Component names must be unique without regard to letter case.');
+            }
+            $seen[$key] = true;
+            $weight = $item['weight_percentage'] ?? null;
+            if (!is_scalar($weight) || !preg_match('/^(?:\d{1,3})(?:\.\d{1,2})?$/', (string)$weight)) {
+                throw new DomainValidationException('Component weight must be a number with at most two decimal places.');
+            }
+            $weightHundredths = $this->decimalToHundredths((string)$weight);
+            if ($weightHundredths < 1 || $weightHundredths > 10000) {
+                throw new DomainValidationException('Component weight must be greater than 0% and no more than 100%.');
+            }
+            $idRaw = $item['id'] ?? null;
+            $componentId = $idRaw === null || $idRaw === '' ? null : DomainValidator::positiveId($idRaw, 'Weighting component');
+            if ($componentId !== null) {
+                if (isset($seenIds[$componentId])) {
+                    throw new DomainValidationException('A component can appear only once in a configuration.');
+                }
+                $seenIds[$componentId] = true;
+            }
+            $normalized[] = [
+                'id' => $componentId,
+                'component_name' => $name,
+                'weight_percentage' => $this->formatHundredths($weightHundredths),
+                'sequence_order' => count($normalized) + 1,
+                '_weight_hundredths' => $weightHundredths,
+            ];
+        }
+        return $normalized;
+    }
+
+    private function weightingAuditContext(array $placement): array
+    {
+        return [
+            'curriculum_version_subject_id' => (int)$placement['id'],
+            'subject_id' => (int)$placement['subject_id'],
+            'subject_code' => (string)$placement['subject_code'],
+            'curriculum_version_id' => (int)$placement['curriculum_version_id'],
+            'version_label' => (string)$placement['version_label'],
+        ];
     }
 
     private function assertProjectedTotal(string $existingTotal, string $newWeight): void

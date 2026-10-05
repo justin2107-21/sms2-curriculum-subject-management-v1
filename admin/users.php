@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../shared/bootstrap.php';
 require_permission('rbac.manage');
 require_once __DIR__ . '/SystemAdminRepository.php';
+require_once __DIR__ . '/../database/ProvisionalRoles.php';
 
 $repository = new SystemAdminRepository(authorization_connection());
 $totalUsers = $repository->userCount();
@@ -15,9 +16,11 @@ $scriptVersion = (string)filemtime(__DIR__ . '/../js/dashboard.js');
 <head>
   <?php require __DIR__ . '/../shared/favicon.php'; ?>
   <meta charset="UTF-8"/>
+  <meta name="csrf-token" content="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Users - BCP Curriculum &amp; Subject Management</title>
   <link rel="stylesheet" href="../css/dashboard.css"/>
+  <link rel="stylesheet" href="../modules/curriculum/assets/curriculum.css?v=<?= (int)filemtime(__DIR__.'/../modules/curriculum/assets/curriculum.css') ?>"/>
   <link rel="stylesheet" href="../css/system-admin.css?v=<?= $styleVersion ?>"/>
   <link rel="stylesheet" href="../css/csms-typography.css?v=<?= $typographyVersion ?>"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
@@ -34,19 +37,20 @@ require __DIR__ . '/../shared/sidebar.php';
     <div class="page-title-bar">
       <div>
         <h1 class="page-title"><i class="fa-solid fa-users"></i> Users</h1>
-        <p class="system-admin-subtitle">Read-only view of user accounts and authoritative RBAC role assignments.</p>
+        <p class="system-admin-subtitle">Manage prototype accounts and authoritative RBAC role assignments.</p>
       </div>
     </div>
+    <div class="system-admin-summary"><button class="primary-action-button" type="button" id="adminNewUser"><i class="fa-solid fa-plus"></i> Create User</button></div>
     <section class="system-admin-card" aria-label="User accounts">
       <p class="system-admin-summary">
         <?= number_format($totalUsers) ?> account<?= $totalUsers === 1 ? '' : 's' ?>.
-        This page does not create, edit, or delete users.
+        Legacy accounts are retained. Use Account Settings for your own profile.
         <?= $totalUsers > count($users) ? 'Showing the first 100 accounts.' : '' ?>
       </p>
       <?php if ($users !== []): ?>
       <div class="system-admin-table-wrap">
         <table class="system-admin-table">
-          <thead><tr><th>Username</th><th>Name</th><th>Email</th><th>RBAC Roles</th><th>Created</th></tr></thead>
+          <thead><tr><th>Username</th><th>Name</th><th>Email</th><th>RBAC Roles</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
           <tbody>
           <?php foreach ($users as $user): ?>
             <tr>
@@ -54,8 +58,9 @@ require __DIR__ . '/../shared/sidebar.php';
               <td class="system-admin-name"><?= htmlspecialchars(trim((string)$user['first_name'] . ' ' . (string)$user['last_name']), ENT_QUOTES, 'UTF-8') ?></td>
               <td><?= htmlspecialchars((string)$user['email'], ENT_QUOTES, 'UTF-8') ?></td>
               <td><?= $user['role_names'] === null ? '<span class="system-admin-muted">No RBAC role</span>' : htmlspecialchars((string)$user['role_names'], ENT_QUOTES, 'UTF-8') ?></td>
+              <td><?= $user['is_active'] ? 'Active' : 'Inactive' ?></td>
               <td><?= htmlspecialchars((string)$user['created_at'], ENT_QUOTES, 'UTF-8') ?></td>
-            </tr>
+            <td><?php if((int)$user['id'] !== (int)current_user_id() && in_array($user['role_names'], array_column(ProvisionalRoles::definitions(), 'label'), true)): ?><button class="button-muted" type="button" data-admin-edit="<?= (int)$user['id'] ?>">Edit User</button><?php endif; ?></td></tr>
           <?php endforeach; ?>
           </tbody>
         </table>
@@ -67,7 +72,9 @@ require __DIR__ . '/../shared/sidebar.php';
   </main>
   <footer class="footer">eLearning Commons &copy; 2026</footer>
 </div>
+<?php require __DIR__.'/account_form.php'; ?>
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
-<script src="../js/dashboard.js?v=<?= $scriptVersion ?>"></script>
+<script src="../modules/curriculum/assets/curriculum-common.js?v=<?= (int)filemtime(__DIR__.'/../modules/curriculum/assets/curriculum-common.js') ?>"></script>
+<script src="../js/account-administration.js?v=<?= (int)filemtime(__DIR__.'/../js/account-administration.js') ?>"></script>
 </body>
 </html>

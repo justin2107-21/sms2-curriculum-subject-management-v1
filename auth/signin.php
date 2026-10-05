@@ -98,7 +98,7 @@ document.getElementById('signinForm').addEventListener('submit', async function 
     try {
         const data = await fetch('../shared/auth_actions.php', { method: 'POST', body: fd }).then(r => r.json());
         if (data.success) {
-            window.location.href = '../dashboard/loading.php';
+            window.location.href = data.redirect || '../dashboard/loading.php';
         } else {
             showError(data.message);
             btn.disabled  = false;

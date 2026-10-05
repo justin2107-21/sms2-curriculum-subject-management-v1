@@ -243,7 +243,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
     <?php if ($isCurriculaPage): ?>
     <section class="version-workspace" id="versionWorkspace" hidden aria-labelledby="workspaceVersionTitle">
       <a class="text-back-button" id="backToCurricula" href="curricula.php?program_id=<?= $initialProgramId === false ? '' : (int)$initialProgramId ?>&amp;curriculum_id=<?= $initialCurriculumId === false ? '' : (int)$initialCurriculumId ?>"><i class="fa-solid fa-arrow-left"></i> Back to <span id="versionBackCurriculumLabel">Curriculum</span></a>
-      <div class="version-workspace-header"><div class="version-heading"><div class="version-title-line"><h2 id="workspaceVersionTitle"></h2><span id="workspaceVersionStatus"></span></div><nav class="subject-breadcrumb" aria-label="Curriculum context"><a id="workspaceProgramCode" href="curricula.php"></a><span class="breadcrumb-separator" aria-hidden="true">›</span><a id="workspaceCurriculumCode" href="curricula.php"></a><span class="breadcrumb-separator" aria-hidden="true">›</span><strong id="workspaceBreadcrumbVersion"></strong></nav></div><div class="version-workspace-actions"><?php if ($canExportCurricula): ?><a class="secondary-action-button" id="versionExportLink" href="curriculum_export.php"><i class="fa-solid fa-download"></i> Export</a><?php endif; ?><button type="button" class="primary-action-button" id="assignSubjectButton" disabled><i class="fa-solid fa-diagram-project"></i> Manage Subject Mapping</button></div></div>
+      <div class="version-workspace-header"><div class="version-heading"><div class="version-title-line"><h2 id="workspaceVersionTitle"></h2><span id="workspaceVersionStatus"></span></div><nav class="subject-breadcrumb" aria-label="Curriculum context"><a id="workspaceProgramCode" href="curricula.php"></a><span class="breadcrumb-separator" aria-hidden="true">›</span><a id="workspaceCurriculumCode" href="curricula.php"></a><span class="breadcrumb-separator" aria-hidden="true">›</span><strong id="workspaceBreadcrumbVersion"></strong></nav></div><div class="version-workspace-actions"><?php if ($canExportCurricula): ?><a class="secondary-action-button" id="versionExportLink" href="curriculum_export.php"><i class="fa-solid fa-download"></i> Export</a><?php endif; ?><button type="button" class="primary-action-button" id="assignSubjectButton" disabled><i class="fa-solid fa-diagram-project"></i> <?= $canAssignSubjects ? 'Manage Subject Mapping' : 'View Subject Mapping' ?></button></div></div>
       <div id="yearTabs" class="year-tabs" role="tablist" aria-label="Academic year"></div>
       <div id="placementRows" class="placement-groups"><p class="state-cell">Select a curriculum version to view assigned subjects.</p></div>
       <div class="pagination-bar" id="placementPagination"></div>
@@ -392,6 +392,24 @@ require __DIR__ . '/../../../shared/sidebar.php';
         <label class="form-field"><span>Technical System State <strong>*</strong></span><select name="status" id="versionStatus" required><option value="draft">Draft</option><option value="active">Active</option><option value="archived">Archived</option></select><small>These are system record states, not institutional approval statuses.</small></label>
       </div>
       <div class="modal-actions"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="submit" class="button-primary">Create Version</button></div>
+    </form>
+  </section>
+</div>
+<?php endif; ?>
+
+<?php if ($isCurriculaPage && $canUpdateCurricula): ?>
+<div class="curriculum-modal" id="versionRenameModal" hidden>
+  <div class="modal-backdrop" data-modal-close></div>
+  <section class="modal-dialog modal-dialog-small" role="dialog" aria-modal="true" aria-labelledby="versionRenameTitle">
+    <div class="modal-header">
+      <div><h2 id="versionRenameTitle">Edit Version Name</h2><p class="modal-context">Rename this curriculum version.</p></div>
+      <button type="button" class="modal-close-button" data-modal-close aria-label="Close version rename form"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <form id="versionRenameForm" class="domain-form">
+      <input type="hidden" name="id" id="versionRenameId"/>
+      <div class="form-error" role="alert" hidden></div>
+      <label class="form-field"><span>Version Name <strong>*</strong></span><input name="version_label" id="versionRenameLabel" maxlength="100" required/></label>
+      <div class="modal-actions"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="submit" class="button-primary">Save Name</button></div>
     </form>
   </section>
 </div>

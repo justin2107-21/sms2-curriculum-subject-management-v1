@@ -50,7 +50,7 @@ class SubjectEquivalencyRepository
 
     public function paginate(array $query): array
     {
-        $conditions = [];
+        $conditions = ["equivalencies.archived_at IS NULL", "equivalencies.decision_status <> 'pending'"];
         $types = '';
         $params = [];
         if ($query['search'] !== null) {
@@ -135,20 +135,31 @@ class SubjectEquivalencyRepository
         $stmt = $this->db->prepare(
             'UPDATE subject_equivalencies
              SET decision_status = ?, remarks = ?, reviewed_by = ?,
-                 reviewed_at = IF(? = 1, CURRENT_TIMESTAMP, NULL)
-             WHERE id = ?'
+                 reviewed_at = CURRENT_TIMESTAMP
+             WHERE id = ? AND archived_at IS NULL'
         );
-        $isFinal = $isFinalDecision ? 1 : 0;
         $stmt->bind_param(
-            'ssiii',
+            'ssii',
             $data['decision_status'],
             $data['remarks'],
             $reviewedBy,
-            $isFinal,
             $id
         );
         $stmt->execute();
         $stmt->close();
+    }
+
+    public function archive(int $id, int $actorId): void
+    {
+        $stmt = $this->db->prepare(
+            'UPDATE subject_equivalencies SET archived_at = UTC_TIMESTAMP(), archived_by = ?
+             WHERE id = ? AND archived_at IS NULL'
+        );
+        $stmt->bind_param('ii', $actorId, $id);
+        $stmt->execute();
+        $changed = $stmt->affected_rows > 0;
+        $stmt->close();
+        if (!$changed) throw new DomainConflictException('This equivalency record is already archived.');
     }
 
     public function usageContext(int $subjectId): array
@@ -176,7 +187,8 @@ class SubjectEquivalencyRepository
             $this->db,
             'SELECT programs.program_code, programs.program_name,
                     curricula.curriculum_code, curricula.curriculum_name,
-                    versions.version_label, versions.status AS version_status'
+                    versions.version_label, versions.status AS version_status,
+                    placements.year_level, placements.semester'
             . $joins .
             ' ORDER BY programs.program_code ASC, curricula.curriculum_code ASC,
                        versions.version_label ASC LIMIT 10',
@@ -185,10 +197,44 @@ class SubjectEquivalencyRepository
         );
         $records = $contextStmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $contextStmt->close();
+        $assignmentStmt = RepositoryQuery::execute(
+            $this->db,
+            'SELECT DISTINCT programs.program_code, programs.program_name
+             FROM program_subject_assignments AS assignments
+             INNER JOIN academic_programs AS programs
+                ON programs.id = assignments.academic_program_id
+             WHERE assignments.subject_id = ? AND assignments.status = \'active\'
+             ORDER BY programs.program_code ASC LIMIT 20',
+            'i',
+            [$subjectId]
+        );
+        $programAssignments = $assignmentStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $assignmentStmt->close();
+        $programCountStmt = RepositoryQuery::execute(
+            $this->db,
+            'SELECT COUNT(DISTINCT program_code) AS total FROM (
+                SELECT programs.program_code
+                FROM curriculum_version_subjects placements
+                INNER JOIN curriculum_versions versions ON versions.id = placements.curriculum_version_id
+                INNER JOIN curricula ON curricula.id = versions.curriculum_id
+                INNER JOIN academic_programs programs ON programs.id = curricula.academic_program_id
+                WHERE placements.subject_id = ?
+                UNION
+                SELECT programs.program_code
+                FROM program_subject_assignments assignments
+                INNER JOIN academic_programs programs ON programs.id = assignments.academic_program_id
+                WHERE assignments.subject_id = ? AND assignments.status = \'active\'
+             ) AS program_contexts',
+            'ii',
+            [$subjectId, $subjectId]
+        );
+        $programCount = (int)$programCountStmt->get_result()->fetch_assoc()['total'];
+        $programCountStmt->close();
         foreach (['placements', 'programs', 'curricula', 'curriculum_versions'] as $key) {
             $summary[$key] = (int)$summary[$key];
         }
-        return ['summary' => $summary, 'records' => $records];
+        $summary['programs'] = $programCount;
+        return ['summary' => $summary, 'program_assignments' => $programAssignments, 'records' => $records];
     }
 
     private function detailSelect(): string
@@ -198,7 +244,7 @@ class SubjectEquivalencyRepository
                        equivalencies.decision_status, equivalencies.remarks,
                        equivalencies.reviewed_by, equivalencies.reviewed_at,
                        equivalencies.created_by, equivalencies.created_at,
-                       equivalencies.updated_at,
+                       equivalencies.updated_at, equivalencies.archived_at,
                        subject_a.subject_code AS subject_a_code,
                        subject_a.subject_title AS subject_a_title,
                        subject_b.subject_code AS subject_b_code,

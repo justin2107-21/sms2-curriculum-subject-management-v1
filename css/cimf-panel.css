@@ -1,0 +1,38 @@
+/* Overlay geometry only; controls reuse curriculum.css and CSMS typography. */
+#csmsCimfPanel, #csmsCimfLauncher { font-family: var(--sms2-font-family, 'Segoe UI', sans-serif); }
+#csmsCimfLauncher { position: fixed; right: 24px; bottom: 24px; z-index: 1150; display: flex; align-items: center; justify-content: center; width: 60px; height: 60px; padding: 0; border: 1px solid #dbe3ee; border-radius: 50%; background: #fff; box-shadow: 0 2px 10px rgba(15,23,42,.12); cursor: pointer; }
+#csmsCimfLauncher img { display: block; width: 42px; height: 42px; object-fit: contain; }
+#csmsCimfLauncher:hover { border-color: #9bb0d7; box-shadow: 0 4px 14px rgba(15,23,42,.16); }
+#csmsCimfLauncher:active { box-shadow: 0 2px 8px rgba(15,23,42,.12); }
+#csmsCimfPanel { position: fixed; inset: 0 0 0 auto; width: 420px; height: 100dvh; z-index: 1200; background: #fff; color: #1f2937; border-left: 1px solid #cbd5e1; box-shadow: -2px 0 10px rgba(15,23,42,.05); box-sizing: border-box; }
+#csmsCimfPanel[hidden], #csmsCimfLauncher[hidden], #csmsCimfPanel [hidden] { display: none !important; }
+#csmsCimfPanel .cimf-panel-surface { display: flex; flex-direction: column; height: 100%; min-width: 0; }
+#csmsCimfPanel .cimf-panel-header { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 18px 20px; background: var(--sms2-sidebar-blue, #1a3a8c); color: #fff; flex: 0 0 auto; }
+#csmsCimfPanel h2 { font-size: var(--sms2-text-lg, 1.125rem); font-weight: 700; margin: 0; line-height: 1.3; }
+#csmsCimfPanel .cimf-panel-header p { font-size: var(--sms2-text-xs); margin: 6px 0 0; }
+#csmsCimfPanel .cimf-panel-header .button-muted { background: transparent; border-color: transparent; color: #fff; }
+#csmsCimfPanel .cimf-panel-header .button-muted:hover { background: var(--sms2-sidebar-blue-hover, #142f73); }
+#csmsCimfPanel .cimf-panel-body { overflow-y: auto; overflow-x: hidden; flex: 1 1 auto; min-height: 0; padding: 18px 20px; overscroll-behavior: contain; }
+#csmsCimfPanel .cimf-context-card { padding: 14px 16px; background: #f4f8ff; border-color: #dbeafe; box-shadow: none; }
+#csmsCimfPanel strong, #csmsCimfPanel p, #csmsCimfPanel li { overflow-wrap: anywhere; }
+#csmsCimfPanel p { margin: 8px 0; line-height: 1.5; }
+#csmsCimfPanel .subtle-text, #csmsCimfPanel .eyebrow { font-size: var(--sms2-text-xs, .8125rem); }
+#csmsCimfPanel .button-primary, #csmsCimfPanel .button-muted, #csmsCimfPanel .form-field { font-size: var(--sms2-text-sm, .875rem); }
+#csmsCimfActions { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+#csmsCimfActions .button-muted { width: 100%; justify-content: space-between; text-align: left; padding: 12px 14px; }
+#csmsCimfPanel form { display: flex; flex-direction: column; gap: 14px; margin: 14px 0; }
+#csmsCimfPanel form > .button-primary { align-self: flex-start; }
+#csmsCimfSubjectPickers { display: grid; gap: 14px; }
+#csmsCimfPanel .cimf-result-section { margin: 16px 0; }
+#csmsCimfPanel .cimf-result-section h3 { font-size: var(--sms2-text-md, 1rem); color: #0f2f69; margin: 0 0 6px; }
+#csmsCimfPanel ul { padding-left: 20px; margin: 8px 0; }
+#csmsCimfPanel li { margin: 6px 0; }
+#csmsCimfPanel .cimf-panel-footer { flex: 0 0 auto; border-top: 1px solid #e2e8f0; padding: 12px 20px; color: #64748b; background: #f8fafc; }
+#csmsCimfResize { position: absolute; inset: 0 auto 0 -4px; width: 8px; cursor: col-resize; touch-action: none; z-index: 1; }
+#csmsCimfResize:hover, #csmsCimfResize:focus-visible { background: rgba(37,99,235,.18); outline: 2px solid #2563eb; }
+#csmsCimfPanel.cimf-peek { width: 32px !important; background: #f4f8ff; }
+#csmsCimfPanel.cimf-peek .cimf-panel-surface { display: none; }
+#csmsCimfPeek { position: absolute; inset: 45% 0 auto; width: 100%; border: 0; padding: 8px 0; background: transparent; color: #1a3a8c; }
+#csmsCimfPanel button:focus-visible, #csmsCimfLauncher:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+@media (max-width: 600px) { #csmsCimfLauncher { right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); width: 56px; height: 56px; } #csmsCimfLauncher img { width: 40px; height: 40px; } #csmsCimfPanel:not(.cimf-peek) { width: 100vw !important; } #csmsCimfResize { display: none; } #csmsCimfPanel .cimf-panel-header, #csmsCimfPanel .cimf-panel-body { padding: 16px; } }
+@media print { #csmsCimfPanel, #csmsCimfLauncher { display: none !important; } }

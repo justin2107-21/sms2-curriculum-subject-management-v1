@@ -16,13 +16,13 @@ class SystemAdminRepository
         $safeLimit = max(1, min(100, $limit));
         $stmt = $this->db->prepare(
             "SELECT users.id, users.username, users.email, users.first_name, users.last_name,
-                    users.created_at,
+                    users.created_at, users.is_active,
                     GROUP_CONCAT(DISTINCT roles.display_name ORDER BY roles.display_name SEPARATOR ', ') AS role_names
              FROM users
              LEFT JOIN user_roles ON user_roles.user_id = users.id
              LEFT JOIN roles ON roles.id = user_roles.role_id
              GROUP BY users.id, users.username, users.email, users.first_name,
-                      users.last_name, users.created_at
+                      users.last_name, users.created_at, users.is_active
              ORDER BY users.username ASC, users.id ASC
              LIMIT ?"
         );

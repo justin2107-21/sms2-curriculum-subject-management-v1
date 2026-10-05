@@ -16,7 +16,7 @@ function authorization_connection(): mysqli
     return $conn;
 }
 
-function get_user_roles(int $userId): array
+function get_user_role_assignments(int $userId): array
 {
     static $roleCache = [];
 
@@ -29,7 +29,7 @@ function get_user_roles(int $userId): array
 
     $db = authorization_connection();
     $stmt = $db->prepare(
-        'SELECT roles.name
+        'SELECT roles.id, roles.name, roles.display_name
          FROM roles
          INNER JOIN user_roles ON user_roles.role_id = roles.id
          WHERE user_roles.user_id = ?
@@ -41,12 +41,21 @@ function get_user_roles(int $userId): array
     $roles = [];
 
     while ($row = $result->fetch_assoc()) {
-        $roles[] = $row['name'];
+        $roles[] = [
+            'id' => (int)$row['id'],
+            'slug' => (string)$row['name'],
+            'display_name' => (string)$row['display_name'],
+        ];
     }
     $stmt->close();
 
     $roleCache[$userId] = $roles;
     return $roles;
+}
+
+function get_user_roles(int $userId): array
+{
+    return array_column(get_user_role_assignments($userId), 'slug');
 }
 
 function get_user_permissions(int $userId): array

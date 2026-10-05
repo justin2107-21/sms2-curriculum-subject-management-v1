@@ -4,6 +4,7 @@ require_once __DIR__ . '/../validators/DomainValidator.php';
 require_once __DIR__ . '/../repositories/AcademicProgramRepository.php';
 require_once __DIR__ . '/../repositories/CurriculumRepository.php';
 require_once __DIR__ . '/../repositories/CurriculumVersionRepository.php';
+require_once __DIR__ . '/../repositories/SubjectRepository.php';
 require_once __DIR__ . '/../repositories/SubjectOfferingHistoryRepository.php';
 
 class SubjectOfferingHistoryService
@@ -12,6 +13,7 @@ class SubjectOfferingHistoryService
     private CurriculumRepository $curricula;
     private CurriculumVersionRepository $versions;
     private SubjectOfferingHistoryRepository $history;
+    private SubjectRepository $subjects;
 
     public function __construct(private mysqli $db)
     {
@@ -19,6 +21,7 @@ class SubjectOfferingHistoryService
         $this->curricula = new CurriculumRepository($db);
         $this->versions = new CurriculumVersionRepository($db);
         $this->history = new SubjectOfferingHistoryRepository($db);
+        $this->subjects = new SubjectRepository($db);
     }
 
     public function listHistory(array $input): array
@@ -33,6 +36,20 @@ class SubjectOfferingHistoryService
         ];
     }
 
+    public function listSubjects(array $input): array
+    {
+        $query = DomainValidator::listQuery($input, ['active', 'inactive']);
+        $result = $this->subjects->paginate($query);
+        return ['subjects' => $result['records'], 'pagination' => $result['pagination']];
+    }
+
+    public function historyDetails(int $placementId): array
+    {
+        $record = $this->history->findPlacement($placementId);
+        if (!$record) throw new DomainNotFoundException('Stored subject placement not found.');
+        return ['record' => $record];
+    }
+
     public function listPrograms(array $input): array
     {
         $query = DomainValidator::listQuery($input, ['active', 'inactive']);
@@ -40,9 +57,9 @@ class SubjectOfferingHistoryService
         return ['programs' => $result['records'], 'pagination' => $result['pagination']];
     }
 
-    public function listCurricula(int $programId, array $input): array
+    public function listCurricula(?int $programId, array $input): array
     {
-        if (!$this->programs->findById($programId)) {
+        if ($programId !== null && !$this->programs->findById($programId)) {
             throw new DomainNotFoundException('Academic program not found.');
         }
         $query = DomainValidator::listQuery($input, ['active', 'inactive'], true);
@@ -117,10 +134,14 @@ class SubjectOfferingHistoryService
     private function integerSummary(array $summary): array
     {
         foreach (['stored_placements', 'programs', 'curricula', 'curriculum_versions',
-                  'added', 'removed', 'changed', 'unchanged'] as $key) {
+                  'added', 'removed', 'moved', 'placement_type_changed', 'changed', 'unchanged',
+                  'version_a_subjects', 'version_b_subjects'] as $key) {
             if (array_key_exists($key, $summary)) {
                 $summary[$key] = (int)$summary[$key];
             }
+        }
+        foreach (['version_a_units', 'version_b_units'] as $key) {
+            if (array_key_exists($key, $summary)) $summary[$key] = (float)$summary[$key];
         }
         return $summary;
     }

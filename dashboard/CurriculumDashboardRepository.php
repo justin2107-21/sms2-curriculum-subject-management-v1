@@ -23,6 +23,25 @@ class CurriculumDashboardRepository
         return $result->fetch_assoc() ?: [];
     }
 
+    public function visiblePrograms(): array
+    {
+        $result = $this->db->query(
+            'SELECT p.id, p.program_code, p.program_name, p.status,
+                    COUNT(DISTINCT c.id) AS curricula
+             FROM academic_programs AS p
+             LEFT JOIN curricula AS c ON c.academic_program_id = p.id
+             GROUP BY p.id
+             ORDER BY p.program_code, p.id'
+        );
+        return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+    }
+
+    public function subjectMasterCount(): int
+    {
+        $result = $this->db->query('SELECT COUNT(*) AS total FROM subjects');
+        return $result ? (int)$result->fetch_assoc()['total'] : 0;
+    }
+
     public function versionStatusCounts(): array
     {
         $result = $this->db->query(

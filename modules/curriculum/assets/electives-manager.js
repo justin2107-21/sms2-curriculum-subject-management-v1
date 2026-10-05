@@ -7,6 +7,7 @@
     const canManage = root.dataset.canManageElectives === '1';
     const labels = {empty:'Empty Elective Groups',selection:'Invalid Selection Rules',duplicate:'Duplicate Subjects',mismatch:'Placement Mismatches',unmapped:'Unmapped Subjects',inactive:'Inactive Subjects',context:'Missing Context'};
     const state = {data:null, request:0, tab:'groups', selected:null, edit:null, members:[], busy:false};
+    window.CSMSPageCIMFContext = () => ({academic_program_id:$('programId').value,curriculum_id:$('curriculumId').value,curriculum_version_id:$('versionId').value,group_id:state.selected?.id || state.selected || ''});
     const view = ui.createModal($('viewGroupModal')), editor = ui.createModal($('groupFormModal')), archive = ui.createModal($('archiveGroupModal'));
     const form = $('groupForm');
     const context = () => ({program_id:$('programId').value,curriculum_id:$('curriculumId').value,curriculum_version_id:$('versionId').value});

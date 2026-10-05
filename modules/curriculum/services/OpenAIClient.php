@@ -1,6 +1,8 @@
 <?php
 
-final class OpenAIClient
+require_once __DIR__ . '/CIMFAIProviderInterface.php';
+
+final class OpenAIClient implements CIMFAIProviderInterface
 {
     public function request(array $config, array $prompt): array
     {
@@ -22,11 +24,11 @@ final class OpenAIClient
         if ($http < 200 || $http >= 300) {
             $code = is_array($data) ? ($data['error']['code'] ?? '') : '';
             $status = match (true) {
-                $http === 401 || $http === 403 => 'AUTH_ERROR',
+                $http === 401 || $http === 403 => 'AUTH_FAILED',
                 $http === 429 && $code === 'insufficient_quota' => 'INSUFFICIENT_QUOTA',
                 $http === 429 => 'RATE_LIMITED',
-                $http >= 500 => 'OPENAI_SERVER_ERROR',
-                default => 'OPENAI_SERVER_ERROR',
+                $http >= 500 => 'PROVIDER_ERROR',
+                default => 'PROVIDER_ERROR',
             };
             return ['status' => $status, 'http_status' => $http];
         }

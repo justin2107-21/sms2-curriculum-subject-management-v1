@@ -7,471 +7,336 @@
 
     const endpoint = workspace.dataset.weightingApi;
     const canManage = workspace.dataset.canManage === '1';
-    const columnCount = Number(workspace.dataset.componentColumnCount || 4);
     const state = {
         placement: null,
         scheme: null,
-        components: new Map(),
-        componentPage: 1,
+        components: [],
+        baseline: '[]',
+        dirty: false,
         contextRequest: 0,
-        componentRequest: 0,
+        selectedItems: [null, null, null, null],
         removeComponent: null,
+        pendingContextChange: null
     };
-
-    const program = document.getElementById('weightingProgram');
-    const curriculum = document.getElementById('weightingCurriculum');
-    const version = document.getElementById('weightingVersion');
-    const placement = document.getElementById('weightingPlacement');
-    const placementInput = document.getElementById('weightingPlacementSearch');
+    const ids = ['weightingProgram', 'weightingCurriculum', 'weightingVersion', 'weightingPlacement'];
+    const searches = ['weightingProgramSearch', 'weightingCurriculumSearch', 'weightingVersionSearch', 'weightingPlacementSearch'];
+    const lists = ['weightingProgramOptions', 'weightingCurriculumOptions', 'weightingVersionOptions', 'weightingPlacementOptions'];
+    const hidden = ids.map(id => document.getElementById(id));
+    const inputs = searches.map(id => document.getElementById(id));
+    const enabledPlaceholders = ['Search code or program name', 'Search curriculum code or name', 'Search version label or academic year', 'Search subject code or title'];
+    const disabledPlaceholders = ['', 'Select a program first', 'Select a curriculum first', 'Select a curriculum version first'];
     const rows = document.getElementById('weightingComponentRows');
-    const pagination = document.getElementById('weightingComponentPagination');
-    const search = document.getElementById('weightingComponentSearch');
-    const perPage = document.getElementById('weightingComponentPerPage');
-    const createSchemeButton = document.getElementById('createWeightingScheme');
-    const editSchemeButton = document.getElementById('editWeightingScheme');
-    const removeSchemeButton = document.getElementById('removeWeightingScheme');
-    const addComponentButton = document.getElementById('addWeightingComponent');
+    const tableWrap = document.getElementById('weightingTableWrap');
+    const footer = document.getElementById('weightingFooter');
+    const addButton = document.getElementById('addWeightingComponent');
+    const saveButton = document.getElementById('saveWeightingChanges');
+    const form = document.getElementById('weightingComponentForm');
+    const componentModal = canManage ? ui.createModal(document.getElementById('weightingComponentModal')) : null;
+    const removeModal = canManage ? ui.createModal(document.getElementById('removeWeightingComponentModal')) : null;
+    const discardModal = ui.createModal(document.getElementById('discardWeightingModal'));
+    const cimfButton = document.getElementById('reviewWeightingWithCimf');
+    const totalMessage = document.getElementById('weightingTotalMessage');
+    const componentsSection = document.getElementById('weightingComponentsSection');
+    const selectionHint = document.getElementById('weightingSelectionHint');
 
-    const schemeForm = document.getElementById('weightingSchemeForm');
-    const componentForm = document.getElementById('weightingComponentForm');
-    const schemeModal = ui.createModal(document.getElementById('weightingSchemeModal'));
-    const componentModal = ui.createModal(document.getElementById('weightingComponentModal'));
-    const removeComponentModal = ui.createModal(document.getElementById('removeWeightingComponentModal'));
-    const removeSchemeModal = ui.createModal(document.getElementById('removeWeightingSchemeModal'));
-    const placementAutocomplete = ui.createAutocomplete({
-        input: placementInput,
-        valueInput: placement,
-        list: document.getElementById('weightingPlacementOptions'),
-        helpText: 'Search mapped subject placements for this version.',
-        selectedText: 'Mapped subject selected.',
-        loadingText: 'Searching mapped subjects…',
-        noResultsText: 'No mapped subjects match this search.',
-        search: async function (query) {
-            const payload = await ui.fetchJson(endpoint, {
-                action: 'placement_options', curriculum_version_id: version.value,
-                page: 1, per_page: 20, search: query
-            });
-            return payload.placements;
-        },
-        getId: item => item.id,
-        format: item => ({
-            label: item.subject_code + ' — ' + item.subject_title,
-            code: item.subject_code,
-            title: item.subject_title,
-            meta: [item.year_level, item.semester].filter(Boolean).join(' / ')
-        }),
-        onSelect: function () { loadScheme(); },
-        onClear: function () { loadScheme(); }
-    });
+    window.CSMSPageCIMFContext = () => ({academic_program_id:hidden[0].value, curriculum_id:hidden[1].value, curriculum_version_id:hidden[2].value, curriculum_version_subject_id:state.placement?.id || '', components:state.components.map(item => ({component_name:item.component_name,weight_percentage:Number(item.weight_percentage).toFixed(2)}))});
 
-    function optionMarkup(value, label) {
-        return '<option value="' + ui.escapeHtml(value) + '">' + ui.escapeHtml(label) + '</option>';
+    function cents(value) {
+        const number = Number(value);
+        return Number.isFinite(number) ? Math.round(number * 100) : 0;
     }
 
-    function resetSelect(select, label, disabled) {
-        select.innerHTML = optionMarkup('', label);
-        select.disabled = disabled;
+    function totalCents(components) {
+        return components.reduce((sum, component) => sum + cents(component.weight_percentage), 0);
     }
 
-    function selectedLabel(select) {
-        if (select === placement) return placementAutocomplete?.getSelectedLabel() || '';
-        return select.value ? (select.options[select.selectedIndex]?.textContent.trim() || '') : '';
+    function serializedDraft(components) {
+        return JSON.stringify(components.map(item => ({
+            id: item.id ? Number(item.id) : null,
+            component_name: String(item.component_name || '').trim(),
+            weight_percentage: (cents(item.weight_percentage) / 100).toFixed(2),
+            sequence_order: Number(item.sequence_order || 0)
+        })));
+    }
+
+    function markDirty() {
+        state.dirty = serializedDraft(state.components) !== state.baseline;
+        const indicator = document.getElementById('weightingUnsaved');
+        if (indicator) indicator.hidden = !state.dirty;
     }
 
     function contextLabel() {
-        return [selectedLabel(program), selectedLabel(curriculum), selectedLabel(version), selectedLabel(placement)]
-            .filter(Boolean).join(' / ');
+        return state.selectedItems.map(function (item, index) {
+            if (!item) return '';
+            if (index === 0) return item.program_code + ' — ' + item.program_name;
+            if (index === 1) return item.curriculum_code;
+            if (index === 2) return item.version_label;
+            return item.subject_code + ' — ' + item.subject_title;
+        }).filter(Boolean).join('  ›  ');
     }
 
-    function componentTableState(message, isError) {
-        rows.innerHTML = '<tr><td colspan="' + columnCount + '" class="empty-cell' +
-            (isError ? ' error-cell' : '') + '">' + ui.escapeHtml(message) + '</td></tr>';
+    function restoreContext() {
+        const cascade = window.weightingContextCascade;
+        if (!cascade) return;
+        state.selectedItems.forEach(function (item, index) {
+            const selector = cascade.get(index);
+            if (selector && item) selector.setSelected(item, false);
+        });
+        inputs.forEach(function (input, index) {
+            const enabled = index === 0 || state.selectedItems.slice(0, index).every(Boolean);
+            input.disabled = !enabled;
+            input.placeholder = enabled ? enabledPlaceholders[index] : disabledPlaceholders[index];
+        });
     }
 
-    async function loadPrograms() {
-        resetSelect(program, 'Loading programs...', true);
-        try {
-            const payload = await ui.fetchJson(endpoint, {
-                action: 'program_options', page: 1, per_page: 50
-            });
-            program.innerHTML = optionMarkup('', 'Select an academic program') +
-                payload.programs.map(function (item) {
-                    return optionMarkup(item.id, item.program_code + ' - ' + item.program_name);
-                }).join('');
-            program.disabled = payload.programs.length === 0;
-        } catch (error) {
-            resetSelect(program, 'Programs unavailable', true);
-            ui.showToast(error.message, 'error');
+    function applyContextChange(index, item, action) {
+        const cascadeSelector = cascade?.get(index);
+        if (action === 'select' && item) cascadeSelector?.setSelected(item, false);
+        else cascadeSelector?.clear(false);
+        for (let child = index + 1; child < 4; child++) {
+            cascade?.get(child)?.clear(false);
+            state.selectedItems[child] = null;
         }
-    }
-
-    async function loadCurricula() {
-        resetSelect(curriculum, program.value ? 'Loading curricula...' : 'Select a program first', true);
-        resetSelect(version, 'Select a curriculum first', true);
-        placementAutocomplete?.clear();
-        placementInput.disabled = true;
-        placementInput.placeholder = 'Select a version first';
-        clearSchemeState('Select a curriculum version and subject to configure grade weighting.');
-        if (!program.value) return;
-        try {
-            const payload = await ui.fetchJson(endpoint, {
-                action: 'curriculum_options', academic_program_id: program.value,
-                page: 1, per_page: 50
-            });
-            curriculum.innerHTML = optionMarkup('', 'Select a curriculum') +
-                payload.curricula.map(function (item) {
-                    return optionMarkup(item.id, item.curriculum_code + ' - ' + item.curriculum_name);
-                }).join('');
-            curriculum.disabled = payload.curricula.length === 0;
-        } catch (error) {
-            resetSelect(curriculum, 'Curricula unavailable', true);
-            ui.showToast(error.message, 'error');
-        }
-    }
-
-    async function loadVersions() {
-        resetSelect(version, curriculum.value ? 'Loading versions...' : 'Select a curriculum first', true);
-        placementAutocomplete?.clear();
-        placementInput.disabled = true;
-        placementInput.placeholder = 'Select a version first';
-        clearSchemeState('Select a curriculum version and subject to configure grade weighting.');
-        if (!curriculum.value) return;
-        try {
-            const payload = await ui.fetchJson(endpoint, {
-                action: 'version_options', curriculum_id: curriculum.value,
-                page: 1, per_page: 50
-            });
-            version.innerHTML = optionMarkup('', 'Select a curriculum version') +
-                payload.versions.map(function (item) {
-                    const year = item.effective_academic_year ? ' / ' + item.effective_academic_year : '';
-                    return optionMarkup(item.id, item.version_label + year);
-                }).join('');
-            version.disabled = payload.versions.length === 0;
-        } catch (error) {
-            resetSelect(version, 'Versions unavailable', true);
-            ui.showToast(error.message, 'error');
-        }
-    }
-
-    async function loadPlacements() {
-        placementAutocomplete?.clear();
-        placementInput.disabled = !version.value;
-        placementInput.placeholder = version.value
-            ? 'Search subject code or title'
-            : 'Select a version first';
-        clearSchemeState('Select a curriculum version and subject to configure grade weighting.');
-    }
-
-    function clearSchemeState(message) {
+        state.selectedItems[index] = action === 'select' ? item : null;
+        inputs.forEach(function (input, level) {
+            const enabled = level === 0 || state.selectedItems.slice(0, level).every(Boolean);
+            input.disabled = !enabled;
+            input.placeholder = enabled ? enabledPlaceholders[level] : disabledPlaceholders[level];
+        });
+        state.dirty = false;
         state.placement = null;
         state.scheme = null;
-        state.components.clear();
-        document.getElementById('weightingContextMessage').textContent = message;
-        document.getElementById('weightingSchemeEmpty').hidden = false;
-        document.getElementById('weightingSchemeDetails').hidden = true;
-        if (createSchemeButton) createSchemeButton.disabled = !placement.value;
-        if (editSchemeButton) editSchemeButton.hidden = true;
-        if (removeSchemeButton) removeSchemeButton.hidden = true;
-        if (addComponentButton) addComponentButton.disabled = true;
-        search.disabled = true;
-        perPage.disabled = true;
-        pagination.innerHTML = '';
-        componentTableState('Select a configured subject placement to view components.', false);
+        state.components = [];
+        state.baseline = '[]';
+        renderComponents();
+        if (index === 3) {
+            document.getElementById('weightingContextMessage').textContent = 'Loading stored weighting configuration…';
+            loadConfiguration();
+        }
     }
 
-    function renderScheme() {
-        const scheme = state.scheme;
-        document.getElementById('weightingContextMessage').textContent = contextLabel();
-        document.getElementById('weightingSchemeEmpty').hidden = Boolean(scheme);
-        document.getElementById('weightingSchemeDetails').hidden = !scheme;
-        if (createSchemeButton) createSchemeButton.disabled = !placement.value || Boolean(scheme);
-        if (editSchemeButton) editSchemeButton.hidden = !scheme;
-        if (removeSchemeButton) {
-            removeSchemeButton.hidden = !scheme;
-            removeSchemeButton.disabled = Boolean(scheme && Number(scheme.component_count) > 0);
-            removeSchemeButton.title = scheme && Number(scheme.component_count) > 0
-                ? 'Remove all components before removing this scheme.' : '';
-        }
-        if (addComponentButton) addComponentButton.disabled = !scheme;
-        search.disabled = !scheme;
-        perPage.disabled = !scheme;
-        if (!scheme) {
-            componentTableState('No grade weighting scheme is configured for this subject placement.', false);
-            pagination.innerHTML = '';
-            return;
-        }
-        document.getElementById('weightingSchemeDescription').textContent =
-            scheme.description || 'No description provided.';
-        document.getElementById('weightingComponentTotal').textContent = scheme.component_count;
-        document.getElementById('weightingCurrentTotal').textContent = scheme.total_weight + '%';
-        document.getElementById('weightingRemainingTotal').textContent = scheme.remaining_weight + '%';
-        const status = document.getElementById('weightingCompletionStatus');
-        const complete = scheme.completion_status === 'complete';
-        status.className = 'weighting-status-badge ' + (complete ? 'is-complete' : 'is-incomplete');
-        status.innerHTML = '<i class="fa-solid ' + (complete ? 'fa-circle-check' : 'fa-circle-half-stroke') +
-            '"></i> ' + (complete ? 'Complete' : 'Incomplete');
+    function updateProgress() {
+        const total = totalCents(state.components);
+        const hundred = 10000;
+        const remaining = hundred - total;
+        const exact = total === hundred;
+        const percent = (total / 100).toFixed(2).replace(/\.00$/, '');
+        const totalText = document.getElementById('weightingTotalText');
+        const bar = document.getElementById('weightingProgress');
+        const track = document.querySelector('.grade-weighting-progress-track');
+        const badge = document.getElementById('weightingCompletionStatus');
+        totalText.textContent = percent + '% total';
+        bar.style.width = Math.max(0, Math.min(100, total / 100)) + '%';
+        bar.classList.toggle('is-over-limit', total > hundred);
+        if (track) track.setAttribute('aria-valuenow', String(Math.max(0, Math.min(100, total / 100))));
+        badge.className = 'status-badge ' + (exact ? 'status-active' : total > hundred ? 'grade-weighting-invalid' : 'status-draft');
+        badge.textContent = exact ? 'Valid configuration' : total > hundred ? 'Invalid configuration' : 'Incomplete configuration';
+        if (exact) totalMessage.textContent = 'The component weights total exactly 100%.';
+        else if (total > hundred) totalMessage.textContent = ((total - hundred) / 100).toFixed(2).replace(/\.00$/, '') + '% over limit. Reduce component weights before saving.';
+        else totalMessage.textContent = ((remaining) / 100).toFixed(2).replace(/\.00$/, '') + '% remaining.';
+        if (saveButton) saveButton.disabled = !canManage || !state.placement || !exact || !state.dirty;
+        cimfButton.disabled = !state.placement || state.components.length === 0;
     }
 
-    async function loadScheme() {
-        const placementId = Number(placement.value);
-        const requestId = ++state.contextRequest;
-        clearSchemeState(placementId ? 'Loading grade weighting configuration...' :
-            'Select a curriculum version and subject to configure grade weighting.');
-        if (!placementId) return;
+    function renderComponents() {
+        const hasPlacement = Boolean(state.placement);
+        const hasRows = state.components.length > 0;
+        componentsSection.hidden = !hasPlacement;
+        selectionHint.hidden = Boolean(hidden[3].value);
+        document.getElementById('weightingContextMessage').textContent = hasPlacement
+            ? 'User-configured academic data for ' + state.placement.subject_code + ' in ' + state.placement.version_label + '.'
+            : '';
+        document.getElementById('weightingDemoNote').hidden = !(state.placement && Number(state.placement.is_demo || 0) === 1);
+        document.getElementById('weightingSchemeEmpty').hidden = hasRows;
+        document.getElementById('weightingSchemeEmpty').innerHTML = hasPlacement && !hasRows
+            ? '<p>No grade weighting has been configured for this subject.</p>'
+            : '';
+        tableWrap.hidden = !hasRows;
+        footer.hidden = !hasPlacement;
+        addButton && (addButton.disabled = !hasPlacement);
+        rows.innerHTML = hasRows ? state.components.map(function (component, index) {
+            return '<tr><td><span class="weighting-component-name">' + ui.escapeHtml(component.component_name) + '</span></td>' +
+                '<td><span class="weighting-component-value">' + ui.escapeHtml(Number(component.weight_percentage).toFixed(2).replace(/\.00$/, '')) + '%</span></td>' +
+                (canManage ? '<td><div class="weighting-component-actions"><button type="button" class="row-action-button" data-edit-component="' + index + '">Edit</button><button type="button" class="remove-action-button" data-remove-component="' + index + '">Remove</button></div></td>' : '') +
+                '</tr>';
+        }).join('') : '';
+        markDirty();
+        updateProgress();
+    }
+
+    async function loadConfiguration() {
+        const placementId = Number(hidden[3].value || 0);
+        const request = ++state.contextRequest;
+        state.placement = null;
+        state.scheme = null;
+        state.components = [];
+        state.baseline = '[]';
+        state.dirty = false;
+        if (!placementId) { renderComponents(); return; }
+        renderComponents();
+        document.getElementById('weightingContextMessage').textContent = 'Loading stored weighting configuration…';
         try {
-            const payload = await ui.fetchJson(endpoint, {
-                action: 'scheme_get', curriculum_version_subject_id: placementId
-            });
-            if (requestId !== state.contextRequest) return;
+            const payload = await ui.fetchJson(endpoint, { action: 'scheme_get', curriculum_version_subject_id: placementId });
+            if (request !== state.contextRequest) return;
             state.placement = payload.placement;
             state.scheme = payload.scheme;
-            renderScheme();
-            if (state.scheme) loadComponents(1);
-        } catch (error) {
-            if (requestId !== state.contextRequest) return;
-            clearSchemeState(error.message);
-            ui.showToast(error.message, 'error');
-        }
-    }
-
-    function componentRow(component) {
-        const actions = canManage
-            ? '<td><div class="weighting-component-actions">' +
-                '<button type="button" class="row-action-button" data-edit-weighting-component="' +
-                Number(component.id) + '"><i class="fa-solid fa-pen"></i> Edit</button>' +
-                '<button type="button" class="remove-action-button" data-remove-weighting-component="' +
-                Number(component.id) + '"><i class="fa-solid fa-trash"></i> Remove</button>' +
-                '</div></td>' : '';
-        return '<tr><td><span class="weighting-component-name">' +
-            ui.escapeHtml(component.component_name) + '</span></td>' +
-            '<td><span class="weighting-component-value">' +
-            ui.escapeHtml(component.weight_percentage) + '%</span></td>' +
-            '<td>' + ui.escapeHtml(component.sequence_order ?? '-') + '</td>' +
-            '<td>' + ui.escapeHtml(ui.formatDate(component.updated_at)) + '</td>' + actions + '</tr>';
-    }
-
-    async function loadComponents(page) {
-        if (!state.scheme) {
-            renderScheme();
-            return;
-        }
-        const requestId = ++state.componentRequest;
-        state.componentPage = Number(page) || 1;
-        componentTableState('Loading weighting components...', false);
-        try {
-            const payload = await ui.fetchJson(endpoint, {
-                action: 'component_list', scheme_id: state.scheme.id,
-                page: state.componentPage, per_page: perPage.value,
-                search: search.value.trim()
-            });
-            if (requestId !== state.componentRequest) return;
-            state.scheme = payload.scheme;
-            state.componentPage = Number(payload.pagination.page);
-            state.components.clear();
-            payload.components.forEach(function (component) {
-                state.components.set(Number(component.id), component);
-            });
-            renderScheme();
-            if (!payload.components.length) {
-                componentTableState(search.value.trim()
-                    ? 'No weighting components match this search.'
-                    : 'No weighting components have been added.', false);
-            } else {
-                rows.innerHTML = payload.components.map(componentRow).join('');
+            if (state.scheme) {
+                const result = await ui.fetchJson(endpoint, { action: 'component_list', scheme_id: state.scheme.id, page: 1, per_page: 50 });
+                if (request !== state.contextRequest) return;
+                state.components = result.components.map(item => ({ ...item, weight_percentage: Number(item.weight_percentage) }));
             }
-            ui.renderPagination(pagination, payload.pagination, loadComponents);
+            state.baseline = serializedDraft(state.components);
+            renderComponents();
         } catch (error) {
-            if (requestId !== state.componentRequest) return;
-            componentTableState(error.message, true);
+            if (request !== state.contextRequest) return;
+            state.placement = null;
+            state.components = [];
+            renderComponents();
             ui.showToast(error.message, 'error');
         }
     }
 
-    function openSchemeForm(editing) {
-        if (!canManage || !schemeForm || !schemeModal || !placement.value) return;
-        schemeForm.reset();
-        ui.clearFormError(schemeForm);
-        const isEdit = Boolean(editing && state.scheme);
-        document.getElementById('weightingSchemeId').value = isEdit ? state.scheme.id : '';
-        document.getElementById('weightingSchemePlacementId').value = placement.value;
-        document.getElementById('weightingSchemeFormDescription').value =
-            isEdit ? (state.scheme.description || '') : '';
-        document.getElementById('weightingSchemeModalTitle').textContent =
-            isEdit ? 'Edit Weighting Scheme' : 'Create Weighting Scheme';
-        document.getElementById('weightingSchemeModalContext').textContent = contextLabel();
-        document.getElementById('saveWeightingScheme').textContent =
-            isEdit ? 'Save Description' : 'Create Scheme';
-        schemeModal.open();
-        document.getElementById('weightingSchemeFormDescription').focus();
-    }
-
-    function openComponentForm(component) {
-        if (!canManage || !componentForm || !componentModal || !state.scheme) return;
-        componentForm.reset();
-        ui.clearFormError(componentForm);
-        const isEdit = Boolean(component);
-        document.getElementById('weightingComponentId').value = isEdit ? component.id : '';
-        document.getElementById('weightingComponentSchemeId').value = state.scheme.id;
-        document.getElementById('weightingComponentName').value = isEdit ? component.component_name : '';
-        document.getElementById('weightingComponentWeight').value = isEdit ? component.weight_percentage : '';
-        document.getElementById('weightingComponentSequence').value =
-            isEdit && component.sequence_order !== null ? component.sequence_order : '';
-        document.getElementById('weightingComponentModalTitle').textContent =
-            isEdit ? 'Edit Weighting Component' : 'Add Weighting Component';
-        document.getElementById('weightingComponentModalContext').textContent =
-            state.scheme.subject_code + ' - ' + state.scheme.subject_title;
-        document.getElementById('saveWeightingComponent').textContent =
-            isEdit ? 'Save Component' : 'Add Component';
-        updateProjectedTotal();
-        componentModal.open();
-        document.getElementById('weightingComponentName').focus();
-    }
-
-    function updateProjectedTotal() {
-        if (!state.scheme || !componentForm) return;
-        const editingId = Number(document.getElementById('weightingComponentId').value || 0);
-        const existing = editingId ? state.components.get(editingId) : null;
-        const current = Number(state.scheme.total_weight || 0);
-        const proposed = Number(document.getElementById('weightingComponentWeight').value || 0);
-        const projected = current - Number(existing?.weight_percentage || 0) + proposed;
+    function updateModalAvailability() {
+        const editing = Number(document.getElementById('weightingComponentIndex').value);
+        const otherTotal = state.components.reduce((sum, item, index) => sum + (index === editing ? 0 : cents(item.weight_percentage)), 0);
+        const entered = cents(document.getElementById('weightingComponentWeight').value);
+        const projected = otherTotal + entered;
         const help = document.getElementById('weightingProjectedTotal');
-        help.textContent = 'Current total: ' + current.toFixed(2) + '%. Projected total: ' +
-            Math.max(0, projected).toFixed(2) + '%.';
-        help.classList.toggle('form-help-error', projected > 100);
+        const currentLabel = editing >= 0 ? 'Other components total' : 'Current Total';
+        help.textContent = currentLabel + ': ' + (otherTotal / 100).toFixed(2).replace(/\.00$/, '') + '% · Available Weight ' +
+            (Math.max(0, 10000 - otherTotal) / 100).toFixed(2).replace(/\.00$/, '') + '%';
+        help.classList.toggle('form-help-error', projected > 10000);
+        document.getElementById('saveWeightingComponent').disabled = !document.getElementById('weightingComponentName').value.trim() || entered <= 0 || projected > 10000;
     }
 
-    async function submitScheme(event) {
+    function openComponentForm(index) {
+        if (!canManage || !state.placement || !componentModal) return;
+        form.reset(); ui.clearFormError(form);
+        const isEdit = Number.isInteger(index) && index >= 0;
+        const component = isEdit ? state.components[index] : null;
+        document.getElementById('weightingComponentIndex').value = isEdit ? String(index) : '-1';
+        document.getElementById('weightingComponentName').value = component?.component_name || '';
+        document.getElementById('weightingComponentWeight').value = component?.weight_percentage ?? '';
+        document.getElementById('weightingComponentModalTitle').textContent = isEdit ? 'Edit Grade Component' : 'Add Grade Component';
+        document.getElementById('weightingComponentSubject').textContent = state.placement.subject_code + ' — ' + state.placement.subject_title;
+        updateModalAvailability(); componentModal.open(); document.getElementById('weightingComponentName').focus();
+    }
+
+    function submitComponent(event) {
         event.preventDefault();
-        ui.clearFormError(schemeForm);
-        const data = new FormData(schemeForm);
-        const isEdit = Boolean(data.get('id'));
-        data.set('action', isEdit ? 'scheme_update' : 'scheme_create');
-        ui.setFormSubmitting(schemeForm, true, isEdit ? 'Saving...' : 'Creating...');
-        try {
-            const payload = await ui.postForm(endpoint, data);
-            state.scheme = payload.scheme;
-            schemeModal.close();
-            ui.showToast(payload.message, isEdit ? 'updated' : 'success');
-            renderScheme();
-            await loadComponents(1);
-        } catch (error) {
-            ui.showFormError(schemeForm, error.message);
-        } finally {
-            ui.setFormSubmitting(schemeForm, false);
-        }
+        if (!form.reportValidity()) return;
+        const index = Number(document.getElementById('weightingComponentIndex').value);
+        const name = document.getElementById('weightingComponentName').value.trim();
+        const weightText = document.getElementById('weightingComponentWeight').value.trim();
+        const weight = Number(weightText);
+        const duplicate = state.components.some((item, position) => position !== index && item.component_name.trim().toLocaleLowerCase() === name.toLocaleLowerCase());
+        if (!name || name.length > 150) return ui.showFormError(form, 'Enter a component name up to 150 characters.');
+        if (duplicate) return ui.showFormError(form, 'A component with this name already exists in this configuration.');
+        if (!/^\d+(?:\.\d{1,2})?$/.test(weightText) || !Number.isFinite(weight) || weight <= 0 || weight > 100) return ui.showFormError(form, 'Weight must be greater than 0%, at most 100%, and use no more than two decimal places.');
+        const other = state.components.reduce((sum, item, position) => sum + (position === index ? 0 : cents(item.weight_percentage)), 0);
+        if (other + cents(weight) > 10000) return ui.showFormError(form, 'This component would exceed the 100% total. Maximum available weight is ' + ((10000 - other) / 100).toFixed(2).replace(/\.00$/, '') + '%.');
+        const old = index >= 0 ? state.components[index] : null;
+        const item = { id: old?.id || null, component_name: name, weight_percentage: weight.toFixed(2), sequence_order: old?.sequence_order ?? index + 1 };
+        if (index >= 0) state.components[index] = item; else state.components.push(item);
+        componentModal.close(); renderComponents();
     }
 
-    async function submitComponent(event) {
-        event.preventDefault();
-        if (!componentForm.reportValidity()) return;
-        ui.clearFormError(componentForm);
-        const data = new FormData(componentForm);
-        const isEdit = Boolean(data.get('id'));
-        data.set('action', isEdit ? 'component_update' : 'component_create');
-        ui.setFormSubmitting(componentForm, true, isEdit ? 'Saving...' : 'Adding...');
-        try {
-            const payload = await ui.postForm(endpoint, data);
-            state.scheme = payload.scheme;
-            componentModal.close();
-            ui.showToast(payload.message, isEdit ? 'updated' : 'success');
-            await loadComponents(state.componentPage);
-        } catch (error) {
-            ui.showFormError(componentForm, error.message);
-        } finally {
-            ui.setFormSubmitting(componentForm, false);
-        }
+    function requestRemoval(index) {
+        const component = state.components[index]; if (!component || !removeModal) return;
+        state.removeComponent = index;
+        document.getElementById('removeWeightingComponentMessage').textContent = 'Remove "' + component.component_name + '" from ' + state.placement.subject_code + '?';
+        removeModal.open();
     }
 
-    function requestComponentRemoval(component) {
-        if (!canManage || !component || !removeComponentModal) return;
-        state.removeComponent = component;
-        document.getElementById('removeWeightingComponentMessage').textContent =
-            'Remove "' + component.component_name + '" (' + component.weight_percentage + '%) from this scheme?';
-        removeComponentModal.open();
+    function removeComponent() {
+        if (state.removeComponent === null) return;
+        state.components.splice(state.removeComponent, 1);
+        state.removeComponent = null; removeModal.close(); renderComponents();
     }
 
-    async function confirmComponentRemoval() {
-        if (!state.removeComponent) return;
-        const button = document.getElementById('confirmRemoveWeightingComponent');
-        button.disabled = true;
+    async function saveConfiguration() {
+        if (!saveButton || saveButton.disabled || totalCents(state.components) !== 10000) return;
+        saveButton.disabled = true;
         const data = new FormData();
-        data.set('action', 'component_remove');
-        data.set('id', state.removeComponent.id);
+        data.set('action', 'configuration_save');
+        data.set('curriculum_version_subject_id', hidden[3].value);
+        data.set('curriculum_version_id', hidden[2].value);
+        data.set('components', JSON.stringify(state.components.map((item, index) => ({
+            id: item.id || '', component_name: item.component_name,
+            weight_percentage: Number(item.weight_percentage).toFixed(2), sequence_order: index + 1
+        }))));
         try {
             const payload = await ui.postForm(endpoint, data);
             state.scheme = payload.scheme;
-            state.removeComponent = null;
-            removeComponentModal.close();
-            ui.showToast(payload.message, 'success');
-            await loadComponents(state.componentPage);
+            state.components = payload.components.map(item => ({ ...item, weight_percentage: Number(item.weight_percentage) }));
+            state.baseline = serializedDraft(state.components);
+            renderComponents(); ui.showToast(payload.message, 'success');
         } catch (error) {
             ui.showToast(error.message, 'error');
-        } finally {
-            button.disabled = false;
+            updateProgress();
         }
     }
 
-    async function confirmSchemeRemoval() {
-        if (!state.scheme) return;
-        const button = document.getElementById('confirmRemoveWeightingScheme');
-        button.disabled = true;
-        const data = new FormData();
-        data.set('action', 'scheme_remove');
-        data.set('id', state.scheme.id);
-        try {
-            const payload = await ui.postForm(endpoint, data);
-            removeSchemeModal.close();
-            ui.showToast(payload.message, 'success');
-            await loadScheme();
-        } catch (error) {
-            ui.showToast(error.message, 'error');
-        } finally {
-            button.disabled = false;
-        }
-    }
+    function reviewWithCimf() { if (state.placement && state.components.length) window.CSMSCIMF?.open('review'); }
 
-    program.addEventListener('change', loadCurricula);
-    curriculum.addEventListener('change', loadVersions);
-    version.addEventListener('change', loadPlacements);
-    document.getElementById('clearWeightingContext').addEventListener('click', function () {
-        program.value = '';
-        resetSelect(curriculum, 'Select a program first', true);
-        resetSelect(version, 'Select a curriculum first', true);
-        placementAutocomplete?.clear();
-        placementInput.disabled = true;
-        placementInput.placeholder = 'Select a version first';
-        clearSchemeState('Select a curriculum version and subject to configure grade weighting.');
-    });
-
-    createSchemeButton?.addEventListener('click', function () { openSchemeForm(false); });
-    editSchemeButton?.addEventListener('click', function () { openSchemeForm(true); });
-    removeSchemeButton?.addEventListener('click', function () {
-        if (state.scheme && Number(state.scheme.component_count) === 0) removeSchemeModal.open();
-    });
-    addComponentButton?.addEventListener('click', function () { openComponentForm(null); });
-    schemeForm?.addEventListener('submit', submitScheme);
-    componentForm?.addEventListener('submit', submitComponent);
-    document.getElementById('weightingComponentWeight')?.addEventListener('input', updateProjectedTotal);
-    document.getElementById('confirmRemoveWeightingComponent')?.addEventListener('click', confirmComponentRemoval);
-    document.getElementById('confirmRemoveWeightingScheme')?.addEventListener('click', confirmSchemeRemoval);
-
-    rows.addEventListener('click', function (event) {
-        const editButton = event.target.closest('[data-edit-weighting-component]');
-        if (editButton) {
-            const component = state.components.get(Number(editButton.dataset.editWeightingComponent));
-            if (component) openComponentForm(component);
-            return;
-        }
-        const removeButton = event.target.closest('[data-remove-weighting-component]');
-        if (removeButton) {
-            const component = state.components.get(Number(removeButton.dataset.removeWeightingComponent));
-            if (component) requestComponentRemoval(component);
+    const cascade = ui.createCascadingAutocomplete({
+        levels: [
+            {
+                input: inputs[0], valueInput: hidden[0], list: document.getElementById(lists[0]),
+                helpText: 'Choose a program or strand.', selectedText: 'Program selected.', loadingText: 'Searching programs…', noResultsText: 'No matching programs found.', placeholder: 'Search code or program name', minimumLength: 0, showSuggestionsOnFocus: true,
+                search: async query => (await ui.fetchJson(endpoint, { action: 'program_options', search: query, page: 1, per_page: 20 })).programs,
+                getId: item => item.id, format: item => ({ label: item.program_code + ' — ' + item.program_name, code: item.program_code, title: item.program_name, meta: item.program_type || '' })
+            },
+            {
+                input: inputs[1], valueInput: hidden[1], list: document.getElementById(lists[1]),
+                helpText: 'Choose a curriculum for the selected program.', selectedText: 'Curriculum selected.', loadingText: 'Searching curricula…', noResultsText: 'No curricula found for this program.', placeholder: 'Search curriculum code or name', disabledPlaceholder: 'Select a program first', minimumLength: 0, showSuggestionsOnEnable: true,
+                search: async query => (await ui.fetchJson(endpoint, { action: 'curriculum_options', academic_program_id: hidden[0].value, search: query, page: 1, per_page: 20 })).curricula,
+                getId: item => item.id, format: item => ({ label: item.curriculum_code + ' — ' + item.curriculum_name, code: item.curriculum_code, title: item.curriculum_name })
+            },
+            {
+                input: inputs[2], valueInput: hidden[2], list: document.getElementById(lists[2]),
+                helpText: 'Choose a version of the selected curriculum.', selectedText: 'Curriculum version selected.', loadingText: 'Searching versions…', noResultsText: 'No curriculum versions found.', placeholder: 'Search version label or academic year', disabledPlaceholder: 'Select a curriculum first', minimumLength: 0, showSuggestionsOnEnable: true,
+                search: async query => (await ui.fetchJson(endpoint, { action: 'version_options', curriculum_id: hidden[1].value, search: query, page: 1, per_page: 20 })).versions,
+                getId: item => item.id, format: item => ({ label: item.version_label + (item.effective_academic_year ? ' — ' + item.effective_academic_year : ''), code: item.version_label, title: item.effective_academic_year || '' })
+            },
+            {
+                input: inputs[3], valueInput: hidden[3], list: document.getElementById(lists[3]),
+                helpText: 'Choose a subject mapped to this curriculum version.', selectedText: 'Mapped subject selected.', loadingText: 'Searching mapped subjects…', noResultsText: 'No mapped subjects found in this version.', placeholder: 'Search subject code or title', disabledPlaceholder: 'Select a curriculum version first', minimumLength: 0, showSuggestionsOnEnable: true,
+                search: async query => (await ui.fetchJson(endpoint, { action: 'placement_options', curriculum_version_id: hidden[2].value, search: query, page: 1, per_page: 20 })).placements,
+                getId: item => item.id, format: item => ({ label: item.subject_code + ' — ' + item.subject_title, code: item.subject_code, title: item.subject_title, meta: [item.year_level, item.semester].filter(Boolean).join(' · ') })
+            }
+        ],
+        onChange: function (index, item, id, action) {
+            if (state.dirty) {
+                state.pendingContextChange = { index, item, action };
+                restoreContext();
+                discardModal.open();
+                return;
+            }
+            applyContextChange(index, item, action);
         }
     });
+    window.weightingContextCascade = cascade;
 
-    search.addEventListener('input', ui.debounce(function () { loadComponents(1); }, 300));
-    perPage.addEventListener('change', function () { loadComponents(1); });
-
-    clearSchemeState('Select a curriculum version and subject to configure grade weighting.');
-    loadPrograms();
+    workspace.addEventListener('click', function (event) {
+        const edit = event.target.closest('[data-edit-component]');
+        if (edit) { openComponentForm(Number(edit.dataset.editComponent)); return; }
+        const remove = event.target.closest('[data-remove-component]');
+        if (remove) requestRemoval(Number(remove.dataset.removeComponent));
+    });
+    form?.addEventListener('submit', submitComponent);
+    document.getElementById('weightingComponentWeight')?.addEventListener('input', updateModalAvailability);
+    document.getElementById('weightingComponentName')?.addEventListener('input', updateModalAvailability);
+    document.getElementById('confirmRemoveWeightingComponent')?.addEventListener('click', removeComponent);
+    document.getElementById('confirmDiscardWeighting')?.addEventListener('click', function () {
+        if (!state.pendingContextChange) return;
+        const pending = state.pendingContextChange;
+        state.pendingContextChange = null;
+        discardModal.close();
+        applyContextChange(pending.index, pending.item, pending.action);
+    });
+    addButton?.addEventListener('click', function () { openComponentForm(-1); });
+    saveButton?.addEventListener('click', saveConfiguration);
+    cimfButton?.addEventListener('click', reviewWithCimf);
+    renderComponents();
 }());

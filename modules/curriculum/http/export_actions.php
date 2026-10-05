@@ -21,6 +21,10 @@ try {
             curriculum_require_read('curriculum_export.view');
             json_response(true, 'Curriculum version options loaded.', $service->versionOptions($_GET));
 
+        case 'scope_options':
+            curriculum_require_read('curriculum_export.view');
+            json_response(true, 'Curriculum export scope options loaded.', $service->scopeOptions($_GET));
+
         case 'preview':
             curriculum_require_read('curriculum_export.view');
             json_response(true, 'Curriculum export preview loaded.', $service->dataset($_GET));
@@ -28,6 +32,9 @@ try {
         case 'download_csv':
             curriculum_require_mutation('curriculum_export.view');
             $dataset = $service->dataset($_POST);
+            if ((int)$dataset['summary']['total_subjects'] === 0) {
+                throw new DomainValidationException('No mapped subjects were found for the selected export scope.');
+            }
 
             $stream = fopen('php://temp', 'w+b');
             if ($stream === false) {

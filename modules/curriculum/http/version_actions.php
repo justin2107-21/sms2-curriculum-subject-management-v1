@@ -23,6 +23,12 @@ try {
             $version = $service->create($_POST, curriculum_actor_id());
             json_response(true, 'Curriculum version created.', ['version' => $version], 201);
 
+        case 'rename':
+            curriculum_require_mutation('curriculum.update');
+            $id = DomainValidator::positiveId($_POST['id'] ?? null, 'Curriculum version');
+            $version = $service->rename($id, $_POST, curriculum_actor_id());
+            json_response(true, 'Curriculum version renamed.', ['version' => $version]);
+
         default:
             json_response(false, 'Unknown action.', [], 400);
     }

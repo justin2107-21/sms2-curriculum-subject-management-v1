@@ -1,5 +1,4 @@
 :root {
-  --sms2-sidebar-blue: #1a3a8c;
   --export-ink: #172033;
   --export-muted: #64748b;
   --export-line: #dbe3ee;
@@ -7,87 +6,7 @@
 
 .export-content { padding-bottom: 36px; }
 
-.export-context-card,
-.export-options-card { margin-bottom: 18px; }
-
-.export-context-grid {
-  border-top: 1px solid #edf1f6;
-  display: grid;
-  gap: 13px;
-  grid-template-columns: repeat(3, minmax(180px, 1fr));
-  padding: 15px 18px 18px;
-}
-
-.export-context-grid .mapping-filter-field {
-  color: #475569;
-  display: flex;
-  flex-direction: column;
-  font-size: .71rem;
-  font-weight: 700;
-  gap: 6px;
-}
-
-.export-context-grid select {
-  background: #fff;
-  border: 1px solid #bfc9d8;
-  border-radius: 7px;
-  color: #25324a;
-  font-family: inherit;
-  font-size: .78rem;
-  height: 39px;
-  max-width: 100%;
-  outline: none;
-  padding: 0 32px 0 10px;
-  width: 100%;
-}
-
-.export-context-grid select:focus {
-  border-color: var(--sms2-sidebar-blue);
-  box-shadow: 0 0 0 3px rgba(26, 58, 140, .13);
-}
-
-.export-context-grid select:disabled { background: #f5f7fa; color: #8a97a9; }
-
-.export-option-grid {
-  border-top: 1px solid #edf1f6;
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(3, minmax(190px, 1fr));
-  padding: 15px 18px;
-}
-
-.export-option {
-  align-items: flex-start;
-  background: #fff;
-  border: 1px solid #d9e1eb;
-  border-radius: 9px;
-  cursor: pointer;
-  display: flex;
-  gap: 10px;
-  min-height: 72px;
-  padding: 11px 12px;
-}
-
-.export-option:hover { border-color: #aebbd0; }
-.export-option.is-required { background: #f6f8fc; cursor: default; }
-.export-option input { accent-color: var(--sms2-sidebar-blue); margin: 3px 0 0; }
-.export-option span { display: flex; flex-direction: column; gap: 4px; }
-.export-option strong { color: #23314a; font-size: .76rem; }
-.export-option small { color: #69778d; font-size: .68rem; line-height: 1.4; }
-
-.export-actions {
-  align-items: center;
-  background: #f8fafc;
-  border-top: 1px solid #e3e9f1;
-  display: flex;
-  gap: 14px;
-  justify-content: space-between;
-  padding: 12px 18px;
-}
-
 .export-action-status { color: #66748a; font-size: .72rem; }
-.export-action-buttons { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
-.export-action-buttons button:disabled { cursor: not-allowed; opacity: .55; }
 
 .export-preview-shell {
   background: #e9eef5;
@@ -194,23 +113,66 @@
 .export-screen-toolbar button { border-radius: 7px; cursor: pointer; font-family: inherit; font-size: .75rem; font-weight: 700; padding: 8px 12px; text-decoration: none; }
 .export-screen-toolbar a { background: #fff; border: 1px solid #cbd5e1; color: #334155; }
 .export-screen-toolbar button { background: var(--sms2-sidebar-blue); border: 1px solid var(--sms2-sidebar-blue); color: #fff; }
-.export-print-body { background: #e9eef5; font-family: 'Segoe UI', sans-serif; margin: 0; min-height: 100vh; padding: 0 0 32px; }
+.export-print-body { background: #e9eef5; margin: 0; min-height: 100vh; padding: 0 0 32px; }
 .export-print-body > .export-report { margin-top: 24px; }
 
+/* Compact curriculum document shared by the live preview and print endpoint. */
+.export-tab-panel[hidden] { display: none !important; }
+.export-context-picker { margin: 14px 0 14px; overflow: visible; position: relative; z-index: 4; }
+.export-scope-card { margin: 0 0 12px; padding: 18px 20px; }
+.export-scope-heading { align-items: center; display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; margin-bottom: 15px; }
+.export-scope-heading h2 { color: #263449; font-size: .85rem; margin: 0; }
+.export-scope-grid { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(220px, 1fr)); }
+.export-scope-grid .mapping-context-field { gap: 5px; }
+.export-scope-grid .select-control, .export-scope-grid select { min-width: 0; width: 100%; }
+.export-scope-grid select:disabled { background: #f1f5f9; }
+.export-tabs { margin: 12px 0 16px; }
+.export-tab-panel { min-width: 0; }
+.export-preview-heading { align-items:flex-start; }
+.export-preview-heading .eyebrow { color:var(--sms2-sidebar-blue); font-weight:800; letter-spacing:.07em; text-transform:uppercase; }
+.export-preview-heading h2 { color:var(--export-ink); font-size:1.05rem; margin:4px 0; }
+.export-preview-summary { color:var(--export-muted); font-size:.75rem; }
+.export-document-header { border:0; border-bottom:1px solid var(--export-line); margin:0 0 20px; padding:4px 0 18px; text-align:center; }
+.export-document-header > p { color:#1c5cae; font-size:.76rem; font-weight:800; letter-spacing:.06em; margin:0 0 10px; text-transform:uppercase; }
+.export-document-header h1 { color:var(--export-ink); font-size:1.35rem; font-weight:500; margin:0 0 8px; }
+.export-document-header > div { color:var(--export-muted); font-size:.76rem; }
+.export-document-header h2 { color:#263449; font-size:.95rem; margin:12px 0 0; }
+.export-document-header h3 { color:#263449; font-size:.95rem; margin:8px 0 0; }
+.export-document-header .export-print-summary { color:var(--export-muted); font-size:.72rem; font-weight:400; letter-spacing:0; margin:8px 0 0; text-transform:none; }
+.export-year { margin:20px 0 0; }
+.export-year > h2, .export-year > h3 { border-bottom:1px solid var(--export-line); color:var(--export-ink); font-size:.98rem; padding-bottom:7px; }
+.export-semester { margin:13px 0 0; }
+.export-semester > h3, .export-semester > h4 { color:#334155; font-size:.8rem; margin:0 0 7px; }
+.export-subtotal { color:#536176; font-size:.68rem; margin:6px 0 0; text-align:right; }
+.export-year-total { color:#334155; font-size:.74rem; margin:8px 0 0; text-align:right; }
+.export-document-footer { border-top:2px solid #294d7c; display:flex; flex-wrap:wrap; gap:12px 24px; justify-content:flex-end; margin-top:24px; padding-top:12px; }
+.export-document-footer > strong { color:#203a5f; font-size:.78rem; }
+.export-document-footer > p,
+.export-document-footer > small { color:var(--export-muted); flex-basis:100%; font-size:.66rem; margin:0; text-align:right; }
+.export-document-footer > small { font-size:.62rem; }
+.export-action-status { color:var(--export-muted); font-size:.7rem; margin:10px 2px 0; }
+.export-document-totals { border-top:2px solid #294d7c; display:flex; gap:24px; justify-content:flex-end; margin-top:22px; padding-top:11px; }
+.export-document-totals strong { color:#203a5f; font-size:.82rem; }
+.export-report-table tfoot th { background:#f8fafc; border:1px solid #dfe5ed; color:#34445b; font-size:.66rem; padding:7px 8px; text-align:left; }
+.export-format-card { align-items: center; display: flex; gap: 24px; justify-content: space-between; padding: 20px 24px; }
+.export-format-card > div { flex: 1 1 auto; min-width: 0; }
+.export-format-card h2 { font-size:.95rem; margin: 0; }
+.export-format-card p { color:var(--export-muted); font-size:.76rem; line-height:1.5; margin-top:7px; }
+.export-format-card button { flex: 0 0 auto; white-space: nowrap; }
+.export-format-scope { margin-top: 9px !important; }
+.export-format-scope strong { color: #334155; font-weight: 650; }
+
 @media (max-width: 900px) {
-  .export-option-grid { grid-template-columns: repeat(2, minmax(180px, 1fr)); }
   .export-report-host { padding: 16px; }
   .export-report { padding: 28px 24px; }
 }
 
 @media (max-width: 680px) {
-  .export-context-grid,
-  .export-option-grid,
+  .export-format-card { align-items: flex-start; flex-direction: column; gap: 16px; padding: 18px; }
+  .export-format-card button { align-self: flex-start; }
+  .export-scope-grid,
   .export-context-summary,
   .export-unit-summary { grid-template-columns: 1fr; }
-  .export-actions { align-items: stretch; flex-direction: column; }
-  .export-action-buttons { justify-content: stretch; }
-  .export-action-buttons button { flex: 1 1 150px; justify-content: center; }
   .export-report-host { padding: 10px; }
   .export-report { padding: 22px 15px; }
   .export-report-title { font-size: 1.15rem; }
@@ -231,5 +193,8 @@
   .export-context-item,
   .export-unit-summary div { break-inside: avoid; page-break-inside: avoid; }
   .export-report-section { break-before: auto; }
+  .export-year, .export-semester { break-inside:auto; page-break-inside:auto; }
+  .export-report-table tr { break-inside:avoid; page-break-inside:avoid; }
+  .export-document-header { break-after:avoid; }
   .export-report a { color: inherit; text-decoration: none; }
 }

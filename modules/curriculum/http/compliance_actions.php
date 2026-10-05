@@ -79,7 +79,7 @@ try {
             json_response(true, 'Compliance rule updated.', ['rule' => $rule]);
 
         case 'validation_run':
-            curriculum_require_mutation('compliance.view');
+            curriculum_require_mutation('compliance.run');
             $versionId = DomainValidator::positiveId(
                 $_POST['curriculum_version_id'] ?? null,
                 'Curriculum version'

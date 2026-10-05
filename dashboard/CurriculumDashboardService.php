@@ -47,6 +47,16 @@ class CurriculumDashboardService
         ];
     }
 
+    public function programs(): array
+    {
+        return $this->repository->visiblePrograms();
+    }
+
+    public function subjectMasterCount(): int
+    {
+        return $this->repository->subjectMasterCount();
+    }
+
     private function actionLabel(string $action): string
     {
         return ucwords(strtolower(str_replace('_', ' ', $action)));

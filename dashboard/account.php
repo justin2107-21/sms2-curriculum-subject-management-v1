@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/../shared/bootstrap.php';
 require_permission('account.view');
+require_once __DIR__.'/../database/ProvisionalRoles.php';
+$canDeleteOwnAccount = !array_intersect(get_user_roles((int)current_user_id()), array_keys(ProvisionalRoles::definitions()));
 $canViewArchives = user_can((int)current_user_id(), 'archive.view');
 $canRestoreArchives = $canViewArchives && user_can((int)current_user_id(), 'archive.restore');
 $archiveTab = $canViewArchives && (($_GET['tab'] ?? '') === 'archives');
@@ -8,7 +10,7 @@ $first_name     = htmlspecialchars($_SESSION['first_name'] ?? '');
 $last_name      = htmlspecialchars($_SESSION['last_name']  ?? '');
 $email          = htmlspecialchars($_SESSION['email']      ?? '');
 $username       = htmlspecialchars($_SESSION['username']   ?? '');
-$role           = ucfirst(htmlspecialchars($_SESSION['role'] ?? 'student'));
+$role = htmlspecialchars(implode(', ', array_map(static fn($key)=>ProvisionalRoles::definitions()[$key]['label'] ?? ucfirst($key),get_user_roles((int)current_user_id()))), ENT_QUOTES, 'UTF-8');
 $avatar_initial = strtoupper(substr($_SESSION['first_name'] ?? 'U', 0, 1));
 $accountCssVersion = (string)filemtime(__DIR__ . '/../css/account.css');
 $typographyVersion = (string)filemtime(__DIR__ . '/../css/csms-typography.css');
@@ -43,6 +45,7 @@ require __DIR__ . '/../shared/sidebar.php';
     <?php if ($canViewArchives): ?><a href="account.php?tab=archives" class="<?= $archiveTab ? 'selected' : '' ?>">Archives</a><?php endif; ?>
   </nav>
   <div id="accountPanel" <?= $archiveTab ? 'hidden' : '' ?>>
+<?php if (current_user()['must_change_password']): ?><div class="settings-card"><div class="settings-card-body"><p role="status">Change your temporary password in the Password section before accessing other modules.</p></div></div><?php endif; ?>
 
   <!-- Profile card -->
   <div class="settings-card">
@@ -110,7 +113,7 @@ require __DIR__ . '/../shared/sidebar.php';
           <div class="form-field">
             <label>New Password</label>
             <div class="password-wrap">
-              <input type="password" name="new_password" id="fNewPw" placeholder="New password (min 6)" autocomplete="new-password"/>
+              <input type="password" name="new_password" id="fNewPw" placeholder="New password (min <?= current_user()['must_change_password'] ? 12 : 6 ?>)" minlength="<?= current_user()['must_change_password'] ? 12 : 6 ?>" maxlength="72" autocomplete="new-password"/>
               <button type="button" class="toggle-pw" data-target="fNewPw">
                 <i class="fa-solid fa-eye"></i>
               </button>
@@ -148,13 +151,13 @@ require __DIR__ . '/../shared/sidebar.php';
       </div>
       <button class="btn-danger" id="btnSignOut">Sign Out</button>
     </div>
-    <div class="danger-zone" style="border-top:1px solid #fef2f2;">
+    <?php if ($canDeleteOwnAccount): ?><div class="danger-zone" style="border-top:1px solid #fef2f2;">
       <div class="danger-info">
         <h3>Delete Account</h3>
         <p>Permanently remove your account. This cannot be undone.</p>
       </div>
       <button class="btn-danger" id="btnDeleteAccount">Delete Account</button>
-    </div>
+    </div><?php endif; ?>
   </div>
 
   </div>
@@ -294,7 +297,7 @@ document.getElementById('btnSavePassword').addEventListener('click', async () =>
     fd.set('action', 'change_password');
     try {
         const data = await postAction(fd);
-        if (data.success) { form.reset(); showToast(data.message, 'success'); }
+        if (data.success) { form.reset(); showToast(data.message, 'success'); if (<?= current_user()['must_change_password'] ? 'true' : 'false' ?>) window.location.href = 'dashboard.php'; }
         else { showToast(data.message, 'error'); }
     } catch { showToast('Request failed.', 'error'); }
 });
@@ -305,7 +308,7 @@ document.getElementById('btnSignOut').addEventListener('click', async () => {
     window.location.href = SIGNIN;
 });
 
-document.getElementById('btnDeleteAccount').addEventListener('click', async () => {
+document.getElementById('btnDeleteAccount')?.addEventListener('click', async () => {
     if (!confirm('Permanently delete your account? This cannot be undone.')) return;
     const fd = new FormData(); fd.set('action', 'delete_account');
     try {

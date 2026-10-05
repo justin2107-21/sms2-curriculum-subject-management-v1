@@ -56,9 +56,9 @@ class SubjectOfferingHistoryRepository
                     academic_programs.program_type'
             . $joins . $where .
             " ORDER BY " . $searchOrder . "subjects.subject_code ASC,
-                       curriculum_versions.created_at ASC,
                        academic_programs.program_code ASC,
                        curricula.curriculum_code ASC,
+                       curriculum_versions.created_at ASC,
                        curriculum_versions.version_label ASC,
                        cvs.id ASC LIMIT ? OFFSET ?",
             $types . str_repeat('s', count($rankParams)) . 'ii',
@@ -109,6 +109,28 @@ class SubjectOfferingHistoryRepository
         ];
     }
 
+    public function findPlacement(int $placementId): ?array
+    {
+        $stmt = RepositoryQuery::execute($this->db,
+            'SELECT cvs.id AS placement_id, cvs.subject_id, cvs.curriculum_version_id,
+                    cvs.year_level, cvs.semester, cvs.sequence_order, cvs.is_required,
+                    cvs.created_at AS placement_created_at, cvs.updated_at AS placement_updated_at,
+                    subjects.subject_code, subjects.subject_title, subjects.units,
+                    curriculum_versions.version_label, curriculum_versions.status AS version_status,
+                    curriculum_versions.created_at AS version_created_at, curriculum_versions.updated_at AS version_updated_at,
+                    curricula.curriculum_code, curricula.curriculum_name,
+                    academic_programs.program_code, academic_programs.program_name, academic_programs.program_type
+             FROM curriculum_version_subjects cvs
+             JOIN subjects ON subjects.id = cvs.subject_id
+             JOIN curriculum_versions ON curriculum_versions.id = cvs.curriculum_version_id
+             JOIN curricula ON curricula.id = curriculum_versions.curriculum_id
+             JOIN academic_programs ON academic_programs.id = curricula.academic_program_id
+             WHERE cvs.id = ? LIMIT 1', 'i', [$placementId]);
+        $record = $stmt->get_result()->fetch_assoc() ?: null;
+        $stmt->close();
+        return $record;
+    }
+
     public function paginateComparison(int $versionAId, int $versionBId, array $query): array
     {
         $from = $this->comparisonFrom();
@@ -135,20 +157,20 @@ class SubjectOfferingHistoryRepository
                     placement_a.semester AS version_a_semester,
                     placement_a.sequence_order AS version_a_sequence_order,
                     placement_a.is_required AS version_a_is_required,
+                    placement_a.created_at AS version_a_stored_date,
                     placement_b.id AS version_b_placement_id,
                     placement_b.year_level AS version_b_year_level,
                     placement_b.semester AS version_b_semester,
                     placement_b.sequence_order AS version_b_sequence_order,
                     placement_b.is_required AS version_b_is_required,
+                    placement_b.created_at AS version_b_stored_date,
                     CASE
                         WHEN placement_a.subject_id IS NULL THEN 'added'
                         WHEN placement_b.subject_id IS NULL THEN 'removed'
-                        WHEN NOT (
-                            placement_a.year_level <=> placement_b.year_level
-                            AND placement_a.semester <=> placement_b.semester
-                            AND placement_a.sequence_order <=> placement_b.sequence_order
-                            AND placement_a.is_required <=> placement_b.is_required
-                        ) THEN 'changed'
+                        WHEN NOT (placement_a.year_level <=> placement_b.year_level
+                                  AND placement_a.semester <=> placement_b.semester) THEN 'moved'
+                        WHEN NOT (placement_a.is_required <=> placement_b.is_required) THEN 'placement_type_changed'
+                        WHEN NOT (placement_a.sequence_order <=> placement_b.sequence_order) THEN 'moved'
                         ELSE 'unchanged'
                     END AS change_type"
             . $from .
@@ -184,6 +206,7 @@ class SubjectOfferingHistoryRepository
         $types = '';
         $params = [];
         foreach ([
+            'subject_id' => 'subjects.id',
             'academic_program_id' => 'academic_programs.id',
             'curriculum_id' => 'curricula.id',
             'curriculum_version_id' => 'curriculum_versions.id',
@@ -258,16 +281,25 @@ class SubjectOfferingHistoryRepository
         $stmt = RepositoryQuery::execute(
             $this->db,
             "SELECT
+                COUNT(DISTINCT CASE WHEN placement_a.subject_id IS NOT NULL THEN subjects.id END) AS version_a_subjects,
+                COUNT(DISTINCT CASE WHEN placement_b.subject_id IS NOT NULL THEN subjects.id END) AS version_b_subjects,
+                COALESCE(SUM(CASE WHEN placement_a.subject_id IS NOT NULL THEN subjects.units ELSE 0 END), 0) AS version_a_units,
+                COALESCE(SUM(CASE WHEN placement_b.subject_id IS NOT NULL THEN subjects.units ELSE 0 END), 0) AS version_b_units,
                 SUM(CASE WHEN placement_a.subject_id IS NULL THEN 1 ELSE 0 END) AS added,
                 SUM(CASE WHEN placement_b.subject_id IS NULL THEN 1 ELSE 0 END) AS removed,
                 SUM(CASE WHEN placement_a.subject_id IS NOT NULL
                               AND placement_b.subject_id IS NOT NULL
-                              AND NOT (
-                                  placement_a.year_level <=> placement_b.year_level
-                                  AND placement_a.semester <=> placement_b.semester
-                                  AND placement_a.sequence_order <=> placement_b.sequence_order
-                                  AND placement_a.is_required <=> placement_b.is_required
-                              ) THEN 1 ELSE 0 END) AS changed,
+                              AND NOT (placement_a.year_level <=> placement_b.year_level
+                                       AND placement_a.semester <=> placement_b.semester) THEN 1 ELSE 0 END) AS moved,
+                SUM(CASE WHEN placement_a.subject_id IS NOT NULL
+                              AND placement_b.subject_id IS NOT NULL
+                              AND placement_a.is_required <> placement_b.is_required THEN 1 ELSE 0 END) AS placement_type_changed,
+                SUM(CASE WHEN placement_a.subject_id IS NOT NULL
+                              AND placement_b.subject_id IS NOT NULL
+                              AND (NOT (placement_a.year_level <=> placement_b.year_level
+                                        AND placement_a.semester <=> placement_b.semester)
+                                   OR NOT (placement_a.sequence_order <=> placement_b.sequence_order)
+                                   OR placement_a.is_required <> placement_b.is_required) THEN 1 ELSE 0 END) AS changed,
                 SUM(CASE WHEN placement_a.subject_id IS NOT NULL
                               AND placement_b.subject_id IS NOT NULL
                               AND placement_a.year_level <=> placement_b.year_level
