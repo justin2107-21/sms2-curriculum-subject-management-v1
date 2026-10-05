@@ -31,7 +31,21 @@ try {
         if (proc_close($process)!==0) { throw new RuntimeException('Maintenance process failed.'); }
         if ($stage==='migration status') {
             $status=json_decode($output,true,512,JSON_THROW_ON_ERROR);
-            echo empty($status['pending']) ? "Startup migrations: no pending migrations.\n" : "Startup migrations: pending migrations found.\n";
+            $pending=$status['pending']??null;
+            if (!is_array($pending)) { throw new RuntimeException('Migration status response is invalid.'); }
+            foreach ($pending as $name) {
+                if (!is_string($name)
+                    || !preg_match('/^(?:000_baseline_schema|[0-9]{3}_[a-z0-9_]+\.sql)$/D',$name)) {
+                    throw new RuntimeException('Migration status contains an invalid name.');
+                }
+            }
+            if ($pending) {
+                // Filenames are safe, useful deployment diagnostics. Never log
+                // the configured schema name, connection values, or SQL.
+                echo 'Pending migrations: '.implode(', ',$pending).PHP_EOL;
+            } else {
+                echo "Startup migrations: no pending migrations.\n";
+            }
         }
         if ($stage==='schema verification') {
             $report=json_decode($output,true,512,JSON_THROW_ON_ERROR);
