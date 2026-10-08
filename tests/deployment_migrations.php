@@ -56,7 +56,7 @@ try { deploymentRun(['--apply','--confirm-database='.$database],1); }
 finally { $stmt=$conn->prepare('SELECT RELEASE_LOCK(?)');$stmt->bind_param('s',$lock);$stmt->execute();$stmt->close(); }
 deployCheck($conn->query('SHOW TABLES')->num_rows===0,'Concurrent migration blocked before writes');
 deploymentRun(['--apply','--confirm-database='.$database],0);
-deployCheck($conn->query('SHOW TABLES')->num_rows===27,'26 application tables plus migration journal after 021');
+deployCheck($conn->query('SHOW TABLES')->num_rows===29,'28 application tables plus migration journal after 021');
 foreach(['users','students','academic_programs','subjects','curricula'] as $table) {
     deployCheck((int)$conn->query("SELECT COUNT(*) FROM `$table`")->fetch_row()[0]===0,'No seeded records: '.$table);
 }
