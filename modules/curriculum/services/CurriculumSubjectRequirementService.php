@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/CurriculumVersionEditPolicy.php';
+
 require_once __DIR__ . '/../validators/DomainValidator.php';
 require_once __DIR__ . '/PrerequisiteGraph.php';
 require_once __DIR__ . '/../repositories/CurriculumVersionSubjectRepository.php';
@@ -49,6 +51,7 @@ class CurriculumSubjectRequirementService
 
         $this->db->begin_transaction();
         try {
+            (new CurriculumVersionEditPolicy($this->db))->assertEditable($data['curriculum_version_id']);
             if (!$this->requirements->lockVersion($data['curriculum_version_id'])) {
                 throw new DomainNotFoundException('Curriculum version not found.');
             }
@@ -128,6 +131,7 @@ class CurriculumSubjectRequirementService
     {
         $this->db->begin_transaction();
         try {
+            (new CurriculumVersionEditPolicy($this->db))->assertChildEditable('requirement', $id);
             $relationship = $this->requirements->findById($id);
             if (!$relationship) {
                 throw new DomainNotFoundException('Subject requirement not found.');
@@ -196,6 +200,7 @@ class CurriculumSubjectRequirementService
         if (count(array_unique($ids)) !== count($ids)) throw new DomainConflictException('This prerequisite relationship already exists.');
         $this->db->begin_transaction();
         try {
+            (new CurriculumVersionEditPolicy($this->db))->assertEditable($version);
             if (!$this->requirements->lockVersion($version)) throw new DomainNotFoundException('Curriculum version not found.');
             $old = $this->requirements->allPrerequisites($version);
             $current = array_values(array_filter($old, fn($e) => (int)$e['subject_id'] === $target));

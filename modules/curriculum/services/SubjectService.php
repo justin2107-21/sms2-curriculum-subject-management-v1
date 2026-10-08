@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/CurriculumVersionEditPolicy.php';
+
 require_once __DIR__ . '/../validators/DomainValidator.php';
 require_once __DIR__ . '/../repositories/SubjectRepository.php';
 require_once __DIR__ . '/../repositories/CurriculumVersionSubjectRepository.php';
@@ -83,6 +85,7 @@ class SubjectService
         $data = DomainValidator::subject($input);
         $this->db->begin_transaction();
         try {
+            (new CurriculumVersionEditPolicy($this->db))->assertMasterEditable('subject', $id, $data);
             $existing = $this->subjects->findById($id);
             if (!$existing) {
                 throw new DomainNotFoundException('Subject not found.');

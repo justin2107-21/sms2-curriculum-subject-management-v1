@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/CurriculumVersionEditPolicy.php';
+
 require_once __DIR__ . '/../validators/DomainValidator.php';
 require_once __DIR__ . '/../repositories/AcademicProgramRepository.php';
 require_once __DIR__ . '/../repositories/CurriculumRepository.php';
@@ -111,6 +113,7 @@ class GradeWeightingService
         $data = DomainValidator::gradeWeightingScheme($input);
         $this->db->begin_transaction();
         try {
+            (new CurriculumVersionEditPolicy($this->db))->assertChildEditable('placement', $data['curriculum_version_subject_id']);
             if (!$this->placements->findDetailedById($data['curriculum_version_subject_id'])) {
                 throw new DomainNotFoundException('Curriculum subject placement not found.');
             }
@@ -149,6 +152,7 @@ class GradeWeightingService
         $data = DomainValidator::gradeWeightingSchemeUpdate($input);
         $this->db->begin_transaction();
         try {
+            (new CurriculumVersionEditPolicy($this->db))->assertChildEditable('scheme', $id);
             $existing = $this->weighting->findSchemeById($id, true);
             if (!$existing) {
                 throw new DomainNotFoundException('Grade weighting scheme not found.');
@@ -177,6 +181,7 @@ class GradeWeightingService
     {
         $this->db->begin_transaction();
         try {
+            (new CurriculumVersionEditPolicy($this->db))->assertChildEditable('scheme', $id);
             $scheme = $this->weighting->findSchemeById($id, true);
             if (!$scheme) {
                 throw new DomainNotFoundException('Grade weighting scheme not found.');
@@ -206,6 +211,7 @@ class GradeWeightingService
         $data = DomainValidator::gradeWeightingComponent($input);
         $this->db->begin_transaction();
         try {
+            (new CurriculumVersionEditPolicy($this->db))->assertChildEditable('scheme', $data['scheme_id']);
             if (!$this->weighting->findSchemeById($data['scheme_id'], true)) {
                 throw new DomainNotFoundException('Grade weighting scheme not found.');
             }
@@ -256,6 +262,7 @@ class GradeWeightingService
         $data = DomainValidator::gradeWeightingComponentFields($input);
         $this->db->begin_transaction();
         try {
+            (new CurriculumVersionEditPolicy($this->db))->assertChildEditable('component', $id);
             $component = $this->weighting->findComponentById($id, true);
             if (!$component) {
                 throw new DomainNotFoundException('Grade weighting component not found.');
@@ -311,6 +318,7 @@ class GradeWeightingService
     {
         $this->db->begin_transaction();
         try {
+            (new CurriculumVersionEditPolicy($this->db))->assertChildEditable('component', $id);
             $component = $this->weighting->findComponentById($id, true);
             if (!$component) {
                 throw new DomainNotFoundException('Grade weighting component not found.');
@@ -353,6 +361,7 @@ class GradeWeightingService
 
         $this->db->begin_transaction();
         try {
+            (new CurriculumVersionEditPolicy($this->db))->assertChildEditable('placement', $placementId);
             $placement = $this->placements->findDetailedById($placementId);
             if (!$placement) {
                 throw new DomainNotFoundException('Curriculum subject placement not found.');

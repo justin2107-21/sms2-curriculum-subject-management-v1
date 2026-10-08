@@ -13,13 +13,13 @@ function checkHttp(bool $ok,string $label):void{global $checks;if(!$ok)throw new
 function status(array $r,int $expected,string $label):array{checkHttp($r['status']===$expected,$label.' expected '.$expected.' received '.$r['status'].' '.$r['body']);checkHttp(!preg_match('/Fatal error|Warning:|Stack trace|mysqli_sql_exception/',$r['body']),$label.' safe response');return $r['json']??[];}
 try{
  $db->query("CREATE DATABASE `$name`");$created=true;
- foreach(['users','roles','permissions','user_roles','role_permissions','audit_logs','academic_programs','curricula','curriculum_versions','subjects','curriculum_version_subjects','curriculum_subject_requirements','curriculum_elective_group_subjects','grade_weighting_schemes'] as $table)$db->query("CREATE TABLE `$name`.`$table` LIKE `$source`.`$table`");
+ foreach(['users','roles','permissions','user_roles','role_permissions','audit_logs','academic_programs','curricula','curriculum_versions','subjects','curriculum_version_subjects','curriculum_subject_requirements','curriculum_elective_group_subjects','grade_weighting_schemes','curriculum_version_subject_snapshots'] as $table)$db->query("CREATE TABLE `$name`.`$table` LIKE `$source`.`$table`");
  $db->select_db($name);
  foreach(['roles','permissions','role_permissions'] as $table)$db->query("INSERT INTO `$table` SELECT * FROM `$source`.`$table`");
  $password=bin2hex(random_bytes(24));$hash=password_hash($password,PASSWORD_DEFAULT);
  foreach(['pradmin','prviewer']as $i=>$username){$id=$i+1;$stmt=$db->prepare("INSERT INTO users(id,username,email,first_name,last_name,password_hash,role) VALUES(?,?,?,'Test','Only',?,'student')");$email=$username.'@example.invalid';$stmt->bind_param('isss',$id,$username,$email,$hash);$stmt->execute();}
  $db->query("INSERT INTO user_roles(user_id,role_id) SELECT 1,id FROM roles WHERE name='admin'");
- $db->query("INSERT INTO roles(name,description) VALUES('pr_test_viewer','Disposable test fixture')");$viewerRole=(int)$db->insert_id;
+ $db->query("INSERT INTO roles(name,display_name,description) VALUES('pr_test_viewer','Synthetic Viewer','Disposable test fixture')");$viewerRole=(int)$db->insert_id;
  $db->query("INSERT INTO user_roles(user_id,role_id) VALUES(2,$viewerRole)");
  $db->query("INSERT INTO role_permissions(role_id,permission_id) SELECT $viewerRole,id FROM permissions WHERE name IN ('prerequisite.view','program.view','curriculum.view')");
  $db->query("INSERT INTO academic_programs(id,program_code,program_name) VALUES(1,'T','Test')");

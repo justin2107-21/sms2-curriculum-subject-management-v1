@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/CurriculumVersionEditPolicy.php';
+
 require_once __DIR__ . '/../validators/DomainValidator.php';
 require_once __DIR__ . '/../repositories/CurriculumElectiveGroupRepository.php';
 require_once __DIR__ . '/../../../shared/audit.php';
@@ -28,6 +30,7 @@ class CurriculumElectiveGroupService
         $data = DomainValidator::electiveGroup($input);
         $this->db->begin_transaction();
         try {
+            (new CurriculumVersionEditPolicy($this->db))->assertEditable($data['curriculum_version_id']);
             if (!$this->groups->lockVersion($data['curriculum_version_id'])) {
                 throw new DomainNotFoundException('Curriculum version not found.');
             }
@@ -72,6 +75,7 @@ class CurriculumElectiveGroupService
         $data = DomainValidator::electiveGroupUpdate($input);
         $this->db->begin_transaction();
         try {
+            (new CurriculumVersionEditPolicy($this->db))->assertChildEditable('group', $id);
             $group = $this->groups->findByIdForUpdate($id);
             if (!$group) {
                 throw new DomainNotFoundException('Elective group not found.');
@@ -114,6 +118,7 @@ class CurriculumElectiveGroupService
     {
         $this->db->begin_transaction();
         try {
+            (new CurriculumVersionEditPolicy($this->db))->assertChildEditable('group', $id);
             $group = $this->groups->findByIdForUpdate($id);
             if (!$group) {
                 throw new DomainNotFoundException('Elective group not found.');

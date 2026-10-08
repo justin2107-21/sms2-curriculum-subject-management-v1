@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/CurriculumVersionEditPolicy.php';
+
 require_once __DIR__ . '/../validators/DomainValidator.php';
 require_once __DIR__ . '/../repositories/ComplianceReferenceRepository.php';
 require_once __DIR__ . '/../repositories/ComplianceRuleRepository.php';
@@ -45,6 +47,8 @@ class ComplianceRuleService
         $data = DomainValidator::complianceRule($input);
         $this->db->begin_transaction();
         try {
+            $policy = new CurriculumVersionEditPolicy($this->db);
+            $policy->assertRuleScopeEditable($data);
             $this->assertRelatedRecords($data);
             if ($this->rules->nameExists($data)) {
                 throw new DomainConflictException('A rule with this name already exists for this reference and scope.');
@@ -74,10 +78,16 @@ class ComplianceRuleService
         $data = DomainValidator::complianceRule($input);
         $this->db->begin_transaction();
         try {
+            $policy = new CurriculumVersionEditPolicy($this->db);
+            $oldScope = $this->rules->findById($id);
+            if (!$oldScope) throw new DomainNotFoundException('Compliance rule not found.');
+            $policy->assertRuleScopeEditable($oldScope);
+            $policy->assertRuleScopeEditable($data);
             $existing = $this->rules->findByIdForUpdate($id);
             if (!$existing) {
                 throw new DomainNotFoundException('Compliance rule not found.');
             }
+            $policy->assertRuleScopeEditable($existing);
             $this->assertRelatedRecords($data);
             if ($this->rules->hasHistory($id) && $this->semanticFieldsChanged($existing, $data)) {
                 throw new DomainConflictException(

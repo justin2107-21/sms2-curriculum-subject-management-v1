@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/CurriculumVersionEditPolicy.php';
+
 require_once __DIR__ . '/../validators/DomainValidator.php';
 require_once __DIR__ . '/AcademicSequenceValidator.php';
 require_once __DIR__ . '/../repositories/SubjectRepository.php';
@@ -78,6 +80,9 @@ class CurriculumVersionSubjectService
         $data = DomainValidator::curriculumVersionSubject($input);
         $this->db->begin_transaction();
         try {
+            $policy = new CurriculumVersionEditPolicy($this->db);
+            $policy->lockSubject($data['subject_id']);
+            $policy->assertEditable($data['curriculum_version_id']);
             if (!$this->requirements->lockVersion($data['curriculum_version_id'])) {
                 throw new DomainNotFoundException('Curriculum version not found.');
             }
@@ -125,6 +130,7 @@ class CurriculumVersionSubjectService
         if (!$initial) throw new DomainNotFoundException('Subject mapping not found.');
         $this->db->begin_transaction();
         try {
+            (new CurriculumVersionEditPolicy($this->db))->assertChildEditable('placement', $id);
             $this->requirements->lockVersion((int)$initial['curriculum_version_id']);
             $assignment = $this->assignments->findById($id);
             if (!$assignment) {
@@ -189,6 +195,7 @@ class CurriculumVersionSubjectService
         if (!$initial) throw new DomainNotFoundException('Subject mapping not found.');
         $this->db->begin_transaction();
         try {
+            (new CurriculumVersionEditPolicy($this->db))->assertChildEditable('placement', $id);
             $this->requirements->lockVersion((int)$initial['curriculum_version_id']);
             $assignment = $this->assignments->findById($id);
             if (!$assignment) {
@@ -216,6 +223,7 @@ class CurriculumVersionSubjectService
                     'Remove the grade weighting configuration before removing this curriculum placement.'
                 );
             }
+            (new CurriculumVersionEditPolicy($this->db))->preparePlacementRemoval($id);
             $this->assignments->delete($id);
             audit_log_required(
                 'CURRICULUM_SUBJECT_REMOVE',

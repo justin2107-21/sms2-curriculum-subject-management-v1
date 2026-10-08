@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/CurriculumVersionEditPolicy.php';
+
 require_once __DIR__ . '/../validators/DomainValidator.php';
 require_once __DIR__ . '/../repositories/AcademicProgramRepository.php';
 require_once __DIR__ . '/../../../shared/audit.php';
@@ -64,6 +66,7 @@ class AcademicProgramService
         $data = DomainValidator::academicProgram($input);
         $this->db->begin_transaction();
         try {
+            (new CurriculumVersionEditPolicy($this->db))->assertMasterEditable('program', $id, $data);
             $existing = $this->programs->findById($id);
             if (!$existing) {
                 throw new DomainNotFoundException('Academic program not found.');

@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/CurriculumVersionEditPolicy.php';
+
 require_once __DIR__ . '/../../../shared/audit.php';
 
 /** The only tables the archive center is allowed to mutate. */
@@ -217,6 +219,7 @@ final class ArchiveCenterService
         [$table, $code, , , , $entity] = $this->config($module);
         $this->db->begin_transaction();
         try {
+            (new CurriculumVersionEditPolicy($this->db))->assertArchiveEditable($module, $id);
             $row = $this->one("SELECT * FROM $table WHERE id=? FOR UPDATE", 'i', [$id]);
             if (!$row) throw new OutOfBoundsException('Record not found.');
             if ($module === 'elective_group' ? $row['status'] === 'archived' : $row['archived_at'] !== null) throw new DomainException('This record is already archived.');
@@ -234,6 +237,7 @@ final class ArchiveCenterService
         [$table, $code, , , , $entity] = $this->config($module);
         $this->db->begin_transaction();
         try {
+            (new CurriculumVersionEditPolicy($this->db))->assertArchiveEditable($module, $id);
             // Validate again under a transaction, after locking the target.
             $row = $this->one("SELECT * FROM $table WHERE id=? FOR UPDATE", 'i', [$id]);
             if (!$row) throw new OutOfBoundsException('Archive record not found.');

@@ -34,9 +34,9 @@ try {
     json_response(false, 'Unknown archive action.', [], 400);
 } catch (InvalidArgumentException $error) {
     json_response(false, $error->getMessage(), [], 400);
-} catch (OutOfBoundsException $error) {
+} catch (OutOfBoundsException | DomainNotFoundException $error) {
     json_response(false, $error->getMessage(), [], 404);
-} catch (DomainException $error) {
+} catch (DomainException | DomainConflictException $error) {
     json_response(false, $error->getMessage(), [], 409);
 } catch (Throwable $error) {
     log_application_error('Archive center request failed', $error);

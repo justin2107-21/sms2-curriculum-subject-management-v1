@@ -1,4 +1,6 @@
 <?php
+
+require_once __DIR__ . '/CurriculumVersionEditPolicy.php';
 require_once __DIR__ . '/../validators/DomainValidator.php';
 require_once __DIR__ . '/../repositories/ElectivesWorkspaceRepository.php';
 require_once __DIR__ . '/../../../shared/audit.php';
@@ -110,6 +112,9 @@ class ElectivesWorkspaceService
         if ($required > count($subjects)) throw new DomainValidationException('Number of subjects to choose cannot exceed the available subjects.');
         $this->db->begin_transaction();
         try {
+            $policy = new CurriculumVersionEditPolicy($this->db);
+            if ($id !== null) $policy->assertChildEditable('group', $id);
+            else $policy->assertEditable(DomainValidator::positiveId($input['curriculum_version_id'] ?? null, 'Curriculum version'));
             $context = $this->context($input,true);
             $version = (int)$context['id'];
             $old = null;
@@ -156,6 +161,7 @@ class ElectivesWorkspaceService
         $id = DomainValidator::positiveId($input['id'] ?? null,'Elective group');
         $this->db->begin_transaction();
         try {
+            (new CurriculumVersionEditPolicy($this->db))->assertChildEditable('group', $id);
             $context = $this->context($input,true);
             $group = $this->repo->lockGroup($id,(int)$context['id']);
             if (!$group) throw new DomainNotFoundException('Elective group not found in the selected version.');

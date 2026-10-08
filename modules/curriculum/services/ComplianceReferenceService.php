@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/CurriculumVersionEditPolicy.php';
+
 require_once __DIR__ . '/../validators/DomainValidator.php';
 require_once __DIR__ . '/../repositories/ComplianceReferenceRepository.php';
 require_once __DIR__ . '/../../../shared/audit.php';
@@ -68,6 +70,7 @@ class ComplianceReferenceService
         $data = DomainValidator::complianceReference($input);
         $this->db->begin_transaction();
         try {
+            (new CurriculumVersionEditPolicy($this->db))->assertReferenceEditable($id);
             if (!$this->references->findByIdForUpdate($id)) {
                 throw new DomainNotFoundException('Compliance reference not found.');
             }

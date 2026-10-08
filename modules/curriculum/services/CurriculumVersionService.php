@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/CurriculumVersionEditPolicy.php';
+
 require_once __DIR__ . '/../validators/DomainValidator.php';
 require_once __DIR__ . '/../repositories/CurriculumRepository.php';
 require_once __DIR__ . '/../repositories/CurriculumVersionRepository.php';
@@ -71,6 +73,7 @@ class CurriculumVersionService
         $label = DomainValidator::requiredString($input, 'version_label', 'Version label', 100);
         $this->db->begin_transaction();
         try {
+            (new CurriculumVersionEditPolicy($this->db))->assertEditable($id);
             $existing = $this->versions->findById($id);
             if (!$existing) {
                 throw new DomainNotFoundException('Curriculum version not found.');
