@@ -1,49 +1,54 @@
 'use strict';
+// The legacy filename is retained; the supported interface is the global CIMF panel.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const elements = new Map();
-function element(id) {
-    if (!elements.has(id)) elements.set(id, {
-        id, hidden: id === 'cimfModal', disabled: false, value: '', textContent: '', innerHTML: '', dataset: {}, handlers: {},
-        addEventListener(name, fn) { (this.handlers[name] ||= []).push(fn); },
-        async click() { for (const fn of this.handlers.click || []) await fn({ target: this }); },
-        querySelector() { return { click() {} }; },
-    });
-    return elements.get(id);
+class Element {
+  constructor(id) { this.id=id; this.hidden=true; this.dataset={}; this.style={}; this.value=''; this.innerHTML=''; this.textContent=''; this.listeners={}; this.attributes={}; this.classList={toggle(){}}; }
+  addEventListener(type, fn) { this.listeners[type]=fn; }
+  setAttribute(name,value) { this.attributes[name]=value; }
+  focus() { this.focused=true; }
+  contains(target) { return target?.id?.startsWith('csmsCimf') || target?.id?.startsWith('globalCimf'); }
+  querySelectorAll() { return []; }
+  querySelector() { return get(this.id+'Submit'); }
+  append() {}
+  closest() { return null; }
 }
-element('prerequisiteWorkspace').dataset = { cimfApi: 'cimf', cimfStatus: 'SUCCESS' };
-const listeners = {};
-const document = { getElementById: element, addEventListener(name, fn) { listeners[name] = fn; } };
-let calls = 0;
-const analysis = { summary: 'Human review advised.', review_items: [], limitations: [] };
-const window = { CurriculumUI: {
-    escapeHtml: value => String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;'),
-    createModal: node => ({ open() { node.hidden = false; }, close() { node.hidden = true; } }),
-    async postForm() { calls++; return { analysis, demo_data: true }; },
-}, PrerequisiteCIMFContext: () => ({ versionId: '1', loaded: true,
-    context: [{ program_code: 'BSIT' }, { curriculum_code: 'C1' }, { version_label: 'V1', description: 'synthetic demo' }],
-    placements: [{ subject_id: 1, subject_code: 'CAP101', subject_title: 'Capstone' }, { subject_id: 2, subject_code: 'BPM101', subject_title: 'BPM' }],
-}) };
-vm.runInNewContext(fs.readFileSync('modules/curriculum/assets/cimf-prerequisite.js', 'utf8'), { window, document, FormData });
-(async () => {
-    await element('openCimfButton').click();
-    assert.equal(element('cimfModal').hidden, false);
-    assert.equal(calls, 0, 'Opening modal has no API cost');
-    await element('cimfAnalyze').click();
-    assert.equal(calls, 1);
-    assert.match(element('cimfAnalysis').innerHTML, /Human review advised/);
-    await element('cimfAskView').click();
-    assert.equal(element('cimfMain').hidden, true);
-    assert.equal(element('cimfBack').hidden, false);
-    await element('cimfBack').click();
-    assert.equal(element('cimfModal').hidden, false, 'Back stays in modal');
-    assert.equal(element('cimfMain').hidden, false);
-    assert.match(element('cimfAnalysis').innerHTML, /Human review advised/, 'Analysis preserved');
-    assert.equal(calls, 1, 'Back does not repeat API request');
-    await element('cimfCompareView').click();
-    await element('cimfBack').click();
-    assert.equal(element('cimfModal').hidden, false);
-    assert.equal(calls, 1);
-    console.log('PASS: CIMF modal Back navigation and analysis preservation.');
-})().catch(error => { console.error(error); process.exitCode = 1; });
+function get(id) { if (!elements.has(id)) elements.set(id,new Element(id)); return elements.get(id); }
+const document = {getElementById:get, addEventListener(type,fn){this[type]=fn;},querySelector(){return get('content');},createElement(){return new Element('generated');}};
+const panel=get('csmsCimfPanel');
+panel.dataset={profile:'subject_master',actions:JSON.stringify({review:'Review',ask:'Ask',compare:'Compare'}),fields:JSON.stringify(['subject_id']),api:'/mock-cimf',route:'subjects',pageToken:'synthetic-token',csrf:'synthetic-csrf',title:'Subject Master'};
+let selected='123', requests=[];
+const window={addEventListener(){},CSMSPageCIMFContext:()=>({subject_id:selected}),CurriculumUI:{createAutocomplete(){return {destroy(){}};}}};
+const sandbox={window,document,innerWidth:1200,localStorage:{getItem(){return null;},setItem(){}},AbortController,FormData,URL,queueMicrotask,MutationObserver:class{observe(){}},location:{href:'http://127.0.0.1/subjects',replace(){throw Error('Unexpected redirect');}},
+fetch:async(url,options)=>{ requests.push({url,options}); return {ok:true,status:200,json:async()=>({success:true,analysis:{status:'needs_human_review',summary:'Synthetic advisory <script>',findings:[],limitations:'Human review only'}})}; }};
+vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../js/cimf-panel.js'),'utf8'),sandbox);
+const tick=()=>new Promise(resolve=>setImmediate(resolve));
+function click(id) { get(id).listeners.click({target:get(id)}); }
+function action(name) { get('csmsCimfActions').listeners.click({target:{closest:()=>({dataset:{cimfAction:name}})}}); }
+(async()=>{
+  click('csmsCimfLauncher');
+  assert.equal(panel.hidden,false); assert.equal(get('csmsCimfHome').hidden,false); assert.equal(requests.length,0);
+  action('review'); await tick();
+  assert.equal(requests.length,1); assert.equal(get('csmsCimfResult').hidden,false);
+  assert.match(get('csmsCimfStatus').textContent,/Human review required/);
+  const result=get('csmsCimfResult').innerHTML;
+  assert.match(result,/&lt;script&gt;/); assert.doesNotMatch(result,/<script>/);
+  const form=requests[0].options.body;
+  assert.equal(requests[0].options.method,'POST'); assert.equal(requests[0].options.credentials,'same-origin');
+  for(const [key,value] of Object.entries({operation:'analyze',action:'review',profile:'subject_master',route:'subjects',page_token:'synthetic-token',_csrf_token:'synthetic-csrf'})) assert.equal(form.get(key),value);
+  assert.deepEqual(JSON.parse(form.get('context')),{subject_id:'123'});
+  action('ask'); assert.equal(get('csmsCimfAsk').hidden,false); click('csmsCimfBack');
+  assert.equal(get('csmsCimfResult').innerHTML,result); assert.equal(requests.length,1);
+  action('compare'); await tick(); assert.equal(get('csmsCimfCompare').hidden,false); assert.equal(requests.length,1);
+  assert.equal(get('csmsCimfCompareSubmit').disabled,true); click('csmsCimfBack');
+  assert.equal(get('csmsCimfResult').innerHTML,result); assert.equal(get('csmsCimfResult').hidden,false);
+  click('csmsCimfCollapse'); assert.equal(get('csmsCimfPeek').hidden,false); click('csmsCimfPeek');
+  assert.equal(get('csmsCimfResult').innerHTML,result); assert.equal(requests.length,1);
+  selected='456'; document['csms:context-changed'](); await tick();
+  assert.equal(get('csmsCimfHome').hidden,false); assert.equal(get('csmsCimfResult').hidden,true); assert.equal(requests.length,1);
+  click('csmsCimfClose'); assert.equal(panel.hidden,true); assert.equal(get('csmsCimfLauncher').focused,true);
+  click('csmsCimfLauncher'); assert.equal(get('csmsCimfHome').hidden,false); assert.equal(requests.length,1);
+  console.log('PASS: global CIMF navigation, preserved advisory, context invalidation, escaped output, request security fields, no unnecessary API calls.');
+})().catch(error=>{console.error(error);process.exitCode=1;});

@@ -41,18 +41,28 @@ function auditCount(): int
     global $conn;
     return (int)$conn->query('SELECT COUNT(*) FROM audit_logs')->fetch_row()[0];
 }
-function mutate(string $endpoint, string $action, array $data, int $status, ?string $event = null): array
+function foundationAcademicRows(): string
+{
+    global $conn;
+    $rows=[];
+    foreach (['academic_programs','curricula','curriculum_versions','subjects','curriculum_version_subjects','curriculum_subject_requirements','curriculum_elective_groups','curriculum_elective_group_subjects','program_subject_assignments','subject_equivalencies','grade_weighting_schemes','grade_weighting_components','compliance_references','compliance_rules','compliance_validation_runs','compliance_validation_results','curriculum_version_subject_snapshots'] as $table) {
+        $items=array_map('json_encode',$conn->query("SELECT * FROM `$table`")->fetch_all(MYSQLI_ASSOC));sort($items);$rows[$table]=$items;
+    }
+    return hash('sha256',json_encode($rows));
+}
+function mutate(string $endpoint, string $action, array $data, int $status, ?string $event = null, int $eventCount = 1): array
 {
     global $admin, $conn;
     $before = auditCount();
     $last = (int)$conn->query('SELECT COALESCE(MAX(id),0) FROM audit_logs')->fetch_row()[0];
+    $academicBefore=foundationAcademicRows();
     $response = $admin->api($endpoint, $action, $data, 'POST');
     // Capture inserted IDs before assertions, so even a failed audit assertion cleans up.
     $created = [
         'program/create'=>['academic_programs','program'], 'subject/create'=>['subjects','subject'],
         'curriculum/create'=>['curricula','curriculum'],'version/create'=>['curriculum_versions','version'],
         'assignment/assign'=>['curriculum_version_subjects','assignment'],
-        'program_assignment/assign'=>['curriculum_version_subjects','assignment'],
+        // Program associations return a count and are captured separately below.
         'requirement/create'=>['curriculum_subject_requirements','relationship'],
         'elective_group/create'=>['curriculum_elective_groups','group'],
         'elective_membership/add'=>['curriculum_elective_group_subjects','membership'],
@@ -80,8 +90,9 @@ function mutate(string $endpoint, string $action, array $data, int $status, ?str
         }
     }
     $json = expect($response, $status, "$endpoint/$action");
+    if ($status>=400) check(foundationAcademicRows()===$academicBefore,"$endpoint/$action rejected write preserves academic records");
     $membershipEvents = $event && $endpoint === 'elective_group' && $action === 'create' ? count($data['subject_ids']) : 0;
-    check(auditCount() === $before + ($event ? 1 : 0) + $membershipEvents, "$endpoint/$action exact audit count");
+    check(auditCount() === $before + ($event ? $eventCount : 0) + $membershipEvents, "$endpoint/$action exact audit count");
     if ($event) {
         $row = $conn->query("SELECT action FROM audit_logs WHERE id > $last ORDER BY id DESC")->fetch_assoc();
         check(($row['action'] ?? '') === $event, "$endpoint/$action audit type");
@@ -186,10 +197,9 @@ try {
         ['assignment','mapping_list','assign'],['assignment','mapping_list','update'],['assignment','mapping_list','remove'],
         ['requirement','list','create'],['requirement','list','remove'],['elective_group','list','create'],
         ['elective_membership','list','add'],['elective_membership','list','remove'],
-        ['program_assignment','list','assign'],['program_assignment','list','update'],['program_assignment','list','remove'],
+        ['program_assignment','list','assign'],['program_assignment','list','remove'],
         ['equivalency','list','create'],['equivalency','list','update'],
-        ['grade_weighting','program_options','scheme_create'],['grade_weighting','program_options','component_update'],
-        ['grade_weighting','program_options','component_remove'],['compliance','reference_list','reference_create'],
+        ['grade_weighting','program_options','configuration_save'],['compliance','reference_list','reference_create'],
         ['compliance','rule_list','rule_update'],['compliance','history_list','validation_run'],['export','program_options','download_csv'],
     ];
     foreach ($guards as [$endpoint,$read,$write]) {
@@ -239,8 +249,11 @@ try {
     }
     $v=$versions[0];
     $emptyPreview=readApi('export','preview',['academic_program_id'=>$programs[0]['id'],'curriculum_id'=>$curricula[0]['id'],'curriculum_version_id'=>$v['id']]);
-    check($emptyPreview['summary']['total_lecture_units']===null && $emptyPreview['summary']['total_laboratory_units']===null,
-        'Empty-version lecture/lab summary unavailable');
+    check($emptyPreview['summary']['total_subjects']===0 && (float)$emptyPreview['summary']['total_units']===0.0,'Empty-version export summary');
+    require_once __DIR__.'/../modules/curriculum/repositories/CurriculumExportRepository.php';
+    $unitSummaries=new CurriculumExportRepository($conn);
+    $emptyUnits=$unitSummaries->unitSummary((int)$v['id']);
+    check($emptyUnits['total_lecture_units']===null && $emptyUnits['total_laboratory_units']===null,'Empty-version stored lecture/lab summary unavailable');
     mutate('version','create',['curriculum_id'=>$c['id'],'version_label'=>$v['version_label']],409);
     readApi('curriculum','get',['id'=>$c['id']]); readApi('version','get',['id'=>$v['id']]);
     for($i=0;$i<11;$i++) {
@@ -253,8 +266,8 @@ try {
     foreach([0,1,11] as $i) {
         own('curriculum_version_subjects',mutate('assignment','assign',['curriculum_version_id'=>$versions[1]['id'],'subject_id'=>$subjects[$i]['id'],'year_level'=>'DEV-Year','semester'=>'DEV-Term','sequence_order'=>$i],201,'CURRICULUM_SUBJECT_ASSIGN')['assignment']);
     }
-    $shared=own('curriculum_version_subjects',mutate('program_assignment','assign',['curriculum_version_id'=>$versions[2]['id'],'subject_id'=>$s['id']],201,'CURRICULUM_SUBJECT_ASSIGN')['assignment']);
-    mutate('program_assignment','update',['id'=>$shared['id'],'year_level'=>'DEV-Shared','semester'=>'DEV-Term','sequence_order'=>0,'is_required'=>1],200,'CURRICULUM_SUBJECT_UPDATE');
+    $shared=own('curriculum_version_subjects',mutate('assignment','assign',['curriculum_version_id'=>$versions[2]['id'],'subject_id'=>$s['id']],201,'CURRICULUM_SUBJECT_ASSIGN')['assignment']);
+    mutate('assignment','update',['id'=>$shared['id'],'year_level'=>'DEV-Shared','semester'=>'DEV-Term','sequence_order'=>0,'is_required'=>1],200,'CURRICULUM_SUBJECT_UPDATE');
     $contextSubjects=readApi('subject','list',['search'=>$prefix,'curriculum_version_id'=>$v['id'],'per_page'=>50]);
     check($contextSubjects['pagination']['total_records']===11,'Subject version filter');
     $contextSubjects=readApi('subject','list',['search'=>$prefix,'year_level'=>'DEV-Year','semester'=>'DEV-Term','per_page'=>50]);
@@ -274,7 +287,9 @@ try {
     $subjectUpdate=['id'=>$s['id'],'subject_code'=>$s['subject_code'],'subject_title'=>$prefix.' Edited Subject','units'=>'3.25','status'=>'inactive'];
     foreach([[null,null],['0','0'],['3','0.25']] as [$lecture,$lab]) {
         mutate('subject','update',$subjectUpdate+['lecture_units'=>$lecture,'laboratory_units'=>$lab],200,'SUBJECT_UPDATE');
-        $summary=readApi('export','preview',$singleContext)['summary'];
+        $preview=readApi('export','preview',$singleContext);
+        check((float)$preview['summary']['total_units']===3.25,'Export preserves total units');
+        $summary=$unitSummaries->unitSummary((int)$versions[2]['id']);
         check($lecture===null ? $summary['total_lecture_units']===null : (float)$summary['total_lecture_units']===(float)$lecture,
             'Lecture summary distinguishes NULL, confirmed zero and numeric values');
         check($lab===null ? $summary['total_laboratory_units']===null : (float)$summary['total_laboratory_units']===(float)$lab,
@@ -307,35 +322,89 @@ try {
     mutate('elective_membership','add',$memberData,422);
     mutate('elective_group','remove',['id'=>$group['id']],422);
     mutate('assignment','remove',['id'=>$placements[3]['id']],409);
-    mutate('program_assignment','remove',['id'=>$placements[3]['id']],409);
+    // Program associations are independent of version placements.
+    $associationData=['view'=>'program','context_id'=>$programs[1]['id'],'record_ids'=>json_encode([$subjects[1]['id']])];
+    $placementCount=(int)$conn->query('SELECT COUNT(*) FROM curriculum_version_subjects')->fetch_row()[0];
+    $associated=mutate('program_assignment','assign',$associationData,201,'PROGRAM_SUBJECT_ASSIGN');
+    check($associated['count']===1,'Program association count');
+    $association=own('program_subject_assignments',$conn->query('SELECT * FROM program_subject_assignments WHERE academic_program_id='.(int)$programs[1]['id'].' AND subject_id='.(int)$subjects[1]['id'])->fetch_assoc());
+    check($association['status']==='active' && (int)$association['academic_program_id']===(int)$programs[1]['id'] && (int)$association['subject_id']===(int)$subjects[1]['id'],'Program association stored relationships');
+    check((int)$conn->query('SELECT COUNT(*) FROM curriculum_version_subjects')->fetch_row()[0]===$placementCount,'Program association does not create a placement');
+    mutate('program_assignment','assign',$associationData,409);
+    mutate('program_assignment','assign',array_replace($associationData,['record_ids'=>'not-json']),422);
+    mutate('program_assignment','assign',array_replace($associationData,['record_ids'=>json_encode([$subjects[0]['id']])]),422);
+    mutate('program_assignment','assign',array_replace($associationData,['record_ids'=>json_encode([2147483647])]),404);
+    // Create a real association for a mapped subject; archival must preserve the placement.
+    $programData=['id'=>$p['id'],'program_code'=>$p['program_code'],'program_name'=>$prefix.' Edited Program','program_type'=>'SYNTHETIC'];
+    mutate('program','update',$programData+['status'=>'active'],200,'PROGRAM_UPDATE');
+    mutate('program_assignment','assign',['view'=>'subject','context_id'=>$subjects[3]['id'],'record_ids'=>json_encode([$p['id']])],201,'PROGRAM_SUBJECT_ASSIGN');
+    $referencedAssociation=own('program_subject_assignments',$conn->query('SELECT * FROM program_subject_assignments WHERE academic_program_id='.(int)$p['id'].' AND subject_id='.(int)$subjects[3]['id'])->fetch_assoc());
+    mutate('program_assignment','remove',['id'=>$referencedAssociation['id']],409);
+    mutate('program','update',$programData+['status'=>'inactive'],200,'PROGRAM_UPDATE');
+    foreach ([['program',$programs[1]['id']],['subject',$subjects[1]['id']]] as [$type,$contextId]) {
+        $query=['type'=>$type,'id'=>$contextId];
+        $defaults=readApi('program_assignment','list',$query);
+        check($defaults['pagination']['page']===1 && $defaults['pagination']['per_page']===20 && (int)$defaults['assignments'][0]['id']===(int)$association['id'],'Omitted pagination defaults to page 1 and size 20');
+        $beforeInvalid=foundationAcademicRows();
+        foreach ([['per_page'=>0],['per_page'=>15],['per_page'=>100000],['per_page'=>'bad'],['per_page'=>'10.5'],['per_page'=>['bad']],['page'=>0],['page'=>-1],['page'=>'bad'],['page'=>'1.5'],['page'=>['bad']],['search'=>['invalid']],['status'=>'invalid']] as $bad) {
+            readApi('program_assignment','list',$bad+$query,422);
+            check(foundationAcademicRows()===$beforeInvalid,'Rejected association query preserves academic records');
+        }
+        foreach ([10,20,50] as $perPage) {
+            $list=readApi('program_assignment','list',$query+['per_page'=>$perPage]);
+            check($list['pagination']['per_page']===$perPage && $list['pagination']['total_records']===1 && (int)$list['assignments'][0]['id']===(int)$association['id'],'Scoped association list and page size');
+        }
+        check(readApi('program_assignment','list',$query+['search'=>$prefix])['pagination']['total_records']===1,'Association search finds stored context');
+        check(readApi('program_assignment','list',$query+['search'=>"%_' OR 1=1 --"])['pagination']['total_records']===0,'Association literal wildcard and injection search');
+        check(readApi('program_assignment','list',$query+['page'=>999999])['assignments']===[],'Association out-of-range page has no records');
+        readApi('program_assignment','list',['type'=>$type,'id'=>0],422);
+        readApi('program_assignment','list',['type'=>$type,'id'=>2147483647],404);
+    }
+    $facts=readApi('program_assignment','review',['type'=>'program','id'=>$programs[1]['id']])['facts'];
+    check($facts['assignment_count']===1 && $facts['mapped_count']===0 && $facts['unmapped_count']===1,'Unplaced program association review');
+    $details=readApi('program_assignment','details',['id'=>$referencedAssociation['id']])['assignment'];
+    check(count($details['placements'])===1,'Referenced association retains actual placement details');
+    mutate('program_assignment','update',['id'=>$association['id'],'curriculum_version_id'=>$v['id']],400);
     readApi('elective_membership','placement_options',['elective_group_id'=>$group['id'],'search'=>$subjects[4]['subject_code']]);
     $pair=['subject_a_id'=>$subjects[0]['id'],'subject_b_id'=>$subjects[1]['id']];
     $comparison=readApi('equivalency','compare',$pair);
     $differenceValues=array_column($comparison['differences'],'result');
     check(in_array('different',$differenceValues,true) && in_array('not_available',$differenceValues,true),'Equivalency objective comparison');
     readApi('equivalency','compare',['subject_a_id'=>$s['id'],'subject_b_id'=>$s['id']],422);
-    $equiv=own('subject_equivalencies',mutate('equivalency','create',$pair+['decision_status'=>'pending'],201,'SUBJECT_EQUIVALENCY_CREATE')['equivalency']);
-    mutate('equivalency','create',['subject_a_id'=>$subjects[1]['id'],'subject_b_id'=>$subjects[0]['id'],'decision_status'=>'pending'],409);
-    mutate('equivalency','update',['id'=>$equiv['id'],'decision_status'=>'equivalent','remarks'=>''],422);
-    foreach(['equivalent','not_equivalent','pending'] as $decision) {
+    $equiv=own('subject_equivalencies',mutate('equivalency','create',$pair+['decision_status'=>'needs_review'],201,'SUBJECT_EQUIVALENCY_CREATE')['equivalency']);
+    mutate('equivalency','create',['subject_a_id'=>$subjects[1]['id'],'subject_b_id'=>$subjects[0]['id'],'decision_status'=>'needs_review'],409);
+    mutate('equivalency','update',['id'=>$equiv['id'],'decision_status'=>'equivalent','remarks'=>''],200,'SUBJECT_EQUIVALENCY_UPDATE');
+    mutate('equivalency','update',['id'=>$equiv['id'],'decision_status'=>'invalid','remarks'=>''],422);
+    foreach(['equivalent','not_equivalent','needs_review'] as $decision) {
         mutate('equivalency','update',['id'=>$equiv['id'],'decision_status'=>$decision,'remarks'=>'DEVELOPMENT SYNTHETIC REVIEW - NOT OFFICIAL'],200,'SUBJECT_EQUIVALENCY_UPDATE');
     }
-    $schemeData=['curriculum_version_subject_id'=>$placements[4]['id'],'description'=>'DEVELOPMENT SYNTHETIC WEIGHTS - NOT OFFICIAL'];
-    $scheme=own('grade_weighting_schemes',mutate('grade_weighting','scheme_create',$schemeData,201,'GRADE_WEIGHTING_SCHEME_CREATE')['scheme']);
-    mutate('grade_weighting','scheme_update',['id'=>$scheme['id'],'description'=>'DEVELOPMENT UPDATED SYNTHETIC WEIGHTS'],200,'GRADE_WEIGHTING_SCHEME_UPDATE');
+    // Public weighting writes now save a complete configuration atomically.
+    $weightingData=['curriculum_version_subject_id'=>$placements[4]['id'],'curriculum_version_id'=>$v['id']];
+    $components=[['component_name'=>$prefix.' Component A','weight_percentage'=>'40.00'],['component_name'=>$prefix.' Component B','weight_percentage'=>'60.00']];
+    $weightResult=mutate('grade_weighting','configuration_save',$weightingData+['components'=>$components],200,'GRADE_WEIGHTING_CONFIGURATION_SAVE',4);
+    $scheme=own('grade_weighting_schemes',$weightResult['scheme']);
+    $weightA=own('grade_weighting_components',$weightResult['components'][0]);$weightB=own('grade_weighting_components',$weightResult['components'][1]);
+    check($weightResult['scheme']['completion_status']==='complete' && $weightResult['scheme']['total_weight']==='100.00','Atomic weighting exactly 100 complete');
     mutate('assignment','remove',['id'=>$placements[4]['id']],409);
-    $componentData=['scheme_id'=>$scheme['id'],'component_name'=>$prefix.' Component A','weight_percentage'=>'40.00'];
-    $weightResult=mutate('grade_weighting','component_create',$componentData,201,'GRADE_WEIGHTING_COMPONENT_CREATE');
-    $weightA=own('grade_weighting_components',$weightResult['component']);
-    check($weightResult['scheme']['completion_status']==='incomplete','Weight below 100 incomplete');
-    mutate('grade_weighting','component_create',$componentData,409);
-    $weightResult=mutate('grade_weighting','component_create',array_replace($componentData,['component_name'=>$prefix.' Component B','weight_percentage'=>'60.00']),201,'GRADE_WEIGHTING_COMPONENT_CREATE');
-    $weightB=own('grade_weighting_components',$weightResult['component']);
-    check($weightResult['scheme']['completion_status']==='complete' && $weightResult['scheme']['total_weight']==='100.00','Weight exactly 100 complete');
-    mutate('grade_weighting','component_update',['id'=>$weightB['id'],'component_name'=>$weightB['component_name'],'weight_percentage'=>'60.01'],422);
-    mutate('grade_weighting','component_update',['id'=>$weightB['id'],'component_name'=>$weightB['component_name'],'weight_percentage'=>'59.99'],200,'GRADE_WEIGHTING_COMPONENT_UPDATE');
-    mutate('grade_weighting','scheme_remove',['id'=>$scheme['id']],409);
-
+    $weightBefore=$conn->query('SELECT * FROM grade_weighting_components WHERE scheme_id='.(int)$scheme['id'].' ORDER BY id')->fetch_all(MYSQLI_ASSOC);
+    foreach (['60.01','59.99'] as $badWeight) {
+        $bad=$components;$bad[1]['weight_percentage']=$badWeight;
+        mutate('grade_weighting','configuration_save',$weightingData+['components'=>$bad],422);
+    }
+    $duplicate=$components;$duplicate[1]['component_name']=$duplicate[0]['component_name'];
+    mutate('grade_weighting','configuration_save',$weightingData+['components'=>$duplicate],422);
+    check($conn->query('SELECT * FROM grade_weighting_components WHERE scheme_id='.(int)$scheme['id'].' ORDER BY id')->fetch_all(MYSQLI_ASSOC)===$weightBefore,'Rejected weighting configurations preserve rows');
+    // Legacy domain methods still support incomplete intermediate weights.
+    require_once __DIR__.'/../modules/curriculum/services/GradeWeightingService.php';
+    $weightingDomain=new GradeWeightingService($conn);$auditBefore=auditCount();
+    $incomplete=$weightingDomain->updateComponent((int)$weightB['id'],['component_name'=>$weightB['component_name'],'weight_percentage'=>'59.99']);
+    check($incomplete['scheme']['completion_status']==='incomplete' && $incomplete['scheme']['total_weight']==='99.99','Legacy intermediate weights remain incomplete');
+    check(auditCount()===$auditBefore+1,'Legacy component update audit');
+    $academicBefore=foundationAcademicRows();$auditBefore=auditCount();
+    try {$weightingDomain->updateComponent((int)$weightB['id'],['component_name'=>$weightB['component_name'],'weight_percentage'=>'60.01']);throw new RuntimeException('Overweight legacy configuration accepted');}
+    catch (DomainValidationException $error) {check(foundationAcademicRows()===$academicBefore && auditCount()===$auditBefore,'Legacy overweight rejection preserves rows and audits');}
+    $updated=[['id'=>$weightA['id'],'component_name'=>$weightA['component_name'],'weight_percentage'=>'45.00'],['id'=>$weightB['id'],'component_name'=>$weightB['component_name'],'weight_percentage'=>'55.00']];
+    mutate('grade_weighting','configuration_save',$weightingData+['components'=>$updated],200,'GRADE_WEIGHTING_CONFIGURATION_SAVE',3);
     $referenceData=['reference_type'=>'OTHER','reference_code'=>$prefix.'-REF','title'=>'DEVELOPMENT SYNTHETIC COMPLIANCE REFERENCE',
         'issuing_body'=>'DEVELOPMENT TEST SOURCE','verification_status'=>'draft','notes'=>'NOT A REAL CHED, DEPED, OR BESTLINK POLICY.'];
     $reference=own('compliance_references',mutate('compliance','reference_create',$referenceData,201,'COMPLIANCE_REFERENCE_CREATE')['reference']);
@@ -382,8 +451,7 @@ try {
         ['assignment','mapping_list',[], 'mappings'],['requirement','list',[], 'requirements'],
         ['elective_group','list',['curriculum_version_id'=>$v['id']], 'groups'],
         ['elective_membership','list',['elective_group_id'=>$group['id']], 'memberships'],
-        ['program_assignment','list',['view'=>'program'], 'assignments'],
-        ['program_assignment','list',['view'=>'subject'], 'assignments'],['subject_history','list',[], 'history'],
+        ['subject_history','list',[], 'history'],
         ['subject_history','compare_versions',$comparisonArgs,'comparison'],['equivalency','list',[], 'equivalencies'],
         ['grade_weighting','component_list',['scheme_id'=>$scheme['id']], 'components'],
         ['compliance','reference_list',[], 'references'],['compliance','rule_list',[], 'rules'],['compliance','history_list',[], 'runs'],
@@ -407,23 +475,28 @@ try {
         check($inactive['pagination']['total_records']===1,"$endpoint status filter");
         check(readApi($endpoint,'list',['search'=>"%_' OR 1=1 --"])['pagination']['total_records']===0,"$endpoint literal wildcard escaping");
     }
-    foreach(['assignment'=>'mapping_list','program_assignment'=>'list','subject_history'=>'list','requirement'=>'list'] as $endpoint=>$action) {
+    foreach(['assignment'=>'mapping_list','subject_history'=>'list','requirement'=>'list'] as $endpoint=>$action) {
         readApi($endpoint,$action,$context+['search'=>$s['subject_code'],'view'=>'program']);
     }
     $filtered=readApi('assignment','mapping_list',$context+['year_level'=>'3rd Year','semester'=>'1st Semester']);
     check($filtered['pagination']['total_records']===1,'Year and term placement filters');
     readApi('requirement','list',['curriculum_version_id'=>$v['id'],'requirement_type'=>'prerequisite','subject_id'=>$s['id']]);
-    readApi('equivalency','list',['search'=>$prefix,'decision_status'=>'pending']);
+    readApi('equivalency','list',['search'=>$prefix,'decision_status'=>'needs_review']);
 
-    mutate('grade_weighting','component_remove',['id'=>$weightA['id']],200,'GRADE_WEIGHTING_COMPONENT_REMOVE');
-    mutate('grade_weighting','component_remove',['id'=>$weightB['id']],200,'GRADE_WEIGHTING_COMPONENT_REMOVE');
-    mutate('grade_weighting','scheme_remove',['id'=>$scheme['id']],200,'GRADE_WEIGHTING_SCHEME_REMOVE');
+    // Legacy domain removal remains supported; public configuration saving cannot save an empty scheme.
+    require_once __DIR__.'/../modules/curriculum/services/GradeWeightingService.php';
+    $weightingService=new GradeWeightingService($conn);
+    $auditBefore=auditCount();
+    $weightingService->removeComponent((int)$weightA['id']);$weightingService->removeComponent((int)$weightB['id']);$weightingService->removeScheme((int)$scheme['id']);
+    check(auditCount()===$auditBefore+3,'Legacy weighting removal audits every operation');
     mutate('elective_membership','remove',['id'=>$member['id']],422);
     mutate('elective_group','archive',$groupData+['id'=>$group['id']],200,'ELECTIVE_GROUP_ARCHIVE');
     mutate('requirement','remove',['id'=>$r1['id']],200,'SUBJECT_REQUIREMENT_REMOVE');
     mutate('requirement','remove',['id'=>$r2['id']],200,'SUBJECT_REQUIREMENT_REMOVE');
     mutate('assignment','remove',['id'=>$placements[0]['id']],200,'CURRICULUM_SUBJECT_REMOVE');
-    mutate('program_assignment','remove',['id'=>$shared['id']],200,'CURRICULUM_SUBJECT_REMOVE');
+    mutate('assignment','remove',['id'=>$shared['id']],200,'CURRICULUM_SUBJECT_REMOVE');
+    mutate('program_assignment','remove',['id'=>$association['id']],200,'PROGRAM_SUBJECT_ASSIGNMENT_ARCHIVE');
+    check($conn->query('SELECT status FROM program_subject_assignments WHERE id='.(int)$association['id'])->fetch_row()[0]==='archived','Program association archival preserves row');
     check(readApi('subject','get',['id'=>$s['id']])['subject']['subject_code']===$s['subject_code'],'Removing placements preserves Subject Master');
     $sensitiveKeys=0;
     foreach($conn->query('SELECT metadata_json FROM audit_logs WHERE metadata_json IS NOT NULL')->fetch_all(MYSQLI_ASSOC) as $row) {
@@ -451,7 +524,7 @@ try {
     $order = ['compliance_validation_results','compliance_validation_runs','compliance_rules','compliance_references',
         'grade_weighting_components','grade_weighting_schemes','subject_equivalencies',
         'curriculum_elective_group_subjects','curriculum_elective_groups','curriculum_subject_requirements',
-        'curriculum_version_subjects','curriculum_versions','curricula','subjects','academic_programs','users'];
+        'program_subject_assignments','curriculum_version_subjects','curriculum_versions','curricula','subjects','academic_programs','users'];
     try {
         $conn->begin_transaction();
         foreach ($order as $table) {

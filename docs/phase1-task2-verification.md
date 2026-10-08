@@ -1,7 +1,7 @@
 # Phase 1 Task 2 implementation and verification
 
 Date: 2026-10-08 (Asia/Manila).
-Recommendation: **FAILED overall regression gate; Task 2 protection suites pass.**
+Recommendation: **VERIFIED complete requested regression gate after narrow maintenance.**
 Do not proceed to deployment or Task 3 from this report.
 
 Starting commit: `fc8f7b2a2f4d3e462219c35b709d05b8bbd4e7f1`.
@@ -99,60 +99,185 @@ reads generally use shared current master data; this task does not change them t
 read snapshots or create missing snapshots. Shared protected masters cannot receive
 material edits; unrelated and legacy masters remain editable.
 
-## Actual validation
+## Final regression reconciliation (2026-10-08)
 
-PHP: **8.0.30**, mysqli/mysqlnd enabled.
-Database: **MariaDB 10.4.32**, separate processes initialized with fresh random
-credentials, new temporary data directories, no-defaults and loopback ports.
-Primary test port: 63622. The reusable runner independently verified another new
-process on port 57986. Before tests, server port, canonical data directory and
-enabled FK checks were explicitly validated. No existing credentials were used.
-Docker was unavailable from Task 1; MariaDB 10.11/MySQL were not tested.
+Maintenance starts at `8a7a94a2d690d3a072a6df577fd6e25f63e24007`.
+Only the pre-existing assignment pagination defect and justified historical test
+maintenance were authorized. Application changes are confined to
+ProgramSubjectAssignmentRepository::list(); ProgramSubjectAssignmentService::list()
+was reviewed and needs no change.
 
-PHP lint: **183 files, zero errors**. Final edited policy/test were rechecked.
-Normal `git diff --check` passed. A check with autocrlf disabled produced
-Windows CRLF-only whitespace noise; repository-default checks passed and no
-unrelated files were changed.
+The repository now uses DomainValidator::listQuery() with its existing active /
+archived status allowlist. Missing page and per_page return HTTP 200 with page 1
+and size 20. Sizes 10, 20 and 50 work in both program and subject views.
+Invalid sizes (0, 15, 100000, nonnumeric, fractional and array), invalid pages
+(0, negative, nonnumeric, fractional and array), array search and invalid status
+return HTTP 422, with unchanged academic records and audit count. The existing
+high-page cap and empty result behavior are preserved. Prepared query bindings,
+association semantics, authorization and CSRF are unchanged.
 
-| Executed test | Final result |
-|---|---|
-| deployment_migrations.php | 29 passed |
-| curriculum_lifecycle_schema.php | 70 passed |
-| version-protection.php | 260 passed |
-| version-protection-http.php | 458 passed |
-| prerequisite-service.php | 73 passed |
-| electives-service.php | 64 passed |
-| subject-mapping-http.php | 199 passed |
-| electives-http.php | 94 passed |
-| archives-http.php | 21 passed |
-| academic-sequence.php | 17 passed |
-| search-ranking.php | 19 passed |
+### Original failure evidence and comparison
 
-The 11 passing suites contain **1,304 checks** using final affected-suite results.
-The reusable isolation runner completed all 11 suites successfully (before the
-additional one-check DECIMAL no-op test); final domain, HTTP and prerequisite
-suites were rerun after that small policy correction.
+The preceding reconciliation ran unchanged detached worktrees at exact Task 1
+`fc8f7b2a2f4d3e462219c35b709d05b8bbd4e7f1` and Task 2 `8a7a94a`.
+Both used PHP 8.0.30, Node v24.11.1, MariaDB 10.4.32 on the same disposable server
+(port 57012), fresh schemas through 021, matching fixtures/environment and the
+same commands. Full evidence was retained in the prior reconciliation report.
 
-Run the reusable passing coverage with:
-`powershell -File tests/version-protection-isolated.ps1`.
-It creates and verifies its own disposable server, uses fresh databases for each
-suite, restores its temporary environment setting and removes only its own server
-data. It is a selected-suite runner, not a claim that the full historical suite is
-green. The following broader tests were separately executed and remain failures.
+| Original command | Task 1 / Task 2 exit | Exact original failure | Classification and supported replacement |
+|---|---|---|---|
+| node tests/cimf-modal.cjs | 1 / 1 | line 31: cimfModal.hidden expected false, actual true | PRE-EXISTING STALE TEST: deprecated modal replaced by js/cimf-panel.js. Test navigation, advisory preservation, context invalidation, escaping, POST/CSRF/page binding and no unnecessary requests. |
+| php tests/foundation.php | 1 / 1, 338 checks | Student program_assignment/update valid CSRF expected 403, received 400 | PRE-EXISTING STALE TEST: update action absent; supported global association writes are assign/remove. Test actual relationships and both list views; use assignment routes for version placements. |
+| php tests/academic_fk_compatibility.php | 255 / 255 | line 127: All 41 foreign keys retained; actual 57 | PRE-EXISTING STALE TEST: fully migrated schema has later additive keys. Verify every complete FK definition against shipped DDL, not an unexplained count. |
+| php tests/cimf.php | 255 / 255 | line 8 Disabled, RuntimeException line 6: expected CONFIG_DISABLED, actual AI_DISABLED | PRE-EXISTING STALE TEST: provider-aware config contract. Retain missing/unsupported configuration, canonical allowlist and prompt security cases. |
 
-| Existing test attempted | Unresolved result |
-|---|---|
-| prerequisite-http.php | Stops on the old cimfModal/CONFIG_DISABLED page assertion; current unchanged page uses the shared CIMF panel. |
-| electives-http.php --foundation (foundation.php) | 338 successful checks including cleanup, then overall failure: obsolete program_assignment/update action expects 403 but the unchanged route returns 400 for unknown actions. Later foundation cases did not execute. |
-| academic_fk_compatibility.php | Fails its fixed expectation of 41 FKs against the schema through 021; the fixture cleanup executes. |
-| cimf.php | Fails the initial Disabled check: unchanged config now returns AI_DISABLED, while the test expects CONFIG_DISABLED. No external provider was called. |
+Replacement foundation coverage additionally exposed a pre-existing application
+defect on BOTH unchanged commits: login 200, valid assign 201, explicit
+per_page=10 list 200, omitted per_page list 500. Server evidence was
+Undefined array key "per_page" at repository line 64 and Division by zero at
+line 84. The conditional accepted default 20 but read the missing key in its
+true branch. The preceding turn stopped; the user's subsequent narrow corrective
+authorization permitted the DomainValidator fix above. No Task 2 regression or
+new unrelated application defect was found.
 
-The failing assertions and relevant application contracts are unchanged from the
-Task 1 base. They appear to be pre-existing test-contract drift; this report does
-not claim a separate pristine-base execution of all four failures. No failing
-assertions were weakened, removed or disabled. Safest next step is separately
-reviewing/updating those historical test contracts, then rerunning the full gate.
-That repair was not expanded into this Task 2 implementation.
+### Historical integrity reconciliation
+
+The FK test now validates all **57** final constraint definitions: names, owning
+tables, ordered composite columns, referenced tables/columns, ON UPDATE and
+ON DELETE actions. Its independent source inventory reads unchanged shipped SQL;
+migration 016 omits ON UPDATE, correctly meaning RESTRICT on tested MariaDB.
+
+Legacy mode starts with synthetic original schema through 012 and reviewed
+historical checksums. It executes unchanged 013 alone, journals its real checksum,
+and verifies every application row, CHECK expression, UNIQUE/ordinary index,
+AUTO_INCREMENT value and constraint name/type is unchanged. Every original FK
+definition remains identical except the seven intended UPDATE RESTRICT changes.
+No permanent key is lost or added by 013.
+
+Then the normal deployment runner applies 014-021. Original academic columns and
+rows, original indexes/constraints and all original FK definitions are preserved;
+014's added index and 018's documented decision CHECK extension are distinguished
+from the original definitions. The complete final FK inventory must equal shipped
+DDL. New security seed rows and lifecycle columns are legitimate additions; cleanup
+compares the current schema excluding only owned fixture IDs. Rerun identity and
+unknown historical checksum rejection remain tested. FK checks stay enabled.
+
+Foundation also reconciles existing atomic grade configuration routes, retains
+legacy domain intermediate-weight/removal validation and audits, tests current
+equivalency decisions without granting credit, and preserves NULL/zero/fractional
+lecture/lab checks through the existing export repository. Authentication, RBAC,
+CSRF, HTTP method checks, valid relationships, duplicate/dependency rejection,
+audit checks and fixture cleanup remain covered. No test was deleted or disabled.
+
+### Actual final validation
+
+PHP **8.0.30**, mysqli/mysqlnd; Node **v24.11.1**.
+MariaDB **10.4.32-MariaDB**, two newly initialized disposable processes:
+
+- Primary port **50224**, data directory
+  `%TEMP%\csms-unblock-4588e543122e4a59b7494779d9de337b\data`.
+- Reusable runner port **54933**, data directory
+  `%TEMP%\csms-task2-3a17f4c613b04bcdb033e4740db16371\data`.
+
+Both used --no-defaults, loopback binding, generated temporary credentials and
+fresh csms_docker_test_* databases. Before tests, VERSION(), @@port, canonical
+@@datadir and @@foreign_key_checks=1 were explicitly verified. Each suite received
+its own schema and exact SMS_TEST_CONFIRM_DATABASE. No existing credentials or
+academic databases were accessed. HTTP servers were synthetic loopback PHP
+processes. CIMF_AI_ENABLED=false; no external provider was contacted.
+
+| Actual command (PHP CLI unless marked Node) | Passed checks / result | Exit |
+|---|---|---|
+| tests/deployment_migrations.php | 29 | 0 |
+| tests/curriculum_lifecycle_schema.php | 70 | 0 |
+| tests/version-protection.php | 260, including actual concurrency and snapshot audit-failure rollback | 0 |
+| tests/version-protection-http.php | 458 | 0 |
+| tests/prerequisite-service.php | 73 | 0 |
+| tests/electives-service.php | 64 | 0 |
+| tests/subject-mapping-http.php | 199 | 0 |
+| tests/electives-http.php | 94 | 0 |
+| tests/archives-http.php | 21 | 0 |
+| tests/academic-sequence.php | 17 | 0 |
+| tests/search-ranking.php | 19 | 0 |
+| tests/academic_fk_compatibility.php | 40, complete 57-key inventory | 0 |
+| tests/academic_fk_compatibility.php --legacy | 396, original and additive upgrade integrity | 0 |
+| tests/prerequisite-http.php | 80, including supported global CIMF and retired endpoint security | 0 |
+| tests/foundation.php | 1,795 on fresh fully deployed schema with real FKs | 0 |
+| tests/cimf.php | configuration / prompt / canonical allowlist assertions | 0 |
+| tests/electives-http.php --foundation | 95 wrapper checks plus repeat of 1,795 foundation checks | 0 |
+| node tests/cimf-modal.cjs | supported global panel assertions | 0 |
+| php -l for every git ls-files '*.php' | 183 files, zero failures | 0 |
+| node --check for every tracked '*.js' / '*.cjs' | 38 files, zero failures | 0 |
+| git diff --check | no whitespace errors | 0 |
+
+The 11 earlier suites retain **1,304** checks, including the unchanged **718**
+Task 2 domain/HTTP protection checks. All listed suites actually ran; no required
+test was skipped. Protected/unauthorized rejections retain whole-table row and
+audit fingerprints in the unchanged Task 2 tests. Foundation rejected mutations
+additionally compare 17 academic tables and exact audit counts. Legacy
+unclassified operations and authorized reads passed.
+
+Concurrency was repeated: a second connection times out updating locked state;
+a waiting mutation sees a committed protected state and rejects; serialized
+synthetic baseline assignments reject an indirect cycle. The disposable
+audit-failure trigger proves snapshot/placement rollback. No protection test file
+was modified by this maintenance.
+
+Exact reproducible aggregate command, from the Task 2 worktree:
+
+```powershell
+powershell -File tests/version-protection-isolated.ps1
+```
+
+The expanded runner prints individual PHP commands/exit codes, runs the original
+11 suites plus fresh/legacy FK, prerequisite HTTP, CIMF config and the elective
+foundation wrapper, then the Node global panel test. Its 16 PHP invocations and
+Node test passed, aggregate exit 0; its own server/data were removed. The
+foundation wrapper uses its existing disposable fixture schema. Separately, the
+primary run executed standalone foundation against actual migrated FK tables:
+1,795 checks, exit 0. Neither fixture is an institutional academic database.
+
+The primary external runner executed all 17 PHP invocations in the table with
+fresh per-suite schemas; all exits 0 and failed=0. Syntax checks used the exact
+PHP/Node binaries above. A sandbox ownership error initially prevented git file
+enumeration; a command-scoped safe.directory option corrected the lint harness,
+then all 183/38 files were actually checked. No global Git configuration changed.
+
+Initial FK helper failures were test-authoring issues: DROP/ADD ordering for
+replacement keys and migration 016's implicit ON UPDATE were corrected after
+comparing actual/source inventories (57 actual versus 55 initially parsed).
+The final fresh and legacy tests pass. A temporary edit helper failed before
+writing due to PHP string interpolation; data-driven edits corrected it.
+These failures did not alter application code, migrations or existing data.
+
+Docker CLI exists but its daemon is unavailable; MariaDB 10.11 and MySQL were not
+tested. Live browser rendering, external AI providers, production-scale lock
+contention and deadlock retries remain outside this verification. Existing
+snapshot history limitations described above remain. The prior legacy-mode
+failure was not separately reproduced on Task 1; no baseline classification is
+claimed for that mode. Its reconciled staged integrity checks were actually run.
+
+## Narrow maintenance changed files
+
+Relative to local Task 2 commit 8a7a94a, exactly these nine files changed:
+
+- modules/curriculum/repositories/ProgramSubjectAssignmentRepository.php
+- tests/academic_fk_compatibility.php
+- tests/cimf-modal.cjs
+- tests/cimf.php
+- tests/electives-http.php
+- tests/foundation.php
+- tests/prerequisite-http.php
+- tests/version-protection-isolated.ps1
+- docs/phase1-task2-verification.md
+
+The only application diff imports DomainValidator and replaces defective local
+list-query coercion with its existing normalized validation. All other changes
+are regression maintenance, runner coverage or evidence documentation. See the
+local maintenance commit's exact diff for review. The existing mutation coverage
+matrix remains applicable: this maintenance changes only a read query, adds no
+mutation path, permission, lifecycle operation or baseline endpoint.
+
 
 ## Initial failures and corrections
 
@@ -178,7 +303,7 @@ archive/restore, shared masters, linked compliance, snapshots and concurrent loc
 all passed in the new suites. Protected history/comparison/export/CIMF context
 reads and append-only validation passed. Live AI/provider traffic was not tested.
 
-## Complete changed-file list
+## Original Task 2 implementation changed-file list
 
 - dashboard/archive_actions.php
 - modules/curriculum/services/AcademicProgramService.php
@@ -211,5 +336,6 @@ workflow, cloning, reference attachment endpoint, outcome/assessment mapping,
 Task 3, UI redesign or new migration was implemented. Main, HostForge, production,
 the existing XAMPP process/data and sms_db were untouched. No push, merge, deploy
 or startup migrations occurred. Temporary test processes and data were removed.
-The implementation is committed locally only for review; the overall regression
-gate is still red for the separately reported historical test failures.
+The original implementation and this verified maintenance are committed locally
+only for review. The complete requested regression acceptance gate is now green.
+The exact maintenance commit is reported in the delivery message.

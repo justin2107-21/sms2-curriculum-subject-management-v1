@@ -1,4 +1,4 @@
-param([string]$MysqlBin='C:\xampp\mysql\bin',[string]$Php='C:\xampp\php\php.exe')
+param([string]$MysqlBin='C:\xampp\mysql\bin',[string]$Php='C:\xampp\php\php.exe',[string]$Node='C:\Program Files\nodejs\node.exe')
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 $taskDir=Join-Path ([IO.Path]::GetTempPath()) ('csms-task2-'+[guid]::NewGuid().ToString('N'))
@@ -30,18 +30,24 @@ echo 'SAFE SERVER '.json_encode($r).PHP_EOL;
 foreach(['DB_HOST'=>'127.0.0.1','DB_PORT'=>(string)$s['port'],'DB_USER'=>'root','DB_PASS'=>$s['password'],'APP_ENV'=>'development','SMS_SESSION_COOKIE_SECURE'=>'0','CIMF_AI_ENABLED'=>'false'] as $k=>$v)putenv("$k=$v");
 function cli(array $args): int {
     global $s;
+    echo 'COMMAND '.json_encode(array_merge([PHP_BINARY],$args)).PHP_EOL;
     $p=proc_open(array_merge([PHP_BINARY],$args),[0=>['pipe','r'],1=>['pipe','w'],2=>['pipe','w']],$pipes,$s['root'],null,['bypass_shell'=>true,'create_new_console'=>false]);
     fclose($pipes[0]);$out=stream_get_contents($pipes[1]);$err=stream_get_contents($pipes[2]);fclose($pipes[1]);fclose($pipes[2]);$code=proc_close($p);echo $out.$err;return $code;
 }
-$tests=['deployment_migrations.php','curriculum_lifecycle_schema.php','version-protection.php','version-protection-http.php','prerequisite-service.php','electives-service.php','subject-mapping-http.php','electives-http.php','archives-http.php','academic-sequence.php','search-ranking.php'];
+$tests=['deployment_migrations.php','curriculum_lifecycle_schema.php','version-protection.php','version-protection-http.php','prerequisite-service.php','electives-service.php','subject-mapping-http.php','electives-http.php','archives-http.php','academic-sequence.php','search-ranking.php','academic_fk_compatibility.php','legacy-fk','prerequisite-http.php','cimf.php','electives-foundation'];
 $failed=[];
 foreach($tests as $i=>$file){
     $name='csms_docker_test_task2_run_'.$i.'_'.bin2hex(random_bytes(4));
     $db->query("CREATE DATABASE `$name` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
     putenv("DB_NAME=$name");putenv("SMS_TEST_CONFIRM_DATABASE=$name");
     try {
-        if($file!=='deployment_migrations.php' && cli([$s['root'].'/database/deploy.php','--apply','--confirm-database='.$name])!==0)throw new RuntimeException('Deployment failed');
-        if(cli([$s['root'].'/tests/'.$file])!==0)$failed[]=$file;
+        if(!in_array($file,['deployment_migrations.php','legacy-fk'],true) && cli([$s['root'].'/database/deploy.php','--apply','--confirm-database='.$name])!==0)throw new RuntimeException('Deployment failed');
+        $testFile=$file==='legacy-fk'?'academic_fk_compatibility.php':($file==='electives-foundation'?'electives-http.php':$file);
+        $args=[$s['root'].'/tests/'.$testFile];
+        if($file==='legacy-fk')$args[]='--legacy';
+        if($file==='electives-foundation')$args[]='--foundation';
+        $code=cli($args);echo $file.' exit='.$code.PHP_EOL;
+        if($code!==0)$failed[]=$file;
     }finally{$db->query("DROP DATABASE `$name`");}
 }
 echo json_encode(['tests'=>count($tests),'failed'=>$failed,'passed'=>count($tests)-count($failed)]).PHP_EOL;
@@ -50,6 +56,10 @@ exit($failed?1:0);
     [IO.File]::WriteAllText((Join-Path $taskDir 'runner.php'),$script,$utf8)
     & $Php (Join-Path $taskDir 'runner.php')
     $testExit=$LASTEXITCODE
+    & $Node (Join-Path $root 'tests/cimf-modal.cjs')
+    $nodeExit=$LASTEXITCODE
+    Write-Output "cimf-modal.cjs exit=$nodeExit"
+    if($nodeExit -ne 0){$testExit=1}
 } finally {
     if($null -ne $server -and -not $server.HasExited){
         $saved=[Environment]::GetEnvironmentVariable('MYSQL_PWD','Process')

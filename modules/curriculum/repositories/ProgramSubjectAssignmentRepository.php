@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/RepositoryQuery.php';
+require_once __DIR__ . '/../validators/DomainValidator.php';
 
 class ProgramSubjectAssignmentRepository
 {
@@ -59,10 +60,11 @@ class ProgramSubjectAssignmentRepository
 
     public function list(string $view, int $id, array $query): array
     {
-        $status = in_array(($query['status'] ?? ''), ['active', 'archived'], true) ? $query['status'] : '';
-        $search = trim((string)($query['search'] ?? ''));
-        $perPage = in_array((int)($query['per_page'] ?? 20), [10,20,50], true) ? (int)$query['per_page'] : 20;
-        $page = max(1, min(100000, (int)($query['page'] ?? 1)));
+        $query = DomainValidator::listQuery($query, ['active', 'archived']);
+        $status = $query['status'] ?? '';
+        $search = $query['search'] ?? '';
+        $perPage = $query['per_page'];
+        $page = min(100000, $query['page']);
         $pattern = '%' . str_replace(['=', '%', '_'], ['==', '=%', '=_'], mb_strtolower($search, 'UTF-8')) . '%';
         $filterColumn = $view === 'program' ? 's' : 'p';
         $searchColumns = $view === 'program' ? ['s.subject_code','s.subject_title'] : ['p.program_code','p.program_name'];

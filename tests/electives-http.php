@@ -21,7 +21,8 @@ try{
  foreach(['roles','permissions','role_permissions'] as $table)$db->query("INSERT INTO `$table` SELECT * FROM `$source`.`$table`");
  $password=bin2hex(random_bytes(24));$hash=password_hash($password,PASSWORD_DEFAULT);
  foreach(['pradmin','prviewer']as $i=>$username){$id=$i+1;$stmt=$db->prepare("INSERT INTO users(id,username,email,first_name,last_name,password_hash,role) VALUES(?,?,?,'Test','Only',?,'student')");$email=$username.'@example.invalid';$stmt->bind_param('isss',$id,$username,$email,$hash);$stmt->execute();}
- $db->query("INSERT INTO user_roles(user_id,role_id) SELECT 1,id FROM roles WHERE name='admin'");
+ $fixtureRole=in_array('--foundation',$argv,true)?'system_administrator':'admin';
+ $stmt=$db->prepare('INSERT INTO user_roles(user_id,role_id) SELECT 1,id FROM roles WHERE name=?');$stmt->bind_param('s',$fixtureRole);$stmt->execute();$stmt->close();
  $db->query("INSERT INTO roles(name,display_name,description) VALUES('pr_test_viewer','Synthetic Viewer','Disposable test fixture')");$viewerRole=(int)$db->insert_id;
  $db->query("INSERT INTO user_roles(user_id,role_id) VALUES(2,$viewerRole)");
  $db->query("INSERT INTO role_permissions(role_id,permission_id) SELECT $viewerRole,id FROM permissions WHERE name IN ('elective.view')");

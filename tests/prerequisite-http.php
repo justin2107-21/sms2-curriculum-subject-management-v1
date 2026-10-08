@@ -35,12 +35,23 @@ try{
  status($guest->api('requirement','workspace',['curriculum_version_id'=>1]),401,'Unauthenticated workspace');
  foreach([[$admin,'pradmin'],[$viewer,'prviewer']] as [$client,$username]){$client->request('auth/signin.php');status($client->request('shared/auth_actions.php',['action'=>'login','username'=>$username,'password'=>$password],'POST'),200,'Fixture login');$page=$client->request('modules/curriculum/pages/prerequisite_configuration.php');status($page,200,'Rendered PHP page');checkHttp(str_contains($page['body'],'Validation Review'),'Three-tab page served');}
  $page=$viewer->request('modules/curriculum/pages/prerequisite_configuration.php');checkHttp(!str_contains($page['body'],'id="addRequirementButton"'),'Read-only page excludes management controls');
- checkHttp(str_contains($page['body'],'id="cimfModal"') && str_contains($page['body'],'CONFIG_DISABLED'),'Disabled CIMF modal leaves page available');
+ checkHttp(str_contains($page['body'],'id="csmsCimfPanel"') && str_contains($page['body'],'js/cimf-panel.js'),'Global CIMF panel leaves prerequisite page available');
  status($guest->api('cimf','prerequisite_review',['curriculum_version_id'=>1],'POST'),401,'CIMF requires authentication');
  status($viewer->api('cimf','prerequisite_review',['curriculum_version_id'=>1]),405,'CIMF requires POST');
  status($viewer->api('cimf','prerequisite_review',['curriculum_version_id'=>1],'POST',''),403,'CIMF requires CSRF');
- $disabled=status($viewer->api('cimf','prerequisite_review',['curriculum_version_id'=>1],'POST'),503,'CIMF disabled');
- checkHttp(($disabled['status']??'')==='CONFIG_DISABLED','CIMF disabled status');
+ $retired=status($viewer->api('cimf','prerequisite_review',['curriculum_version_id'=>1],'POST'),410,'Legacy modal endpoint retired');
+ checkHttp(($retired['status']??'')==='LEGACY_INTERFACE_RETIRED','Retired endpoint directs clients to global panel');
+ $dom=new DOMDocument();@$dom->loadHTML($page['body']);$panel=(new DOMXPath($dom))->query('//*[@id="csmsCimfPanel"]')->item(0);
+ $global=['operation'=>'analyze','profile'=>$panel->getAttribute('data-profile'),'route'=>$panel->getAttribute('data-route'),'page_token'=>$panel->getAttribute('data-page-token'),'action'=>'prerequisite_review','context'=>json_encode(['academic_program_id'=>1,'curriculum_id'=>1,'curriculum_version_id'=>1])];
+ status($guest->request('modules/curriculum/http/global_cimf_actions.php',$global,'POST'),401,'Global CIMF authentication');
+ status($viewer->request('modules/curriculum/http/global_cimf_actions.php',$global),405,'Global CIMF POST');
+ status($viewer->request('modules/curriculum/http/global_cimf_actions.php',$global,'POST',''),403,'Global CIMF CSRF');
+ status($viewer->request('modules/curriculum/http/global_cimf_actions.php',array_replace($global,['page_token'=>'forged']),'POST'),422,'Global CIMF page binding');
+ $disabled=status($viewer->request('modules/curriculum/http/global_cimf_actions.php',$global,'POST'),503,'Global CIMF disabled');
+ checkHttp(($disabled['status']??'')==='AI_DISABLED','Provider-aware disabled status');
+ $academicBefore=$db->query('SELECT * FROM curriculum_version_subjects ORDER BY id')->fetch_all(MYSQLI_ASSOC);
+ status($viewer->request('modules/curriculum/http/global_cimf_actions.php',array_replace($global,['operation'=>'context']),'POST'),200,'Global CIMF read-only context');
+ checkHttp($db->query('SELECT * FROM curriculum_version_subjects ORDER BY id')->fetch_all(MYSQLI_ASSOC)===$academicBefore,'CIMF context preserves placements');
  status($viewer->api('requirement','workspace',['curriculum_version_id'=>1]),200,'Viewer reads rules');
  $input=['curriculum_version_id'=>1,'subject_id'=>2,'required_subject_id'=>1,'requirement_type'=>'prerequisite'];
  foreach(['create','update_rule','remove']as $action){status($viewer->api('requirement',$action,$input+['id'=>1],'POST'),403,'Viewer denied '.$action);status($admin->api('requirement',$action,$input+['id'=>1],'POST',''),403,'CSRF denied '.$action);status($admin->api('requirement',$action,$input+['id'=>1]),405,'GET denied '.$action);}
