@@ -50,6 +50,100 @@ index/AUTO_INCREMENT preservation, unchanged historical hashes, hostile digest
 rejection, same-version relationships, self/duplicate/canonical/type rules,
 protected deletes and blocked identity updates. Local `sms_db` is never a target.
 
+## Phase 1 Task 1: additive curriculum lifecycle schema (migration 021)
+
+**Status: schema foundation only.** This migration does not activate an academic
+approval workflow, assign responsibilities, clone records, verify any BCP policy,
+grant roles, create student data, or edit any existing curriculum/subject values.
+
+File: `migrations/021_create_curriculum_lifecycle_foundation.sql`.
+It adds nullable `curriculum_versions.baseline_version_id`, defaulted
+`version_role='unclassified'`, defaulted `review_status='not_started'`,
+and four narrowly scoped tables:
+
+- `curriculum_version_references` links existing `compliance_references` to
+  curriculum versions with a source-purpose and metadata captured at link time.
+  The registry remains authoritative; no duplicate document registry is created.
+- `curriculum_version_personnel` records actual users and provisional
+  preparer/reviewer/approver responsibilities, without conferring permissions.
+- `curriculum_version_review_events` reserves append-style academic review
+  event records, separate from system `audit_logs`.
+- `curriculum_version_subject_snapshots` reserves one subject-attribute capture
+  per existing mapped placement. No existing placement is changed or snapshotted
+  by the migration.
+
+All new foreign keys retain IDs and restrict academic-record deletion; optional
+actor-attribution FKs use `ON DELETE SET NULL`. New values on legacy versions
+remain neutral. New `reference`/ `proposed` roles and
+`not_started`/`draft`/`under_review`/`returned`/`approved` review states
+are **not** replacements for the existing technical
+`draft`/`active`/`archived` column. `approved` is stored vocabulary
+only and is **not** an institutional approval claim.
+
+The composite FK
+`(baseline_version_id, curriculum_id) -> curriculum_versions(id,curriculum_id)`
+enforces a real baseline from the same curriculum. `proposed` requires a
+baseline, and `reference`/`unclassified` must not have one. **Known
+limitation:** MySQL/MariaDB do not permit an AUTO_INCREMENT column (`id`)
+inside a CHECK expression; therefore the schema does not prevent
+`baseline_version_id = id`. A locked, transactional application policy
+must reject a self-baseline and more complex cycles before the workflow is
+enabled in Phase 1 Task 2+. No UI or API accepts this new field yet.
+
+### Development-only verification
+
+Run *only* against a newly provisioned, disposable test schema matching one
+of `csms_docker_test_...` or
+`sms_db_foundation_test_lifecycle_...`. Never use your working `sms_db`,
+production database, or a schema containing genuine academic records.
+
+After preparing an empty disposable database, set the connection environment
+to that database and confirm the same exact name in
+`SMS_TEST_CONFIRM_DATABASE` (see `tests/README.md` and
+`shared/database_config.php`). Inspect the migration plan:
+
+```sh
+php database/deploy.php --status
+```
+
+Only if it shows the expected pending migrations *and the target is disposable*,
+use the existing guarded runner:
+
+```sh
+php database/deploy.php --apply --confirm-database=YOUR_DISPOSABLE_SCHEMA
+php tests/curriculum_lifecycle_schema.php
+php database/inspect.php
+```
+
+`tests/curriculum_lifecycle_schema.php` requires a confirmed disposable
+schema, verifies journal digest/foreign keys/CHECKs/legacy defaults,
+creates synthetic fixture rows inside a transaction, challenges invalid
+relationships, and rolls them back. It refuses production-like database names.
+`tests/deployment_migrations.php` remains an **empty database only**
+deployment regression that also checks journal replays and mismatch failures;
+do not run it against the populated lifecycle test schema.
+
+The runner refuses incomplete/unknown/out-of-order migration journals and
+cannot automatically adopt untracked databases. The local development
+environment and the HostForge database are not the same environment.
+Live production migration state was **not** inspected in Task 1.
+
+### Safe rollback and rollout boundary
+
+MySQL/MariaDB DDL can implicitly commit; do not assume an entire migration is
+transactional. For a failed application on a **disposable test database**,
+inspect the ledger for a `running` marker, then discard/recreate that
+explicitly disposable schema rather than blindly replaying partial DDL.
+For any future non-disposable rollout, obtain an independently verified
+backup and approved maintenance window first. Restore that verified backup if
+a schema migration fails. Once lifecycle rows exist, never drop new tables
+as a shortcut without preserving those records and obtaining approval.
+
+**Not performed by this task:** applying migration 021 to production, role
+granting, BCP workflow approval, modifying PHP service mutation controls,
+creating source links, reference protections, snapshot-capture jobs, cloning
+procedures, reviewer/approver access, or UI changes.
+
 ## Existing initialization notes
 
 Production/HostForge initialization uses the separate CLI-only
