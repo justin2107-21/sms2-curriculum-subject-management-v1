@@ -1,3 +1,22 @@
+## Phase 1 Task 1: curriculum lifecycle schema 021
+
+`php tests/curriculum_lifecycle_schema.php` is a CLI-only schema regression.
+It **requires** a fully applied migration 021 on an **empty disposable test
+schema** named `csms_docker_test_...` or
+`sms_db_foundation_test_lifecycle_...`, and a matching
+`SMS_TEST_CONFIRM_DATABASE` value. It refuses other schema names and
+checks that its fixture tables start empty. It inspects CHECK and foreign-key
+constraints, migration checksum, neutral legacy defaults, duplicate/invalid
+values, delete restrictions, then rolls test fixture rows back. It does not
+change production data or install roles.
+
+`php tests/deployment_migrations.php` independently tests the journal runner
+using its own empty disposable schema, including migration 021 and replay
+rejection. Run the deployment test **before** applying migrations to its
+test schema. See `database/README.md` for the setup and rollback policy.
+Both tests require PHP with mysqli/mysqlnd and a supported MySQL/MariaDB
+server with CHECK constraints enforced.
+
 # Foundation regression (CLI only)
 
 ## Settings Archives
