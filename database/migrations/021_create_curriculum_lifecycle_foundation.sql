@@ -18,7 +18,11 @@ ALTER TABLE curriculum_versions
     CHECK (
       (version_role = 'proposed' AND baseline_version_id IS NOT NULL)
       OR (version_role IN ('unclassified', 'reference') AND baseline_version_id IS NULL)
-    ),
+    );
+
+-- MariaDB 10.4 needs the referenced composite index to exist before adding
+-- a self-referencing FK; create it in the preceding ALTER statement.
+ALTER TABLE curriculum_versions
   ADD CONSTRAINT fk_cv_baseline_same_curriculum
     FOREIGN KEY (baseline_version_id, curriculum_id)
     REFERENCES curriculum_versions (id, curriculum_id)

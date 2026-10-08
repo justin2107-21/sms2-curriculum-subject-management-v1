@@ -61,7 +61,8 @@ foreach(['users','students','academic_programs','subjects','curricula'] as $tabl
     deployCheck((int)$conn->query("SELECT COUNT(*) FROM `$table`")->fetch_row()[0]===0,'No seeded records: '.$table);
 }
 deployCheck((int)$conn->query("SELECT COUNT(*) FROM schema_migrations WHERE status='applied'")->fetch_row()[0]===$expectedMigrations,'All migrations journaled');
-deployCheck((int)$conn->query('SELECT COUNT(*) FROM permissions')->fetch_row()[0]===36,'Permissions initialized');
+// Migration 020 adds dashboard.view and settings.view to the prior 36.
+deployCheck((int)$conn->query('SELECT COUNT(*) FROM permissions')->fetch_row()[0]===38,'Permissions initialized');
 $snapshot=deploymentSnapshot($conn);
 deploymentRun(['--apply','--confirm-database='.$database],0);
 deployCheck(deploymentSnapshot($conn)===$snapshot,'Second apply changes no data');
