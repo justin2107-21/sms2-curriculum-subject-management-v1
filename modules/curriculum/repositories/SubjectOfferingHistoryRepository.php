@@ -5,9 +5,9 @@ require_once __DIR__ . '/RepositoryQuery.php';
 /**
  * Read model for stored curriculum-version subject history.
  *
- * No historical copy is maintained here. curriculum_version_subjects remains
- * authoritative, joined to existing version, curriculum, program, and subject
- * master records.
+ * Complete captured snapshots are historical evidence. Legacy rows without
+ * snapshots disclose missing historical details; current master values are
+ * exposed separately and never substituted into historical fields.
  */
 class SubjectOfferingHistoryRepository
 {
@@ -43,7 +43,18 @@ class SubjectOfferingHistoryRepository
                     cvs.sequence_order, cvs.is_required,
                     cvs.created_at AS placement_created_at,
                     cvs.updated_at AS placement_updated_at,
-                    subjects.subject_code, subjects.subject_title, subjects.units,
+                    CASE WHEN subject_snapshots.snapshot_complete=1 THEN subject_snapshots.subject_code_snapshot ELSE NULL END AS subject_code,
+                    CASE WHEN subject_snapshots.snapshot_complete=1 THEN subject_snapshots.subject_title_snapshot ELSE NULL END AS subject_title,
+                    CASE WHEN subject_snapshots.snapshot_complete=1 THEN subject_snapshots.units_snapshot ELSE NULL END AS units,
+                    subjects.subject_code AS current_subject_code,
+                    subjects.subject_title AS current_subject_title,
+                    subjects.units AS current_units,
+                    subject_snapshots.lecture_units_snapshot AS lecture_units,
+                    subject_snapshots.laboratory_units_snapshot AS laboratory_units,
+                    subject_snapshots.description_snapshot AS description,
+                    subject_snapshots.captured_at AS snapshot_captured_at,
+                    subject_snapshots.capture_method,
+                    COALESCE(subject_snapshots.snapshot_complete, 0) AS snapshot_complete,
                     curriculum_versions.version_label,
                     curriculum_versions.effective_academic_year,
                     curriculum_versions.status AS version_status,
@@ -115,7 +126,18 @@ class SubjectOfferingHistoryRepository
             'SELECT cvs.id AS placement_id, cvs.subject_id, cvs.curriculum_version_id,
                     cvs.year_level, cvs.semester, cvs.sequence_order, cvs.is_required,
                     cvs.created_at AS placement_created_at, cvs.updated_at AS placement_updated_at,
-                    subjects.subject_code, subjects.subject_title, subjects.units,
+                    CASE WHEN subject_snapshots.snapshot_complete=1 THEN subject_snapshots.subject_code_snapshot ELSE NULL END AS subject_code,
+                    CASE WHEN subject_snapshots.snapshot_complete=1 THEN subject_snapshots.subject_title_snapshot ELSE NULL END AS subject_title,
+                    CASE WHEN subject_snapshots.snapshot_complete=1 THEN subject_snapshots.units_snapshot ELSE NULL END AS units,
+                    subjects.subject_code AS current_subject_code,
+                    subjects.subject_title AS current_subject_title,
+                    subjects.units AS current_units,
+                    subject_snapshots.lecture_units_snapshot AS lecture_units,
+                    subject_snapshots.laboratory_units_snapshot AS laboratory_units,
+                    subject_snapshots.description_snapshot AS description,
+                    subject_snapshots.captured_at AS snapshot_captured_at,
+                    subject_snapshots.capture_method,
+                    COALESCE(subject_snapshots.snapshot_complete, 0) AS snapshot_complete,
                     curriculum_versions.version_label, curriculum_versions.status AS version_status,
                     curriculum_versions.created_at AS version_created_at, curriculum_versions.updated_at AS version_updated_at,
                     curricula.curriculum_code, curricula.curriculum_name,
@@ -125,6 +147,8 @@ class SubjectOfferingHistoryRepository
              JOIN curriculum_versions ON curriculum_versions.id = cvs.curriculum_version_id
              JOIN curricula ON curricula.id = curriculum_versions.curriculum_id
              JOIN academic_programs ON academic_programs.id = curricula.academic_program_id
+             LEFT JOIN curriculum_version_subject_snapshots AS subject_snapshots
+                ON subject_snapshots.curriculum_version_subject_id=cvs.id
              WHERE cvs.id = ? LIMIT 1', 'i', [$placementId]);
         $record = $stmt->get_result()->fetch_assoc() ?: null;
         $stmt->close();
@@ -150,8 +174,27 @@ class SubjectOfferingHistoryRepository
         $params[] = $pagination['offset'];
         $stmt = RepositoryQuery::execute(
             $this->db,
-            "SELECT subjects.id AS subject_id, subjects.subject_code,
-                    subjects.subject_title, subjects.units,
+            "SELECT subjects.id AS subject_id,
+                    CASE WHEN snapshot_a.snapshot_complete=1 THEN snapshot_a.subject_code_snapshot
+                         WHEN snapshot_b.snapshot_complete=1 THEN snapshot_b.subject_code_snapshot ELSE NULL END AS subject_code,
+                    CASE WHEN snapshot_a.snapshot_complete=1 THEN snapshot_a.subject_title_snapshot
+                         WHEN snapshot_b.snapshot_complete=1 THEN snapshot_b.subject_title_snapshot ELSE NULL END AS subject_title,
+                    snapshot_a.subject_code_snapshot AS version_a_subject_code,
+                    snapshot_a.subject_title_snapshot AS version_a_subject_title,
+                    snapshot_a.units_snapshot AS version_a_units,
+                    snapshot_a.lecture_units_snapshot AS version_a_lecture_units,
+                    snapshot_a.laboratory_units_snapshot AS version_a_laboratory_units,
+                    snapshot_a.description_snapshot AS version_a_description,
+                    snapshot_a.captured_at AS version_a_snapshot_captured_at,
+                    snapshot_a.snapshot_complete AS version_a_snapshot_complete,
+                    snapshot_b.subject_code_snapshot AS version_b_subject_code,
+                    snapshot_b.subject_title_snapshot AS version_b_subject_title,
+                    snapshot_b.units_snapshot AS version_b_units,
+                    snapshot_b.lecture_units_snapshot AS version_b_lecture_units,
+                    snapshot_b.laboratory_units_snapshot AS version_b_laboratory_units,
+                    snapshot_b.description_snapshot AS version_b_description,
+                    snapshot_b.captured_at AS version_b_snapshot_captured_at,
+                    snapshot_b.snapshot_complete AS version_b_snapshot_complete,
                     placement_a.id AS version_a_placement_id,
                     placement_a.year_level AS version_a_year_level,
                     placement_a.semester AS version_a_semester,
@@ -174,7 +217,7 @@ class SubjectOfferingHistoryRepository
                         ELSE 'unchanged'
                     END AS change_type"
             . $from .
-            ' ORDER BY subjects.subject_code ASC, subjects.id ASC LIMIT ? OFFSET ?',
+            ' ORDER BY subject_code ASC, subjects.id ASC LIMIT ? OFFSET ?',
             'iiiiii',
             $params
         );
@@ -197,7 +240,9 @@ class SubjectOfferingHistoryRepository
                     ON curriculum_versions.id = cvs.curriculum_version_id
                  INNER JOIN curricula ON curricula.id = curriculum_versions.curriculum_id
                  INNER JOIN academic_programs
-                    ON academic_programs.id = curricula.academic_program_id';
+                    ON academic_programs.id = curricula.academic_program_id
+                 LEFT JOIN curriculum_version_subject_snapshots AS subject_snapshots
+                    ON subject_snapshots.curriculum_version_subject_id=cvs.id';
     }
 
     private function historyConditions(array $query): array
@@ -273,7 +318,11 @@ class SubjectOfferingHistoryRepository
                    AND placement_a.curriculum_version_id = ?
                  LEFT JOIN curriculum_version_subjects AS placement_b
                     ON placement_b.subject_id = compared_subjects.subject_id
-                   AND placement_b.curriculum_version_id = ?';
+                   AND placement_b.curriculum_version_id = ?
+                 LEFT JOIN curriculum_version_subject_snapshots AS snapshot_a
+                    ON snapshot_a.curriculum_version_subject_id=placement_a.id
+                 LEFT JOIN curriculum_version_subject_snapshots AS snapshot_b
+                    ON snapshot_b.curriculum_version_subject_id=placement_b.id';
     }
 
     private function comparisonSummary(int $versionAId, int $versionBId): array
@@ -283,8 +332,14 @@ class SubjectOfferingHistoryRepository
             "SELECT
                 COUNT(DISTINCT CASE WHEN placement_a.subject_id IS NOT NULL THEN subjects.id END) AS version_a_subjects,
                 COUNT(DISTINCT CASE WHEN placement_b.subject_id IS NOT NULL THEN subjects.id END) AS version_b_subjects,
-                COALESCE(SUM(CASE WHEN placement_a.subject_id IS NOT NULL THEN subjects.units ELSE 0 END), 0) AS version_a_units,
-                COALESCE(SUM(CASE WHEN placement_b.subject_id IS NOT NULL THEN subjects.units ELSE 0 END), 0) AS version_b_units,
+                CASE WHEN SUM(CASE WHEN placement_a.subject_id IS NOT NULL THEN 1 ELSE 0 END)=0 THEN 0
+                     WHEN SUM(CASE WHEN placement_a.subject_id IS NOT NULL AND snapshot_a.snapshot_complete=1 THEN 1 ELSE 0 END)=SUM(CASE WHEN placement_a.subject_id IS NOT NULL THEN 1 ELSE 0 END)
+                     THEN SUM(CASE WHEN placement_a.subject_id IS NOT NULL THEN snapshot_a.units_snapshot ELSE 0 END) ELSE NULL END AS version_a_units,
+                CASE WHEN SUM(CASE WHEN placement_b.subject_id IS NOT NULL THEN 1 ELSE 0 END)=0 THEN 0
+                     WHEN SUM(CASE WHEN placement_b.subject_id IS NOT NULL AND snapshot_b.snapshot_complete=1 THEN 1 ELSE 0 END)=SUM(CASE WHEN placement_b.subject_id IS NOT NULL THEN 1 ELSE 0 END)
+                     THEN SUM(CASE WHEN placement_b.subject_id IS NOT NULL THEN snapshot_b.units_snapshot ELSE 0 END) ELSE NULL END AS version_b_units,
+                SUM(CASE WHEN placement_a.subject_id IS NOT NULL AND snapshot_a.snapshot_complete=1 THEN 1 ELSE 0 END) AS version_a_captured_subjects,
+                SUM(CASE WHEN placement_b.subject_id IS NOT NULL AND snapshot_b.snapshot_complete=1 THEN 1 ELSE 0 END) AS version_b_captured_subjects,
                 SUM(CASE WHEN placement_a.subject_id IS NULL THEN 1 ELSE 0 END) AS added,
                 SUM(CASE WHEN placement_b.subject_id IS NULL THEN 1 ELSE 0 END) AS removed,
                 SUM(CASE WHEN placement_a.subject_id IS NOT NULL

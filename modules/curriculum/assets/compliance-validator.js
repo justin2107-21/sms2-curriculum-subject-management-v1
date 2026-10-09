@@ -9,6 +9,7 @@
     const activeView = workspace.dataset.complianceView;
     const canRun = workspace.dataset.canRun === '1';
     const canManage = workspace.dataset.canManage === '1';
+    const canVerifyReferences = workspace.dataset.canVerifyReferences === '1';
     const ruleColumns = Number(workspace.dataset.ruleColumns || 7);
     const referenceColumns = Number(workspace.dataset.referenceColumns || 6);
     const state = {
@@ -34,8 +35,10 @@
     const historyRows = document.getElementById('complianceHistoryRows');
     const ruleForm = document.getElementById('complianceRuleForm');
     const referenceForm = document.getElementById('complianceReferenceForm');
+    const evidenceForm = document.getElementById('complianceEvidenceForm');
     const ruleModal = ui.createModal(document.getElementById('complianceRuleModal'));
     const referenceModal = ui.createModal(document.getElementById('complianceReferenceModal'));
+    const evidenceModal = ui.createModal(document.getElementById('complianceEvidenceModal'));
     const runModal = ui.createModal(document.getElementById('complianceRunModal'));
     const referenceAutocomplete = ui.createAutocomplete({
         input: document.getElementById('complianceRuleReferenceInput'),
@@ -327,10 +330,11 @@
     function referenceRow(reference) {
         const source = reference.source_url
             ? '<a class="compliance-reference-link" href="' + ui.escapeHtml(reference.source_url) + '" target="_blank" rel="noopener noreferrer">Open source <i class="fa-solid fa-arrow-up-right-from-square"></i></a>' : '<span class="compliance-subtext">No URL stored</span>';
-        const actions = canManage ? '<td><button type="button" class="row-action-button" data-edit-compliance-reference="' + Number(reference.id) + '"><i class="fa-solid fa-pen"></i> Edit</button></td>' : '';
+        const actions = (canManage || canVerifyReferences) ? '<td>' + (canManage ? '<button type="button" class="row-action-button" data-edit-compliance-reference="' + Number(reference.id) + '"><i class="fa-solid fa-pen"></i> Edit</button> ' : '') + (canVerifyReferences ? '<button type="button" class="row-action-button" data-assess-compliance-reference="' + Number(reference.id) + '"><i class="fa-solid fa-clipboard-check"></i> Assess</button>' : '') + '</td>' : '';
+        const assessments = 'Identity: ' + (reference.document_identity_assessment || 'not assessed') + ' · Origin: ' + (reference.declared_origin_assessment || 'not assessed') + ' · Applicability: ' + (reference.applicability_assessment || 'not assessed');
         return '<tr><td><span class="compliance-name">' + ui.escapeHtml(reference.reference_code || reference.title || 'Reference') + '</span><span class="compliance-subtext">' + ui.escapeHtml(reference.title || 'No title') + (reference.effective_date ? ' / ' + ui.escapeHtml(reference.effective_date) : '') + '</span></td>' +
-            '<td>' + badge(reference.reference_type, reference.reference_type === 'DEPED' ? 'DepEd' : reference.reference_type) + '</td><td>' + ui.escapeHtml(reference.issuing_body) + '</td>' +
-            '<td>' + badge(reference.verification_status, reference.verification_status) + '</td><td>' + source + '</td><td>' + Number(reference.rule_count || 0) + '</td>' + actions + '</tr>';
+            '<td>' + badge(reference.reference_type, reference.reference_type === 'DEPED' ? 'DepEd' : reference.reference_type) + '<span class="compliance-subtext">' + ui.escapeHtml(reference.source_kind || 'unknown') + '</span></td><td>' + ui.escapeHtml(reference.issuing_body) + '</td>' +
+            '<td>' + badge(reference.verification_status, 'Internal status: ' + reference.verification_status) + '<span class="compliance-subtext">' + ui.escapeHtml(assessments) + '</span></td><td>' + source + '</td><td>' + Number(reference.rule_count || 0) + '</td>' + actions + '</tr>';
     }
 
     async function loadReferences(page) {
@@ -489,6 +493,8 @@
         ui.clearFormError(referenceForm);
         document.getElementById('complianceReferenceId').value = reference ? reference.id : '';
         document.getElementById('complianceReferenceType').value = reference ? reference.reference_type : 'CHED';
+        document.getElementById('complianceReferenceSourceKind').value = reference ? (reference.source_kind || 'unknown') : 'unknown';
+        document.getElementById('complianceReferenceSupersedes').value = reference?.supersedes_reference_id ?? '';
         document.getElementById('complianceReferenceCode').value = reference?.reference_code ?? '';
         document.getElementById('complianceReferenceTitle').value = reference?.title ?? '';
         document.getElementById('complianceReferenceIssuer').value = reference?.issuing_body ?? '';
@@ -499,6 +505,41 @@
         document.getElementById('complianceReferenceModalTitle').textContent = reference ? 'Edit Compliance Reference' : 'New Compliance Reference';
         document.getElementById('saveComplianceReference').textContent = reference ? 'Save Reference' : 'Create Reference';
         referenceModal.open();
+    }
+
+    async function openEvidenceForm(referenceId) {
+        if (!canVerifyReferences || !evidenceForm || !evidenceModal) return;
+        try {
+            const payload = await ui.fetchJson(endpoint, {action: 'reference_get', id: referenceId});
+            const reference = payload.reference;
+            evidenceForm.reset();
+            ui.clearFormError(evidenceForm);
+            document.getElementById('complianceEvidenceReferenceId').value = reference.id;
+            document.getElementById('complianceEvidenceReferenceLabel').textContent =
+                (reference.reference_code || reference.title || 'Reference') + ' — ' + (reference.title || '') +
+                ' · ' + (reference.source_kind || 'unknown') + ' · adoption/approval not verified';
+            const history = document.getElementById('complianceEvidenceHistory');
+            history.textContent = reference.evidence_events?.length
+                ? reference.evidence_events.map(item => item.created_at + ' · ' + item.verification_subject.replaceAll('_',' ') + ': ' + item.result + ' · assessed record: ' + (item.reference_code_snapshot || item.title_snapshot || 'unnamed source') + ' / ' + (item.issuing_body_snapshot || 'issuer unknown') + ' · ' + (item.rationale || '') + (item.evidence_locator ? ' · evidence: ' + item.evidence_locator : '')).join('\n')
+                : 'No evidence assessments recorded. Identity, origin, and applicability are not assessed.';
+            evidenceModal.open();
+        } catch (error) { ui.showToast(error.message, 'error'); }
+    }
+
+    async function submitEvidence(event) {
+        event.preventDefault();
+        if (!evidenceForm.reportValidity()) return;
+        ui.clearFormError(evidenceForm);
+        const data = new FormData(evidenceForm);
+        data.set('action', 'reference_evidence');
+        ui.setFormSubmitting(evidenceForm, true, 'Recording...');
+        try {
+            const payload = await ui.postForm(endpoint, data);
+            evidenceModal.close();
+            ui.showToast(payload.message, 'success');
+            await loadReferences(state.referencePage);
+        } catch (error) { ui.showFormError(evidenceForm, error.message); }
+        finally { ui.setFormSubmitting(evidenceForm, false); }
     }
 
     async function submitReference(event) {
@@ -597,6 +638,8 @@
     referenceRows?.addEventListener('click', function (event) {
         const button = event.target.closest('[data-edit-compliance-reference]');
         if (button) openReferenceForm(state.references.get(Number(button.dataset.editComplianceReference)));
+        const assess = event.target.closest('[data-assess-compliance-reference]');
+        if (assess) openEvidenceForm(Number(assess.dataset.assessComplianceReference));
     });
     historyRows?.addEventListener('click', function (event) {
         const button = event.target.closest('[data-view-compliance-run]');
@@ -624,6 +667,7 @@
         referenceForm?.addEventListener('submit', submitReference);
         ruleForm?.addEventListener('submit', submitRule);
     }
+    if (canVerifyReferences) evidenceForm?.addEventListener('submit', submitEvidence);
 
     if (activeView === 'validate') loadPrograms();
     if (activeView === 'rules') loadRules(1);

@@ -1610,3 +1610,9 @@ body.curriculum-modal-open { overflow: hidden; }
   .version-workspace > #placementPagination { margin-left: 16px; margin-right: 16px; }
 }
 .curriculum-content button[hidden]{display:none!important}
+.reference-baseline-panel { margin: 1.25rem 0; }
+.reference-baseline-details { margin: 0 0 1rem; }
+.reference-action-details { border-top: 1px solid var(--border-color, #e5e7eb); padding-top: .85rem; margin-top: .85rem; }
+.reference-action-details > summary { cursor: pointer; color: var(--primary-color, #174a7e); font-weight: 700; }
+.reference-action-details[hidden] { display: none; }
+.reference-action-details .domain-form { margin-top: .75rem; }

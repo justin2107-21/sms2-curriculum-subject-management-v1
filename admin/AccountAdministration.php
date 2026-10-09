@@ -55,7 +55,8 @@ final class AccountAdministration
         $s=$this->db->prepare('SELECT 1 FROM user_roles WHERE user_id=? AND role_id=?');$s->bind_param('ii',$actor,$id);$s->execute();$own=$s->get_result()->num_rows;$s->close();
         if($own)throw new InvalidArgumentException('You cannot change permissions for your own role.');
         $names=$input['permissions']??[];if(!is_array($names))throw new InvalidArgumentException('Invalid permissions.');
-        $allowed=ProvisionalRoles::definitions()[$role['name']]['permissions'];
+        $definition=ProvisionalRoles::definitions()[$role['name']];
+        $allowed=$definition['grantable_permissions']??$definition['permissions'];
         foreach($names as $name)if(!is_string($name)||!in_array($name,$allowed,true))throw new InvalidArgumentException('Permission exceeds the provisional authority of this role.');
         foreach(['dashboard.view','account.view','account.update'] as $required)if(!in_array($required,$names,true))throw new InvalidArgumentException('Dashboard and personal account access must remain available.');
         $this->db->begin_transaction();try{

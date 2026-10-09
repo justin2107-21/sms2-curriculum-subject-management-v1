@@ -114,3 +114,4 @@
   .compliance-toolbar .select-control,
   .compliance-toolbar .compact-select { flex: 1 1 auto; max-width: none; width: 100%; }
 }
+.compliance-evidence-history { white-space: pre-line; max-height: 12rem; overflow: auto; padding: .75rem; margin: .5rem 0 1rem; border: 1px solid var(--border-color, #d7dde5); border-radius: .5rem; font-size: .875rem; }

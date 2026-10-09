@@ -135,13 +135,14 @@ class SubjectOfferingHistoryService
     {
         foreach (['stored_placements', 'programs', 'curricula', 'curriculum_versions',
                   'added', 'removed', 'moved', 'placement_type_changed', 'changed', 'unchanged',
-                  'version_a_subjects', 'version_b_subjects'] as $key) {
+                  'version_a_subjects', 'version_b_subjects', 'version_a_captured_subjects',
+                  'version_b_captured_subjects'] as $key) {
             if (array_key_exists($key, $summary)) {
                 $summary[$key] = (int)$summary[$key];
             }
         }
         foreach (['version_a_units', 'version_b_units'] as $key) {
-            if (array_key_exists($key, $summary)) $summary[$key] = (float)$summary[$key];
+            if (array_key_exists($key, $summary) && $summary[$key] !== null) $summary[$key] = (float)$summary[$key];
         }
         return $summary;
     }

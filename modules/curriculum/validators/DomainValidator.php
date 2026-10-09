@@ -480,8 +480,22 @@ class DomainValidator
             throw new DomainValidationException('Invalid reference verification status.');
         }
 
+        $sourceKind = strtolower((string)($input['source_kind'] ?? 'unknown'));
+        if (!in_array($sourceKind, [
+            'regulatory_document', 'ched_sample_curriculum', 'institutional_curriculum',
+            'institutional_policy', 'supporting_document', 'other_document', 'unknown',
+        ], true)) {
+            throw new DomainValidationException('Invalid documentary source kind.');
+        }
+        $supersedesReferenceId = self::optionalPositiveId(
+            $input['supersedes_reference_id'] ?? null,
+            'Superseded reference'
+        );
+
         return [
             'reference_type' => $referenceType,
+            'source_kind' => $sourceKind,
+            'supersedes_reference_id' => $supersedesReferenceId,
             'reference_code' => $referenceCode,
             'title' => $title,
             'issuing_body' => self::requiredString($input, 'issuing_body', 'Issuing body', 180),
@@ -489,6 +503,46 @@ class DomainValidator
             'effective_date' => $effectiveDate,
             'notes' => self::optionalString($input, 'notes', 'Reference notes', 60000),
             'verification_status' => $verificationStatus,
+        ];
+    }
+
+    public static function complianceReferenceEvidence(array $input): array
+    {
+        $subject = strtolower((string)self::requiredString($input, 'verification_subject', 'Verification subject', 30));
+        if (!in_array($subject, ['document_identity', 'declared_origin', 'applicability'], true)) {
+            throw new DomainValidationException('Invalid verification subject.');
+        }
+        $result = strtolower((string)self::requiredString($input, 'result', 'Verification result', 24));
+        if (!in_array($result, ['confirmed', 'not_confirmed', 'not_assessed'], true)) {
+            throw new DomainValidationException('Invalid verification result.');
+        }
+        $locator = self::optionalString($input, 'evidence_locator', 'Evidence locator', 1000);
+        $sha256 = self::optionalString($input, 'evidence_sha256', 'Evidence SHA-256', 64);
+        if ($sha256 !== null && !preg_match('/^[a-fA-F0-9]{64}$/', $sha256)) {
+            throw new DomainValidationException('Evidence SHA-256 must contain exactly 64 hexadecimal characters.');
+        }
+        if ($result === 'confirmed' && $subject !== 'applicability' && $locator === null && $sha256 === null) {
+            throw new DomainValidationException('A confirmed document identity or origin requires an evidence locator or fingerprint.');
+        }
+        return [
+            'verification_subject' => $subject,
+            'result' => $result,
+            'evidence_locator' => $locator,
+            'evidence_sha256' => $sha256,
+            'rationale' => self::requiredString($input, 'rationale', 'Rationale', 2000),
+        ];
+    }
+
+    public static function curriculumVersionReference(array $input): array
+    {
+        $purpose = strtolower((string)self::requiredString($input, 'reference_purpose', 'Reference purpose', 30));
+        if (!in_array($purpose, ['school_curriculum', 'regulatory', 'institutional_policy', 'other'], true)) {
+            throw new DomainValidationException('Invalid curriculum reference purpose.');
+        }
+        return [
+            'curriculum_version_id' => self::positiveId($input['curriculum_version_id'] ?? null, 'Curriculum version'),
+            'compliance_reference_id' => self::positiveId($input['compliance_reference_id'] ?? null, 'Documentary reference'),
+            'reference_purpose' => $purpose,
         ];
     }
 

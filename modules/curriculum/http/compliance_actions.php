@@ -67,6 +67,12 @@ try {
             $reference = $referenceService->update($id, $_POST);
             json_response(true, 'Compliance reference updated.', ['reference' => $reference]);
 
+        case 'reference_evidence':
+            curriculum_require_mutation('compliance.reference.verify');
+            $id = DomainValidator::positiveId($_POST['id'] ?? null, 'Compliance reference');
+            $reference = $referenceService->recordEvidence($id, $_POST, curriculum_actor_id());
+            json_response(true, 'Internal source assessment recorded.', ['reference' => $reference], 201);
+
         case 'rule_create':
             curriculum_require_mutation('compliance.manage');
             $rule = $ruleService->create($_POST, curriculum_actor_id());

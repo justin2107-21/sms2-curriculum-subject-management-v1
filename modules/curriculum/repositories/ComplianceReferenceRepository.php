@@ -109,13 +109,16 @@ class ComplianceReferenceRepository
     {
         $stmt = $this->db->prepare(
             'INSERT INTO compliance_references
-                (reference_type, reference_code, title, issuing_body, source_url,
-                 effective_date, notes, verification_status, created_by)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                (reference_type, source_kind, supersedes_reference_id,
+                 reference_code, title, issuing_body, source_url, effective_date,
+                 notes, verification_status, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->bind_param(
-            'ssssssssi',
+            'ssisssssssi',
             $data['reference_type'],
+            $data['source_kind'],
+            $data['supersedes_reference_id'],
             $data['reference_code'],
             $data['title'],
             $data['issuing_body'],
@@ -135,13 +138,16 @@ class ComplianceReferenceRepository
     {
         $stmt = $this->db->prepare(
             'UPDATE compliance_references
-             SET reference_type = ?, reference_code = ?, title = ?, issuing_body = ?,
-                 source_url = ?, effective_date = ?, notes = ?, verification_status = ?
+             SET reference_type = ?, source_kind = ?, supersedes_reference_id = ?,
+                 reference_code = ?, title = ?, issuing_body = ?, source_url = ?,
+                 effective_date = ?, notes = ?, verification_status = ?
              WHERE id = ?'
         );
         $stmt->bind_param(
-            'ssssssssi',
+            'ssisssssssi',
             $data['reference_type'],
+            $data['source_kind'],
+            $data['supersedes_reference_id'],
             $data['reference_code'],
             $data['title'],
             $data['issuing_body'],
@@ -155,11 +161,93 @@ class ComplianceReferenceRepository
         $stmt->close();
     }
 
+    public function setVerificationStatus(int $id, string $status): void
+    {
+        $stmt = $this->db->prepare('UPDATE compliance_references SET verification_status=? WHERE id=?');
+        $stmt->bind_param('si', $status, $id);
+        $stmt->execute();
+        $stmt->close();
+    }
+
+    public function recordEvidence(int $referenceId, array $reference, array $evidence, int $actorId): int
+    {
+        $stmt = $this->db->prepare(
+            'INSERT INTO compliance_reference_evidence_events
+              (compliance_reference_id, verification_subject, result,
+               reference_code_snapshot, title_snapshot, source_kind_snapshot,
+               issuing_body_snapshot, source_url_snapshot, effective_date_snapshot,
+               evidence_locator, evidence_sha256, rationale, recorded_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        );
+        $stmt->bind_param(
+            'isssssssssssi',
+            $referenceId,
+            $evidence['verification_subject'],
+            $evidence['result'],
+            $reference['reference_code'],
+            $reference['title'],
+            $reference['source_kind'],
+            $reference['issuing_body'],
+            $reference['source_url'],
+            $reference['effective_date'],
+            $evidence['evidence_locator'],
+            $evidence['evidence_sha256'],
+            $evidence['rationale'],
+            $actorId
+        );
+        $stmt->execute();
+        $id = (int)$this->db->insert_id;
+        $stmt->close();
+        return $id;
+    }
+
+    public function evidenceEvents(int $referenceId): array
+    {
+        $stmt = RepositoryQuery::execute($this->db,
+            'SELECT e.*, u.username AS recorded_by_username
+             FROM compliance_reference_evidence_events e
+             LEFT JOIN users u ON u.id = e.recorded_by
+             WHERE e.compliance_reference_id = ? ORDER BY e.id DESC', 'i', [$referenceId]);
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return $rows;
+    }
+
     private function detailSelect(): string
     {
         return 'SELECT references_table.*, creator.username AS creator_username,
                        (SELECT COUNT(*) FROM compliance_rules AS linked_rules
-                        WHERE linked_rules.compliance_reference_id = references_table.id) AS rule_count
+                        WHERE linked_rules.compliance_reference_id = references_table.id) AS rule_count,
+                       (SELECT CASE WHEN e.reference_code_snapshot <=> references_table.reference_code
+                                          AND e.title_snapshot <=> references_table.title
+                                          AND e.source_kind_snapshot <=> references_table.source_kind
+                                          AND e.issuing_body_snapshot <=> references_table.issuing_body
+                                          AND e.source_url_snapshot <=> references_table.source_url
+                                          AND e.effective_date_snapshot <=> references_table.effective_date
+                                     THEN e.result ELSE \'stale_for_current_metadata\' END
+                        FROM compliance_reference_evidence_events e
+                        WHERE e.compliance_reference_id=references_table.id AND e.verification_subject=\'document_identity\'
+                        ORDER BY e.id DESC LIMIT 1) AS document_identity_assessment,
+                       (SELECT CASE WHEN e.reference_code_snapshot <=> references_table.reference_code
+                                          AND e.title_snapshot <=> references_table.title
+                                          AND e.source_kind_snapshot <=> references_table.source_kind
+                                          AND e.issuing_body_snapshot <=> references_table.issuing_body
+                                          AND e.source_url_snapshot <=> references_table.source_url
+                                          AND e.effective_date_snapshot <=> references_table.effective_date
+                                     THEN e.result ELSE \'stale_for_current_metadata\' END
+                        FROM compliance_reference_evidence_events e
+                        WHERE e.compliance_reference_id=references_table.id AND e.verification_subject=\'declared_origin\'
+                        ORDER BY e.id DESC LIMIT 1) AS declared_origin_assessment,
+                       (SELECT CASE WHEN e.reference_code_snapshot <=> references_table.reference_code
+                                          AND e.title_snapshot <=> references_table.title
+                                          AND e.source_kind_snapshot <=> references_table.source_kind
+                                          AND e.issuing_body_snapshot <=> references_table.issuing_body
+                                          AND e.source_url_snapshot <=> references_table.source_url
+                                          AND e.effective_date_snapshot <=> references_table.effective_date
+                                     THEN e.result ELSE \'stale_for_current_metadata\' END
+                        FROM compliance_reference_evidence_events e
+                        WHERE e.compliance_reference_id=references_table.id AND e.verification_subject=\'applicability\'
+                        ORDER BY e.id DESC LIMIT 1) AS applicability_assessment
                 FROM compliance_references AS references_table
                 LEFT JOIN users AS creator ON creator.id = references_table.created_by';
     }

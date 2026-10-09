@@ -56,13 +56,14 @@ try { deploymentRun(['--apply','--confirm-database='.$database],1); }
 finally { $stmt=$conn->prepare('SELECT RELEASE_LOCK(?)');$stmt->bind_param('s',$lock);$stmt->execute();$stmt->close(); }
 deployCheck($conn->query('SHOW TABLES')->num_rows===0,'Concurrent migration blocked before writes');
 deploymentRun(['--apply','--confirm-database='.$database],0);
-deployCheck($conn->query('SHOW TABLES')->num_rows===29,'28 application tables plus migration journal after 021');
+deployCheck($conn->query('SHOW TABLES')->num_rows===30,'29 application tables plus migration journal after 022');
 foreach(['users','students','academic_programs','subjects','curricula'] as $table) {
     deployCheck((int)$conn->query("SELECT COUNT(*) FROM `$table`")->fetch_row()[0]===0,'No seeded records: '.$table);
 }
 deployCheck((int)$conn->query("SELECT COUNT(*) FROM schema_migrations WHERE status='applied'")->fetch_row()[0]===$expectedMigrations,'All migrations journaled');
-// Migration 020 adds dashboard.view and settings.view to the prior 36.
-deployCheck((int)$conn->query('SELECT COUNT(*) FROM permissions')->fetch_row()[0]===38,'Permissions initialized');
+// Migration 022 registers three Task 3 capabilities without granting them.
+deployCheck((int)$conn->query('SELECT COUNT(*) FROM permissions')->fetch_row()[0]===41,'Permissions initialized');
+deployCheck((int)$conn->query("SELECT COUNT(*) FROM role_permissions rp JOIN permissions p ON p.id=rp.permission_id WHERE p.name IN ('curriculum.reference.attach','compliance.reference.verify','curriculum.reference.classify')")->fetch_row()[0]===0,'Task 3 permissions are not automatically granted');
 $snapshot=deploymentSnapshot($conn);
 deploymentRun(['--apply','--confirm-database='.$database],0);
 deployCheck(deploymentSnapshot($conn)===$snapshot,'Second apply changes no data');

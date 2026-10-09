@@ -46,6 +46,7 @@ $viewDescription = $complianceViewDescriptions[$complianceView];
 $userId = current_user_id();
 $canRunCompliance = $userId !== null && user_can($userId, 'compliance.run');
 $canManageCompliance = $userId !== null && user_can($userId, 'compliance.manage');
+$canVerifyReferences = $userId !== null && user_can($userId, 'compliance.reference.verify');
 $avatarInitial = strtoupper(substr((string)($_SESSION['first_name'] ?? 'U'), 0, 1));
 $curriculumCssVersion = (int)filemtime(__DIR__ . '/../assets/curriculum.css');
 $typographyCssVersion = (int)filemtime(__DIR__ . '/../../../css/csms-typography.css');
@@ -54,7 +55,7 @@ $complianceCssVersion = (int)filemtime(__DIR__ . '/../assets/compliance-validato
 $commonJsVersion = (int)filemtime(__DIR__ . '/../assets/curriculum-common.js');
 $complianceJsVersion = (int)filemtime(__DIR__ . '/../assets/compliance-validator.js');
 $ruleColumns = $canManageCompliance ? 8 : 7;
-$referenceColumns = $canManageCompliance ? 7 : 6;
+$referenceColumns = ($canManageCompliance || $canVerifyReferences) ? 7 : 6;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -87,6 +88,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
         data-compliance-view="<?= htmlspecialchars($complianceView, ENT_QUOTES, 'UTF-8') ?>"
         data-can-run="<?= $canRunCompliance ? '1' : '0' ?>"
         data-can-manage="<?= $canManageCompliance ? '1' : '0' ?>"
+        data-can-verify-references="<?= $canVerifyReferences ? '1' : '0' ?>"
         data-rule-columns="<?= $ruleColumns ?>"
         data-reference-columns="<?= $referenceColumns ?>">
     <div class="page-title-bar curriculum-title-bar">
@@ -155,7 +157,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
           <label class="select-control"><span>Status</span><select id="referenceStatusFilter"><option value="">All</option><option value="draft">Draft</option><option value="verified">Verified</option><option value="inactive">Inactive</option></select></label>
           <label class="select-control compact-select"><span>Rows</span><select id="referencePerPage"><option value="10">10</option><option value="20" selected>20</option><option value="50">50</option></select></label>
         </div>
-        <div class="table-scroll" tabindex="0" aria-label="Scrollable compliance references"><table class="domain-table compliance-reference-table"><thead><tr><th>Reference</th><th>Category</th><th>Issuing Body</th><th>Status</th><th>Source</th><th>Rules</th><?php if ($canManageCompliance): ?><th>Actions</th><?php endif; ?></tr></thead><tbody id="complianceReferenceRows"><tr><td colspan="<?= $referenceColumns ?>" class="empty-cell">Loading compliance references...</td></tr></tbody></table></div>
+        <div class="table-scroll" tabindex="0" aria-label="Scrollable compliance references"><table class="domain-table compliance-reference-table"><thead><tr><th>Reference</th><th>Category / source kind</th><th>Issuing Body</th><th>Status</th><th>Source</th><th>Rules</th><?php if ($canManageCompliance || $canVerifyReferences): ?><th>Actions</th><?php endif; ?></tr></thead><tbody id="complianceReferenceRows"><tr><td colspan="<?= $referenceColumns ?>" class="empty-cell">Loading compliance references...</td></tr></tbody></table></div>
         <div class="pagination-bar" id="referencePagination"></div>
       </section>
     </section>
@@ -182,19 +184,37 @@ require __DIR__ . '/../../../shared/sidebar.php';
       <input type="hidden" name="id" id="complianceReferenceId"/><div class="form-error" role="alert" hidden></div>
       <div class="form-grid">
         <label class="form-field"><span>Reference Category <strong>*</strong></span><select name="reference_type" id="complianceReferenceType" required><option value="CHED">CHED</option><option value="DEPED">DepEd</option><option value="INSTITUTIONAL">Institutional</option><option value="OTHER">Other</option></select></label>
+        <label class="form-field"><span>Document kind <strong>*</strong></span><select name="source_kind" id="complianceReferenceSourceKind" required><option value="unknown">Unknown / not classified</option><option value="regulatory_document">Regulatory document</option><option value="ched_sample_curriculum">CHED sample curriculum</option><option value="institutional_curriculum">Institution-provided curriculum</option><option value="institutional_policy">Institutional policy</option><option value="supporting_document">Supporting document</option><option value="other_document">Other document</option></select><small>Issuer category and document kind are separate facts.</small></label>
+        <label class="form-field"><span>Supersedes reference ID</span><input type="number" name="supersedes_reference_id" id="complianceReferenceSupersedes" min="1" step="1" placeholder="Optional existing record ID"/></label>
         <label class="form-field"><span>Reference Code</span><input type="text" name="reference_code" id="complianceReferenceCode" maxlength="120" placeholder="Optional source identifier"/></label>
         <label class="form-field form-field-wide"><span>Reference Title</span><input type="text" name="title" id="complianceReferenceTitle" maxlength="255" placeholder="Required when no code is supplied"/></label>
         <label class="form-field"><span>Issuing Body <strong>*</strong></span><input type="text" name="issuing_body" id="complianceReferenceIssuer" maxlength="180" required/></label>
         <label class="form-field"><span>Effective Date</span><input type="date" name="effective_date" id="complianceReferenceDate"/></label>
         <label class="form-field form-field-wide"><span>Source URL</span><input type="url" name="source_url" id="complianceReferenceUrl" maxlength="1000" placeholder="https://..."/></label>
-        <label class="form-field"><span>Verification Status <strong>*</strong></span><select name="verification_status" id="complianceReferenceStatus" required><option value="draft">Draft</option><option value="verified">Verified</option><option value="inactive">Inactive</option></select><small>Verified means internally confirmed as the intended source only.</small></label>
+        <label class="form-field"><span>Internal Compliance Status <strong>*</strong></span><select name="verification_status" id="complianceReferenceStatus" required><option value="draft">Draft</option><option value="verified">Verified (confirmed identity evidence required)</option><option value="inactive">Inactive</option></select><small>This legacy status is not CHED certification, applicability, or BCP approval. Document identity must be confirmed in the separate evidence action.</small></label>
         <label class="form-field form-field-wide"><span>Notes</span><textarea name="notes" id="complianceReferenceNotes" rows="3" placeholder="Optional traceability notes"></textarea></label>
       </div>
       <div class="modal-actions"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="submit" class="button-primary" id="saveComplianceReference">Create Reference</button></div>
     </form>
   </section>
 </div>
+<?php endif; ?>
 
+<?php if ($canVerifyReferences): ?>
+<div class="curriculum-modal" id="complianceEvidenceModal" hidden>
+  <div class="modal-backdrop" data-modal-close></div>
+  <section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="complianceEvidenceTitle">
+    <div class="modal-header"><div><h2 id="complianceEvidenceTitle">Internal Source Assessment</h2><p class="modal-context">Record the evidence and scope of this internal assessment. It does not certify legal applicability or BCP adoption.</p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close assessment"><i class="fa-solid fa-xmark"></i></button></div>
+    <form class="domain-form" id="complianceEvidenceForm"><input type="hidden" name="id" id="complianceEvidenceReferenceId"/><div class="form-error" role="alert" hidden></div>
+      <p id="complianceEvidenceReferenceLabel" class="curriculum-notice"></p><div id="complianceEvidenceHistory" class="compliance-evidence-history" aria-live="polite"></div>
+      <div class="form-grid"><label class="form-field"><span>Assessment subject <strong>*</strong></span><select name="verification_subject" required><option value="document_identity">Document identity</option><option value="declared_origin">Declared origin</option><option value="applicability">Applicability</option></select></label><label class="form-field"><span>Result <strong>*</strong></span><select name="result" required><option value="not_assessed">Not assessed</option><option value="confirmed">Confirmed</option><option value="not_confirmed">Not confirmed</option></select></label><label class="form-field form-field-wide"><span>Evidence locator</span><input name="evidence_locator" maxlength="1000" placeholder="Local document identifier or page/section; no server URL fetch"/></label><label class="form-field form-field-wide"><span>Evidence SHA-256</span><input name="evidence_sha256" maxlength="64" pattern="[a-fA-F0-9]{64}" placeholder="Optional 64-character digest"/></label><label class="form-field form-field-wide"><span>Rationale <strong>*</strong></span><textarea name="rationale" maxlength="2000" rows="3" required></textarea></label></div>
+      <div class="modal-actions"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="submit" class="button-primary">Record Assessment</button></div>
+    </form>
+  </section>
+</div>
+<?php endif; ?>
+
+<?php if ($canManageCompliance): ?>
 <div class="curriculum-modal" id="complianceRuleModal" hidden>
   <div class="modal-backdrop" data-modal-close></div>
   <section class="modal-dialog modal-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="complianceRuleModalTitle">

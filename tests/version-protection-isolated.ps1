@@ -36,7 +36,7 @@ function cli(array $args): int {
     $p=proc_open(array_merge([PHP_BINARY],$args),[0=>['pipe','r'],1=>['pipe','w'],2=>['pipe','w']],$pipes,$s['root'],null,['bypass_shell'=>true,'create_new_console'=>false]);
     fclose($pipes[0]);$out=stream_get_contents($pipes[1]);$err=stream_get_contents($pipes[2]);fclose($pipes[1]);fclose($pipes[2]);$code=proc_close($p);echo $out.$err;return $code;
 }
-$tests=['deployment_migrations.php','curriculum_lifecycle_schema.php','version-protection.php','version-protection-http.php','curriculum-concurrency.php','prerequisite-service.php','electives-service.php','subject-mapping-http.php','electives-http.php','archives-http.php','academic-sequence.php','search-ranking.php','academic_fk_compatibility.php','legacy-fk','prerequisite-http.php','cimf.php','electives-foundation'];
+$tests=['deployment_migrations.php','curriculum_lifecycle_schema.php','curriculum-reference-schema.php','curriculum-reference-baseline.php','curriculum-reference-http.php','curriculum-reference-concurrency.php','version-protection.php','version-protection-http.php','curriculum-concurrency.php','prerequisite-service.php','electives-service.php','subject-mapping-http.php','electives-http.php','archives-http.php','academic-sequence.php','search-ranking.php','academic_fk_compatibility.php','legacy-fk','prerequisite-http.php','cimf.php','electives-foundation'];
 $only=getenv('CSMS_TASK2_ISOLATED_ONLY') ?: '';
 if($only!=='' && !in_array($only,$tests,true))throw new RuntimeException('Requested isolated test is not in the approved suite.');
 if($only!=='')$tests=[$only];

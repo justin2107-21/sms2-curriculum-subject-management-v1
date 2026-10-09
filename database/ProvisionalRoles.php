@@ -11,7 +11,7 @@ final class ProvisionalRoles
             'curriculum.version.create','subject.create','subject.update','prerequisite.manage',
             'elective.manage','program_assignment.manage','grade_weighting.manage','compliance.run',
             'compliance.manage','equivalency.manage','archive.view','archive.restore'];
-        return [
+        $definitions = [
             'system_administrator' => ['label'=>'System Administrator','description'=>'Manages accounts, roles, permissions, security, audit logs, and technical system settings.',
                 'permissions'=>array_merge($read,$academicManage,['rbac.manage','audit.view','settings.view']), 'username'=>'csms_admin','name'=>'System Administrator'],
             'academic_curriculum_staff' => ['label'=>'Academic / Curriculum Staff','description'=>'Operational academic user for curriculum and subject management.',
@@ -21,6 +21,16 @@ final class ProvisionalRoles
             'faculty_academic_viewer' => ['label'=>'Faculty / Academic Viewer','description'=>'Read-only academic curriculum and subject viewer.',
                 'permissions'=>$read, 'username'=>'faculty_viewer','name'=>'Faculty Viewer'],
         ];
+        // These are available for deliberate RBAC-manager assignment only. They
+        // are not included in the default permissions reconciled by seed().
+        $task3 = ['curriculum.reference.attach','compliance.reference.verify','curriculum.reference.classify'];
+        foreach ($definitions as &$definition) {
+            $definition['grantable_permissions'] = array_values(array_unique(
+                array_merge($definition['permissions'], $task3)
+            ));
+        }
+        unset($definition);
+        return $definitions;
     }
     public static function seed(mysqli $db): array
     {

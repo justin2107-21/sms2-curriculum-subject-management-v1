@@ -76,7 +76,9 @@ function protectionInputs(array $f): array
         'subject'=>['subject_code'=>'Changed-'.$f['version'],'subject_title'=>'Changed','units'=>'4'],
         'program'=>['program_code'=>'Changed-'.$f['version'],'program_name'=>'Changed'],
         'curriculum'=>['curriculum_code'=>'Changed-'.$f['version'],'curriculum_name'=>'Changed','academic_program_id'=>$f['program']],
-        'reference'=>['reference_type'=>'OTHER','title'=>'Changed','issuing_body'=>'Synthetic','verification_status'=>'verified'],
+        // Source verification now requires an append-only confirmed identity-evidence event.
+        // This legacy mutation fixture only exercises editable metadata updates.
+        'reference'=>['reference_type'=>'OTHER','title'=>'Changed','issuing_body'=>'Synthetic','verification_status'=>'draft'],
         'rule'=>['compliance_reference_id'=>$f['reference'],'rule_name'=>'Changed','rule_type'=>'MIN_TOTAL_UNITS','numeric_value'=>'2','scope_type'=>'curriculum','scope_id'=>$f['curriculum'],'technical_status'=>'active'],
     ];
 }

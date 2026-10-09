@@ -17,6 +17,8 @@
         curricula: workspace.dataset.curriculumApi,
         versions: workspace.dataset.versionApi,
         assignments: workspace.dataset.assignmentApi
+        ,versionReferences: workspace.dataset.versionReferenceApi
+        ,compliance: workspace.dataset.complianceApi
     };
     const permissions = {
         viewPrograms: workspace.dataset.canViewPrograms === '1',
@@ -28,6 +30,8 @@
         createVersions: workspace.dataset.canCreateVersions === '1',
         assignSubjects: workspace.dataset.canAssignSubjects === '1',
         removeAssignments: workspace.dataset.canRemoveAssignments === '1'
+        ,attachReferences: workspace.dataset.canAttachReferences === '1'
+        ,classifyReference: workspace.dataset.canClassifyReference === '1'
     };
     const columns = {
         programs: permissions.updatePrograms ? 6 : 5,
@@ -899,8 +903,115 @@
         document.getElementById('workspaceCurriculumCode').href = 'curricula.php?program_id=' + programId + '&curriculum_id=' + curriculumId;
         const exportLink = document.getElementById('versionExportLink');
         if (exportLink) exportLink.href = 'curriculum_export.php';
+        await loadReferenceWorkspace(id);
         await loadPlacements();
     }
+
+    function sourceKindLabel(kind) {
+        return ({regulatory_document:'Regulatory document', ched_sample_curriculum:'CHED sample curriculum',
+            institutional_curriculum:'Institution-provided curriculum', institutional_policy:'Institutional policy',
+            supporting_document:'Supporting document', other_document:'Other documented source', unknown:'Unknown source kind'})[kind] || 'Unknown source kind';
+    }
+
+    async function loadReferenceWorkspace(versionId) {
+        const formAttach = document.getElementById('attachVersionReferenceForm');
+        const formClassify = document.getElementById('classifyReferenceForm');
+        try {
+            const payload = await ui.fetchJson(endpoints.versionReferences, {
+                action:'workspace', curriculum_version_id:versionId
+            });
+            const record = payload.workspace;
+            document.getElementById('referenceProgram').textContent = record.program_code + ' — ' + record.program_name;
+            document.getElementById('referenceCurriculumVersion').textContent = record.curriculum_code + ' — ' + record.curriculum_name + ' / ' + record.version_label;
+            document.getElementById('referenceVersionRole').textContent = record.version_role;
+            document.getElementById('referenceReviewStatus').textContent = record.review_status + ' (workflow state; not proof of adoption)';
+            document.getElementById('referenceBaseline').textContent = record.baseline_version_id
+                ? record.baseline_version_label + ' (' + record.baseline_version_role + ')' : 'None';
+            const summary = record.snapshot_summary;
+            document.getElementById('referenceSnapshotStatus').textContent = summary.placements > 0 && summary.complete_snapshots === summary.placements
+                ? summary.complete_snapshots + '/' + summary.placements + ' complete; captured ' + (summary.last_capture || 'date unavailable')
+                : summary.complete_snapshots + '/' + summary.placements + ' complete; Historical subject details unavailable';
+            const primary = record.references.find(item => item.reference_purpose === 'school_curriculum');
+            const originResult = primary?.evidence_events.find(item => item.verification_subject === 'declared_origin')?.result || 'not assessed';
+            document.getElementById('referenceBasis').textContent = primary
+                ? sourceKindLabel(primary.source_kind_snapshot) + (primary.source_kind_snapshot === 'institutional_curriculum' ? ' · declared-origin assessment: ' + originResult : '')
+                : 'Unknown / no curriculum source attached';
+            document.getElementById('referenceVersionContext').textContent = 'Technical status: ' + record.status + ' · Review status is a workflow state only.';
+            document.getElementById('referenceProtectionBadge').innerHTML = record.editable
+                ? ui.statusBadge('editable') : ui.statusBadge('protected');
+            const body = document.getElementById('versionReferenceRows');
+            body.innerHTML = record.references.length ? record.references.map(function (item) {
+                const sourceName = item.reference_code_snapshot || item.reference_title_snapshot || ('Source #' + item.compliance_reference_id);
+                const title = item.reference_title_snapshot || 'Title unavailable at attachment';
+                const locator = item.reference_url_snapshot
+                    ? '<a href="' + ui.escapeHtml(item.reference_url_snapshot) + '" target="_blank" rel="noopener noreferrer">Open attached locator</a>'
+                    : 'No locator captured';
+                const latest = {};
+                item.evidence_events.forEach(e => { if (!latest[e.verification_subject]) latest[e.verification_subject] = e.result; });
+                const assess = ['document_identity','declared_origin','applicability'].map(key => key.replaceAll('_',' ') + ': ' + (latest[key] || 'not assessed')).join(' · ');
+                const currentWarning = item.verification_status === 'inactive' ? ' · CURRENT SOURCE INACTIVE/WITHDRAWN' : '';
+                return '<tr><td><strong>' + ui.escapeHtml(sourceName) + '</strong><span class="compliance-subtext">' + ui.escapeHtml(title) + ' · ' + ui.escapeHtml(item.issuing_body_snapshot || 'Issuer unavailable at attachment') + '<br>' + locator + '</span></td>' +
+                    '<td>' + ui.escapeHtml(item.reference_purpose) + '</td><td>' + ui.escapeHtml(sourceKindLabel(item.source_kind_snapshot)) + '<span class="compliance-subtext">' + ui.escapeHtml(assess) + currentWarning + '</span></td>' +
+                    '<td>' + ui.escapeHtml(item.linked_by_username || 'Unknown user') + '<span class="compliance-subtext">' + ui.escapeHtml(item.linked_at) + '</span></td></tr>';
+            }).join('') : '<tr><td colspan="4" class="empty-cell">No documentary references are attached.</td></tr>';
+            document.querySelectorAll('#attachVersionReferenceForm [name="curriculum_version_id"],#classifyReferenceForm [name="curriculum_version_id"]').forEach(el => { el.value = record.id; });
+            const eligible = record.version_role === 'unclassified' && record.review_status === 'not_started' && !record.baseline_version_id;
+            const attachDetails = formAttach?.closest('details');
+            const classifyDetails = document.getElementById('classifyReferenceDetails');
+            if (attachDetails) attachDetails.hidden = !eligible;
+            if (classifyDetails) classifyDetails.hidden = !eligible;
+            const choices = record.references.filter(item => item.reference_purpose === 'school_curriculum');
+            if (formClassify) {
+                const select = formClassify.querySelector('[name="compliance_reference_id"]');
+                select.innerHTML = choices.length ? choices.map(item => '<option value="' + Number(item.compliance_reference_id) + '">' + ui.escapeHtml((item.reference_code_snapshot || item.reference_title_snapshot || 'Source') + ' · ' + sourceKindLabel(item.source_kind_snapshot)) + '</option>').join('') : '<option value="">Attach a curriculum source first</option>';
+                select.disabled = !choices.length;
+                if (choices.length) select.value = choices[0].compliance_reference_id;
+            }
+            if (formAttach) await populateReferenceChoices(formAttach.querySelector('[name="compliance_reference_id"]'));
+        } catch (error) {
+            document.getElementById('referenceVersionContext').textContent = error.message || 'Reference details could not be loaded.';
+            ui.showToast(error.message, 'error');
+        }
+    }
+
+    async function populateReferenceChoices(select) {
+        if (!select) return;
+        try {
+            const payload = await ui.fetchJson(endpoints.compliance, {action:'reference_list',page:1,per_page:50,search:''});
+            const available = payload.references.filter(item => item.verification_status !== 'inactive');
+            select.innerHTML = available.length ? '<option value="">Select a source</option>' + available.map(item =>
+                '<option value="' + Number(item.id) + '">' + ui.escapeHtml((item.reference_code || item.title || 'Reference') + ' — ' + sourceKindLabel(item.source_kind) + ' — ' + item.issuing_body) + '</option>').join('')
+                : '<option value="">No available source records</option>';
+        } catch (error) { select.innerHTML = '<option value="">Source records unavailable</option>'; }
+    }
+
+    document.getElementById('attachVersionReferenceForm')?.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        const form = event.currentTarget;
+        if (!form.reportValidity()) return;
+        const data = new FormData(form); data.set('action','attach');
+        ui.setFormSubmitting(form,true,'Attaching...');
+        try {
+            const payload = await ui.postForm(endpoints.versionReferences,data);
+            form.reset(); ui.showToast(payload.message,'success');
+            await loadReferenceWorkspace(state.selectedVersionId);
+        } catch(error) { ui.showFormError(form,error.message); }
+        finally { ui.setFormSubmitting(form,false); }
+    });
+    document.getElementById('classifyReferenceForm')?.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        const form = event.currentTarget;
+        if (!form.reportValidity()) return;
+        const data = new FormData(form); data.set('action','classify_reference');
+        ui.setFormSubmitting(form,true,'Capturing and protecting...');
+        try {
+            const payload = await ui.postForm(endpoints.versionReferences,data);
+            ui.showToast(payload.message,'success');
+            await loadReferenceWorkspace(state.selectedVersionId);
+            await loadVersions(state.versionPage,state.selectedVersionId,false);
+        } catch(error) { ui.showFormError(form,error.message); }
+        finally { ui.setFormSubmitting(form,false); }
+    });
 
     async function loadCurriculumProgramFilter() {
         const filter = document.getElementById('curriculumProgramFilter');

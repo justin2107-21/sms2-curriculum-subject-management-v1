@@ -19,6 +19,7 @@ $student = new FoundationHttpClient($base);
 $owned = [];
 $checks = 0;
 $beforeCounts = [];
+$temporaryTask3PermissionGrants = [];
 foreach ($conn->query('SHOW TABLES')->fetch_all(MYSQLI_NUM) as [$table]) {
     $beforeCounts[$table] = (int)$conn->query("SELECT COUNT(*) FROM `$table`")->fetch_row()[0];
 }
@@ -45,7 +46,7 @@ function foundationAcademicRows(): string
 {
     global $conn;
     $rows=[];
-    foreach (['academic_programs','curricula','curriculum_versions','subjects','curriculum_version_subjects','curriculum_subject_requirements','curriculum_elective_groups','curriculum_elective_group_subjects','program_subject_assignments','subject_equivalencies','grade_weighting_schemes','grade_weighting_components','compliance_references','compliance_rules','compliance_validation_runs','compliance_validation_results','curriculum_version_subject_snapshots'] as $table) {
+    foreach (['academic_programs','curricula','curriculum_versions','subjects','curriculum_version_subjects','curriculum_subject_requirements','curriculum_elective_groups','curriculum_elective_group_subjects','program_subject_assignments','subject_equivalencies','grade_weighting_schemes','grade_weighting_components','compliance_references','compliance_reference_evidence_events','compliance_rules','compliance_validation_runs','compliance_validation_results','curriculum_version_subject_snapshots'] as $table) {
         $items=array_map('json_encode',$conn->query("SELECT * FROM `$table`")->fetch_all(MYSQLI_ASSOC));sort($items);$rows[$table]=$items;
     }
     return hash('sha256',json_encode($rows));
@@ -125,6 +126,12 @@ try {
     expect($admin->request('shared/auth_actions.php', ['action' => 'login', 'username' => getenv('SMS_TEST_ADMIN_USER') ?: 'admin', 'password' => $password], 'POST'), 200, 'Admin login');
     expect($admin->request('dashboard/dashboard.php'), 200, 'Admin dashboard');
     expect($admin->request('dashboard/account.php'), 200, 'Account / refreshed CSRF');
+    // Verification is deliberately not default-granted; this disposable test actor receives an explicit temporary grant.
+    $adminUser=(int)$conn->query("SELECT id FROM users WHERE username='".$conn->real_escape_string(getenv('SMS_TEST_ADMIN_USER') ?: 'admin')."'")->fetch_row()[0];
+    $priorGrants=[];foreach($conn->query("SELECT ur.role_id,p.id AS permission_id FROM user_roles ur JOIN role_permissions rp ON rp.role_id=ur.role_id JOIN permissions p ON p.id=rp.permission_id AND p.name='compliance.reference.verify' WHERE ur.user_id=$adminUser")->fetch_all(MYSQLI_ASSOC) as $grant){$priorGrants[(int)$grant['role_id'].':'.(int)$grant['permission_id']]=true;}
+    $grantStmt=$conn->prepare("INSERT IGNORE INTO role_permissions(role_id,permission_id) SELECT ur.role_id,p.id FROM user_roles ur JOIN permissions p ON p.name='compliance.reference.verify' WHERE ur.user_id=?");
+    $grantStmt->bind_param('i',$adminUser);$grantStmt->execute();$grantStmt->close();
+    foreach($conn->query("SELECT ur.role_id,p.id AS permission_id FROM user_roles ur JOIN permissions p ON p.name='compliance.reference.verify' WHERE ur.user_id=$adminUser")->fetch_all(MYSQLI_ASSOC) as $grant){$key=(int)$grant['role_id'].':'.(int)$grant['permission_id'];if(!isset($priorGrants[$key]))$temporaryTask3PermissionGrants[]=[(int)$grant['role_id'],(int)$grant['permission_id']];}
     $pages = ['academic_programs','curricula','subjects','subject_mapping','prerequisite_configuration','electives_manager',
         'program_centric_assignment','subject_centric_assignment','subject_history_view','curriculum_history_view',
         'subject_comparison','equivalency_records','grade_weighting_setup','validate_curriculum','compliance_rules',
@@ -419,6 +426,8 @@ try {
     mutate('compliance','rule_update',['id'=>$rules[0]['id']]+$ruleInputs[0],200,'COMPLIANCE_RULE_UPDATE');
     $run=mutate('compliance','validation_run',['curriculum_version_id'=>$v['id']],200);
     check($run['run']===null,'Draft references excluded');
+    mutate('compliance','reference_evidence',['id'=>$reference['id'],'verification_subject'=>'document_identity','result'=>'confirmed','evidence_locator'=>'synthetic-fixture://document-identity','rationale'=>'Synthetic regression evidence; not an official source verification.'],201,'COMPLIANCE_REFERENCE_EVIDENCE');
+    foreach($conn->query('SELECT id FROM compliance_reference_evidence_events WHERE compliance_reference_id='.(int)$reference['id'])->fetch_all(MYSQLI_ASSOC) as $event){own('compliance_reference_evidence_events',$event);}
     mutate('compliance','reference_update',['id'=>$reference['id']]+array_replace($referenceData,['verification_status'=>'verified']),200,'COMPLIANCE_REFERENCE_UPDATE');
     $run=mutate('compliance','validation_run',['curriculum_version_id'=>$v['id']],201,'COMPLIANCE_VALIDATION_RUN');
     check($run['summary']['passed']===3 && $run['summary']['failed']===1 && $run['summary']['not_evaluated']===1,'All five deterministic rule types PASS / FAIL / NOT_EVALUATED');
@@ -521,11 +530,12 @@ try {
         if ($client->csrf !== '') { $client->request('shared/auth_actions.php', ['action' => 'logout'], 'POST'); }
     }
     // Exact IDs captured from this process only. FK checks remain enabled.
-    $order = ['compliance_validation_results','compliance_validation_runs','compliance_rules','compliance_references',
+    $order = ['compliance_validation_results','compliance_validation_runs','compliance_rules','compliance_reference_evidence_events','compliance_references',
         'grade_weighting_components','grade_weighting_schemes','subject_equivalencies',
         'curriculum_elective_group_subjects','curriculum_elective_groups','curriculum_subject_requirements',
         'program_subject_assignments','curriculum_version_subjects','curriculum_versions','curricula','subjects','academic_programs','users'];
     try {
+        foreach($temporaryTask3PermissionGrants as [$roleId,$permissionId]){$stmt=$conn->prepare('DELETE FROM role_permissions WHERE role_id=? AND permission_id=?');$stmt->bind_param('ii',$roleId,$permissionId);$stmt->execute();$stmt->close();}
         $conn->begin_transaction();
         foreach ($order as $table) {
             foreach ($owned[$table] ?? [] as $id) {

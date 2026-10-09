@@ -94,7 +94,10 @@
     }
     function historyRow(row, index) {
         state.historyRows.set(String(index), row);
-        return '<tr><td><span class="history-subject-context"><strong>' + esc(row.subject_code) + '</strong><span>' + esc(row.subject_title) + '</span></span></td>' +
+        const historicalSubject = Number(row.snapshot_complete) === 1
+            ? '<strong>' + esc(row.subject_code) + '</strong><span>' + esc(row.subject_title) + '</span><small>Captured snapshot · ' + esc(row.snapshot_captured_at || 'capture date unavailable') + '</small>'
+            : '<strong>Historical subject details unavailable</strong><span>Current Subject Master: ' + esc(row.current_subject_code || '') + ' · ' + esc(row.current_subject_title || '') + '</span>';
+        return '<tr><td><span class="history-subject-context">' + historicalSubject + '</span></td>' +
             '<td><span class="history-code">' + esc(row.program_code) + '</span></td>' +
             '<td><span class="history-curriculum-context"><strong>' + esc(row.curriculum_code) + '</strong><span>' + esc(row.version_label) + '</span></span></td>' +
             '<td>' + esc([row.year_level, row.semester].filter(Boolean).join(' · ') || '—') + '</td><td>' + ui.statusBadge(row.version_status) + '</td>' +
@@ -170,7 +173,10 @@
     function changeName(type) { return ({ added: 'Added', removed: 'Removed', moved: 'Moved', placement_type_changed: 'Placement Type Changed', unchanged: 'Unchanged' })[type] || type; }
     function comparisonRow(record, i) {
         state.compareRows.set(String(i), record);
-        return '<tr><td><span class="history-subject-context"><strong>' + esc(record.subject_code) + '</strong><span>' + esc(record.subject_title) + '</span></span></td>' +
+        const historicalSubject = record.subject_code
+            ? '<strong>' + esc(record.subject_code) + '</strong><span>' + esc(record.subject_title) + '</span><small>Snapshot-backed details where captured</small>'
+            : '<strong>Historical subject details unavailable</strong><span>No complete snapshot exists for either version.</span>';
+        return '<tr><td><span class="history-subject-context">' + historicalSubject + '</span></td>' +
             '<td><span class="history-change-badge history-change-' + esc(record.change_type) + '">' + esc(changeName(record.change_type)) + '</span></td>' +
             '<td>' + esc(placement(record, 'version_a')) + '</td><td>' + esc(placement(record, 'version_b')) + '</td>' +
             '<td><button type="button" class="row-action-button" data-change-details="' + i + '">View Details</button></td></tr>';
@@ -189,7 +195,9 @@
         if (request !== state.comparisonRequest) return;
         state.comparison = data; state.compareRows.clear(); ui.setCount($('comparisonCount'), Number(data.pagination.total_records));
         const s = data.summary, changes = Number(s.added) + Number(s.removed) + Number(s.moved) + Number(s.placement_type_changed);
-        $('comparisonSummary').textContent = 'Version A: ' + s.version_a_subjects + ' subjects · ' + ui.formatUnits(s.version_a_units) + ' units   |   Version B: ' + s.version_b_subjects + ' subjects · ' + ui.formatUnits(s.version_b_units) + ' units   |   Changes: ' + s.added + ' Added · ' + s.removed + ' Removed · ' + s.moved + ' Moved' + (s.placement_type_changed ? ' · ' + s.placement_type_changed + ' Placement Type Changed' : '');
+        const unitsA = s.version_a_units === null ? 'unavailable without complete snapshots' : ui.formatUnits(s.version_a_units) + ' units';
+        const unitsB = s.version_b_units === null ? 'unavailable without complete snapshots' : ui.formatUnits(s.version_b_units) + ' units';
+        $('comparisonSummary').textContent = 'Version A: ' + s.version_a_subjects + ' subjects · ' + unitsA + '   |   Version B: ' + s.version_b_subjects + ' subjects · ' + unitsB + '   |   Changes: ' + s.added + ' Added · ' + s.removed + ' Removed · ' + s.moved + ' Moved' + (s.placement_type_changed ? ' · ' + s.placement_type_changed + ' Placement Type Changed' : '');
         $('historyCimfButton').disabled = false;
         if (!data.comparison.length || changes === 0) {
             $('comparisonEmpty').textContent = 'No subject placement differences were found between the selected stored versions.';
@@ -213,8 +221,9 @@
         const row = state.historyRows.get(String(index)); if (!row) return;
         try {
             const { record: r } = await ui.fetchJson(api, { action: 'details', placement_id: row.placement_id });
-            $('historyDetailsContext').textContent = r.subject_code + ' · ' + r.subject_title;
-            const entries = [['Subject', r.subject_code + ' — ' + r.subject_title], ['Program / Strand', r.program_code + ' — ' + r.program_name], ['Curriculum', r.curriculum_code + ' — ' + r.curriculum_name], ['Curriculum Version', r.version_label + ' · ' + r.version_status], ['Year Level', r.year_level || '—'], ['Semester / Term', r.semester || '—'], ['Placement Type', Number(r.is_required) === 1 ? 'Required' : 'Optional'], ['Stored Date', ui.formatDate(r.placement_created_at)], ['Units', ui.formatUnits(r.units)], ['Last Updated Date', ui.formatDate(r.placement_updated_at)], ['Program Type', r.program_type || '—']];
+            const subjectLabel = Number(r.snapshot_complete) === 1 ? r.subject_code + ' · ' + r.subject_title : 'Historical subject details unavailable';
+            $('historyDetailsContext').textContent = subjectLabel;
+            const entries = [['Historical subject', subjectLabel], ['Current Subject Master (present-day context)', (r.current_subject_code || '—') + ' — ' + (r.current_subject_title || '—')], ['Snapshot captured', Number(r.snapshot_complete) === 1 ? ui.formatDate(r.snapshot_captured_at) + ' · ' + (r.capture_method || '') : 'Unavailable'], ['Program / Strand', r.program_code + ' — ' + r.program_name], ['Curriculum', r.curriculum_code + ' — ' + r.curriculum_name], ['Curriculum Version', r.version_label + ' · ' + r.version_status], ['Year Level', r.year_level || '—'], ['Semester / Term', r.semester || '—'], ['Sequence', r.sequence_order ?? '—'], ['Placement Type', Number(r.is_required) === 1 ? 'Required' : 'Optional'], ['Stored Date', ui.formatDate(r.placement_created_at)], ['Captured units', Number(r.snapshot_complete) === 1 ? ui.formatUnits(r.units) : 'Unavailable'], ['Lecture units', Number(r.snapshot_complete) === 1 ? ui.formatUnits(r.lecture_units) : 'Unavailable'], ['Laboratory units', Number(r.snapshot_complete) === 1 ? ui.formatUnits(r.laboratory_units) : 'Unavailable'], ['Description', Number(r.snapshot_complete) === 1 ? (r.description || '—') : 'Unavailable'], ['Last Updated Date', ui.formatDate(r.placement_updated_at)], ['Program Type', r.program_type || '—']];
             $('historyDetailsBody').innerHTML = entries.map(([k,v]) => '<div><dt class="eyebrow">' + esc(k) + '</dt><dd>' + esc(v) + '</dd></div>').join('');
             $('historyMappingLink').href = 'subject_mapping.php?curriculum_version_id=' + Number(r.curriculum_version_id) + '&subject_id=' + Number(r.subject_id);
             detailsModal.open();
@@ -222,9 +231,12 @@
     }
     function showChangeDetails(index) {
         const r = state.compareRows.get(String(index)); if (!r || !state.comparison) return;
-        $('comparisonDetailsContext').textContent = r.subject_code + ' · ' + r.subject_title;
+        $('comparisonDetailsContext').textContent = r.subject_code ? r.subject_code + ' · ' + r.subject_title : 'Historical subject details unavailable';
         const a = placement(r, 'version_a'), b = placement(r, 'version_b');
-        $('comparisonDetailsVersions').innerHTML = '<article><span class="eyebrow">VERSION A</span><strong>' + esc(state.comparison.version_a.version_label) + '</strong><p>Record state: ' + esc(state.comparison.version_a.status) + '<br>' + esc(a) + (r.version_a_placement_id ? '<br>' + (Number(r.version_a_is_required) ? 'Required' : 'Optional') : '') + '</p></article><article><span class="eyebrow">VERSION B</span><strong>' + esc(state.comparison.version_b.version_label) + '</strong><p>Record state: ' + esc(state.comparison.version_b.status) + '<br>' + esc(b) + (r.version_b_placement_id ? '<br>' + (Number(r.version_b_is_required) ? 'Required' : 'Optional') : '') + '</p></article>';
+        const attrs = (prefix, present) => !present ? 'Not present' : (Number(r[prefix + '_snapshot_complete']) === 1
+            ? esc(r[prefix + '_subject_code']) + ' — ' + esc(r[prefix + '_subject_title']) + '<br>' + ui.formatUnits(r[prefix + '_units']) + ' units · captured ' + esc(r[prefix + '_snapshot_captured_at'] || 'date unavailable')
+            : 'Historical subject details unavailable');
+        $('comparisonDetailsVersions').innerHTML = '<article><span class="eyebrow">VERSION A</span><strong>' + esc(state.comparison.version_a.version_label) + '</strong><p>Record state: ' + esc(state.comparison.version_a.status) + '<br>' + esc(a) + (r.version_a_placement_id ? '<br>' + (Number(r.version_a_is_required) ? 'Required' : 'Optional') + '<br>' + attrs('version_a', true) : '') + '</p></article><article><span class="eyebrow">VERSION B</span><strong>' + esc(state.comparison.version_b.version_label) + '</strong><p>Record state: ' + esc(state.comparison.version_b.status) + '<br>' + esc(b) + (r.version_b_placement_id ? '<br>' + (Number(r.version_b_is_required) ? 'Required' : 'Optional') + '<br>' + attrs('version_b', true) : '') + '</p></article>';
         $('comparisonDetailsChange').innerHTML = '<span class="history-change-badge history-change-' + esc(r.change_type) + '">' + esc(changeName(r.change_type)) + '</span>';
         $('comparisonDetailsExplanation').textContent = explainChange(r); changeModal.open();
     }
