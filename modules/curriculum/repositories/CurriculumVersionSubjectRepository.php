@@ -8,9 +8,9 @@ class CurriculumVersionSubjectRepository
     {
     }
 
-    public function findById(int $id): ?array
+    public function findById(int $id, bool $forUpdate = false): ?array
     {
-        $stmt = $this->db->prepare('SELECT * FROM curriculum_version_subjects WHERE id = ? LIMIT 1');
+        $stmt = $this->db->prepare('SELECT * FROM curriculum_version_subjects WHERE id = ? LIMIT 1' . ($forUpdate ? ' FOR UPDATE' : ''));
         $stmt->bind_param('i', $id);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc() ?: null;
@@ -18,11 +18,11 @@ class CurriculumVersionSubjectRepository
         return $row;
     }
 
-    public function assignmentExists(int $versionId, int $subjectId): bool
+    public function assignmentExists(int $versionId, int $subjectId, bool $forUpdate = false): bool
     {
         $stmt = $this->db->prepare(
             'SELECT 1 FROM curriculum_version_subjects
-             WHERE curriculum_version_id = ? AND subject_id = ? LIMIT 1'
+             WHERE curriculum_version_id = ? AND subject_id = ? LIMIT 1' . ($forUpdate ? ' FOR UPDATE' : '')
         );
         $stmt->bind_param('ii', $versionId, $subjectId);
         $stmt->execute();

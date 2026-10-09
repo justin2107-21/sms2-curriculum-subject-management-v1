@@ -223,8 +223,13 @@ class GradeWeightingService
                     'A component with this name already exists in this weighting scheme.'
                 );
             }
+            $components = $this->weighting->allComponents($data['scheme_id'], true);
+            $existingHundredths = array_sum(array_map(
+                fn(array $component): int => $this->decimalToHundredths((string)$component['weight_percentage']),
+                $components
+            ));
             $this->assertProjectedTotal(
-                $this->weighting->sumComponentWeights($data['scheme_id']),
+                $this->formatHundredths($existingHundredths),
                 $data['weight_percentage']
             );
             $id = $this->weighting->createComponent($data, $actorId);
@@ -280,10 +285,14 @@ class GradeWeightingService
                     'A component with this name already exists in this weighting scheme.'
                 );
             }
-            $this->assertProjectedTotal(
-                $this->weighting->sumComponentWeights($schemeId, $id),
-                $data['weight_percentage']
-            );
+            $components = $this->weighting->allComponents($schemeId, true);
+            $existingHundredths = 0;
+            foreach ($components as $row) {
+                if ((int)$row['id'] !== $id) {
+                    $existingHundredths += $this->decimalToHundredths((string)$row['weight_percentage']);
+                }
+            }
+            $this->assertProjectedTotal($this->formatHundredths($existingHundredths), $data['weight_percentage']);
             $this->weighting->updateComponent($id, $data);
             audit_log_required(
                 'GRADE_WEIGHTING_COMPONENT_UPDATE',
@@ -370,7 +379,7 @@ class GradeWeightingService
                 throw new DomainValidationException('The selected subject is not mapped to this curriculum version.');
             }
 
-            $scheme = $this->weighting->findSchemeByPlacement($placementId);
+            $scheme = $this->weighting->findSchemeByPlacement($placementId, true);
             if (!$scheme) {
                 $schemeId = $this->weighting->createScheme([
                     'curriculum_version_subject_id' => $placementId,
@@ -386,7 +395,8 @@ class GradeWeightingService
                 $existing = [];
             } else {
                 $schemeId = (int)$scheme['id'];
-                if (!$this->weighting->findSchemeById($schemeId, true)) {
+                $scheme = $this->weighting->findSchemeById($schemeId, true);
+                if (!$scheme) {
                     throw new DomainNotFoundException('Grade weighting scheme not found.');
                 }
                 $existing = $this->weighting->allComponents($schemeId, true);

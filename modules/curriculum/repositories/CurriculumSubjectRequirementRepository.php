@@ -21,8 +21,21 @@ class CurriculumSubjectRequirementRepository
         return $row;
     }
 
-    public function allPrerequisites(int $versionId): array
+    public function allPrerequisites(int $versionId, bool $forUpdate = false): array
     {
+        if ($forUpdate) {
+            $stmt = RepositoryQuery::execute($this->db,
+                "SELECT * FROM curriculum_subject_requirements WHERE curriculum_version_id = ? AND requirement_type = 'prerequisite' ORDER BY id FOR UPDATE", 'i', [$versionId]);
+            $current = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+            $stmt->close();
+            $details = $this->allPrerequisites($versionId);
+            $byId = array_column($details, null, 'id');
+            foreach ($current as &$row) {
+                if (isset($byId[$row['id']])) $row = $row + $byId[$row['id']];
+            }
+            unset($row);
+            return $current;
+        }
         $stmt = RepositoryQuery::execute($this->db, $this->detailSelect() .
             " WHERE requirements.curriculum_version_id = ? AND requirements.requirement_type = 'prerequisite' ORDER BY requirements.id", 'i', [$versionId]);
         $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -30,8 +43,24 @@ class CurriculumSubjectRequirementRepository
         return $rows;
     }
 
-    public function allPlacements(int $versionId): array
+    public function allPlacements(int $versionId, bool $forUpdate = false): array
     {
+        if ($forUpdate) {
+            $stmt = RepositoryQuery::execute($this->db,
+                'SELECT * FROM curriculum_version_subjects WHERE curriculum_version_id = ? ORDER BY subject_id FOR UPDATE', 'i', [$versionId]);
+            $current = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+            $stmt->close();
+            $details = $this->allPlacements($versionId);
+            $bySubject = array_column($details, null, 'subject_id');
+            foreach ($current as &$row) {
+                if (isset($bySubject[$row['subject_id']])) {
+                    $row['subject_code'] = $bySubject[$row['subject_id']]['subject_code'];
+                    $row['subject_title'] = $bySubject[$row['subject_id']]['subject_title'];
+                }
+            }
+            unset($row);
+            return $current;
+        }
         $stmt = RepositoryQuery::execute($this->db,
             'SELECT p.*, s.subject_code, s.subject_title FROM curriculum_version_subjects p
              INNER JOIN subjects s ON s.id = p.subject_id WHERE p.curriculum_version_id = ? ORDER BY s.subject_code', 'i', [$versionId]);
@@ -44,7 +73,8 @@ class CurriculumSubjectRequirementRepository
         int $versionId,
         int $subjectId,
         int $requiredSubjectId,
-        string $type
+        string $type,
+        bool $forUpdate = false
     ): bool {
         $stmt = $this->db->prepare(
             'SELECT 1
@@ -53,7 +83,7 @@ class CurriculumSubjectRequirementRepository
                AND subject_id = ?
                AND required_subject_id = ?
                AND requirement_type = ?
-             LIMIT 1'
+             LIMIT 1' . ($forUpdate ? ' FOR UPDATE' : '')
         );
         $stmt->bind_param('iiis', $versionId, $subjectId, $requiredSubjectId, $type);
         $stmt->execute();
@@ -158,12 +188,12 @@ class CurriculumSubjectRequirementRepository
         return ['records' => $rows, 'pagination' => $pagination];
     }
 
-    public function prerequisiteEdges(int $versionId): array
+    public function prerequisiteEdges(int $versionId, bool $forUpdate = false): array
     {
         $stmt = $this->db->prepare(
             "SELECT subject_id, required_subject_id
              FROM curriculum_subject_requirements
-             WHERE curriculum_version_id = ? AND requirement_type = 'prerequisite'"
+             WHERE curriculum_version_id = ? AND requirement_type = 'prerequisite'" . ($forUpdate ? ' FOR UPDATE' : '')
         );
         $stmt->bind_param('i', $versionId);
         $stmt->execute();
@@ -172,14 +202,14 @@ class CurriculumSubjectRequirementRepository
         return $rows;
     }
 
-    public function placementHasRelationships(int $versionId, int $subjectId): bool
+    public function placementHasRelationships(int $versionId, int $subjectId, bool $forUpdate = false): bool
     {
         $stmt = $this->db->prepare(
             'SELECT 1
              FROM curriculum_subject_requirements
              WHERE curriculum_version_id = ?
-               AND (subject_id = ? OR required_subject_id = ?)
-             LIMIT 1'
+                AND (subject_id = ? OR required_subject_id = ?)
+             LIMIT 1' . ($forUpdate ? ' FOR UPDATE' : '')
         );
         $stmt->bind_param('iii', $versionId, $subjectId, $subjectId);
         $stmt->execute();

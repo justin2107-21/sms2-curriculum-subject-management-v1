@@ -48,9 +48,9 @@ class ElectivesWorkspaceRepository
         return $this->rows('SELECT * FROM curriculum_elective_groups WHERE id=? AND curriculum_version_id=? FOR UPDATE','ii',[$id,$version])[0] ?? null;
     }
 
-    public function memberIds(int $id): array
+    public function memberIds(int $id, bool $forUpdate = false): array
     {
-        return array_map('intval',array_column($this->rows('SELECT subject_id FROM curriculum_elective_group_subjects WHERE elective_group_id=?','i',[$id]),'subject_id'));
+        return array_map('intval',array_column($this->rows('SELECT subject_id FROM curriculum_elective_group_subjects WHERE elective_group_id=?' . ($forUpdate ? ' FOR UPDATE' : ''),'i',[$id]),'subject_id'));
     }
 
     public function hasPlacement(int $version, string $year, string $term): bool
@@ -58,9 +58,9 @@ class ElectivesWorkspaceRepository
         return (bool)$this->rows('SELECT id FROM curriculum_version_subjects WHERE curriculum_version_id=? AND year_level=? AND semester=? LIMIT 1', 'iss', [$version,$year,$term]);
     }
 
-    public function duplicateGroup(int $version, string $name, string $year, string $term, ?int $excludeId): bool
+    public function duplicateGroup(int $version, string $name, string $year, string $term, ?int $excludeId, bool $forUpdate = false): bool
     {
-        return (bool)$this->rows('SELECT id FROM curriculum_elective_groups WHERE curriculum_version_id=? AND LOWER(TRIM(group_name))=LOWER(TRIM(?)) AND year_level=? AND semester=? AND id<>? LIMIT 1', 'isssi', [$version,$name,$year,$term,$excludeId ?? 0]);
+        return (bool)$this->rows('SELECT id FROM curriculum_elective_groups WHERE curriculum_version_id=? AND LOWER(TRIM(group_name))=LOWER(TRIM(?)) AND year_level=? AND semester=? AND id<>? LIMIT 1' . ($forUpdate ? ' FOR UPDATE' : ''), 'isssi', [$version,$name,$year,$term,$excludeId ?? 0]);
     }
 
     public function saveGroup(?int $id, array $data, int $actor): int

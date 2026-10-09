@@ -124,8 +124,15 @@ class ElectivesWorkspaceService
                 if ($old['status'] === 'archived') throw new DomainConflictException('Restore this elective group from Settings > Archives before editing.');
             }
             $placements = $this->repo->placements($version,true);
-            if (!$this->repo->hasPlacement($version, $year, $term)) throw new DomainValidationException('The selected year / grade and semester / term do not have a current placement in this curriculum version.');
-            if ($this->repo->duplicateGroup($version, $name, $year, $term, $id)) throw new DomainConflictException('An identical elective group already exists in this version and placement.');
+            $hasPlacement = false;
+            foreach ($placements as $placement) {
+                if ($placement['year_level'] === $year && $placement['semester'] === $term) {
+                    $hasPlacement = true;
+                    break;
+                }
+            }
+            if (!$hasPlacement) throw new DomainValidationException('The selected year / grade and semester / term do not have a current placement in this curriculum version.');
+            if ($this->repo->duplicateGroup($version, $name, $year, $term, $id, true)) throw new DomainConflictException('An identical elective group already exists in this version and placement.');
             $bySubject = array_column($placements,null,'subject_id');
             foreach ($subjects as $subject) {
                 $p = $bySubject[$subject] ?? null;
@@ -134,7 +141,7 @@ class ElectivesWorkspaceService
                 if ($p['subject_status'] !== 'active') throw new DomainValidationException("{$p['subject_code']} is inactive. Remove it from the group or review Subject Master.");
             }
             // Requiring a matching stored placement also validates flexible College/SHS values.
-            $before = $id ? $this->repo->memberIds($id) : [];
+            $before = $id ? $this->repo->memberIds($id, true) : [];
             $id = $this->repo->saveGroup($id,['curriculum_version_id'=>$version,'group_name'=>$name,'year_level'=>$year,'semester'=>$term,'required_selections'=>$required,'status'=>$status],$actor);
             foreach (array_diff($before,$subjects) as $subject) {
                 $this->repo->removeMember($id,$subject);

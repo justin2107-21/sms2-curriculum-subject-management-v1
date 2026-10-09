@@ -1,4 +1,4 @@
-param([string]$MysqlBin='C:\xampp\mysql\bin',[string]$Php='C:\xampp\php\php.exe',[string]$Node='C:\Program Files\nodejs\node.exe')
+param([string]$MysqlBin='C:\xampp\mysql\bin',[string]$Php='C:\xampp\php\php.exe',[string]$Node='C:\Program Files\nodejs\node.exe',[string]$OnlyTest='')
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 $taskDir=Join-Path ([IO.Path]::GetTempPath()) ('csms-task2-'+[guid]::NewGuid().ToString('N'))
@@ -19,6 +19,8 @@ try {
     if(-not $ready){throw 'BLOCKED: disposable server not ready'}
     $utf8=[Text.UTF8Encoding]::new($false)
     [IO.File]::WriteAllText((Join-Path $taskDir 'state.json'),(@{port=$taskPort;password=$taskPassword;root=$root}|ConvertTo-Json),$utf8)
+    $env:CSMS_TASK2_TEMP_ROOT=$taskDir
+    if($OnlyTest){$env:CSMS_TASK2_ISOLATED_ONLY=$OnlyTest}
     $script=@'
 <?php
 $s=json_decode(file_get_contents(__DIR__.'/state.json'),true);
@@ -34,7 +36,10 @@ function cli(array $args): int {
     $p=proc_open(array_merge([PHP_BINARY],$args),[0=>['pipe','r'],1=>['pipe','w'],2=>['pipe','w']],$pipes,$s['root'],null,['bypass_shell'=>true,'create_new_console'=>false]);
     fclose($pipes[0]);$out=stream_get_contents($pipes[1]);$err=stream_get_contents($pipes[2]);fclose($pipes[1]);fclose($pipes[2]);$code=proc_close($p);echo $out.$err;return $code;
 }
-$tests=['deployment_migrations.php','curriculum_lifecycle_schema.php','version-protection.php','version-protection-http.php','prerequisite-service.php','electives-service.php','subject-mapping-http.php','electives-http.php','archives-http.php','academic-sequence.php','search-ranking.php','academic_fk_compatibility.php','legacy-fk','prerequisite-http.php','cimf.php','electives-foundation'];
+$tests=['deployment_migrations.php','curriculum_lifecycle_schema.php','version-protection.php','version-protection-http.php','curriculum-concurrency.php','prerequisite-service.php','electives-service.php','subject-mapping-http.php','electives-http.php','archives-http.php','academic-sequence.php','search-ranking.php','academic_fk_compatibility.php','legacy-fk','prerequisite-http.php','cimf.php','electives-foundation'];
+$only=getenv('CSMS_TASK2_ISOLATED_ONLY') ?: '';
+if($only!=='' && !in_array($only,$tests,true))throw new RuntimeException('Requested isolated test is not in the approved suite.');
+if($only!=='')$tests=[$only];
 $failed=[];
 foreach($tests as $i=>$file){
     $name='csms_docker_test_task2_run_'.$i.'_'.bin2hex(random_bytes(4));

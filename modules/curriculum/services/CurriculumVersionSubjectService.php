@@ -92,11 +92,12 @@ class CurriculumVersionSubjectService
             }
             if ($this->assignments->assignmentExists(
                 $data['curriculum_version_id'],
-                $data['subject_id']
+                $data['subject_id'],
+                true
             )) {
                 throw new DomainConflictException('This subject is already placed in this curriculum version. Use Edit Placement to change its placement.');
             }
-            $validation = $this->placementSequence($data);
+            $validation = $this->placementSequence($data, true);
             if (!$validation['valid']) throw new AcademicSequenceException($validation);
             $id = $this->assignments->create($data, $createdBy);
             audit_log_required(
@@ -126,17 +127,16 @@ class CurriculumVersionSubjectService
     public function updatePlacement(int $id, array $input, bool $placementOnly = false): array
     {
         $data = DomainValidator::curriculumVersionSubjectPlacement($input);
-        $initial = $this->assignments->findById($id);
-        if (!$initial) throw new DomainNotFoundException('Subject mapping not found.');
         $this->db->begin_transaction();
         try {
-            (new CurriculumVersionEditPolicy($this->db))->assertChildEditable('placement', $id);
-            $this->requirements->lockVersion((int)$initial['curriculum_version_id']);
-            $assignment = $this->assignments->findById($id);
+            $version = (int)(new CurriculumVersionEditPolicy($this->db))->assertChildEditable('placement', $id)['id'];
+            if (!$this->requirements->lockVersion($version)) throw new DomainNotFoundException('Subject mapping not found.');
+            $assignment = $this->assignments->findById($id, true);
             if (!$assignment) {
                 throw new DomainNotFoundException('Subject mapping not found.');
             }
-            $validation = $this->placementSequence(array_replace($assignment, $data));
+            if ((int)$assignment['curriculum_version_id'] !== $version) throw new DomainConflictException('Academic context changed. Reload before editing.');
+            $validation = $this->placementSequence(array_replace($assignment, $data), true);
             if (!$validation['valid']) throw new AcademicSequenceException($validation);
             if ($placementOnly) {
                 $data['sequence_order'] = $assignment['sequence_order'];
@@ -180,31 +180,30 @@ class CurriculumVersionSubjectService
         return $this->placementSequence(array_replace($assignment, $data));
     }
 
-    private function placementSequence(array $proposed): array
+    private function placementSequence(array $proposed, bool $forUpdate = false): array
     {
         $version = (int)$proposed['curriculum_version_id'];
-        $placements = array_values(array_filter($this->requirements->allPlacements($version), fn($p) => (int)$p['subject_id'] !== (int)$proposed['subject_id']));
+        $placements = array_values(array_filter($this->requirements->allPlacements($version, $forUpdate), fn($p) => (int)$p['subject_id'] !== (int)$proposed['subject_id']));
         $subject = $this->subjects->findById((int)$proposed['subject_id']);
         $placements[] = array_replace($subject ?? [], $proposed);
-        return AcademicSequenceValidator::validate($placements, $this->requirements->allPrerequisites($version), (int)$proposed['subject_id']) + ['curriculum_version_id' => $version];
+        return AcademicSequenceValidator::validate($placements, $this->requirements->allPrerequisites($version, $forUpdate), (int)$proposed['subject_id']) + ['curriculum_version_id' => $version];
     }
 
     public function remove(int $id): void
     {
-        $initial = $this->assignments->findById($id);
-        if (!$initial) throw new DomainNotFoundException('Subject mapping not found.');
         $this->db->begin_transaction();
         try {
-            (new CurriculumVersionEditPolicy($this->db))->assertChildEditable('placement', $id);
-            $this->requirements->lockVersion((int)$initial['curriculum_version_id']);
-            $assignment = $this->assignments->findById($id);
+            $version = (int)(new CurriculumVersionEditPolicy($this->db))->assertChildEditable('placement', $id)['id'];
+            if (!$this->requirements->lockVersion($version)) throw new DomainNotFoundException('Subject mapping not found.');
+            $assignment = $this->assignments->findById($id, true);
             if (!$assignment) {
                 throw new DomainNotFoundException('Curriculum subject assignment not found.');
             }
-            $this->requirements->lockVersion((int)$assignment['curriculum_version_id']);
+            if ((int)$assignment['curriculum_version_id'] !== $version) throw new DomainConflictException('Academic context changed. Reload before editing.');
             if ($this->requirements->placementHasRelationships(
                 (int)$assignment['curriculum_version_id'],
-                (int)$assignment['subject_id']
+                (int)$assignment['subject_id'],
+                true
             )) {
                 throw new DomainConflictException(
                     'Remove this subject\'s prerequisite or corequisite relationships before removing its curriculum placement.'
@@ -212,13 +211,14 @@ class CurriculumVersionSubjectService
             }
             if ($this->electiveMemberships->placementHasMemberships(
                 (int)$assignment['curriculum_version_id'],
-                (int)$assignment['subject_id']
+                (int)$assignment['subject_id'],
+                true
             )) {
                 throw new DomainConflictException(
                     'Remove this subject from all elective groups before removing its curriculum placement.'
                 );
             }
-            if ($this->gradeWeighting->placementHasScheme($id)) {
+            if ($this->gradeWeighting->placementHasScheme($id, true)) {
                 throw new DomainConflictException(
                     'Remove the grade weighting configuration before removing this curriculum placement.'
                 );

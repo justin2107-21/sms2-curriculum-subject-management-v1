@@ -57,7 +57,8 @@ class CurriculumSubjectRequirementService
             }
             if (!$this->placements->assignmentExists(
                 $data['curriculum_version_id'],
-                $data['subject_id']
+                $data['subject_id'],
+                true
             )) {
                 throw new DomainValidationException(
                     'The selected subject is not mapped to this curriculum version.'
@@ -65,7 +66,8 @@ class CurriculumSubjectRequirementService
             }
             if (!$this->placements->assignmentExists(
                 $data['curriculum_version_id'],
-                $data['required_subject_id']
+                $data['required_subject_id'],
+                true
             )) {
                 throw new DomainValidationException(
                     'The selected required subject is not mapped to this curriculum version.'
@@ -75,7 +77,8 @@ class CurriculumSubjectRequirementService
                 $data['curriculum_version_id'],
                 $data['subject_id'],
                 $data['required_subject_id'],
-                $data['requirement_type']
+                $data['requirement_type'],
+                true
             )) {
                 throw new DomainConflictException(
                     'This prerequisite relationship already exists.'
@@ -83,7 +86,7 @@ class CurriculumSubjectRequirementService
             }
             if ($data['requirement_type'] === 'prerequisite'
                 && $this->wouldCreatePrerequisiteCycle(
-                    $this->requirements->prerequisiteEdges($data['curriculum_version_id']),
+                    $this->requirements->prerequisiteEdges($data['curriculum_version_id'], true),
                     $data['subject_id'],
                     $data['required_subject_id']
                 )) {
@@ -93,7 +96,7 @@ class CurriculumSubjectRequirementService
             }
 
             if ($data['requirement_type'] === 'prerequisite') {
-                $this->validatePlacements($data['curriculum_version_id'], $data['subject_id'], [$data['required_subject_id']], $input);
+                $this->validatePlacements($data['curriculum_version_id'], $data['subject_id'], [$data['required_subject_id']], $input, true);
             }
             $id = $this->requirements->create($data, $createdBy);
             audit_log_required(
@@ -160,11 +163,11 @@ class CurriculumSubjectRequirementService
         }
     }
 
-    public function workspace(int $versionId): array
+    public function workspace(int $versionId, bool $forUpdate = false): array
     {
         if (!$this->requirements->versionExists($versionId)) throw new DomainNotFoundException('Curriculum version not found.');
-        $placements = $this->requirements->allPlacements($versionId);
-        $edges = $this->requirements->allPrerequisites($versionId);
+        $placements = $this->requirements->allPlacements($versionId, $forUpdate);
+        $edges = $this->requirements->allPrerequisites($versionId, $forUpdate);
         return ['placements' => $placements, 'relationships' => $edges,
             'review' => PrerequisiteGraph::review($placements, $edges)];
     }
@@ -176,10 +179,10 @@ class CurriculumSubjectRequirementService
             array_map(fn($id) => ['subject_id' => $target, 'required_subject_id' => DomainValidator::positiveId($id, 'Required subject')], $required));
     }
 
-    private function validatePlacements(int $version, int $target, array $required, array $input): void
+    private function validatePlacements(int $version, int $target, array $required, array $input, bool $forUpdate = false): void
     {
         $map = [];
-        foreach ($this->requirements->allPlacements($version) as $p) $map[(int)$p['subject_id']] = $p;
+        foreach ($this->requirements->allPlacements($version, $forUpdate) as $p) $map[(int)$p['subject_id']] = $p;
         foreach (array_merge([$target], $required) as $id) {
             if (!isset($map[$id])) throw new DomainValidationException('Only subjects mapped to this curriculum version are allowed.');
         }
@@ -202,7 +205,7 @@ class CurriculumSubjectRequirementService
         try {
             (new CurriculumVersionEditPolicy($this->db))->assertEditable($version);
             if (!$this->requirements->lockVersion($version)) throw new DomainNotFoundException('Curriculum version not found.');
-            $old = $this->requirements->allPrerequisites($version);
+            $old = $this->requirements->allPrerequisites($version, true);
             $current = array_values(array_filter($old, fn($e) => (int)$e['subject_id'] === $target));
             $actual = array_map(fn($e) => (int)$e['id'], $current); sort($actual);
             $expected = array_map('intval', $input['expected_ids'] ?? []); sort($expected);
@@ -211,12 +214,14 @@ class CurriculumSubjectRequirementService
             foreach ($ids as $id) {
                 if ($this->wouldCreatePrerequisiteCycle($others, $target, $id)) throw new DomainValidationException('This relationship would create a circular prerequisite chain.');
             }
-            $this->validatePlacements($version, $target, $ids, $input);
+            $this->validatePlacements($version, $target, $ids, $input, true);
             $kept = [];
             foreach ($current as $edge) {
                 $id = (int)$edge['required_subject_id'];
                 if (!in_array($id, $ids, true) || isset($kept[$id])) {
-                    $this->requirements->delete((int)$edge['id']);
+                    if (!$this->requirements->delete((int)$edge['id'])) {
+                        throw new DomainConflictException('This rule changed. Close this dialog and reload before editing.');
+                    }
                     audit_log_required('SUBJECT_REQUIREMENT_REMOVE', 'curriculum_subject_requirement', (int)$edge['id'], 'Prerequisite relationship removed.',
                         ['event' => 'prerequisite.removed', 'version_id' => $version, 'target_subject_id' => $target, 'required_subject_id' => $id]);
                 } else $kept[$id] = true;
@@ -229,7 +234,7 @@ class CurriculumSubjectRequirementService
             }
             audit_log_required('SUBJECT_REQUIREMENT_UPDATE', 'curriculum_subject_requirement', null, 'Target prerequisite rule updated.',
                 ['event' => 'prerequisite.updated', 'version_id' => $version, 'target_subject_id' => $target, 'required_subject_ids' => $ids]);
-            $result = $this->workspace($version);
+            $result = $this->workspace($version, true);
             $this->db->commit();
             return $result;
         } catch (Throwable $error) { $this->db->rollback(); throw $error; }

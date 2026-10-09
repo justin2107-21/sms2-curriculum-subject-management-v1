@@ -20,12 +20,12 @@ class GradeWeightingRepository
         return $row;
     }
 
-    public function findSchemeByPlacement(int $placementId): ?array
+    public function findSchemeByPlacement(int $placementId, bool $forUpdate = false): ?array
     {
         $stmt = RepositoryQuery::execute(
             $this->db,
             $this->schemeDetailSelect() .
-            ' WHERE schemes.curriculum_version_subject_id = ? LIMIT 1',
+            ' WHERE schemes.curriculum_version_subject_id = ? LIMIT 1' . ($forUpdate ? ' FOR UPDATE' : ''),
             'i',
             [$placementId]
         );
@@ -47,12 +47,12 @@ class GradeWeightingRepository
         return $row;
     }
 
-    public function placementHasScheme(int $placementId): bool
+    public function placementHasScheme(int $placementId, bool $forUpdate = false): bool
     {
         $stmt = RepositoryQuery::execute(
             $this->db,
             'SELECT 1 FROM grade_weighting_schemes
-             WHERE curriculum_version_subject_id = ? LIMIT 1',
+              WHERE curriculum_version_subject_id = ? LIMIT 1' . ($forUpdate ? ' FOR UPDATE' : ''),
             'i',
             [$placementId]
         );

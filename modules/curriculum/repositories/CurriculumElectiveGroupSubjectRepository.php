@@ -52,11 +52,11 @@ class CurriculumElectiveGroupSubjectRepository
         return $exists;
     }
 
-    public function placementHasMemberships(int $versionId, int $subjectId): bool
+    public function placementHasMemberships(int $versionId, int $subjectId, bool $forUpdate = false): bool
     {
         $stmt = $this->db->prepare(
             'SELECT 1 FROM curriculum_elective_group_subjects
-             WHERE curriculum_version_id = ? AND subject_id = ? LIMIT 1'
+             WHERE curriculum_version_id = ? AND subject_id = ? LIMIT 1' . ($forUpdate ? ' FOR UPDATE' : '')
         );
         $stmt->bind_param('ii', $versionId, $subjectId);
         $stmt->execute();
