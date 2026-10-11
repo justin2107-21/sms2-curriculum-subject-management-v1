@@ -27,19 +27,24 @@ function task3Version(mysqli $db, string $suffix, bool $withPlacement = true): a
     }
     return $out;
 }
-function task3Source(ComplianceReferenceService $svc, int $actor, string $suffix, string $kind='ched_sample_curriculum', string $status='draft'): array {
+function task3Source(ComplianceReferenceService $svc, int $actor, string $suffix, string $kind='ched_sample_curriculum', string $status='draft', bool $withLocator=true): array {
     return $svc->create(['reference_type'=>$kind==='institutional_curriculum'?'INSTITUTIONAL':'CHED',
         'source_kind'=>$kind,'reference_code'=>'T3-'.$suffix,'title'=>'Task 3 '.$suffix,
         'issuing_body'=>$kind==='institutional_curriculum'?'Institution-provided (declared)':'CHED',
-        'source_url'=>'https://example.invalid/'.$suffix,'effective_date'=>'2026-01-01',
+        'source_url'=>$withLocator?'https://example.invalid/'.$suffix:null,'effective_date'=>'2026-01-01',
         'verification_status'=>$status,'notes'=>'Synthetic fixture'], $actor);
 }
 function task3Attach(CurriculumVersionReferenceService $svc, int $v, int $source, int $actor): void {
     $svc->attach(['curriculum_version_id'=>$v,'compliance_reference_id'=>$source,'reference_purpose'=>'school_curriculum'],$actor);
 }
-function task3Identity(ComplianceReferenceService $svc, int $source, int $actor, string $result='not_assessed'): void {
+function task3Identity(ComplianceReferenceService $svc, int $source, int $actor, string $result='not_assessed', ?string $locator=null, ?string $sha256=null): void {
     $svc->recordEvidence($source,['verification_subject'=>'document_identity','result'=>$result,
-        'evidence_locator'=>$result==='confirmed'?'fixture://synthetic-document':'','rationale'=>'Synthetic test evidence only.'],$actor);
+        'evidence_locator'=>$locator ?? ($result==='confirmed'?'fixture://synthetic-document':''),
+        'evidence_sha256'=>$sha256,'rationale'=>'Synthetic test evidence only.'],$actor);
+}
+
+function task3ClassificationAuditCount(mysqli $db, int $versionId): int {
+    return (int)$db->query("SELECT COUNT(*) FROM audit_logs WHERE entity_type='curriculum_version' AND entity_id=$versionId AND action='CURRICULUM_VERSION_CLASSIFY_REFERENCE'")->fetch_row()[0];
 }
 
 $f = task3Version($db,'CLASSIFY');
@@ -78,6 +83,68 @@ $historyList = $history->listHistory(['curriculum_version_id'=>$legacyVersion,'p
 task3Check(count($historyList['history'])===1 && $historyList['history'][0]['subject_title']===null && (int)$historyList['history'][0]['snapshot_complete']===0, 'historical list preserves explicit legacy snapshot gap');
 task3Check((int)$db->query("SELECT COUNT(*) FROM audit_logs WHERE entity_type='curriculum_version' AND entity_id={$f['version']} AND action='CURRICULUM_VERSION_CLASSIFY_REFERENCE'")->fetch_row()[0]===1, 'classification and required audit commit together');
 task3Reject(fn()=>$service->classifyReference($f['version'],(int)$source['id'],'ched_sample',true,$actor),'reference cannot be reclassified');
+
+// F1: preserve old assessment events, but never present them as current after source metadata changes.
+$staleWorkspaceVersion = task3Version($db,'STALEWORKSPACE');
+$staleWorkspaceSource = task3Source($sourceService,$actor,'STALEWORKSPACE');
+task3Attach($service,$staleWorkspaceVersion['version'],(int)$staleWorkspaceSource['id'],$actor);
+$sourceService->recordEvidence((int)$staleWorkspaceSource['id'],[
+    'verification_subject'=>'document_identity','result'=>'confirmed',
+    'evidence_locator'=>'fixture://stale-workspace-original','rationale'=>'Synthetic confirmed identity evidence.'],$actor);
+$originalEvent = $db->query("SELECT id,result,title_snapshot,source_url_snapshot,created_at FROM compliance_reference_evidence_events WHERE compliance_reference_id={$staleWorkspaceSource['id']} AND verification_subject='document_identity' ORDER BY id DESC LIMIT 1")->fetch_assoc();
+$sourceService->update((int)$staleWorkspaceSource['id'],[
+    'reference_type'=>'CHED','source_kind'=>'ched_sample_curriculum','reference_code'=>'T3-STALEWORKSPACE',
+    'title'=>'Corrected Task 3 STALEWORKSPACE','issuing_body'=>'CHED',
+    'source_url'=>'https://example.invalid/STALEWORKSPACE-corrected','effective_date'=>'2026-01-01',
+    'verification_status'=>'draft','notes'=>'Synthetic fixture'], $actor);
+$staleWorkspace = $service->workspace($staleWorkspaceVersion['version']);
+$staleLink = $staleWorkspace['references'][0];
+$staleAssessment = $staleLink['current_assessments']['document_identity'];
+task3Check($staleAssessment['status']==='stale_for_current_metadata' && $staleAssessment['historical_result']==='confirmed', 'workspace marks prior confirmation stale after current source metadata changes');
+task3Check($staleLink['attachment_matches_current_source']===false && $staleLink['reference_title_snapshot']==='Task 3 STALEWORKSPACE', 'workspace distinguishes current source from retained attachment-time snapshot');
+$preservedEvent = $db->query("SELECT id,result,title_snapshot,source_url_snapshot,created_at FROM compliance_reference_evidence_events WHERE id={$originalEvent['id']}")->fetch_assoc();
+task3Check($preservedEvent===$originalEvent, 'source edits do not alter original append-only evidence event');
+$sourceService->recordEvidence((int)$staleWorkspaceSource['id'],[
+    'verification_subject'=>'document_identity','result'=>'confirmed',
+    'evidence_locator'=>'fixture://stale-workspace-corrected','rationale'=>'Synthetic current identity assessment.'],$actor);
+$refreshedWorkspace = $service->workspace($staleWorkspaceVersion['version']);
+$refreshedAssessment = $refreshedWorkspace['references'][0]['current_assessments']['document_identity'];
+task3Check($refreshedAssessment['status']==='confirmed' && $refreshedAssessment['matches_current_source']===true, 'new matching identity evidence becomes the current assessment');
+task3Check($db->query("SELECT result,title_snapshot FROM compliance_reference_evidence_events WHERE id={$originalEvent['id']}")->fetch_assoc()===['result'=>'confirmed','title_snapshot'=>'Task 3 STALEWORKSPACE'], 'new assessment leaves historical assessment identity unchanged');
+
+// F2: an honest demonstration classification still needs a traceable document location.
+$noLocatorVersion = task3Version($db,'NOLOCATOR');
+$noLocatorSource = task3Source($sourceService,$actor,'NOLOCATOR','ched_sample_curriculum','draft',false);
+task3Identity($sourceService,(int)$noLocatorSource['id'],$actor,'not_assessed',null,str_repeat('a',64));
+task3Attach($service,$noLocatorVersion['version'],(int)$noLocatorSource['id'],$actor);
+$noLocatorAudits = task3ClassificationAuditCount($db,$noLocatorVersion['version']);
+task3Reject(fn()=>$service->classifyReference($noLocatorVersion['version'],(int)$noLocatorSource['id'],'ched_sample',true,$actor),'fingerprint alone cannot satisfy documentary location requirement');
+task3Check($db->query("SELECT version_role FROM curriculum_versions WHERE id={$noLocatorVersion['version']}")->fetch_row()[0]==='unclassified'
+    && (int)$db->query("SELECT COUNT(*) FROM curriculum_version_subject_snapshots WHERE curriculum_version_subject_id={$noLocatorVersion['placement']}")->fetch_row()[0]===0
+    && task3ClassificationAuditCount($db,$noLocatorVersion['version'])===$noLocatorAudits, 'missing locator rejection creates no snapshots, role change, or classification audit');
+
+$evidenceLocatorVersion = task3Version($db,'EVIDENCELOCATOR');
+$evidenceLocatorSource = task3Source($sourceService,$actor,'EVIDENCELOCATOR','ched_sample_curriculum','draft',false);
+task3Identity($sourceService,(int)$evidenceLocatorSource['id'],$actor,'not_assessed','fixture://traceable-ched-sample');
+task3Attach($service,$evidenceLocatorVersion['version'],(int)$evidenceLocatorSource['id'],$actor);
+$evidenceLocatorResult = $service->classifyReference($evidenceLocatorVersion['version'],(int)$evidenceLocatorSource['id'],'ched_sample',true,$actor);
+task3Check($evidenceLocatorResult['version_role']==='reference'
+    && $service->workspace($evidenceLocatorVersion['version'])['references'][0]['current_assessments']['document_identity']['status']==='not_assessed', 'traceable evidence locator permits an honestly unverified CHED demonstration reference');
+task3Check($evidenceLocatorResult['institutional_adoption_label']==='Institutional adoption/approval not verified', 'traceable CHED demonstration remains distinct from BCP adoption');
+
+$staleLocatorVersion = task3Version($db,'STALELOCATOR');
+$staleLocatorSource = task3Source($sourceService,$actor,'STALELOCATOR','ched_sample_curriculum','draft',false);
+task3Identity($sourceService,(int)$staleLocatorSource['id'],$actor,'not_assessed','fixture://old-source-location');
+$sourceService->update((int)$staleLocatorSource['id'],[
+    'reference_type'=>'CHED','source_kind'=>'ched_sample_curriculum','reference_code'=>'T3-STALELOCATOR',
+    'title'=>'Changed after identity assessment','issuing_body'=>'CHED','source_url'=>null,
+    'effective_date'=>'2026-01-01','verification_status'=>'draft','notes'=>'Synthetic fixture'], $actor);
+task3Attach($service,$staleLocatorVersion['version'],(int)$staleLocatorSource['id'],$actor);
+$staleLocatorAudits = task3ClassificationAuditCount($db,$staleLocatorVersion['version']);
+task3Reject(fn()=>$service->classifyReference($staleLocatorVersion['version'],(int)$staleLocatorSource['id'],'ched_sample',true,$actor),'stale evidence locator cannot satisfy classification traceability');
+task3Check($db->query("SELECT version_role FROM curriculum_versions WHERE id={$staleLocatorVersion['version']}")->fetch_row()[0]==='unclassified'
+    && (int)$db->query("SELECT COUNT(*) FROM curriculum_version_subject_snapshots WHERE curriculum_version_subject_id={$staleLocatorVersion['placement']}")->fetch_row()[0]===0
+    && task3ClassificationAuditCount($db,$staleLocatorVersion['version'])===$staleLocatorAudits, 'stale-locator rejection leaves snapshots, role, and classification audits unchanged');
 
 $inactiveVersion = task3Version($db,'INACTIVE');
 $inactiveSource = task3Source($sourceService,$actor,'INACTIVE','ched_sample_curriculum','inactive');

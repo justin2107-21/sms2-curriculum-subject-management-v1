@@ -41,10 +41,27 @@ final class CurriculumVersionReferenceRepository
     public function evidence(int $referenceId): array
     {
         $stmt = RepositoryQuery::execute($this->db,
-            'SELECT verification_subject, result, evidence_locator, evidence_sha256,
-                    rationale, created_at
-             FROM compliance_reference_evidence_events
-             WHERE compliance_reference_id=? ORDER BY id DESC', 'i', [$referenceId]);
+            'SELECT e.id, e.verification_subject, e.result, e.evidence_locator, e.evidence_sha256,
+                    e.reference_code_snapshot, e.title_snapshot, e.source_kind_snapshot,
+                    e.issuing_body_snapshot, e.source_url_snapshot, e.effective_date_snapshot,
+                    e.rationale, e.created_at,
+                    CASE WHEN e.reference_code_snapshot <=> r.reference_code
+                               AND e.title_snapshot <=> r.title
+                               AND e.source_kind_snapshot <=> r.source_kind
+                               AND e.issuing_body_snapshot <=> r.issuing_body
+                               AND e.source_url_snapshot <=> r.source_url
+                               AND e.effective_date_snapshot <=> r.effective_date
+                         THEN 1 ELSE 0 END AS matches_current_source,
+                    CASE WHEN e.reference_code_snapshot <=> r.reference_code
+                               AND e.title_snapshot <=> r.title
+                               AND e.source_kind_snapshot <=> r.source_kind
+                               AND e.issuing_body_snapshot <=> r.issuing_body
+                               AND e.source_url_snapshot <=> r.source_url
+                               AND e.effective_date_snapshot <=> r.effective_date
+                         THEN e.result ELSE \'stale_for_current_metadata\' END AS current_assessment_result
+             FROM compliance_reference_evidence_events e
+             JOIN compliance_references r ON r.id=e.compliance_reference_id
+             WHERE e.compliance_reference_id=? ORDER BY e.id DESC', 'i', [$referenceId]);
         $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
         return $rows;

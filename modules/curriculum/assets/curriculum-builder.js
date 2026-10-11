@@ -913,6 +913,14 @@
             supporting_document:'Supporting document', other_document:'Other documented source', unknown:'Unknown source kind'})[kind] || 'Unknown source kind';
     }
 
+    function currentAssessmentLabel(assessment) {
+        if (!assessment) return 'not assessed';
+        if (assessment.status === 'stale_for_current_metadata') {
+            return 'STALE — previous recorded result: ' + String(assessment.historical_result || 'unknown');
+        }
+        return String(assessment.status || 'not assessed').replaceAll('_', ' ');
+    }
+
     async function loadReferenceWorkspace(versionId) {
         const formAttach = document.getElementById('attachVersionReferenceForm');
         const formClassify = document.getElementById('classifyReferenceForm');
@@ -932,7 +940,7 @@
                 ? summary.complete_snapshots + '/' + summary.placements + ' complete; captured ' + (summary.last_capture || 'date unavailable')
                 : summary.complete_snapshots + '/' + summary.placements + ' complete; Historical subject details unavailable';
             const primary = record.references.find(item => item.reference_purpose === 'school_curriculum');
-            const originResult = primary?.evidence_events.find(item => item.verification_subject === 'declared_origin')?.result || 'not assessed';
+            const originResult = currentAssessmentLabel(primary?.current_assessments?.declared_origin);
             document.getElementById('referenceBasis').textContent = primary
                 ? sourceKindLabel(primary.source_kind_snapshot) + (primary.source_kind_snapshot === 'institutional_curriculum' ? ' · declared-origin assessment: ' + originResult : '')
                 : 'Unknown / no curriculum source attached';
@@ -946,12 +954,17 @@
                 const locator = item.reference_url_snapshot
                     ? '<a href="' + ui.escapeHtml(item.reference_url_snapshot) + '" target="_blank" rel="noopener noreferrer">Open attached locator</a>'
                     : 'No locator captured';
-                const latest = {};
-                item.evidence_events.forEach(e => { if (!latest[e.verification_subject]) latest[e.verification_subject] = e.result; });
-                const assess = ['document_identity','declared_origin','applicability'].map(key => key.replaceAll('_',' ') + ': ' + (latest[key] || 'not assessed')).join(' · ');
+                const currentLocator = item.current_source_url
+                    ? '<a href="' + ui.escapeHtml(item.current_source_url) + '" target="_blank" rel="noopener noreferrer">Open current source locator</a>'
+                    : 'Current source has no locator';
+                const assess = ['document_identity','declared_origin','applicability'].map(key =>
+                    key.replaceAll('_',' ') + ': ' + currentAssessmentLabel(item.current_assessments?.[key])).join(' · ');
+                const attachmentWarning = item.attachment_matches_current_source
+                    ? '' : ' · CURRENT SOURCE CHANGED SINCE ATTACHMENT; ATTACHMENT SNAPSHOT RETAINED';
                 const currentWarning = item.verification_status === 'inactive' ? ' · CURRENT SOURCE INACTIVE/WITHDRAWN' : '';
-                return '<tr><td><strong>' + ui.escapeHtml(sourceName) + '</strong><span class="compliance-subtext">' + ui.escapeHtml(title) + ' · ' + ui.escapeHtml(item.issuing_body_snapshot || 'Issuer unavailable at attachment') + '<br>' + locator + '</span></td>' +
-                    '<td>' + ui.escapeHtml(item.reference_purpose) + '</td><td>' + ui.escapeHtml(sourceKindLabel(item.source_kind_snapshot)) + '<span class="compliance-subtext">' + ui.escapeHtml(assess) + currentWarning + '</span></td>' +
+                const currentSource = [item.current_reference_code || item.current_title || 'Current source', item.current_issuing_body || 'Issuer unavailable'].join(' · ');
+                return '<tr><td><strong>' + ui.escapeHtml(sourceName) + '</strong><span class="compliance-subtext">Attachment-time snapshot: ' + ui.escapeHtml(title) + ' · ' + ui.escapeHtml(item.issuing_body_snapshot || 'Issuer unavailable at attachment') + '<br>' + locator + '<br>Current source: ' + ui.escapeHtml(currentSource) + ' · ' + currentLocator + '</span></td>' +
+                    '<td>' + ui.escapeHtml(item.reference_purpose) + '</td><td>' + ui.escapeHtml(sourceKindLabel(item.source_kind_snapshot)) + '<span class="compliance-subtext">Current source assessments: ' + ui.escapeHtml(assess) + attachmentWarning + currentWarning + '</span></td>' +
                     '<td>' + ui.escapeHtml(item.linked_by_username || 'Unknown user') + '<span class="compliance-subtext">' + ui.escapeHtml(item.linked_at) + '</span></td></tr>';
             }).join('') : '<tr><td colspan="4" class="empty-cell">No documentary references are attached.</td></tr>';
             document.querySelectorAll('#attachVersionReferenceForm [name="curriculum_version_id"],#classifyReferenceForm [name="curriculum_version_id"]').forEach(el => { el.value = record.id; });

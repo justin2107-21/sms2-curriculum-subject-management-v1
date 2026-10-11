@@ -35,6 +35,28 @@ final class CurriculumVersionReferenceService
         $stmt->close();
         if (!$version) throw new DomainNotFoundException('Curriculum version not found.');
         $version['references'] = $this->references->listForVersion($versionId);
+        foreach ($version['references'] as &$reference) {
+            $reference['current_assessments'] = [];
+            foreach ($reference['evidence_events'] as $event) {
+                $subject = $event['verification_subject'];
+                if (isset($reference['current_assessments'][$subject])) continue;
+                $isCurrent = (int)$event['matches_current_source'] === 1;
+                $reference['current_assessments'][$subject] = [
+                    'status' => $isCurrent ? $event['result'] : 'stale_for_current_metadata',
+                    'historical_result' => $event['result'],
+                    'matches_current_source' => $isCurrent,
+                    'recorded_at' => $event['created_at'],
+                ];
+            }
+            $reference['attachment_matches_current_source'] =
+                ($reference['reference_code_snapshot'] ?? null) === ($reference['current_reference_code'] ?? null)
+                && ($reference['reference_title_snapshot'] ?? null) === ($reference['current_title'] ?? null)
+                && ($reference['source_kind_snapshot'] ?? null) === ($reference['current_source_kind'] ?? null)
+                && ($reference['issuing_body_snapshot'] ?? null) === ($reference['current_issuing_body'] ?? null)
+                && ($reference['reference_url_snapshot'] ?? null) === ($reference['current_source_url'] ?? null)
+                && ($reference['effective_date_snapshot'] ?? null) === ($reference['current_effective_date'] ?? null);
+        }
+        unset($reference);
         $version['snapshot_summary'] = $this->snapshotSummary($versionId);
         $version['institutional_adoption_label'] = 'Institutional adoption/approval not verified';
         $version['editable'] = CurriculumVersionEditPolicy::isEditable($version);
@@ -196,6 +218,11 @@ final class CurriculumVersionReferenceService
         if (!isset($latest['document_identity']) || !$this->evidenceMatchesSource($latest['document_identity'], $source)) {
             throw new DomainConflictException('Record an explicit document-identity assessment before classification.');
         }
+        $sourceLocator = (string)($source['source_url'] ?? '');
+        $evidenceLocator = trim((string)($latest['document_identity']['evidence_locator'] ?? ''));
+        if (!$this->isValidSourceLocator($sourceLocator) && $evidenceLocator === '') {
+            throw new DomainConflictException('A traceable document location is required: add a valid source locator or a matching identity-evidence locator. A fingerprint alone is not a location.');
+        }
         if ($basis === 'institutional_source' && (!isset($latest['declared_origin'])
             || !$this->evidenceMatchesSource($latest['declared_origin'], $source))) {
             throw new DomainConflictException('Record a separate declared-origin assessment. This does not establish BCP adoption or approval.');
@@ -210,6 +237,15 @@ final class CurriculumVersionReferenceService
             && ($event['issuing_body_snapshot'] ?? null) === ($source['issuing_body'] ?? null)
             && ($event['source_url_snapshot'] ?? null) === ($source['source_url'] ?? null)
             && ($event['effective_date_snapshot'] ?? null) === ($source['effective_date'] ?? null);
+    }
+
+    private function isValidSourceLocator(string $locator): bool
+    {
+        $locator = trim($locator);
+        if ($locator === '' || !filter_var($locator, FILTER_VALIDATE_URL)) return false;
+        $parts = parse_url($locator);
+        return is_array($parts)
+            && in_array(strtolower((string)($parts['scheme'] ?? '')), ['http', 'https'], true);
     }
 
     private function placementSignature(array $rows): string
