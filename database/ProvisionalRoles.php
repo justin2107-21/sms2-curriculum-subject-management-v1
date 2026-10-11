@@ -23,7 +23,7 @@ final class ProvisionalRoles
         ];
         // These are available for deliberate RBAC-manager assignment only. They
         // are not included in the default permissions reconciled by seed().
-        $task3 = ['curriculum.reference.attach','compliance.reference.verify','curriculum.reference.classify'];
+        $task3 = ['curriculum.reference.attach','compliance.reference.verify','curriculum.reference.classify','curriculum.version.clone'];
         foreach ($definitions as &$definition) {
             $definition['grantable_permissions'] = array_values(array_unique(
                 array_merge($definition['permissions'], $task3)

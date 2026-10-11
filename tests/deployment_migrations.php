@@ -62,7 +62,8 @@ foreach(['users','students','academic_programs','subjects','curricula'] as $tabl
 }
 deployCheck((int)$conn->query("SELECT COUNT(*) FROM schema_migrations WHERE status='applied'")->fetch_row()[0]===$expectedMigrations,'All migrations journaled');
 // Migration 022 registers three Task 3 capabilities without granting them.
-deployCheck((int)$conn->query('SELECT COUNT(*) FROM permissions')->fetch_row()[0]===41,'Permissions initialized');
+deployCheck((int)$conn->query('SELECT COUNT(*) FROM permissions')->fetch_row()[0]===42,'Permissions initialized including ungranted clone capability');
+deployCheck((int)$conn->query("SELECT COUNT(*) FROM role_permissions rp JOIN permissions p ON p.id=rp.permission_id WHERE p.name='curriculum.version.clone'")->fetch_row()[0]===0,'Clone permission is not automatically granted');
 deployCheck((int)$conn->query("SELECT COUNT(*) FROM role_permissions rp JOIN permissions p ON p.id=rp.permission_id WHERE p.name IN ('curriculum.reference.attach','compliance.reference.verify','curriculum.reference.classify')")->fetch_row()[0]===0,'Task 3 permissions are not automatically granted');
 $snapshot=deploymentSnapshot($conn);
 deploymentRun(['--apply','--confirm-database='.$database],0);

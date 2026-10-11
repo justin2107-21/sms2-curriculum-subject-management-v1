@@ -35,6 +35,14 @@ final class CurriculumVersionReferenceService
         $stmt->close();
         if (!$version) throw new DomainNotFoundException('Curriculum version not found.');
         $version['references'] = $this->references->listForVersion($versionId);
+        // Inherited provenance stays attached to the immutable baseline, never copied as
+        // a new verification or attachment event on the editable proposal.
+        $version['references_inherited_from_version_id'] = null;
+        if ($version['version_role'] === 'proposed' && $version['baseline_version_role'] === 'reference'
+            && $version['baseline_version_id'] !== null) {
+            $version['references'] = $this->references->listForVersion((int)$version['baseline_version_id']);
+            $version['references_inherited_from_version_id'] = (int)$version['baseline_version_id'];
+        }
         foreach ($version['references'] as &$reference) {
             $reference['current_assessments'] = [];
             foreach ($reference['evidence_events'] as $event) {
@@ -200,7 +208,7 @@ final class CurriculumVersionReferenceService
         }
     }
 
-    private function assertClassificationEvidence(int $sourceId, array $source, string $basis): void
+    public function assertClassificationEvidence(int $sourceId, array $source, string $basis): void
     {
         $allowed = [
             'ched_sample' => ['ched_sample_curriculum'],
@@ -211,7 +219,7 @@ final class CurriculumVersionReferenceService
             throw new DomainConflictException('The selected classification basis does not match the documentary source kind.');
         }
         $latest = [];
-        foreach ($this->sources->evidenceEvents($sourceId) as $event) {
+        foreach ($this->sources->evidenceEvents($sourceId, true) as $event) {
             if (!isset($latest[$event['verification_subject']])) $latest[$event['verification_subject']] = $event;
         }
         // Document identity is explicitly assessed but may honestly remain not assessed/not confirmed.

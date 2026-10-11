@@ -32,6 +32,7 @@
         removeAssignments: workspace.dataset.canRemoveAssignments === '1'
         ,attachReferences: workspace.dataset.canAttachReferences === '1'
         ,classifyReference: workspace.dataset.canClassifyReference === '1'
+        ,cloneReference: workspace.dataset.canCloneReference === '1'
     };
     const columns = {
         programs: permissions.updatePrograms ? 6 : 5,
@@ -885,6 +886,8 @@
     }
 
     async function openVersionSubjects(id, label, status) {
+        const cloneDetails = document.getElementById('cloneReferenceDetails');
+        if (cloneDetails) cloneDetails.hidden = true;
         const button = versionRows?.querySelector('[data-version-id="' + Number(id) + '"]');
         setVersionContext(id, label, button?.dataset.versionStatus || status || 'draft');
         curriculumDetailModal?.close();
@@ -928,6 +931,7 @@
             const payload = await ui.fetchJson(endpoints.versionReferences, {
                 action:'workspace', curriculum_version_id:versionId
             });
+            if (Number(state.selectedVersionId) !== Number(versionId)) return;
             const record = payload.workspace;
             document.getElementById('referenceProgram').textContent = record.program_code + ' — ' + record.program_name;
             document.getElementById('referenceCurriculumVersion').textContent = record.curriculum_code + ' — ' + record.curriculum_name + ' / ' + record.version_label;
@@ -944,7 +948,8 @@
             document.getElementById('referenceBasis').textContent = primary
                 ? sourceKindLabel(primary.source_kind_snapshot) + (primary.source_kind_snapshot === 'institutional_curriculum' ? ' · declared-origin assessment: ' + originResult : '')
                 : 'Unknown / no curriculum source attached';
-            document.getElementById('referenceVersionContext').textContent = 'Technical status: ' + record.status + ' · Review status is a workflow state only.';
+            document.getElementById('referenceVersionContext').textContent = 'Technical status: ' + record.status + ' · Review status is a workflow state only.' +
+                (record.references_inherited_from_version_id ? ' Documentary provenance inherited through baseline #' + record.references_inherited_from_version_id + '; no new verification implied.' : '');
             document.getElementById('referenceProtectionBadge').innerHTML = record.editable
                 ? ui.statusBadge('editable') : ui.statusBadge('protected');
             const body = document.getElementById('versionReferenceRows');
@@ -981,11 +986,65 @@
                 if (choices.length) select.value = choices[0].compliance_reference_id;
             }
             if (formAttach) await populateReferenceChoices(formAttach.querySelector('[name="compliance_reference_id"]'));
+            await loadCloneScope(record);
         } catch (error) {
             document.getElementById('referenceVersionContext').textContent = error.message || 'Reference details could not be loaded.';
             ui.showToast(error.message, 'error');
         }
     }
+
+    async function loadCloneScope(record) {
+        const details = document.getElementById('cloneReferenceDetails');
+        const form = document.getElementById('cloneReferenceForm');
+        if (!details || !form || !permissions.cloneReference || Number(state.selectedVersionId) !== Number(record.id)) return;
+        const availability = document.getElementById('cloneReferenceAvailability');
+        if (availability) {
+            availability.hidden = record.version_role === 'reference';
+            availability.textContent = 'This version is not a protected reference. Open an eligible protected reference to create a curriculum revision.';
+        }
+        details.hidden = record.version_role !== 'reference';
+        form.querySelector('button[type="submit"]').disabled = true;
+        if (details.hidden) return;
+        form.reset(); ui.clearFormError(form);
+        form.elements.source_version_id.value = record.id;
+        form.elements.curriculum_id.value = record.curriculum_id;
+        const scope = document.getElementById('cloneReferenceScope');
+        scope.textContent = 'Checking protected reference and copy scope...';
+        try {
+            const result = await ui.fetchJson(endpoints.versions, {action:'clone_preview', source_version_id:record.id, curriculum_id:record.curriculum_id});
+            if (Number(state.selectedVersionId) !== Number(record.id)) return;
+            const sources = record.references.filter(item => item.reference_purpose === 'school_curriculum').map(item =>
+                sourceKindLabel(item.source_kind_snapshot) + ': ' + (item.reference_title_snapshot || 'Title unavailable') +
+                ' [' + (item.reference_code_snapshot || 'Code unavailable') + ']' +
+                ' / Document location: ' + (item.reference_url_snapshot || item.evidence_events?.find(event => event.verification_subject === 'document_identity' && Number(event.matches_current_source) === 1)?.evidence_locator || 'Location unavailable') +
+                ' / Recorded effective date: ' + (item.effective_date_snapshot || 'Not recorded'));
+            scope.textContent = record.program_code + ' — ' + record.program_name + ' / ' + record.version_label + '. ' + sources.join('; ') + '. Copy: ' +
+                Object.entries(result.preview.counts).map(([key,value]) => value + ' ' + key).join(', ') + '. ' + result.preview.notice;
+            form.querySelector('button[type="submit"]').disabled = false;
+        } catch (error) {
+            if (Number(state.selectedVersionId) === Number(record.id)) scope.textContent = 'Cannot create a revision: ' + error.message;
+        }
+    }
+
+    document.getElementById('cloneReferenceForm')?.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        const form = event.currentTarget;
+        if (!form.reportValidity()) return;
+        ui.clearFormError(form);
+        if (Number(form.elements.source_version_id.value) !== Number(state.selectedVersionId)) {
+            ui.showFormError(form,'Reference selection changed. Reload the selected reference before creating a revision.');
+            return;
+        }
+        const data = new FormData(form); data.set('action','clone_reference');
+        ui.setFormSubmitting(form,true,'Creating revision...');
+        try {
+            const payload = await ui.postForm(endpoints.versions,data);
+            ui.showToast(payload.message,'success');
+            await loadVersions(1,payload.version.id,false);
+            await openVersionSubjects(payload.version.id,payload.version.version_label,payload.version.status);
+        } catch (error) { ui.showFormError(form,error.message || 'Revision creation failed.'); }
+        finally { ui.setFormSubmitting(form,false); }
+    });
 
     async function populateReferenceChoices(select) {
         if (!select) return;

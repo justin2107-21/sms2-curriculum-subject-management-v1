@@ -201,13 +201,13 @@ class ComplianceReferenceRepository
         return $id;
     }
 
-    public function evidenceEvents(int $referenceId): array
+    public function evidenceEvents(int $referenceId, bool $forUpdate = false): array
     {
         $stmt = RepositoryQuery::execute($this->db,
             'SELECT e.*, u.username AS recorded_by_username
              FROM compliance_reference_evidence_events e
              LEFT JOIN users u ON u.id = e.recorded_by
-             WHERE e.compliance_reference_id = ? ORDER BY e.id DESC', 'i', [$referenceId]);
+             WHERE e.compliance_reference_id = ? ORDER BY e.id DESC' . ($forUpdate ? ' FOR UPDATE' : ''), 'i', [$referenceId]);
         $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
         return $rows;
