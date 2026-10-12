@@ -129,10 +129,10 @@ require __DIR__ . '/../../../shared/sidebar.php';
           <label class="mapping-filter-field"><span>Curriculum <strong>*</strong></span>
             <div class="record-autocomplete"><input type="search" id="compareCurriculumSearch" placeholder="Select a program first" disabled/><input type="hidden" id="compareCurriculum"/><button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear curriculum" hidden><i class="fa-solid fa-xmark"></i></button><div class="record-autocomplete-options" id="compareCurriculumOptions" role="listbox" hidden></div></div>
           </label>
-          <label class="mapping-filter-field"><span>Version A <strong>*</strong></span>
+          <label class="mapping-filter-field"><span>Protected reference (defaults to recorded baseline)</span>
             <div class="record-autocomplete"><input type="search" id="compareVersionASearch" placeholder="Select a curriculum first" disabled required/><input type="hidden" id="compareVersionA"/><button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Version A" title="Clear selection" hidden><i class="fa-solid fa-xmark"></i></button><div class="record-autocomplete-options" id="compareVersionAOptions" role="listbox" aria-label="Version A suggestions" hidden></div></div>
           </label>
-          <label class="mapping-filter-field"><span>Version B <strong>*</strong></span>
+          <label class="mapping-filter-field"><span>Curriculum revision <strong>*</strong></span>
             <div class="record-autocomplete"><input type="search" id="compareVersionBSearch" placeholder="Select a curriculum first" disabled required/><input type="hidden" id="compareVersionB"/><button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Version B" title="Clear selection" hidden><i class="fa-solid fa-xmark"></i></button><div class="record-autocomplete-options" id="compareVersionBOptions" role="listbox" aria-label="Version B suggestions" hidden></div></div>
           </label>
         </div>
@@ -141,6 +141,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 
       <p class="curriculum-notice history-state-notice" role="note">System states and record dates are technical history only, not official institutional approval or offering dates.</p>
       <p class="history-summary-line comparison-summary-line" id="comparisonSummary">Select two stored curriculum versions to compare.</p>
+      <section class="domain-card" id="comparisonEvidence" aria-label="Reference provenance and comparison coverage" hidden></section>
 
       <section class="domain-card mapping-results-card" aria-labelledby="comparisonResultsTitle">
         <div class="domain-card-header">
@@ -159,6 +160,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
         </div>
         <div class="pagination-bar" id="comparisonPagination" hidden></div>
       </section>
+      <section class="domain-card" id="comparisonStructures" aria-label="Requirement, elective and grade weighting differences" hidden></section>
     </section>
     <?php endif; ?>
   </main>
@@ -186,6 +188,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 <script src="../assets/curriculum-common.js?v=<?= $curriculumCommonVersion ?>"></script>
+<script src="../assets/curriculum-history-comparison.js?v=<?= (int)filemtime(__DIR__ . '/../assets/curriculum-history-comparison.js') ?>"></script>
 <script src="../assets/subject-history.js?v=<?= $historyScriptVersion ?>"></script>
 </body>
 </html>

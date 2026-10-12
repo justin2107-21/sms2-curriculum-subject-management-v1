@@ -40,6 +40,10 @@ try {
             curriculum_require_read('subject_history.view');
             json_response(true, 'Curriculum versions compared.', $service->compareVersions($_GET));
 
+        case 'compare_revision':
+            curriculum_require_read('subject_history.view');
+            json_response(true, 'Reference and revision compared.', $service->compareRevision($_GET));
+
         default:
             json_response(false, 'Unknown action.', [], 400);
     }

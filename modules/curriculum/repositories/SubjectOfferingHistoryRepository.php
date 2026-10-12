@@ -15,6 +15,32 @@ class SubjectOfferingHistoryRepository
     {
     }
 
+    /** Plain consistent reads only: the History service owns the report snapshot. */
+    public function comparisonState(int $version): array
+    {
+        $rows = function (string $sql) use ($version): array {
+            $stmt = RepositoryQuery::execute($this->db, $sql, 'i', [$version]);
+            $result = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+            $stmt->close();
+            return $result;
+        };
+        return [
+            'placements' => $rows('SELECT p.*, s.subject_code, s.subject_title, s.units, s.lecture_units,
+                s.laboratory_units, s.description, h.subject_code_snapshot, h.subject_title_snapshot,
+                h.units_snapshot, h.lecture_units_snapshot, h.laboratory_units_snapshot, h.description_snapshot,
+                h.snapshot_complete, h.source_reference_id, h.capture_method, h.captured_at
+                FROM curriculum_version_subjects p JOIN subjects s ON s.id=p.subject_id
+                LEFT JOIN curriculum_version_subject_snapshots h ON h.curriculum_version_subject_id=p.id
+                WHERE p.curriculum_version_id=? ORDER BY p.subject_id,p.id'),
+            'requirements' => $rows('SELECT subject_id,required_subject_id,requirement_type FROM curriculum_subject_requirements WHERE curriculum_version_id=? ORDER BY subject_id,required_subject_id,requirement_type'),
+            'groups' => $rows('SELECT id,group_name,description,year_level,semester,required_selections,status FROM curriculum_elective_groups WHERE curriculum_version_id=? ORDER BY id'),
+            'memberships' => $rows('SELECT elective_group_id,subject_id FROM curriculum_elective_group_subjects WHERE curriculum_version_id=? ORDER BY elective_group_id,subject_id'),
+            'schemes' => $rows('SELECT w.id,p.subject_id,w.description FROM grade_weighting_schemes w JOIN curriculum_version_subjects p ON p.id=w.curriculum_version_subject_id WHERE p.curriculum_version_id=? ORDER BY p.subject_id'),
+            'components' => $rows('SELECT p.subject_id,c.component_name,c.weight_percentage,c.sequence_order FROM grade_weighting_components c JOIN grade_weighting_schemes w ON w.id=c.scheme_id JOIN curriculum_version_subjects p ON p.id=w.curriculum_version_subject_id WHERE p.curriculum_version_id=? ORDER BY p.subject_id,c.component_name'),
+            'clone_events' => $rows("SELECT metadata_json FROM audit_logs WHERE action='CURRICULUM_REVISION_CREATE' AND entity_type='curriculum_version' AND entity_id=? ORDER BY id"),
+        ];
+    }
+
     public function paginate(array $query): array
     {
         [$conditions, $types, $params] = $this->historyConditions($query);

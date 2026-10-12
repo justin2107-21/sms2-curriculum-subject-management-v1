@@ -933,6 +933,11 @@
             });
             if (Number(state.selectedVersionId) !== Number(versionId)) return;
             const record = payload.workspace;
+            const comparisonLink = document.getElementById('compareBaselineLink');
+            if (comparisonLink) {
+                comparisonLink.hidden = record.version_role !== 'proposed' || !record.baseline_version_id;
+                comparisonLink.href = 'curriculum_history_view.php?curriculum_id=' + Number(record.curriculum_id) + '&version_b_id=' + Number(record.id);
+            }
             document.getElementById('referenceProgram').textContent = record.program_code + ' — ' + record.program_name;
             document.getElementById('referenceCurriculumVersion').textContent = record.curriculum_code + ' — ' + record.curriculum_name + ' / ' + record.version_label;
             document.getElementById('referenceVersionRole').textContent = record.version_role;

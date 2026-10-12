@@ -83,7 +83,7 @@ class CurriculumVersionRepository
         $stmt = RepositoryQuery::execute(
             $this->db,
             'SELECT id, curriculum_id, version_label, effective_academic_year,
-                    description, status, created_at, updated_at
+                    description, status, version_role, review_status, baseline_version_id, created_at, updated_at
              FROM curriculum_versions' . $where . '
              ORDER BY ' . $searchOrder . 'created_at DESC, id DESC LIMIT ? OFFSET ?',
             $types . str_repeat('s', count($rankParams)) . 'ii',

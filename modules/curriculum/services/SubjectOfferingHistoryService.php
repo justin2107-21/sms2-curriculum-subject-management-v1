@@ -6,6 +6,8 @@ require_once __DIR__ . '/../repositories/CurriculumRepository.php';
 require_once __DIR__ . '/../repositories/CurriculumVersionRepository.php';
 require_once __DIR__ . '/../repositories/SubjectRepository.php';
 require_once __DIR__ . '/../repositories/SubjectOfferingHistoryRepository.php';
+require_once __DIR__ . '/CurriculumHistoryComparison.php';
+require_once __DIR__ . '/CurriculumVersionReferenceService.php';
 
 class SubjectOfferingHistoryService
 {
@@ -117,6 +119,64 @@ class SubjectOfferingHistoryService
             'pagination' => $result['pagination'],
             'summary' => $this->integerSummary($result['summary']),
         ];
+    }
+
+    /** Task 5 comparison. The older generic history endpoint remains a separate compatibility read. */
+    public function compareRevision(array $input): array
+    {
+        $curriculumId=DomainValidator::positiveId($input['curriculum_id']??null,'Curriculum');
+        $revisionId=DomainValidator::positiveId($input['version_b_id']??null,'Revision version');
+        $referenceId=DomainValidator::optionalPositiveId($input['version_a_id']??null,'Reference version');
+        $query=DomainValidator::listQuery($input,[]);
+        if ((int)$this->db->query('SELECT @@in_transaction')->fetch_row()[0]!==0) {
+            throw new RuntimeException('History comparison requires its own read-only transaction.');
+        }
+        // Next transaction only. No session/global isolation change and no academic write locks.
+        $this->db->query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+        $this->db->query('START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY');
+        try {
+            $curriculum=$this->curricula->findById($curriculumId);
+            $revision=$this->versions->findById($revisionId);
+            if (!$curriculum || !$revision) throw new DomainNotFoundException('Curriculum or revision not found.');
+            if ($revision['version_role']!=='proposed' || $revision['baseline_version_id']===null
+                || (int)$revision['curriculum_id']!==$curriculumId) {
+                throw new DomainValidationException('Select a proposed revision with a recorded baseline in this curriculum.');
+            }
+            $referenceId=$referenceId??(int)$revision['baseline_version_id'];
+            $reference=$this->versions->findById($referenceId);
+            if (!$reference) throw new DomainNotFoundException('Reference version not found.');
+            if ($reference['version_role']!=='reference' || $reference['baseline_version_id']!==null
+                || (int)$reference['curriculum_id']!==$curriculumId || $referenceId===$revisionId
+                || (int)$revision['baseline_version_id']!==$referenceId) {
+                throw new DomainValidationException('Reference must be the revision\'s exact protected baseline in the same curriculum.');
+            }
+            foreach ([$reference,$revision] as $version) {
+                if (!in_array($version['status'],['draft','active','archived'],true)
+                    || !in_array($version['review_status'],['not_started','draft','under_review','returned','approved'],true)) {
+                    throw new DomainValidationException('Invalid version lifecycle.');
+                }
+            }
+            // History has always allowed archived versions/owners by explicit ID; keep that read visibility.
+            $workspace=(new CurriculumVersionReferenceService($this->db))->workspace($referenceId);
+            $sources=[];
+            foreach ($workspace['references'] as $link) if ($link['reference_purpose']==='school_curriculum'
+                && in_array($link['source_kind_snapshot'],['ched_sample_curriculum','institutional_curriculum','other_document','supporting_document'],true)) {
+                $sources[]=(int)$link['compliance_reference_id'];
+            }
+            $referenceState=$this->history->comparisonState($referenceId);
+            $revisionState=$this->history->comparisonState($revisionId);
+            $result=CurriculumHistoryComparison::calculate($referenceState,$revisionState,$sources,$referenceId);
+            if (!$referenceState['placements']) {$result['partial']=true;$result['warnings'][]='Historical subject details unavailable: reference has no recorded placements.';}
+            if (!$sources) {$result['partial']=true;$result['warnings'][]='Reference documentary provenance is unavailable.';}
+            $pagination=RepositoryQuery::pagination(count($result['comparison']),$query['page'],$query['per_page']);
+            $result['comparison']=array_slice($result['comparison'],$pagination['offset'],$pagination['per_page']);
+            unset($pagination['offset']);
+            $result+=['pagination'=>$pagination,'curriculum'=>$curriculum,'program'=>$this->programs->findById((int)$curriculum['academic_program_id']),'version_a'=>$reference,'version_b'=>$revision,
+                'references'=>$workspace['references'],'institutional_adoption_label'=>$workspace['institutional_adoption_label'],
+                'read_view'=>'Single read-only REPEATABLE READ consistent snapshot; no lifecycle or audit writes.'];
+            $this->db->commit();
+            return $result;
+        } catch (Throwable $error) { $this->db->rollback(); throw $error; }
     }
 
     private function versionContext(array $version): array

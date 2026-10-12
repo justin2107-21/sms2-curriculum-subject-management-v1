@@ -62,11 +62,12 @@
             search: async query => {
                 if (!curriculumSelect.value) return [];
                 const data = await ui.fetchJson(api, { action: 'version_options', curriculum_id: curriculumSelect.value, search: query, page: 1, per_page: 20 });
-                return data.versions;
+                return subjectView ? data.versions : data.versions.filter(v => v.version_role === (hidden.id === 'compareVersionA' ? 'reference' : 'proposed'));
             },
             getId: item => item.id,
             format: item => ({ label: item.version_label + (item.effective_academic_year ? ' — ' + item.effective_academic_year : ''), code: item.version_label, title: item.effective_academic_year || item.status }),
             onSelect: () => {
+                if (!subjectView && hidden.id === 'compareVersionB') versionAPicker.clear(false);
                 const duplicate = Boolean(otherPicker && hidden.value === otherPicker()?.getSelectedId());
                 if (duplicate) {
                     otherPicker().clear(false);
@@ -162,24 +163,13 @@
         $('compareValidation').hidden = true; updateCompareAvailability();
     }
     function updateCompareAvailability() {
-        const valid = Boolean($('compareCurriculum').value && $('compareVersionA').value && $('compareVersionB').value && $('compareVersionA').value !== $('compareVersionB').value);
-        if (!valid) clearComparisonResult('Select a program, curriculum, and two different versions to compare their stored placements.');
+        const valid = Boolean($('compareCurriculum').value && $('compareVersionB').value && $('compareVersionA').value !== $('compareVersionB').value);
+        if (!valid) clearComparisonResult('Select a curriculum revision. The reference defaults to its recorded baseline.');
         else loadComparison(1).catch(error => clearComparisonResult(error.message || 'Versions could not be compared.'));
     }
-    function placement(record, prefix) {
-        if (!record[prefix + '_placement_id']) return 'Not present';
-        return [record[prefix + '_year_level'], record[prefix + '_semester']].filter(Boolean).join(' · ') || 'Placement not specified';
-    }
-    function changeName(type) { return ({ added: 'Added', removed: 'Removed', moved: 'Moved', placement_type_changed: 'Placement Type Changed', unchanged: 'Unchanged' })[type] || type; }
-    function comparisonRow(record, i) {
-        state.compareRows.set(String(i), record);
-        const historicalSubject = record.subject_code
-            ? '<strong>' + esc(record.subject_code) + '</strong><span>' + esc(record.subject_title) + '</span><small>Snapshot-backed details where captured</small>'
-            : '<strong>Historical subject details unavailable</strong><span>No complete snapshot exists for either version.</span>';
-        return '<tr><td><span class="history-subject-context">' + historicalSubject + '</span></td>' +
-            '<td><span class="history-change-badge history-change-' + esc(record.change_type) + '">' + esc(changeName(record.change_type)) + '</span></td>' +
-            '<td>' + esc(placement(record, 'version_a')) + '</td><td>' + esc(placement(record, 'version_b')) + '</td>' +
-            '<td><button type="button" class="row-action-button" data-change-details="' + i + '">View Details</button></td></tr>';
+    function comparisonRow(record, index) {
+        state.compareRows.set(String(index), record);
+        return window.CurriculumHistoryComparisonUI.row(record, index);
     }
     function clearComparisonResult(message) {
         state.comparisonRequest++;
@@ -187,35 +177,40 @@
         $('comparisonPagination').innerHTML = ''; $('comparisonPagination').hidden = true; $('comparisonSummary').textContent = message;
         $('comparisonEmpty').textContent = message; $('comparisonEmpty').hidden = false; $('comparisonTableWrap').hidden = true;
         $('historyCimfButton').disabled = true;
+        $('comparisonEvidence').hidden = true; $('comparisonStructures').hidden = true;
     }
     async function loadComparison(page) {
         const request = ++state.comparisonRequest;
-        const data = await ui.fetchJson(api, { action: 'compare_versions', curriculum_id: $('compareCurriculum').value,
-            version_a_id: $('compareVersionA').value, version_b_id: $('compareVersionB').value, page, per_page: 20 });
+        state.comparison=null;state.compareRows.clear();
+        $('comparisonSummary').textContent='Loading reference and revision comparison...';
+        $('comparisonEvidence').hidden=true;$('comparisonStructures').hidden=true;$('comparisonTableWrap').hidden=true;
+        let data;
+        try {
+            data = await ui.fetchJson(api, { action: 'compare_revision', curriculum_id: $('compareCurriculum').value,
+                version_a_id: $('compareVersionA').value, version_b_id: $('compareVersionB').value, page, per_page: 20 });
+        } catch (error) {
+            if (request === state.comparisonRequest) clearComparisonResult(error.message || 'Comparison unavailable.');
+            return;
+        }
         if (request !== state.comparisonRequest) return;
         state.comparison = data; state.compareRows.clear(); ui.setCount($('comparisonCount'), Number(data.pagination.total_records));
-        const s = data.summary, changes = Number(s.added) + Number(s.removed) + Number(s.moved) + Number(s.placement_type_changed);
-        const unitsA = s.version_a_units === null ? 'unavailable without complete snapshots' : ui.formatUnits(s.version_a_units) + ' units';
-        const unitsB = s.version_b_units === null ? 'unavailable without complete snapshots' : ui.formatUnits(s.version_b_units) + ' units';
-        $('comparisonSummary').textContent = 'Version A: ' + s.version_a_subjects + ' subjects · ' + unitsA + '   |   Version B: ' + s.version_b_subjects + ' subjects · ' + unitsB + '   |   Changes: ' + s.added + ' Added · ' + s.removed + ' Removed · ' + s.moved + ' Moved' + (s.placement_type_changed ? ' · ' + s.placement_type_changed + ' Placement Type Changed' : '');
-        $('historyCimfButton').disabled = false;
-        if (!data.comparison.length || changes === 0) {
-            $('comparisonEmpty').textContent = 'No subject placement differences were found between the selected stored versions.';
-            $('comparisonEmpty').hidden = false; $('comparisonTableWrap').hidden = true; $('comparisonPagination').hidden = true;
-        } else {
-            $('comparisonEmpty').hidden = true; $('comparisonTableWrap').hidden = false;
-            $('comparisonRows').innerHTML = data.comparison.map(comparisonRow).join('');
-            $('comparisonPagination').hidden = Number(data.pagination.total_pages) <= 1;
-        }
-        ui.renderPagination($('comparisonPagination'), data.pagination, loadComparison);
-    }
-    function explainChange(record) {
-        const a = placement(record, 'version_a'), b = placement(record, 'version_b');
-        if (record.change_type === 'removed') return 'The subject exists in Version A but is not present in Version B.';
-        if (record.change_type === 'added') return 'The subject is not present in Version A and appears in Version B.';
-        if (record.change_type === 'moved') return 'The stored placement changed from ' + a + ' to ' + b + '.';
-        if (record.change_type === 'placement_type_changed') return 'The stored placement type changed from ' + (Number(record.version_a_is_required) ? 'Required' : 'Optional') + ' to ' + (Number(record.version_b_is_required) ? 'Required' : 'Optional') + '.';
-        return 'The stored placement is the same in both selected versions.';
+        versionAPicker.setSelected(data.version_a,false);versionBPicker.setSelected(data.version_b,false);
+        compareCurriculumPicker.setSelected(data.curriculum,false);compareProgramPicker.setSelected(data.program,false);
+        compareCurriculumInput.disabled=false;versionAInput.disabled=false;versionBInput.disabled=false;
+        const counters=data.summary;
+        $('versionAHeader').textContent='Reference: '+data.version_a.version_label;
+        $('versionBHeader').textContent='Revision: '+data.version_b.version_label;
+        $('comparisonSummary').textContent = counters.total_subjects+' unique subjects · '+counters.unique_changed_subjects+' with confirmed changes · '+
+            ['added','removed','moved','changed','unchanged','unresolved'].map(k=>counters[k]+' '+k).join(' · ')+' · '+counters.counter_semantics;
+        $('comparisonEvidence').innerHTML=window.CurriculumHistoryComparisonUI.evidence(data);$('comparisonEvidence').hidden=false;
+        $('comparisonStructures').innerHTML=window.CurriculumHistoryComparisonUI.structures(data);$('comparisonStructures').hidden=false;
+        $('comparisonEmpty').textContent=data.partial ? 'Comparison coverage is partial. Review the evidence warnings.' : 'All stored subjects are shown, including unchanged records.';
+        $('comparisonEmpty').hidden=false;$('comparisonTableWrap').hidden=!data.comparison.length;
+        $('comparisonRows').innerHTML=data.comparison.map(comparisonRow).join('');
+        $('comparisonPagination').hidden=Number(data.pagination.total_pages)<=1;
+        ui.renderPagination($('comparisonPagination'),data.pagination,loadComparison);
+        // This report is deterministic; no external AI is invoked for comparison.
+        $('historyCimfButton').disabled=true;
     }
     async function showHistoryDetails(index) {
         const row = state.historyRows.get(String(index)); if (!row) return;
@@ -230,17 +225,15 @@
         } catch (error) { ui.showToast(error.message || 'History details could not be loaded.', 'error'); }
     }
     function showChangeDetails(index) {
-        const r = state.compareRows.get(String(index)); if (!r || !state.comparison) return;
-        $('comparisonDetailsContext').textContent = r.subject_code ? r.subject_code + ' · ' + r.subject_title : 'Historical subject details unavailable';
-        const a = placement(r, 'version_a'), b = placement(r, 'version_b');
-        const attrs = (prefix, present) => !present ? 'Not present' : (Number(r[prefix + '_snapshot_complete']) === 1
-            ? esc(r[prefix + '_subject_code']) + ' — ' + esc(r[prefix + '_subject_title']) + '<br>' + ui.formatUnits(r[prefix + '_units']) + ' units · captured ' + esc(r[prefix + '_snapshot_captured_at'] || 'date unavailable')
-            : 'Historical subject details unavailable');
-        $('comparisonDetailsVersions').innerHTML = '<article><span class="eyebrow">VERSION A</span><strong>' + esc(state.comparison.version_a.version_label) + '</strong><p>Record state: ' + esc(state.comparison.version_a.status) + '<br>' + esc(a) + (r.version_a_placement_id ? '<br>' + (Number(r.version_a_is_required) ? 'Required' : 'Optional') + '<br>' + attrs('version_a', true) : '') + '</p></article><article><span class="eyebrow">VERSION B</span><strong>' + esc(state.comparison.version_b.version_label) + '</strong><p>Record state: ' + esc(state.comparison.version_b.status) + '<br>' + esc(b) + (r.version_b_placement_id ? '<br>' + (Number(r.version_b_is_required) ? 'Required' : 'Optional') + '<br>' + attrs('version_b', true) : '') + '</p></article>';
-        $('comparisonDetailsChange').innerHTML = '<span class="history-change-badge history-change-' + esc(r.change_type) + '">' + esc(changeName(r.change_type)) + '</span>';
-        $('comparisonDetailsExplanation').textContent = explainChange(r); changeModal.open();
+        const record = state.compareRows.get(String(index));
+        if (!record || !state.comparison) return;
+        const render = window.CurriculumHistoryComparisonUI;
+        $('comparisonDetailsContext').textContent = 'Shared subject identity #' + record.subject_id;
+        $('comparisonDetailsVersions').innerHTML = '<article><h3>Reference</h3>' + render.values(record.before) + '</article><article><h3>Revision</h3>' + render.values(record.after) + '</article>';
+        $('comparisonDetailsChange').textContent = record.categories.join(' / ');
+        $('comparisonDetailsExplanation').textContent = (record.warning || 'Recorded placement and supported academic values compared.') + (record.revision_clone_snapshot ? ' ' + record.revision_clone_snapshot.notice : '');
+        changeModal.open();
     }
-
     if (subjectView) {
         $('moreHistoryFilters').addEventListener('click', function () {
             const open = this.getAttribute('aria-expanded') !== 'true'; this.setAttribute('aria-expanded', String(open)); $('historyMoreFilters').hidden = !open;
@@ -257,7 +250,15 @@
     async function initialize() {
         if ($('historyCimfButton')) $('historyCimfButton').disabled = true;
         try { await loadPrograms(); } catch (error) { if (subjectView) $('historySummary').textContent = error.message; }
-        if (subjectView) clearHistory(); else clearComparisonResult('Select a program, curriculum, and two different versions to compare their stored placements.');
+        if (subjectView) clearHistory(); else {
+            clearComparisonResult('Select a curriculum revision to compare with its protected reference baseline.');
+            const params=new URLSearchParams(window.location.search);
+            if (params.get('curriculum_id') && params.get('version_b_id')) {
+                $('compareCurriculum').value=params.get('curriculum_id');$('compareVersionB').value=params.get('version_b_id');
+                $('compareVersionA').value=params.get('version_a_id') || '';
+                try {await loadComparison(1);} catch(error) {clearComparisonResult(error.message || 'Comparison unavailable.');}
+            }
+        }
     }
     initialize();
 }());
