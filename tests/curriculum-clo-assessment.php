@@ -50,6 +50,23 @@ cloCheck(str_contains($csvText,'Course Learning Outcomes and Planned Assessment'
 $db->query("UPDATE curriculum_versions SET review_status='under_review' WHERE id=$newVersion");
 cloReject(fn()=>$service->createClo($placement,'CLO2','Must not be recorded.',2,$actor),'Task 2 lifecycle policy protects under-review version');
 $db->query("UPDATE curriculum_versions SET review_status='not_started' WHERE id=$newVersion");
+$lockDb=new mysqli(getenv('DB_HOST'),getenv('DB_USER'),getenv('DB_PASS'),getenv('DB_NAME'),(int)getenv('DB_PORT'));
+$observer=new mysqli(getenv('DB_HOST'),getenv('DB_USER'),getenv('DB_PASS'),getenv('DB_NAME'),(int)getenv('DB_PORT'));
+$lockDb->begin_transaction();$lockDb->query("SELECT id FROM academic_programs WHERE id={$f['program']} FOR UPDATE");
+$raceAuditsBefore=(int)$db->query("SELECT COUNT(*) FROM audit_logs WHERE action='CURRICULUM_CLO_CREATE'")->fetch_row()[0];
+$proc=proc_open([PHP_BINARY,__DIR__.'/curriculum-clo-lock-worker.php',(string)$placement,(string)$actor],[0=>['pipe','r'],1=>['pipe','w'],2=>['pipe','w']],$pipes,dirname(__DIR__),getenv(),['bypass_shell'=>true]);
+if(!is_resource($proc))throw new RuntimeException('Could not start CLO lock worker.');fclose($pipes[0]);$ready=fgets($pipes[1]);
+if(!is_string($ready)||!preg_match('/^READY (\d+)/',$ready,$workerMatch))throw new RuntimeException('CLO lock worker did not reach its barrier.');$workerThread=(int)$workerMatch[1];$waiting=false;
+for($i=0;$i<500;$i++){$waits=$observer->query('SELECT r.trx_mysql_thread_id FROM information_schema.INNODB_LOCK_WAITS w JOIN information_schema.INNODB_TRX r ON r.trx_id=w.requesting_trx_id')->fetch_all(MYSQLI_NUM);
+    if(in_array($workerThread,array_map('intval',array_column($waits,0)),true)){$waiting=true;break;}
+    $query=$observer->query('SELECT INFO FROM information_schema.PROCESSLIST WHERE ID='.$workerThread)->fetch_row();
+    if($query&&str_contains((string)$query[0],'SELECT id FROM academic_programs WHERE id=? FOR UPDATE')){$waiting=true;break;}usleep(10000);}
+if(!$waiting){$lockDb->rollback();proc_terminate($proc);throw new RuntimeException('CLO writer did not wait on the expected version-owner lock.');}
+$lockDb->query("UPDATE curriculum_versions SET review_status='under_review' WHERE id=$newVersion");$lockDb->commit();
+$workerOut=stream_get_contents($pipes[1]);$workerErr=stream_get_contents($pipes[2]);fclose($pipes[1]);fclose($pipes[2]);$workerExit=proc_close($proc);$observer->close();$lockDb->close();
+$raceAuditsAfter=(int)$db->query("SELECT COUNT(*) FROM audit_logs WHERE action='CURRICULUM_CLO_CREATE'")->fetch_row()[0];
+cloCheck($workerExit===0&&str_contains($workerOut,'REJECTED')&&$workerErr===''&&$raceAuditsBefore===$raceAuditsAfter&&(int)$db->query("SELECT COUNT(*) FROM curriculum_version_course_learning_outcomes WHERE curriculum_version_subject_id=$placement AND clo_code='RACE-CLO'")->fetch_row()[0]===0,'post-wait current lifecycle read rejects Task 8 CLO write without data or success audit');
+$db->query("UPDATE curriculum_versions SET review_status='not_started' WHERE id=$newVersion");
 cloReject(fn()=>(new CurriculumCloAssessmentService($db))->createClo((int)$f['placements'][0],'REF','Cannot write reference.',1,$actor),'Task 2 lifecycle policy protects immutable reference');
 cloReject(fn()=>(new CurriculumVersionSubjectService($db))->remove($placement),'placement deletion preserves CLO evidence');
 $service->withdrawPlan($placement,$clo,$plan,$actor);$service->withdrawAlignment($placement,$alignment,$actor);
