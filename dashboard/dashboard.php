@@ -68,6 +68,7 @@ function dashboard_activity_time(string $value): string
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Dashboard - BCP Curriculum &amp; Subject Management</title>
   <link rel="stylesheet" href="../css/dashboard.css"/>
+  <link rel="stylesheet" href="../modules/curriculum/assets/curriculum.css"/>
   <link rel="stylesheet" href="../css/curriculum-dashboard.css?v=<?= $dashboardCssVersion ?>"/>
   <link rel="stylesheet" href="../css/csms-typography.css?v=<?= $typographyCssVersion ?>"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
@@ -86,7 +87,7 @@ require __DIR__ . '/../shared/sidebar.php';
       data-curriculum-api="../modules/curriculum/http/curriculum_actions.php"
       data-version-api="../modules/curriculum/http/version_actions.php"
       data-assignment-api="../modules/curriculum/http/assignment_actions.php" data-program-api="../modules/curriculum/http/program_actions.php" data-analytics-api="analytics.php"
-      data-user-id="<?= (int)$userId ?>" data-can-view-prerequisite="<?= $userId !== null && user_can($userId, 'prerequisite.view') ? '1' : '0' ?>"
+      data-user-id="<?= (int)$userId ?>" data-can-view-programs="<?= $userId !== null && user_can($userId, 'program.view') ? '1' : '0' ?>" data-can-view-prerequisite="<?= $userId !== null && user_can($userId, 'prerequisite.view') ? '1' : '0' ?>"
       data-can-view-elective="<?= $userId !== null && user_can($userId, 'elective.view') ? '1' : '0' ?>" data-can-view-weighting="<?= $userId !== null && user_can($userId, 'grade_weighting.view') ? '1' : '0' ?>"
       data-can-view-curriculum="<?= $canViewCurriculum ? '1' : '0' ?>">
     <div class="page-title-bar dashboard-title-bar">
@@ -156,7 +157,7 @@ require __DIR__ . '/../shared/sidebar.php';
 </div>
 
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
-<script src="../js/dashboard.js?v=<?= $dashboardScriptVersion ?>"></script>
+<script src="../modules/curriculum/assets/curriculum-common.js?v=<?= substr(hash_file('sha256', __DIR__.'/../modules/curriculum/assets/curriculum-common.js'),0,16) ?>"></script>
 <?php if ($canViewCurriculum): ?><script src="../js/curriculum-dashboard.js?v=<?= $curriculumDashboardScriptVersion ?>"></script><?php endif; ?>
 </body>
 </html>

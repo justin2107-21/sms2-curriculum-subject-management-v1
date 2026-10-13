@@ -1616,3 +1616,5 @@ body.curriculum-modal-open { overflow: hidden; }
 .reference-action-details > summary { cursor: pointer; color: var(--primary-color, #174a7e); font-weight: 700; }
 .reference-action-details[hidden] { display: none; }
 .reference-action-details .domain-form { margin-top: .75rem; }
+
+.record-autocomplete-code { overflow-wrap:anywhere; min-width:0; }

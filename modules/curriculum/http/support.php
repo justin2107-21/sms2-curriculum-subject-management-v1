@@ -50,6 +50,10 @@ function curriculum_handle_error(Throwable $error): void
         json_response(false, $error->getMessage(), [], 404);
     }
 
+    if ($error instanceof mysqli_sql_exception && in_array((int)$error->getCode(), [1054,1146], true)) {
+        log_application_error('Curriculum schema does not match application; verify migration compatibility', $error);
+        json_response(false, 'This workspace database schema does not match the application. Ask the local administrator to verify its migration status before continuing. No automatic upgrade was performed.', ['error_code'=>'schema_mismatch'], 503);
+    }
     log_application_error('Curriculum domain request failed', $error);
-    json_response(false, 'Unable to complete the curriculum request at this time.', [], 500);
+    json_response(false, 'The curriculum service could not complete this request. Retry it; if the problem continues, ask the administrator to check the application log.', ['error_code'=>'service_unavailable'], 500);
 }

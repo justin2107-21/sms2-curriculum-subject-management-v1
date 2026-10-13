@@ -29,8 +29,13 @@ class CurriculumVersionService
 
     public function list(int $curriculumId, array $input): array
     {
-        if (!$this->curricula->findById($curriculumId)) {
+        $curriculum=$this->curricula->findById($curriculumId);
+        if (!$curriculum) {
             throw new DomainNotFoundException('Curriculum not found.');
+        }
+        $program=DomainValidator::optionalPositiveId($input['academic_program_id']??null,'Academic program');
+        if ($program!==null && $program!==(int)$curriculum['academic_program_id']) {
+            throw new DomainValidationException('The selected curriculum does not belong to this program.');
         }
         $query = DomainValidator::listQuery($input, ['draft', 'active', 'archived']);
         $result = $this->versions->paginateByCurriculum($curriculumId, $query);

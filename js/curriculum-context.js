@@ -3,6 +3,7 @@
   const userId = document.currentScript?.dataset.userId || 'guest';
   const storageKey = 'csms.curriculum-context.' + userId;
   let restoring = false;
+  let restoreGeneration = 0;
 
   try {
     const navigation = performance.getEntriesByType('navigation')[0];
@@ -26,6 +27,7 @@
   }
   document.addEventListener('csms:curriculum-context-selection', function (event) {
     if (restoring) return;
+    restoreGeneration++;
     const detail = event.detail || {};
     const keys = ['program', 'curriculum', 'version'];
     const context = read();
@@ -45,17 +47,19 @@
   document.addEventListener('csms:curriculum-context-cascade-ready', async function (event) {
     const context = read();
     const { levels, selectors } = event.detail || {};
-    if (!Array.isArray(levels) || !Array.isArray(selectors)) return;
-    restoring = true;
+    if (!Array.isArray(levels) || !Array.isArray(selectors) || event.detail.restoreSavedContext === false) return;
+    const generation=++restoreGeneration;
     try {
       for (let index = 0; index < Math.min(3, levels.length); index += 1) {
         const key = ['program', 'curriculum', 'version'][index];
         const saved = context[key];
         if (!saved?.id || !selectors[index]) break;
         const candidates = await levels[index].search(String(saved.query || ''));
+        if(generation!==restoreGeneration)return;
         const item = (Array.isArray(candidates) ? candidates : []).find(record => String((levels[index].getId ? levels[index].getId(record) : record.id)) === String(saved.id));
         if (!item) break;
-        selectors[index].setSelected(item);
+        restoring=true;
+        try { selectors[index].setSelected(item); } finally { restoring=false; }
       }
     } catch (_) {
       // The current page remains usable if saved context is stale or inaccessible.

@@ -29,7 +29,7 @@
         program: null, curriculum: null, version: null, loaded: false, year: '', requirements: [], relationshipRequest: null, relationshipsLoaded: false, requirementError: '', detailRequest: 0,
         mappings: new Map(), allMappings: [], pendingRemoval: null,
         selectedMapping: null, currentTab: 'map', mapRequest: 0,
-        reviewLoaded: false, yearValues: [], semesterValues: [], outcomeData: null, outcomeRequest: 0
+        reviewLoaded: false, yearValues: [], semesterValues: [], outcomeData: null, outcomeRequest: 0, cloRequest: 0
     };
     window.CSMSPageCIMFContext = () => ({academic_program_id:state.program?.id || '',curriculum_id:state.curriculum?.id || '',curriculum_version_id:state.version?.id || '',subject_id:state.selectedMapping?.subject_id || '',year_level:state.year || ''});
     const el = id => document.getElementById(id);
@@ -121,6 +121,7 @@
     }
 
     const mappingContextCascade = ui.createCascadingAutocomplete({
+        restoreSavedContext: !new URLSearchParams(window.location.search).has('version_id'),
         levels: [
             {
                 input: programInput, valueInput: programIdInput, list: el('mappingProgramOptions'),
@@ -242,6 +243,10 @@
     async function loadMap() {
         const request = ++state.mapRequest;
         const version = versionIdInput.value;
+        state.outcomeRequest++; state.cloRequest++; state.outcomeData=null;
+        el('cloPlacementSelect').replaceChildren(new Option('Select a placement',''));
+        showPanelState(el('cloAssessmentContent'), 'Select a curriculum version and subject placement.');
+        showPanelState(el('outcomeMatrix'), 'Select a BSIT curriculum version to view its recorded outcome mappings.');
         if (state.currentTab === 'outcomes') loadOutcomes();
         state.loaded = false; state.reviewLoaded = false; state.allMappings = []; state.requirements = []; state.relationshipRequest = null; state.relationshipsLoaded = false; state.requirementError = '';
         connectionModal?.close(); renderConnections();
@@ -280,7 +285,7 @@
             renderConnections();
         } catch (error) {
             if (request !== state.mapRequest) return;
-            state.loaded = false; updateContextMessage();
+            state.loaded = false; el('mappingCount').textContent='Not loaded'; updateContextMessage();
             ['mappingMap', 'mappingReviewCards', 'mappingReviewResults'].forEach(id => showPanelState(el(id), error.message || 'Selected context could not be loaded.', true));
         }
     }
@@ -328,12 +333,13 @@
 
     async function loadCloWorkspace() {
         const placementId = el('cloPlacementSelect')?.value, target = el('cloAssessmentContent');
+        const request=++state.cloRequest, version=versionIdInput.value;
         if (!target) return;
         if (!placementId) { showPanelState(target, 'Select a subject placement to view its course learning outcomes.'); return; }
         showPanelState(target, 'Loading placement-owned CLO and planned assessment records...');
         try {
             const data = await ui.fetchJson(api.clos, {action:'workspace',placement_id:placementId});
-            if (String(el('cloPlacementSelect').value) !== String(placementId)) return;
+            if (request!==state.cloRequest || version!==versionIdInput.value || String(el('cloPlacementSelect').value) !== String(placementId)) return;
             const clos = arr(data.clos), alignments = arr(data.alignments), plans = arr(data.plans), parents = arr(data.parent_mappings);
             const editable = Boolean(data.editable), canClo = editable && permission.manageClos, canPlan = editable && permission.managePlans;
             const parentOptions = parents.map(p => '<option value="' + Number(p.mapping_id) + '">' + esc(p.outcome_code + ' · ' + p.outcome_text) + '</option>').join('');
@@ -344,13 +350,13 @@
                     const ownPlans = plans.filter(p => Number(p.clo_id) === Number(clo.id));
                     const activeClo = clo.record_state === 'active';
                     return '<article class="outcome-card"><header><div><span class="record-code">' + esc(clo.clo_code) + '</span><span class="outcome-status">' + esc(clo.record_state === 'withdrawn' ? 'Withdrawn · history retained' : (clo.review_state === 'awaiting_review' ? 'Awaiting academic review' : (clo.origin === 'inherited' ? 'Inherited · review required' : 'User authored'))) + '</span><p>' + esc(clo.clo_statement) + '</p></div><span>Sequence ' + Number(clo.sequence_order) + '</span>' + (canClo && activeClo ? '<button type="button" class="button-muted" data-clo-action="clo_withdraw" data-id="' + Number(clo.id) + '">Withdraw CLO</button>' : '') + '</header>' +
-                        '<h4>Graduate outcome alignments</h4>' + (links.length ? '<ul>' + links.map(a => '<li><strong>' + esc(a.outcome_code) + '</strong> ' + esc(a.outcome_text) + '<p>' + esc(a.rationale) + '</p>' + (a.review_state === 'awaiting_review' ? '<small>Awaiting academic review</small>' : '') + (canClo ? '<button type="button" class="button-muted" data-clo-action="alignment_withdraw" data-id="' + Number(a.id) + '" data-clo="' + Number(clo.id) + '">Withdraw alignment</button>' : '') + '</li>').join('') + '</ul>' : '<p>No graduate outcome alignment recorded.</p>') +
-                        (canClo && parentOptions ? '<form class="clo-alignment-form"><input type="hidden" name="clo_id" value="' + Number(clo.id) + '"><label>Existing graduate outcome mapping<select name="parent_mapping_id" required><option value="">Choose mapped outcome</option>' + parentOptions + '</select></label><label>Academic rationale<textarea name="rationale" maxlength="3000" required></textarea></label><button class="button-muted">Align CLO</button></form>' : (canClo ? '<p class="mapping-state">Record a subject-to-graduate-outcome mapping above before aligning a CLO.</p>' : '')) +
-                        '<h4>Planned assessment</h4>' + (ownPlans.length ? ownPlans.map(p => '<p><strong>' + esc(p.plan_status === 'planned' ? 'Planned' : 'Incomplete plan') + '</strong> · ' + esc(p.assessment_method || 'Method not recorded') + '<br>' + esc(p.performance_indicator || 'Performance indicator not recorded') + '<br>' + esc(p.planned_task || p.evidence_description || 'Task/evidence not recorded') + (p.review_state === 'awaiting_review' ? '<br>Awaiting academic review' : '') + (canPlan ? ' <button type="button" class="button-muted" data-clo-action="plan_withdraw" data-id="' + Number(p.id) + '" data-clo="' + Number(clo.id) + '">Withdraw plan</button>' : '') + '</p>').join('') : '<p>No assessment plan recorded.</p>') +
-                        (canPlan ? '<form class="clo-plan-form"><input type="hidden" name="clo_id" value="' + Number(clo.id) + '"><label>Assessment method<input name="assessment_method" maxlength="180"></label><label>Planned task<textarea name="planned_task" maxlength="12000"></textarea></label><label>Evidence description<textarea name="evidence_description" maxlength="12000"></textarea></label><label>Performance indicator / criterion<textarea name="performance_indicator" maxlength="6000"></textarea></label><label>Rubric / standard (optional)<textarea name="rubric_or_standard" maxlength="12000"></textarea></label><button class="button-muted">Record planned assessment</button></form>' : '') +
+                        '<h4>Graduate outcome alignments</h4>' + (links.length ? '<ul>' + links.map(a => '<li><strong>' + esc(a.outcome_code) + '</strong> ' + esc(a.outcome_text) + '<p>' + esc(a.rationale) + '</p>' + (a.review_state === 'awaiting_review' ? '<small>Awaiting academic review</small>' : '') + (canClo && a.record_state === 'active' ? '<button type="button" class="button-muted" data-clo-action="alignment_withdraw" data-id="' + Number(a.id) + '" data-clo="' + Number(clo.id) + '">Withdraw alignment</button>' : '') + '</li>').join('') + '</ul>' : '<p>No graduate outcome alignment recorded.</p>') +
+                        (canClo && activeClo && parentOptions ? '<form class="clo-alignment-form"><input type="hidden" name="clo_id" value="' + Number(clo.id) + '"><label>Existing graduate outcome mapping<select name="parent_mapping_id" required><option value="">Choose mapped outcome</option>' + parentOptions + '</select></label><label>Academic rationale<textarea name="rationale" maxlength="3000" required></textarea></label><button class="button-muted">Align CLO</button></form>' : (canClo ? '<p class="mapping-state">Record a subject-to-graduate-outcome mapping above before aligning a CLO.</p>' : '')) +
+                        '<h4>Planned assessment</h4>' + (ownPlans.length ? ownPlans.map(p => '<p><strong>' + esc(p.plan_status === 'planned' ? 'Planned' : 'Incomplete plan') + '</strong> · ' + esc(p.assessment_method || 'Method not recorded') + '<br>' + esc(p.performance_indicator || 'Performance indicator not recorded') + '<br>' + esc(p.planned_task || p.evidence_description || 'Task/evidence not recorded') + (p.review_state === 'awaiting_review' ? '<br>Awaiting academic review' : '') + (canPlan && p.record_state === 'active' ? ' <button type="button" class="button-muted" data-clo-action="plan_withdraw" data-id="' + Number(p.id) + '" data-clo="' + Number(clo.id) + '">Withdraw plan</button>' : '') + '</p>').join('') : '<p>No assessment plan recorded.</p>') +
+                        (canPlan && activeClo ? '<form class="clo-plan-form"><input type="hidden" name="clo_id" value="' + Number(clo.id) + '"><label>Assessment method<input name="assessment_method" maxlength="180"></label><label>Planned task<textarea name="planned_task" maxlength="12000"></textarea></label><label>Evidence description<textarea name="evidence_description" maxlength="12000"></textarea></label><label>Performance indicator / criterion<textarea name="performance_indicator" maxlength="6000"></textarea></label><label>Rubric / standard (optional)<textarea name="rubric_or_standard" maxlength="12000"></textarea></label><button class="button-muted">Record planned assessment</button></form>' : '') +
                         '</article>';
                 }).join('') : '<p class="mapping-state">No course learning outcomes recorded for this placement.</p>');
-        } catch (error) { showPanelState(target, error.message || 'CLO workspace could not be loaded.', true); }
+        } catch (error) { if(request===state.cloRequest && version===versionIdInput.value) showPanelState(target, error.message || 'CLO workspace could not be loaded.', true); }
     }
 
     el('cloPlacementSelect')?.addEventListener('change', loadCloWorkspace);
@@ -599,7 +605,7 @@
             if (request !== state.mapRequest) return;
             if ((params.get('program_id') && Number(params.get('program_id')) !== Number(program.id)) || (params.get('curriculum_id') && Number(params.get('curriculum_id')) !== Number(curriculum.id))) throw new Error('The linked mapping context is inconsistent. Please choose a context.');
             state.program = program; state.curriculum = curriculum; state.version = version;
-            programAutocomplete.setSelected(program, false); curriculumAutocomplete.setSelected(curriculum, false); versionAutocomplete.setSelected(version, false);
+            mappingContextCascade.setContext([program,curriculum,version]);
             resetTrace();
             updateContextMessage(); await loadMap();
             if (params.get('placement_id')) openMappingDetails(state.mappings.get(Number(params.get('placement_id'))));

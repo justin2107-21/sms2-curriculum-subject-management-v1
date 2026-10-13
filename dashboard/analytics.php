@@ -1,14 +1,22 @@
 <?php
-require_once __DIR__ . '/../shared/bootstrap.php';
+require_once __DIR__ . '/../modules/curriculum/http/support.php';
+require_once __DIR__ . '/../modules/curriculum/validators/DomainValidator.php';
+require_http_method(['GET']);
 require_permission('dashboard.view', true);
 require_permission('curriculum.view', true);
 header('Content-Type: application/json; charset=utf-8');
 $id = filter_input(INPUT_GET, 'version_id', FILTER_VALIDATE_INT);
 if (!$id || $id < 1) { http_response_code(400); echo json_encode(['success'=>false,'message'=>'Select a curriculum version.']); exit; }
 $db = authorization_connection();
+try {
+$db->query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+$db->query('START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY');
 $version = $db->prepare('SELECT v.id,v.version_label,v.status,c.id curriculum_id,c.curriculum_code,c.curriculum_name,p.id program_id,p.program_code,p.program_name FROM curriculum_versions v JOIN curricula c ON c.id=v.curriculum_id JOIN academic_programs p ON p.id=c.academic_program_id WHERE v.id=?');
 $version->bind_param('i',$id); $version->execute(); $context=$version->get_result()->fetch_assoc(); $version->close();
 if (!$context) { http_response_code(404); echo json_encode(['success'=>false,'message'=>'Curriculum version not found.']); exit; }
+foreach (['program_id'=>'program_id','curriculum_id'=>'curriculum_id'] as $parameter=>$field) {
+    if (isset($_GET[$parameter]) && DomainValidator::positiveId($_GET[$parameter], 'Selected context') !== (int)$context[$field]) throw new DomainValidationException('The selected program, curriculum and version do not belong together.');
+}
 $q=$db->prepare('SELECT m.id,m.subject_id,m.year_level,m.semester,m.is_required,s.units FROM curriculum_version_subjects m JOIN subjects s ON s.id=m.subject_id WHERE m.curriculum_version_id=? ORDER BY m.year_level,m.semester,m.sequence_order,m.id');
 $q->bind_param('i',$id);$q->execute();$rows=$q->get_result()->fetch_all(MYSQLI_ASSOC);$q->close();
 $years=[];$terms=[];$units=0;$required=0;
@@ -18,4 +26,7 @@ $pre=$db->prepare("SELECT COUNT(DISTINCT subject_id) subjects FROM curriculum_su
 $eg=$db->prepare('SELECT COUNT(*) total FROM curriculum_elective_groups WHERE curriculum_version_id=?');$eg->bind_param('i',$id);$eg->execute();$electives=(int)$eg->get_result()->fetch_assoc()['total'];$eg->close();
 $gw=$db->prepare('SELECT COUNT(DISTINCT g.id) configured, SUM(CASE WHEN (SELECT COALESCE(SUM(c.weight_percentage),0) FROM grade_weighting_components c WHERE c.scheme_id=g.id)=100 THEN 1 ELSE 0 END) complete FROM curriculum_version_subjects m LEFT JOIN grade_weighting_schemes g ON g.curriculum_version_subject_id=m.id WHERE m.curriculum_version_id=?');$gw->bind_param('i',$id);$gw->execute();$weight=$gw->get_result()->fetch_assoc();$gw->close();
 $count=count($rows);$conf=(int)$weight['configured'];$complete=(int)$weight['complete'];$status=$count===0?'Not Configured':($complete===$count?'Configured':($conf===0?'Not Configured':($conf<$count?'Partially Configured':'Incomplete')));
+$db->commit();
 echo json_encode(['success'=>true,'context'=>$context,'metrics'=>['mapped_subjects'=>$count,'units'=>$units,'year_levels'=>count($years),'requirements'=>(int)$requirements['total'],'subjects_with_requirements'=>(int)$requirements['subjects'],'subjects_with_prerequisites'=>$prerequisiteSubjects,'elective_groups'=>$electives,'grade_status'=>$status,'weight_summary'=>"$complete Complete  /  ".max(0,$count-$complete).' Not fully configured'],'years'=>$years,'terms'=>$terms,'required'=>$required,'optional'=>$count-$required,'total'=>$count],JSON_UNESCAPED_UNICODE);
+
+} catch (Throwable $error) { $db->rollback(); curriculum_handle_error($error); }

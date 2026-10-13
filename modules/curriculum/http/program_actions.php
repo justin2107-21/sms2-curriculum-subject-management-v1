@@ -13,6 +13,12 @@ try {
             curriculum_require_read('program.view');
             json_response(true, 'Academic programs loaded.', $service->list($_GET));
 
+        case 'summary':
+            curriculum_require_read('program.view');
+            require_permission('curriculum.view', true);
+            $id = DomainValidator::positiveId($_GET['id'] ?? null, 'Academic program');
+            json_response(true, 'Program curriculum counts loaded.', ['summary'=>$service->summary($id)]);
+
         case 'get':
             curriculum_require_read('program.view');
             $id = DomainValidator::positiveId($_GET['id'] ?? null, 'Academic program');

@@ -60,10 +60,11 @@
     }
 
     class CurriculumRequestError extends Error {
-        constructor(message, status) {
+        constructor(message, status, code) {
             super(message);
             this.name = 'CurriculumRequestError';
             this.status = status;
+            this.code = code || '';
         }
     }
 
@@ -91,7 +92,7 @@
         if (!response.ok || !payload.success) {
             throw new CurriculumRequestError(
                 payload.message || 'The request could not be completed.',
-                response.status
+                response.status, payload.error_code
             );
         }
         return payload;
@@ -111,7 +112,7 @@
         if (!response.ok || !payload.success) {
             throw new CurriculumRequestError(
                 payload.message || 'The request could not be completed.',
-                response.status
+                response.status, payload.error_code
             );
         }
         return payload;
@@ -261,6 +262,13 @@
             row.setAttribute('role', 'status');
             row.textContent = message;
             list.appendChild(row);
+            if (kind === 'error') {
+                const retry = document.createElement('button');
+                retry.type = 'button'; retry.className = 'record-autocomplete-option';
+                retry.textContent = 'Retry search';
+                retry.addEventListener('click', () => { if (!input.disabled) scheduleSearch(true); });
+                list.appendChild(retry);
+            }
             setExpanded(true);
         }
 
@@ -390,7 +398,9 @@
                 render(ranked.slice(0, options.maxSuggestions || (contextEntity ? 3 : 5)));
             } catch (error) {
                 if (sequence !== requestSequence) return;
-                showState(options.errorText || 'Matching records could not be loaded.', 'error');
+                showState(error.status === 403 ? 'You do not have permission to view these records.' :
+                    (error.status === 401 ? 'Your session has ended. Sign in again.' :
+                    (error.message || options.errorText || 'Matching records could not be loaded. Retry the search.')), 'error');
                 if (options.onError) options.onError(error);
             }
         }
@@ -565,9 +575,15 @@
         });
 
         syncAvailability(-1);
-        document.dispatchEvent(new CustomEvent('csms:curriculum-context-cascade-ready', { detail: { levels, selectors } }));
+        document.dispatchEvent(new CustomEvent('csms:curriculum-context-cascade-ready', { detail: { levels, selectors, restoreSavedContext: config.restoreSavedContext !== false } }));
         return {
             get: function (index) { return selectors[index] || null; },
+            setContext: function (items) {
+                if (!Array.isArray(items) || items.length !== selectors.length) throw new Error('Incomplete curriculum context.');
+                selectors.forEach((selector,index) => selector.setSelected(items[index],false));
+                syncAvailability(-1);
+                items.forEach((item,index) => document.dispatchEvent(new CustomEvent('csms:curriculum-context-selection',{detail:{index,item,action:'select'}})));
+            },
             clear: function (index) {
                 const start = Number.isInteger(index) ? index : 0;
                 selectors[start]?.clear(false);
@@ -608,6 +624,13 @@
 
     function setCount(element, count) {
         if (element) element.textContent = count + (count === 1 ? ' record' : ' records');
+    }
+
+    function setCountState(element, state) {
+        if (!element) return;
+        element.textContent = state === 'loading' ? 'Loading...' : 'Not loaded';
+        element.dataset.loadState = state;
+        element.setAttribute('aria-live','polite');
     }
 
     function renderPagination(container, pagination, onPage) {
@@ -694,7 +717,7 @@
         statusBadge,
         formatDate,
         formatUnits,
-        setCount,
+        setCount, setCountState,
         renderPagination,
         debounce
     };

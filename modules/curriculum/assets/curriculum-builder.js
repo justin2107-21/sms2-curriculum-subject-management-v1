@@ -303,6 +303,7 @@
         const sequence = ++state.programDetailsRequest;
         state.viewingProgramId = Number(id);
         state.viewingProgram = null;
+        const summaryNote=document.getElementById('programSummaryNotice');if(summaryNote)summaryNote.hidden=true;
         programDetailsModal.open();
         document.getElementById('programDetailsName').textContent = 'Loading program...';
         document.getElementById('programDetailsCode').textContent = '';
@@ -331,7 +332,9 @@
                 } catch (summaryError) {
                     if (sequence !== state.programDetailsRequest) return;
                     ['programCurriculaTotal', 'programVersionsTotal', 'programPlacementsTotal']
-                        .forEach(function (fieldId) { document.getElementById(fieldId).textContent = 'Unavailable'; });
+                        .forEach(function (fieldId) { document.getElementById(fieldId).textContent = summaryError.status === 403 ? 'Access restricted' : 'Not loaded'; });
+                    const note=document.getElementById('programSummaryNotice');
+                    if(note){note.textContent=summaryError.message || 'Counts could not be loaded. Reopen these details to retry.';note.hidden=false;}
                 }
             }
         } catch (error) {
@@ -342,37 +345,14 @@
     }
 
     async function loadProgramCurriculumSummary(program, request) {
-        const curriculaPayload = await ui.fetchJson(endpoints.curricula, {
-            action: 'list', page: 1, per_page: 50, search: '', status: '',
-            academic_program_id: program.id
-        });
-        if (request !== state.programDetailsRequest) return;
-        const curricula = curriculaPayload.curricula || [];
-        let versionCount = 0;
-        let placementCount = 0;
-
-        for (const curriculum of curricula) {
-            const versionsPayload = await ui.fetchJson(endpoints.versions, {
-                action: 'list', curriculum_id: curriculum.id, page: 1, per_page: 50
-            });
-            if (request !== state.programDetailsRequest) return;
-            for (const version of versionsPayload.versions || []) {
-                const assignments = await window.CurriculumPlacementView.load(
-                    page => ui.fetchJson(endpoints.assignments, {
-                        action: 'list', curriculum_version_id: version.id, page: page, per_page: 50
-                    }),
-                    () => request === state.programDetailsRequest
-                );
-                if (request !== state.programDetailsRequest) return;
-                if (assignments === null) return;
-                versionCount += 1;
-                placementCount += assignments.length;
-            }
-        }
-        if (request !== state.programDetailsRequest) return;
-        document.getElementById('programCurriculaTotal').textContent = String(curricula.length);
-        document.getElementById('programVersionsTotal').textContent = String(versionCount);
-        document.getElementById('programPlacementsTotal').textContent = String(placementCount);
+        const payload=await ui.fetchJson(endpoints.programs,{action:'summary',id:program.id});
+        if(request!==state.programDetailsRequest)return;
+        const summary=payload.summary;
+        document.getElementById('programCurriculaTotal').textContent=String(summary.curricula);
+        document.getElementById('programVersionsTotal').textContent=String(summary.versions);
+        document.getElementById('programPlacementsTotal').textContent=String(summary.placements);
+        const note=document.getElementById('programSummaryNotice');
+        if(note){note.textContent=summary.scope;note.hidden=false;}
     }
 
     function openProgramArchiveConfirmation() {
@@ -753,7 +733,7 @@
         tableState(placementRows, columns.placements, 'Select a curriculum version to view assigned subjects.', false);
         document.getElementById('versionPagination').innerHTML = '';
         document.getElementById('placementPagination').innerHTML = '';
-        ui.setCount(document.getElementById('versionCount'), 0);
+        ui.setCountState(document.getElementById('versionCount'), 'loading');
         setButtonEnabled('newVersionButton', false);
         setButtonEnabled('assignSubjectButton', false);
     }
@@ -764,13 +744,6 @@
             const curriculum = payload.curriculum;
             setCurriculumContext(curriculum.id, curriculum);
             await loadCurricula(1);
-            const versions = await ui.fetchJson(endpoints.versions, {
-                action: 'list', curriculum_id: curriculum.id, page: 1, per_page: 50
-            });
-            const version = versions.versions.find(function (item) {
-                return String(item.status).toLowerCase() === 'active';
-            }) || versions.versions[0];
-            if (version) setVersionContext(version.id, version.version_label);
         } catch (error) {
             ui.showToast(error.message || 'Curriculum context could not be restored.', 'warning');
         }
@@ -805,7 +778,8 @@
             state.selectedCurriculum = null;
             document.getElementById('detailCurriculumName').textContent = 'Curriculum unavailable';
             document.getElementById('detailCurriculumCode').textContent = error.message || 'The record could not be loaded.';
-            tableState(versionRows, columns.versions, 'Curriculum versions could not be loaded.', true);
+            ui.setCountState(document.getElementById('versionCount'), 'error');
+            tableState(versionRows, columns.versions, error.message || 'Curriculum versions could not be loaded.', true);
         }
     }
 
@@ -814,6 +788,7 @@
         const curriculumId = state.selectedCurriculumId;
         const sequence = ++state.versionRequest;
         state.versionPage = Number(page) || 1;
+        ui.setCountState(document.getElementById('versionCount'), 'loading');
         tableState(versionRows, columns.versions, 'Loading curriculum versions…', false);
         try {
             const payload = await ui.fetchJson(endpoints.versions, {
@@ -879,9 +854,13 @@
             }
         } catch (error) {
             if (sequence !== state.versionRequest) return;
-            ui.setCount(document.getElementById('versionCount'), 0);
+            ui.setCountState(document.getElementById('versionCount'), 'error');
             document.getElementById('versionPagination').innerHTML = '';
             tableState(versionRows, columns.versions, error.message || 'Curriculum versions could not be loaded.', true);
+            const retry = document.createElement('button');
+            retry.type='button'; retry.className='button-muted'; retry.textContent='Retry loading versions';
+            retry.addEventListener('click', () => loadVersions(state.versionPage));
+            versionRows.appendChild(retry);
         }
     }
 

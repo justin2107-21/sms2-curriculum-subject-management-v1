@@ -18,6 +18,18 @@ class AcademicProgramRepository
         return $row;
     }
 
+    /** One authoritative aggregate, without pagination or lifecycle-column dependencies. */
+    public function curriculumSummary(int $programId): array
+    {
+        $stmt=RepositoryQuery::execute($this->db,
+            'SELECT COUNT(DISTINCT c.id) curricula,COUNT(DISTINCT v.id) versions,COUNT(p.id) placements
+             FROM curricula c LEFT JOIN curriculum_versions v ON v.curriculum_id=c.id
+             LEFT JOIN curriculum_version_subjects p ON p.curriculum_version_id=v.id
+             WHERE c.academic_program_id=?','i',[$programId]);
+        $row=$stmt->get_result()->fetch_assoc();$stmt->close();
+        return array_map('intval',$row)+['scope'=>'All stored curricula and versions, including archived records; subjects are counted as version placements.'];
+    }
+
     public function codeExists(string $code, ?int $excludeId = null): bool
     {
         if ($excludeId === null) {

@@ -24,6 +24,12 @@ class AcademicProgramService
         return $program;
     }
 
+    public function summary(int $id): array
+    {
+        $this->get($id);
+        return $this->programs->curriculumSummary($id);
+    }
+
     public function list(array $input): array
     {
         $query = DomainValidator::listQuery($input, ['active', 'inactive']);

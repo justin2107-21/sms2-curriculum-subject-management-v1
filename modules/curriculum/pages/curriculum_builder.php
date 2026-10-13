@@ -303,12 +303,13 @@ require __DIR__ . '/../../../shared/sidebar.php';
         <div class="program-degree-level"><div><dt>Degree Level</dt><dd id="programDetailsType"></dd></div><?php if ($canViewCurricula): ?><a class="secondary-action-button program-see-curricula" id="programSeeCurricula" href="curricula.php"><i class="fa-solid fa-list"></i> See Curriculas</a><?php endif; ?></div>
       </dl>
       <?php if ($canViewCurricula): ?>
+      <p id="programSummaryNotice" class="curriculum-notice" role="status" hidden></p>
       <section class="nested-section program-related-section" aria-label="Related curricula">
         <div class="section-heading"><p class="eyebrow">Curricula for this program</p></div>
         <div class="program-summary-grid">
           <div><span>Curricula</span><strong id="programCurriculaTotal">—</strong></div>
           <div><span>Versions</span><strong id="programVersionsTotal">—</strong></div>
-          <div><span>Subjects</span><strong id="programPlacementsTotal">—</strong></div>
+          <div><span>Subject Placements</span><strong id="programPlacementsTotal">—</strong></div>
         </div>
       </section>
       <?php else: ?>
