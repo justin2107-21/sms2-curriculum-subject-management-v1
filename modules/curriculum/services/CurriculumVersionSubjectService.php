@@ -228,6 +228,11 @@ class CurriculumVersionSubjectService
                     'Remove recorded graduate outcome mappings before removing this curriculum placement.'
                 );
             }
+            if ($this->assignments->placementHasCloEvidence($id, true)) {
+                throw new DomainConflictException(
+                    'This placement has current or withdrawn CLO and assessment history. Preserve that evidence before removing the placement.'
+                );
+            }
             (new CurriculumVersionEditPolicy($this->db))->preparePlacementRemoval($id);
             $this->assignments->delete($id);
             audit_log_required(

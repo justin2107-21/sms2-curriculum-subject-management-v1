@@ -114,6 +114,13 @@ final class CurriculumOutcomeMappingService
             $row = $this->rows('SELECT m.* FROM curriculum_version_subject_outcomes m JOIN curriculum_version_subjects p ON p.id=m.curriculum_version_subject_id WHERE m.id=? AND p.curriculum_version_id=? FOR UPDATE','ii',[$mappingId,$versionId])[0] ?? null;
             if (!$row) throw new DomainNotFoundException('Outcome mapping not found in this curriculum version.');
             $this->assertBsitVersion($versionId);
+            $dependents = $this->rows(
+                "SELECT id FROM curriculum_version_clo_outcome_alignments WHERE parent_mapping_id=? AND record_state='active' ORDER BY id FOR UPDATE",
+                'i', [$mappingId]
+            );
+            if ($dependents) {
+                throw new DomainConflictException('Withdraw dependent CLO alignments before removing this graduate-outcome mapping.');
+            }
             $this->run('DELETE FROM curriculum_version_subject_outcomes WHERE id=?','i',[$mappingId]);
             $this->invalidateCoverage($versionId,(int)$row['outcome_id'],$actor);
             audit_log_required('CURRICULUM_OUTCOME_MAPPING_REMOVE','curriculum_version_subject_outcome',$mappingId,

@@ -13,6 +13,8 @@ $canViewSubjects = $userId !== null && user_can($userId, 'subject.view');
 $canViewPrerequisites = $userId !== null && user_can($userId, 'prerequisite.view');
 $canManageMappings = $userId !== null && user_can($userId, 'curriculum.update');
 $canManageOutcomeMappings = $userId !== null && user_can($userId, 'curriculum.outcome_mapping.manage');
+$canManageClos = $userId !== null && user_can($userId, 'curriculum.clo.manage');
+$canManageAssessmentPlans = $userId !== null && user_can($userId, 'curriculum.assessment_plan.manage');
 $canAddMappings = $canManageMappings && $canViewSubjects;
 $curriculumCssVersion = (int)filemtime(__DIR__ . '/../assets/curriculum.css');
 $typographyCssVersion = (int)filemtime(__DIR__ . '/../../../css/csms-typography.css');
@@ -52,12 +54,15 @@ require __DIR__ . '/../../../shared/sidebar.php';
         data-subject-api="../http/subject_actions.php"
         data-assignment-api="../http/assignment_actions.php"
         data-outcome-api="../http/outcome_mapping_actions.php"
+        data-clo-api="../http/clo_assessment_actions.php"
         data-requirement-api="../http/requirement_actions.php"
         data-can-view-prerequisites="<?= $canViewPrerequisites ? '1' : '0' ?>"
         data-can-view-programs="<?= $canViewPrograms ? '1' : '0' ?>"
         data-can-view-subjects="<?= $canViewSubjects ? '1' : '0' ?>"
         data-can-manage-mappings="<?= $canManageMappings ? '1' : '0' ?>"
         data-can-manage-outcomes="<?= $canManageOutcomeMappings ? '1' : '0' ?>"
+        data-can-manage-clos="<?= $canManageClos ? '1' : '0' ?>"
+        data-can-manage-plans="<?= $canManageAssessmentPlans ? '1' : '0' ?>"
         data-can-add-mappings="<?= $canAddMappings ? '1' : '0' ?>">
     <header class="mapping-workspace-header">
         <div><h1 class="page-title">Subject Mapping</h1><p class="page-subtitle">Organize subjects within curriculum versions.</p></div>
@@ -116,6 +121,12 @@ require __DIR__ . '/../../../shared/sidebar.php';
         <p class="curriculum-notice">Source: CHED Memorandum Order No. 25, series of 2015. The supplied scan is fingerprinted; independent registry validation and current applicability have not been established. Institutional adoption/approval not verified.</p>
         <p class="mapping-state">Curriculum mapping does not establish student outcome attainment, regulatory compliance, or institutional approval.</p>
         <div id="outcomeMatrix" class="outcome-matrix"><p class="mapping-state">Select a BSIT curriculum version to view its recorded outcome mappings.</p></div>
+        <section class="clo-assessment-workspace" aria-labelledby="cloAssessmentHeading">
+          <h3 id="cloAssessmentHeading">Course Learning Outcomes &amp; Planned Assessment</h3>
+          <p class="mapping-state">User-entered academic planning records. A mapping or plan does not establish student attainment, compliance, or approval.</p>
+          <label>Subject placement <select id="cloPlacementSelect"><option value="">Select a placement</option></select></label>
+          <div id="cloAssessmentContent"><p class="mapping-state">Select a curriculum version and subject placement.</p></div>
+        </section>
       </section>
     </section>
 

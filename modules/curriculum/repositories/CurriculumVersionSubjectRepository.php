@@ -41,6 +41,19 @@ class CurriculumVersionSubjectRepository
         return $exists;
     }
 
+    /** Historical CLO records remain linked and prevent placement identity deletion. */
+    public function placementHasCloEvidence(int $placementId, bool $forUpdate = false): bool
+    {
+        $stmt = $this->db->prepare(
+            'SELECT id FROM curriculum_version_course_learning_outcomes WHERE curriculum_version_subject_id=? ORDER BY id LIMIT 1' . ($forUpdate ? ' FOR UPDATE' : '')
+        );
+        $stmt->bind_param('i', $placementId);
+        $stmt->execute();
+        $exists = $stmt->get_result()->fetch_row() !== null;
+        $stmt->close();
+        return $exists;
+    }
+
     public function paginateByVersion(int $versionId, array $query): array
     {
         $conditions = ['curriculum_version_subjects.curriculum_version_id = ?'];

@@ -168,12 +168,14 @@ class CurriculumExportService
             : ($yearLabel . ' · ' . ($semesterLabel === '' ? 'All Semesters / Terms' : $semesterLabel));
         $outcomeMappings = strtoupper((string)$context['program_code']) === 'BSIT'
             ? $this->exports->outcomeMappings($versionId) : [];
+        $cloAssessment = $this->exports->cloAssessmentRecords($versionId);
         return [
             'context' => $context,
             'scope' => ['year_level' => $yearLabel, 'semester' => $semesterLabel, 'label' => $scopeLabel],
             'summary' => ['total_subjects' => $totalSubjects, 'total_units' => $this->formatHundredths($totalUnitsHundredths)],
             'subjects' => $subjects,
             'graduate_outcomes' => $outcomeMappings,
+            'course_learning_outcomes' => $cloAssessment,
             'years' => array_values($years),
             // Retain explicitly requested legacy report sections for existing API
             // consumers. The Curriculum Export page does not select these by default.
@@ -308,6 +310,17 @@ class CurriculumExportService
             foreach ($dataset['graduate_outcomes'] as $outcome) {
                 if (!$outcome['mappings']) $this->csvRow($stream,[$outcome['outcome_code'],$outcome['outcome_text'],$outcome['document_code'],$outcome['document_title'],$outcome['source_section'],$outcome['printed_page'],$outcome['pdf_page_index'],$outcome['source_sha256'],$outcome['coverage_status']]);
                 foreach($outcome['mappings'] as $mapping)$this->csvRow($stream,[$outcome['outcome_code'],$outcome['outcome_text'],$outcome['document_code'],$outcome['document_title'],$outcome['source_section'],$outcome['printed_page'],$outcome['pdf_page_index'],$outcome['source_sha256'],$outcome['coverage_status'],$mapping['subject_code'],$mapping['subject_title'],$mapping['year_level'],$mapping['semester'],$mapping['rationale'],$mapping['mapping_origin']]);
+            }
+        }
+        if (!empty($dataset['course_learning_outcomes'])) {
+            $this->csvRow($stream, []);
+            $this->csvRow($stream, ['Course Learning Outcomes and Planned Assessment','Planning records only; no student attainment is represented.']);
+            $this->csvRow($stream, ['Subject','CLO code','CLO statement','CLO status','Review state','Record type','Graduate outcome','Alignment rationale','Assessment method','Planned task','Evidence','Performance indicator','Rubric / standard','Record review state']);
+            foreach ($dataset['course_learning_outcomes'] as $clo) {
+                $identity=[$clo['subject_code'].' · '.$clo['subject_title'],$clo['clo_code'],$clo['clo_statement'],$clo['record_state'],$clo['review_state']];
+                if (!$clo['alignments'] && !$clo['assessment_plans']) $this->csvRow($stream,array_merge($identity,['CLO','','','','','','','','']));
+                foreach($clo['alignments'] as $alignment) $this->csvRow($stream,array_merge($identity,['Graduate outcome alignment',$alignment['outcome_code'],$alignment['rationale'],'','','','','',$alignment['review_state']]));
+                foreach($clo['assessment_plans'] as $plan) $this->csvRow($stream,array_merge($identity,['Planned assessment','','',$plan['assessment_method'],$plan['planned_task'],$plan['evidence_description'],$plan['performance_indicator'],$plan['rubric_or_standard'],$plan['review_state']]));
             }
         }
     }

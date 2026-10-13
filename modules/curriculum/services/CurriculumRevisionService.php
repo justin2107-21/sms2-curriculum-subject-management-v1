@@ -38,7 +38,7 @@ final class CurriculumRevisionService
                 throw new DomainConflictException('Version label already exists for this curriculum.');
             }
             $id=$this->repo->createVersion($data,$sourceId,$actor);
-            $maps=['placements'=>[],'groups'=>[],'schemes'=>[],'outcomes'=>[]];
+            $maps=['placements'=>[],'groups'=>[],'schemes'=>[],'outcomes'=>[],'clos'=>[]];
             foreach ($source['placements'] as $p) {
                 $new=$this->repo->copy('placement',$p,['curriculum_version_id'=>$id,'created_by'=>$actor]);
                 $maps['placements'][(int)$p['id']]=$new;
@@ -63,12 +63,35 @@ final class CurriculumRevisionService
                     'mapping_origin'=>'inherited','inherited_from_mapping_id'=>(int)$row['id'],'created_by'=>$actor]);
                 $maps['outcomes'][(int)$row['id']]=$newMapping;
             }
+            foreach ($source['clos'] as $row) {
+                $maps['clos'][(int)$row['id']]=$this->repo->copy('clo',$row,[
+                    'curriculum_version_subject_id'=>$maps['placements'][(int)$row['curriculum_version_subject_id']],
+                    'origin'=>'inherited','source_clo_id'=>(int)$row['id'],'review_state'=>'awaiting_review','created_by'=>$actor]);
+            }
+            foreach ($source['clo_alignments'] as $row) {
+                if (!isset($maps['clos'][(int)$row['clo_id']],$maps['outcomes'][(int)$row['parent_mapping_id']])) continue;
+                $this->repo->copy('clo_alignment',$row,[
+                    'clo_id'=>$maps['clos'][(int)$row['clo_id']],
+                    'curriculum_version_subject_id'=>$maps['placements'][(int)$row['curriculum_version_subject_id']],
+                    'parent_mapping_id'=>$maps['outcomes'][(int)$row['parent_mapping_id']],
+                    'source_alignment_id'=>(int)$row['id'],'origin'=>'inherited','review_state'=>'awaiting_review','created_by'=>$actor]);
+            }
+            foreach ($source['clo_plans'] as $row) {
+                if (!isset($maps['clos'][(int)$row['clo_id']])) continue;
+                $this->repo->copy('clo_plan',$row,[
+                    'clo_id'=>$maps['clos'][(int)$row['clo_id']],
+                    'curriculum_version_subject_id'=>$maps['placements'][(int)$row['curriculum_version_subject_id']],
+                    'source_plan_id'=>(int)$row['id'],'origin'=>'inherited','review_state'=>'awaiting_review','created_by'=>$actor]);
+            }
             audit_log_required('CURRICULUM_REVISION_CREATE','curriculum_version',$id,
                 'Editable curriculum revision created from a protected reference.',[
                     'source_version_id'=>$sourceId,'curriculum_id'=>$data['curriculum_id'],
                     'version_label'=>$data['version_label'],'actor_id'=>$actor,'counts'=>$source['counts'],
                     'group_id_map'=>$maps['groups'],'scheme_id_map'=>$maps['schemes'],
                     'inherited_outcome_mapping_count'=>count($maps['outcomes']),
+                    'inherited_clo_count'=>count($maps['clos']),
+                    'inherited_clo_alignment_count'=>count($source['clo_alignments']),
+                    'inherited_assessment_plan_count'=>count($source['clo_plans']),
                     'institutional_adoption'=>'not_verified']);
             $result=$this->repo->rows('SELECT * FROM curriculum_versions WHERE id=? FOR UPDATE','i',[$id])[0];
             $this->db->commit();

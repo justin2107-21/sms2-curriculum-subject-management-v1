@@ -96,6 +96,21 @@ class CurriculumExportRepository
         unset($outcome);return array_values($result);
     }
 
+    /** Placement-scoped CLO, alignment and planning records; no attainment fields exist. */
+    public function cloAssessmentRecords(int $versionId): array
+    {
+        $run = fn(string $sql) => RepositoryQuery::execute($this->db,$sql,'i',[$versionId]);
+        $stmt=$run('SELECT c.id clo_id,c.curriculum_version_subject_id placement_id,p.subject_id,s.subject_code,s.subject_title,c.clo_code,c.clo_statement,c.sequence_order,c.origin,c.source_clo_id,c.record_state,c.review_state FROM curriculum_version_course_learning_outcomes c JOIN curriculum_version_subjects p ON p.id=c.curriculum_version_subject_id JOIN subjects s ON s.id=p.subject_id WHERE p.curriculum_version_id=? ORDER BY p.year_level,p.semester,p.sequence_order,c.sequence_order,c.id');
+        $clos=$stmt->get_result()->fetch_all(MYSQLI_ASSOC);$stmt->close();$byId=[];
+        foreach($clos as $row){$row['alignments']=[];$row['assessment_plans']=[];$byId[(int)$row['clo_id']]=$row;}
+        $stmt=$run('SELECT a.clo_id,o.outcome_code,o.outcome_text,a.rationale,a.origin,a.record_state,a.review_state FROM curriculum_version_clo_outcome_alignments a JOIN curriculum_version_subjects p ON p.id=a.curriculum_version_subject_id JOIN curriculum_outcome_catalog o ON o.id=a.outcome_id WHERE p.curriculum_version_id=? ORDER BY a.id');
+        foreach($stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row) if(isset($byId[(int)$row['clo_id']])) $byId[(int)$row['clo_id']]['alignments'][]=$row;
+        $stmt->close();
+        $stmt=$run('SELECT clo_id,assessment_method,planned_task,evidence_description,performance_indicator,rubric_or_standard,origin,source_plan_id,record_state,review_state FROM curriculum_version_clo_assessment_plans WHERE curriculum_version_subject_id IN (SELECT id FROM curriculum_version_subjects WHERE curriculum_version_id=?) ORDER BY id');
+        foreach($stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row) if(isset($byId[(int)$row['clo_id']])) $byId[(int)$row['clo_id']]['assessment_plans'][]=$row;
+        $stmt->close();return array_values($byId);
+    }
+
     public function unitSummary(int $versionId): array
     {
         $stmt = RepositoryQuery::execute(

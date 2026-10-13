@@ -34,6 +34,9 @@ final class CurriculumRevisionRepository
             'schemes' => $this->rows('SELECT s.* FROM grade_weighting_schemes s JOIN curriculum_version_subjects p ON p.id=s.curriculum_version_subject_id WHERE p.curriculum_version_id=? ORDER BY s.id FOR UPDATE','i',[$version]),
             'components' => $this->rows('SELECT c.* FROM grade_weighting_components c JOIN grade_weighting_schemes s ON s.id=c.scheme_id JOIN curriculum_version_subjects p ON p.id=s.curriculum_version_subject_id WHERE p.curriculum_version_id=? ORDER BY c.id FOR UPDATE','i',[$version]),
             'outcomes' => $this->rows('SELECT m.* FROM curriculum_version_subject_outcomes m JOIN curriculum_version_subjects p ON p.id=m.curriculum_version_subject_id WHERE p.curriculum_version_id=? ORDER BY m.id FOR UPDATE','i',[$version]),
+            'clos' => $this->rows("SELECT c.* FROM curriculum_version_course_learning_outcomes c JOIN curriculum_version_subjects p ON p.id=c.curriculum_version_subject_id WHERE p.curriculum_version_id=? AND c.record_state='active' ORDER BY c.id FOR UPDATE",'i',[$version]),
+            'clo_alignments' => $this->rows("SELECT a.* FROM curriculum_version_clo_outcome_alignments a JOIN curriculum_version_subjects p ON p.id=a.curriculum_version_subject_id WHERE p.curriculum_version_id=? AND a.record_state='active' ORDER BY a.id FOR UPDATE",'i',[$version]),
+            'clo_plans' => $this->rows("SELECT a.* FROM curriculum_version_clo_assessment_plans a JOIN curriculum_version_subjects p ON p.id=a.curriculum_version_subject_id WHERE p.curriculum_version_id=? AND a.record_state='active' ORDER BY a.id FOR UPDATE",'i',[$version]),
         ];
     }
 
@@ -58,6 +61,9 @@ final class CurriculumRevisionRepository
             'scheme'=>['grade_weighting_schemes',['description']],
             'component'=>['grade_weighting_components',['component_name','weight_percentage','sequence_order']],
             'outcome_mapping'=>['curriculum_version_subject_outcomes',['outcome_id','rationale']],
+            'clo'=>['curriculum_version_course_learning_outcomes',['clo_code','clo_statement','sequence_order']],
+            'clo_alignment'=>['curriculum_version_clo_outcome_alignments',['outcome_id','rationale','source_mapping_id_snapshot']],
+            'clo_plan'=>['curriculum_version_clo_assessment_plans',['assessment_method','planned_task','evidence_description','performance_indicator','rubric_or_standard']],
         ];
         if (!isset($definitions[$kind])) throw new InvalidArgumentException('Unsupported clone structure.');
         [$table,$fields] = $definitions[$kind];

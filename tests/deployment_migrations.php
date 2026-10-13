@@ -56,16 +56,17 @@ try { deploymentRun(['--apply','--confirm-database='.$database],1); }
 finally { $stmt=$conn->prepare('SELECT RELEASE_LOCK(?)');$stmt->bind_param('s',$lock);$stmt->execute();$stmt->close(); }
 deployCheck($conn->query('SHOW TABLES')->num_rows===0,'Concurrent migration blocked before writes');
 deploymentRun(['--apply','--confirm-database='.$database],0);
-deployCheck($conn->query('SHOW TABLES')->num_rows===33,'32 application tables plus migration journal through 024');
+deployCheck($conn->query('SHOW TABLES')->num_rows===36,'35 application tables plus migration journal through 025');
 foreach(['users','students','academic_programs','subjects','curricula'] as $table) {
     deployCheck((int)$conn->query("SELECT COUNT(*) FROM `$table`")->fetch_row()[0]===0,'No seeded records: '.$table);
 }
 deployCheck((int)$conn->query("SELECT COUNT(*) FROM schema_migrations WHERE status='applied'")->fetch_row()[0]===$expectedMigrations,'All migrations journaled');
 // Migration 022 registers three Task 3 capabilities without granting them.
-deployCheck((int)$conn->query('SELECT COUNT(*) FROM permissions')->fetch_row()[0]===43,'Permissions initialized including ungranted clone and outcome-mapping capabilities');
+deployCheck((int)$conn->query('SELECT COUNT(*) FROM permissions')->fetch_row()[0]===45,'Permissions initialized including ungranted Task 4 through Task 8 capabilities');
 deployCheck((int)$conn->query("SELECT COUNT(*) FROM role_permissions rp JOIN permissions p ON p.id=rp.permission_id WHERE p.name='curriculum.version.clone'")->fetch_row()[0]===0,'Clone permission is not automatically granted');
 deployCheck((int)$conn->query("SELECT COUNT(*) FROM role_permissions rp JOIN permissions p ON p.id=rp.permission_id WHERE p.name IN ('curriculum.reference.attach','compliance.reference.verify','curriculum.reference.classify')")->fetch_row()[0]===0,'Task 3 permissions are not automatically granted');
 deployCheck((int)$conn->query("SELECT COUNT(*) FROM role_permissions rp JOIN permissions p ON p.id=rp.permission_id WHERE p.name='curriculum.outcome_mapping.manage'")->fetch_row()[0]===0,'Outcome-mapping permission is not automatically granted');
+deployCheck((int)$conn->query("SELECT COUNT(*) FROM role_permissions rp JOIN permissions p ON p.id=rp.permission_id WHERE p.name IN ('curriculum.clo.manage','curriculum.assessment_plan.manage')")->fetch_row()[0]===0,'CLO and assessment permissions are not automatically granted');
 $snapshot=deploymentSnapshot($conn);
 deploymentRun(['--apply','--confirm-database='.$database],0);
 deployCheck(deploymentSnapshot($conn)===$snapshot,'Second apply changes no data');

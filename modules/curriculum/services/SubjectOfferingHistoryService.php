@@ -166,6 +166,11 @@ class SubjectOfferingHistoryService
             $referenceState=$this->history->comparisonState($referenceId);
             $revisionState=$this->history->comparisonState($revisionId);
             $result=CurriculumHistoryComparison::calculate($referenceState,$revisionState,$sources,$referenceId);
+            $result['clo_assessment']=$this->compareCloAssessment($referenceState,$revisionState);
+            if (!$result['clo_assessment']['complete']) {
+                $result['partial']=true;
+                $result['warnings'][]='CLO alignment and planned assessment comparison has records without reliable clone lineage.';
+            }
             if (!$referenceState['placements']) {$result['partial']=true;$result['warnings'][]='Historical subject details unavailable: reference has no recorded placements.';}
             if (!$sources) {$result['partial']=true;$result['warnings'][]='Reference documentary provenance is unavailable.';}
             $pagination=RepositoryQuery::pagination(count($result['comparison']),$query['page'],$query['per_page']);
@@ -177,6 +182,35 @@ class SubjectOfferingHistoryService
             $this->db->commit();
             return $result;
         } catch (Throwable $error) { $this->db->rollback(); throw $error; }
+    }
+
+    /** Compare only recorded CLO lineage and normalized outcome/business fields. */
+    private function compareCloAssessment(array $before,array $after): array
+    {
+        $dimensions=[];$complete=true;
+        foreach ([
+            'clos'=>['source_clo_id',['clo_code','clo_statement','sequence_order','record_state']],
+            'clo_alignments'=>['source_alignment_id',['outcome_id','outcome_code','rationale','record_state']],
+            'clo_plans'=>['source_plan_id',['assessment_method','planned_task','evidence_description','performance_indicator','rubric_or_standard','record_state']],
+        ] as $name=>[$lineage,$fields]) {
+            $left=[];$right=[];
+            foreach ($before[$name]??[] as $row) $left['id:'.(int)$row['id']]=$row;
+            foreach ($after[$name]??[] as $row) {
+                if (($row[$lineage]??null)!==null) $key='id:'.(int)$row[$lineage];
+                else { $key='new:'.(int)$row['id']; if (($row['origin']??'manual')==='inherited') $complete=false; }
+                $right[$key]=$row;
+            }
+            $changes=[];
+            foreach (array_unique(array_merge(array_keys($left),array_keys($right))) as $key) {
+                $a=$left[$key]??null;$b=$right[$key]??null;
+                $record=['change'=>$a===null?'added':($b===null?'removed':'unchanged'),'before'=>$a,'after'=>$b,'differences'=>[]];
+                if ($a && $b) foreach ($fields as $field) if ((string)($a[$field]??'')!==(string)($b[$field]??'')) $record['differences'][$field]=['before'=>$a[$field]??null,'after'=>$b[$field]??null];
+                if ($record['differences']) $record['change']='changed';
+                if ($record['change']!=='unchanged') $changes[]=$record;
+            }
+            $dimensions[$name]=$changes;
+        }
+        return ['complete'=>$complete,'changes'=>$dimensions,'coverage'=>'CLO, alignment and planned assessment records only; no attainment is represented.'];
     }
 
     private function versionContext(array $version): array

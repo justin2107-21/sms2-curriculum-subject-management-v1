@@ -12,7 +12,8 @@
         subjects: root.dataset.subjectApi,
         requirements: root.dataset.requirementApi,
         mappings: root.dataset.assignmentApi,
-        outcomes: root.dataset.outcomeApi
+        outcomes: root.dataset.outcomeApi,
+        clos: root.dataset.cloApi
     };
     const permission = {
         prerequisites: root.dataset.canViewPrerequisites === '1',
@@ -20,7 +21,9 @@
         subjects: root.dataset.canViewSubjects === '1',
         manage: root.dataset.canManageMappings === '1',
         add: root.dataset.canAddMappings === '1',
-        manageOutcomes: root.dataset.canManageOutcomes === '1'
+        manageOutcomes: root.dataset.canManageOutcomes === '1',
+        manageClos: root.dataset.canManageClos === '1',
+        managePlans: root.dataset.canManagePlans === '1'
     };
     const state = {
         program: null, curriculum: null, version: null, loaded: false, year: '', requirements: [], relationshipRequest: null, relationshipsLoaded: false, requirementError: '', detailRequest: 0,
@@ -304,6 +307,12 @@
         if (!data || !target) return;
         const context = data.context, outcomes = arr(data.outcomes), placements = arr(data.placements), mappings = arr(data.mappings);
         el('outcomeVersionScope').textContent = [context.program_code, context.curriculum_name, context.version_label].join(' / ');
+        const placementSelect = el('cloPlacementSelect');
+        const previousPlacement = placementSelect.value;
+        placementSelect.innerHTML = '<option value="">Select a placement</option>' + placements.map(row => '<option value="' + Number(row.placement_id) + '">' + esc(row.subject_code + ' · ' + row.subject_title + ' · ' + (row.year_level || 'Year not set') + ' / ' + (row.semester || 'Term not set')) + '</option>').join('');
+        if (placements.some(row => String(row.placement_id) === previousPlacement)) placementSelect.value = previousPlacement;
+        if (placementSelect.value) loadCloWorkspace();
+        else showPanelState(el('cloAssessmentContent'), 'Select a curriculum version and subject placement.');
         if (!outcomes.length) { showPanelState(target, 'The source-traceable IT01–IT13 catalog has not been loaded in this environment.'); return; }
         const canEdit = permission.manageOutcomes && Boolean(context.editable);
         const labels = { not_assessed: 'Not assessed', incomplete: 'Incomplete', mapped: 'Mapped', unmapped: 'Unmapped' };
@@ -316,6 +325,49 @@
             return '<article class="outcome-card"><header><div><span class="record-code">' + esc(outcome.outcome_code) + '</span><span class="outcome-status outcome-status-' + esc(outcome.coverage_status) + '">' + esc(labels[outcome.coverage_status]) + '</span><p>' + esc(outcome.outcome_text) + '</p><small>' + esc(citation) + '</small>' + (Number(outcome.source_order) === 1 ? '<small>Source PDF SHA-256: ' + esc(outcome.source_sha256) + '</small>' : '') + '</div><strong>' + Number(outcome.mapping_count) + ' recorded subject link' + (Number(outcome.mapping_count) === 1 ? '' : 's') + '</strong></header><ul class="outcome-link-list">' + linkHtml + '</ul>' + actions + '</article>';
         }).join('');
     }
+
+    async function loadCloWorkspace() {
+        const placementId = el('cloPlacementSelect')?.value, target = el('cloAssessmentContent');
+        if (!target) return;
+        if (!placementId) { showPanelState(target, 'Select a subject placement to view its course learning outcomes.'); return; }
+        showPanelState(target, 'Loading placement-owned CLO and planned assessment records...');
+        try {
+            const data = await ui.fetchJson(api.clos, {action:'workspace',placement_id:placementId});
+            if (String(el('cloPlacementSelect').value) !== String(placementId)) return;
+            const clos = arr(data.clos), alignments = arr(data.alignments), plans = arr(data.plans), parents = arr(data.parent_mappings);
+            const editable = Boolean(data.editable), canClo = editable && permission.manageClos, canPlan = editable && permission.managePlans;
+            const parentOptions = parents.map(p => '<option value="' + Number(p.mapping_id) + '">' + esc(p.outcome_code + ' · ' + p.outcome_text) + '</option>').join('');
+            target.innerHTML = '<p><strong>' + esc(data.placement.subject_code + ' · ' + data.placement.subject_title) + '</strong> — ' + esc(data.placement.version_label) + (editable ? ' · Editable draft' : ' · Read only') + '</p><p class="curriculum-notice">' + esc(data.disclaimer) + '</p>' +
+                (canClo ? '<form class="clo-create-form"><input type="hidden" name="placement_id" value="' + Number(placementId) + '"><label>CLO code<input name="clo_code" maxlength="40" required></label><label>Sequence<input name="sequence_order" type="number" min="1" max="65535" required></label><label>Course learning outcome<textarea name="clo_statement" maxlength="12000" required></textarea></label><button class="button-primary">Record CLO</button></form>' : '') +
+                (clos.length ? clos.map(clo => {
+                    const links = alignments.filter(a => Number(a.clo_id) === Number(clo.id));
+                    const ownPlans = plans.filter(p => Number(p.clo_id) === Number(clo.id));
+                    const activeClo = clo.record_state === 'active';
+                    return '<article class="outcome-card"><header><div><span class="record-code">' + esc(clo.clo_code) + '</span><span class="outcome-status">' + esc(clo.record_state === 'withdrawn' ? 'Withdrawn · history retained' : (clo.review_state === 'awaiting_review' ? 'Awaiting academic review' : (clo.origin === 'inherited' ? 'Inherited · review required' : 'User authored'))) + '</span><p>' + esc(clo.clo_statement) + '</p></div><span>Sequence ' + Number(clo.sequence_order) + '</span>' + (canClo && activeClo ? '<button type="button" class="button-muted" data-clo-action="clo_withdraw" data-id="' + Number(clo.id) + '">Withdraw CLO</button>' : '') + '</header>' +
+                        '<h4>Graduate outcome alignments</h4>' + (links.length ? '<ul>' + links.map(a => '<li><strong>' + esc(a.outcome_code) + '</strong> ' + esc(a.outcome_text) + '<p>' + esc(a.rationale) + '</p>' + (a.review_state === 'awaiting_review' ? '<small>Awaiting academic review</small>' : '') + (canClo ? '<button type="button" class="button-muted" data-clo-action="alignment_withdraw" data-id="' + Number(a.id) + '" data-clo="' + Number(clo.id) + '">Withdraw alignment</button>' : '') + '</li>').join('') + '</ul>' : '<p>No graduate outcome alignment recorded.</p>') +
+                        (canClo && parentOptions ? '<form class="clo-alignment-form"><input type="hidden" name="clo_id" value="' + Number(clo.id) + '"><label>Existing graduate outcome mapping<select name="parent_mapping_id" required><option value="">Choose mapped outcome</option>' + parentOptions + '</select></label><label>Academic rationale<textarea name="rationale" maxlength="3000" required></textarea></label><button class="button-muted">Align CLO</button></form>' : (canClo ? '<p class="mapping-state">Record a subject-to-graduate-outcome mapping above before aligning a CLO.</p>' : '')) +
+                        '<h4>Planned assessment</h4>' + (ownPlans.length ? ownPlans.map(p => '<p><strong>' + esc(p.plan_status === 'planned' ? 'Planned' : 'Incomplete plan') + '</strong> · ' + esc(p.assessment_method || 'Method not recorded') + '<br>' + esc(p.performance_indicator || 'Performance indicator not recorded') + '<br>' + esc(p.planned_task || p.evidence_description || 'Task/evidence not recorded') + (p.review_state === 'awaiting_review' ? '<br>Awaiting academic review' : '') + (canPlan ? ' <button type="button" class="button-muted" data-clo-action="plan_withdraw" data-id="' + Number(p.id) + '" data-clo="' + Number(clo.id) + '">Withdraw plan</button>' : '') + '</p>').join('') : '<p>No assessment plan recorded.</p>') +
+                        (canPlan ? '<form class="clo-plan-form"><input type="hidden" name="clo_id" value="' + Number(clo.id) + '"><label>Assessment method<input name="assessment_method" maxlength="180"></label><label>Planned task<textarea name="planned_task" maxlength="12000"></textarea></label><label>Evidence description<textarea name="evidence_description" maxlength="12000"></textarea></label><label>Performance indicator / criterion<textarea name="performance_indicator" maxlength="6000"></textarea></label><label>Rubric / standard (optional)<textarea name="rubric_or_standard" maxlength="12000"></textarea></label><button class="button-muted">Record planned assessment</button></form>' : '') +
+                        '</article>';
+                }).join('') : '<p class="mapping-state">No course learning outcomes recorded for this placement.</p>');
+        } catch (error) { showPanelState(target, error.message || 'CLO workspace could not be loaded.', true); }
+    }
+
+    el('cloPlacementSelect')?.addEventListener('change', loadCloWorkspace);
+    el('cloAssessmentContent')?.addEventListener('submit', async event => {
+        const form = event.target.closest('.clo-create-form,.clo-edit-form,.clo-alignment-form,.clo-alignment-edit-form,.clo-plan-form,.clo-plan-edit-form'); if (!form) return;
+        event.preventDefault(); const body = new FormData(form); body.set('placement_id',el('cloPlacementSelect').value);
+        body.set('action',form.matches('.clo-create-form')?'clo_create':form.matches('.clo-edit-form')?'clo_update':form.matches('.clo-alignment-form')?'alignment_add':form.matches('.clo-alignment-edit-form')?'alignment_update':form.matches('.clo-plan-edit-form')?'plan_update':'plan_add');
+        try { const result=await ui.postForm(api.clos,body); ui.showToast(result.message || 'Academic planning record saved.','success'); await loadCloWorkspace(); }
+        catch(error) { ui.showToast(error.message || 'Record could not be saved.','error'); }
+    });
+    el('cloAssessmentContent')?.addEventListener('click', async event => {
+        const button=event.target.closest('[data-clo-action]'); if (!button) return;
+        if (!window.confirm('Withdraw this record? Its historical record will be retained.')) return;
+        const body=new FormData(); body.set('placement_id',el('cloPlacementSelect').value); body.set('action',button.dataset.cloAction); body.set('clo_id',button.dataset.clo || button.dataset.id); if (button.dataset.cloAction==='alignment_withdraw') body.set('alignment_id',button.dataset.id); if (button.dataset.cloAction==='plan_withdraw') body.set('plan_id',button.dataset.id);
+        try { const result=await ui.postForm(api.clos,body); ui.showToast(result.message || 'Record withdrawn.','success'); await loadCloWorkspace(); }
+        catch(error) { ui.showToast(error.message || 'Record could not be withdrawn.','error'); }
+    });
 
     el('mappingPanelOutcomes')?.addEventListener('submit', async event => {
         const form = event.target.closest('[data-outcome-add], [data-outcome-assess]');
