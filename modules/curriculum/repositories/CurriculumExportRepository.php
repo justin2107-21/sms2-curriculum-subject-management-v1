@@ -62,6 +62,40 @@ class CurriculumExportRepository
         return $rows;
     }
 
+    /** Source-scoped outcomes with mappings from this exact version only. */
+    public function outcomeMappings(int $versionId): array
+    {
+        $stmt=RepositoryQuery::execute($this->db,
+            'SELECT o.id outcome_id,o.outcome_code,o.outcome_text,o.source_order,o.document_code,o.document_title,
+                    o.issuing_authority,o.source_section,o.printed_page,o.pdf_page_index,o.source_sha256,
+                    c.assessment_state,c.rationale coverage_rationale,m.mapping_id,m.mapping_rationale,m.mapping_origin,
+                    m.inherited_from_mapping_id,m.placement_id,m.subject_code,m.subject_title,m.year_level,m.semester
+             FROM curriculum_outcome_catalog o
+             LEFT JOIN curriculum_version_outcome_coverage c ON c.curriculum_version_id=? AND c.outcome_id=o.id
+             LEFT JOIN (SELECT x.id mapping_id,x.outcome_id,x.rationale mapping_rationale,x.mapping_origin,
+                        x.inherited_from_mapping_id,p.id placement_id,s.subject_code,s.subject_title,p.year_level,p.semester
+                        FROM curriculum_version_subject_outcomes x
+                        JOIN curriculum_version_subjects p ON p.id=x.curriculum_version_subject_id AND p.curriculum_version_id=?
+                        JOIN subjects s ON s.id=p.subject_id) m ON m.outcome_id=o.id
+             WHERE o.source_key=? ORDER BY o.source_order,m.subject_code,m.placement_id',
+            'iis',[$versionId,$versionId,'CHED-CMO-25-2015-BSIT']);
+        $rows=$stmt->get_result()->fetch_all(MYSQLI_ASSOC);$stmt->close();$result=[];
+        foreach($rows as $row){$id=(int)$row['outcome_id'];if(!isset($result[$id]))$result[$id]=[
+            'id'=>$id,'outcome_code'=>$row['outcome_code'],'outcome_text'=>$row['outcome_text'],'source_order'=>(int)$row['source_order'],
+            'document_code'=>$row['document_code'],'document_title'=>$row['document_title'],'issuing_authority'=>$row['issuing_authority'],
+            'source_section'=>$row['source_section'],'printed_page'=>(int)$row['printed_page'],'pdf_page_index'=>(int)$row['pdf_page_index'],
+            'source_sha256'=>$row['source_sha256'],'assessment_state'=>$row['assessment_state'],'coverage_rationale'=>$row['coverage_rationale'],'mappings'=>[]];
+            if($row['mapping_id']!==null)$result[$id]['mappings'][]=[
+                'id'=>(int)$row['mapping_id'],'placement_id'=>(int)$row['placement_id'],'subject_code'=>$row['subject_code'],
+                'subject_title'=>$row['subject_title'],'year_level'=>$row['year_level'],'semester'=>$row['semester'],
+                'rationale'=>$row['mapping_rationale'],'mapping_origin'=>$row['mapping_origin'],
+                'inherited_from_mapping_id'=>$row['inherited_from_mapping_id']===null?null:(int)$row['inherited_from_mapping_id']];
+        }
+        foreach($result as &$outcome){$count=count($outcome['mappings']);$outcome['mapping_count']=$count;
+            $outcome['coverage_status']=$outcome['assessment_state']===null?'not_assessed':($outcome['assessment_state']==='incomplete'?'incomplete':($count>0?'mapped':'unmapped'));}
+        unset($outcome);return array_values($result);
+    }
+
     public function unitSummary(int $versionId): array
     {
         $stmt = RepositoryQuery::execute(

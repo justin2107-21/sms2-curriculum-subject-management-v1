@@ -38,7 +38,7 @@ final class CurriculumRevisionService
                 throw new DomainConflictException('Version label already exists for this curriculum.');
             }
             $id=$this->repo->createVersion($data,$sourceId,$actor);
-            $maps=['placements'=>[],'groups'=>[],'schemes'=>[]];
+            $maps=['placements'=>[],'groups'=>[],'schemes'=>[],'outcomes'=>[]];
             foreach ($source['placements'] as $p) {
                 $new=$this->repo->copy('placement',$p,['curriculum_version_id'=>$id,'created_by'=>$actor]);
                 $maps['placements'][(int)$p['id']]=$new;
@@ -57,11 +57,18 @@ final class CurriculumRevisionService
                 'curriculum_version_subject_id'=>$maps['placements'][(int)$row['curriculum_version_subject_id']],'created_by'=>$actor]);
             foreach ($source['components'] as $row) $this->repo->copy('component',$row,[
                 'scheme_id'=>$maps['schemes'][(int)$row['scheme_id']],'created_by'=>$actor]);
+            foreach ($source['outcomes'] as $row) {
+                $newMapping=$this->repo->copy('outcome_mapping',$row,[
+                    'curriculum_version_subject_id'=>$maps['placements'][(int)$row['curriculum_version_subject_id']],
+                    'mapping_origin'=>'inherited','inherited_from_mapping_id'=>(int)$row['id'],'created_by'=>$actor]);
+                $maps['outcomes'][(int)$row['id']]=$newMapping;
+            }
             audit_log_required('CURRICULUM_REVISION_CREATE','curriculum_version',$id,
                 'Editable curriculum revision created from a protected reference.',[
                     'source_version_id'=>$sourceId,'curriculum_id'=>$data['curriculum_id'],
                     'version_label'=>$data['version_label'],'actor_id'=>$actor,'counts'=>$source['counts'],
                     'group_id_map'=>$maps['groups'],'scheme_id_map'=>$maps['schemes'],
+                    'inherited_outcome_mapping_count'=>count($maps['outcomes']),
                     'institutional_adoption'=>'not_verified']);
             $result=$this->repo->rows('SELECT * FROM curriculum_versions WHERE id=? FOR UPDATE','i',[$id])[0];
             $this->db->commit();

@@ -123,8 +123,10 @@
         const count = Number(data.summary.total_subjects || 0);
         document.getElementById('exportPreviewTitle').textContent = context.curriculum_name;
         document.getElementById('exportPreviewSummary').textContent = context.version_label + ' · ' + count + ' Subjects · ' + displayUnits(data.summary.total_units).replace(/&mdash;/g, '0') + ' Units · ' + data.scope.label;
+        const graduateOutcomes = Array.isArray(data.graduate_outcomes) ? data.graduate_outcomes : [];
+        const outcomeMarkup = graduateOutcomes.length ? '<section class="export-outcomes"><h2>CHED BSIT Graduate Outcome Mapping</h2><p>CHED Memorandum Order No. 25, series of 2015 · Section 6.3. Institutional adoption/approval not verified. Curriculum mapping does not establish student outcome attainment, regulatory compliance, or institutional approval.</p>' + graduateOutcomes.map(outcome => '<article><h3>' + escape(outcome.outcome_code) + ' · ' + escape(outcome.coverage_status.replace('_',' ')) + '</h3><p>' + escape(outcome.outcome_text) + '</p><small>' + escape(outcome.document_code + ' · ' + outcome.document_title + ' · ' + outcome.source_section + ' · printed p. ' + outcome.printed_page + ' / PDF p. ' + outcome.pdf_page_index + ' · SHA-256 ' + outcome.source_sha256) + '</small><ul>' + outcome.mappings.map(mapping => '<li><strong>' + escape(mapping.subject_code + ' · ' + mapping.subject_title) + '</strong> — ' + escape(mapping.rationale) + '</li>').join('') + (outcome.mappings.length ? '' : '<li>No subject links recorded.</li>') + '</ul></article>').join('') + '</section>' : '';
         if (!count) {
-            preview.innerHTML = '<div class="export-empty-state"><p>No mapped subjects were found for the selected export scope.</p></div>';
+            preview.innerHTML = '<div class="export-empty-state"><p>No mapped subjects were found for the selected export scope.</p></div>' + outcomeMarkup + '<p>' + escape(data.disclaimer) + '</p>';
             return;
         }
 
@@ -138,7 +140,7 @@
             return '<section class="export-year"><h3>' + escape(year.year_level) + '</h3>' + semesterMarkup + '<p class="export-year-total">Year Total Units: <strong>' + displayUnits(year.total_units) + '</strong></p></section>';
         }).join('');
 
-        preview.innerHTML = '<article class="export-report"><header class="export-document-header"><p>' + escape(context.program_name).toUpperCase() + '</p><h2>Curriculum Structure</h2><div>' + escape(context.curriculum_code) + ' · ' + escape(context.version_label) + '</div><h3>' + escape(context.curriculum_name) + '</h3><p class="export-print-summary">Export scope: ' + escape(data.scope.label) + '</p></header>' + yearMarkup + '<footer class="export-document-footer"><strong>Total Subjects: ' + count + '</strong><strong>Total Units: ' + displayUnits(data.summary.total_units) + '</strong><p>' + escape(data.disclaimer) + '</p><small>Generated from CSMS · ' + escape(data.generated_at) + '</small></footer></article>';
+        preview.innerHTML = '<article class="export-report"><header class="export-document-header"><p>' + escape(context.program_name).toUpperCase() + '</p><h2>Curriculum Structure</h2><div>' + escape(context.curriculum_code) + ' · ' + escape(context.version_label) + '</div><h3>' + escape(context.curriculum_name) + '</h3><p class="export-print-summary">Export scope: ' + escape(data.scope.label) + '</p></header>' + yearMarkup + outcomeMarkup + '<footer class="export-document-footer"><strong>Total Subjects: ' + count + '</strong><strong>Total Units: ' + displayUnits(data.summary.total_units) + '</strong><p>' + escape(data.disclaimer) + '</p><small>Generated from CSMS · ' + escape(data.generated_at) + '</small></footer></article>';
     }
 
     async function generatePreview() {

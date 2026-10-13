@@ -16,16 +16,23 @@ function revisionReject(callable $fn,string $label): void {
 }
 $service=new CurriculumRevisionService($db);$f=revisionFixture($db,$actor,'FULL');
 revisionCheck((int)$db->query("SELECT COUNT(*) FROM role_permissions rp JOIN permissions p ON p.id=rp.permission_id WHERE p.name='curriculum.version.clone'")->fetch_row()[0]===0,'migration registers clone capability without default grants');
-// Reconstruct an upgrade from 022 on disposable data; migration 023 is permission-only.
+// Reconstruct the upgrade after 022 on disposable data; migrations 023 and 024
+// must preserve the populated pre-existing academic and reference records.
 $upgradeDigest=revisionSourceDigest($db,$f);
+$db->query('DROP TABLE curriculum_version_subject_outcomes');
+$db->query('DROP TABLE curriculum_version_outcome_coverage');
+$db->query('DROP TABLE curriculum_outcome_catalog');
+$db->query("DELETE FROM role_permissions WHERE permission_id=(SELECT id FROM permissions WHERE name='curriculum.outcome_mapping.manage')");
+$db->query("DELETE FROM permissions WHERE name='curriculum.outcome_mapping.manage'");
 $db->query("DELETE FROM schema_migrations WHERE migration='023_curriculum_revision_clone_permission.sql'");
+$db->query("DELETE FROM schema_migrations WHERE migration='024_curriculum_outcome_mapping.sql'");
 $db->query("DELETE FROM permissions WHERE name='curriculum.version.clone'");
 $proc=proc_open([PHP_BINARY,__DIR__.'/../database/deploy.php','--apply','--confirm-database='.getenv('DB_NAME')],[0=>['pipe','r'],1=>['pipe','w'],2=>['pipe','w']],$pipes);
 fclose($pipes[0]);$out=stream_get_contents($pipes[1]);$err=stream_get_contents($pipes[2]);fclose($pipes[1]);fclose($pipes[2]);$exit=proc_close($proc);
-revisionCheck($exit===0 && str_contains($out,'Applied 023_curriculum_revision_clone_permission.sql') && revisionSourceDigest($db,$f)===$upgradeDigest,'022 to 023 upgrade preserves populated academic records and reference evidence');
+revisionCheck($exit===0 && str_contains($out,'Applied 023_curriculum_revision_clone_permission.sql') && str_contains($out,'Applied 024_curriculum_outcome_mapping.sql') && revisionSourceDigest($db,$f)===$upgradeDigest,'022 through 024 upgrade preserves populated academic records and reference evidence');
 $digest=revisionSourceDigest($db,$f);
 $preview=$service->preview($f['version'],$f['curriculum']);
-revisionCheck($preview['counts']===['requirements'=>4,'groups'=>1,'memberships'=>2,'schemes'=>1,'components'=>2,'placements'=>4,'snapshots'=>4],'preview counts all owned structures');
+revisionCheck($preview['counts']===['requirements'=>4,'groups'=>1,'memberships'=>2,'schemes'=>1,'components'=>2,'outcomes'=>0,'placements'=>4,'snapshots'=>4],'preview counts all owned structures');
 $result=$service->create(revisionInput($f,'Synthetic revision 1')+['version_role'=>'reference','review_status'=>'approved','status'=>'active','baseline_version_id'=>999],$actor);
 $v=(int)$result['version']['id'];
 revisionCheck($result['version']['version_role']==='proposed' && $result['version']['review_status']==='not_started' && $result['version']['status']==='draft' && (int)$result['version']['baseline_version_id']===$f['version'],'server owns exact baseline and neutral lifecycle despite forged input');

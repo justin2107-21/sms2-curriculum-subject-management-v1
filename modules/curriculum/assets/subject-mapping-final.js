@@ -11,20 +11,22 @@
         versions: root.dataset.versionApi,
         subjects: root.dataset.subjectApi,
         requirements: root.dataset.requirementApi,
-        mappings: root.dataset.assignmentApi
+        mappings: root.dataset.assignmentApi,
+        outcomes: root.dataset.outcomeApi
     };
     const permission = {
         prerequisites: root.dataset.canViewPrerequisites === '1',
         programs: root.dataset.canViewPrograms === '1',
         subjects: root.dataset.canViewSubjects === '1',
         manage: root.dataset.canManageMappings === '1',
-        add: root.dataset.canAddMappings === '1'
+        add: root.dataset.canAddMappings === '1',
+        manageOutcomes: root.dataset.canManageOutcomes === '1'
     };
     const state = {
         program: null, curriculum: null, version: null, loaded: false, year: '', requirements: [], relationshipRequest: null, relationshipsLoaded: false, requirementError: '', detailRequest: 0,
         mappings: new Map(), allMappings: [], pendingRemoval: null,
         selectedMapping: null, currentTab: 'map', mapRequest: 0,
-        reviewLoaded: false, yearValues: [], semesterValues: []
+        reviewLoaded: false, yearValues: [], semesterValues: [], outcomeData: null, outcomeRequest: 0
     };
     window.CSMSPageCIMFContext = () => ({academic_program_id:state.program?.id || '',curriculum_id:state.curriculum?.id || '',curriculum_version_id:state.version?.id || '',subject_id:state.selectedMapping?.subject_id || '',year_level:state.year || ''});
     const el = id => document.getElementById(id);
@@ -237,6 +239,7 @@
     async function loadMap() {
         const request = ++state.mapRequest;
         const version = versionIdInput.value;
+        if (state.currentTab === 'outcomes') loadOutcomes();
         state.loaded = false; state.reviewLoaded = false; state.allMappings = []; state.requirements = []; state.relationshipRequest = null; state.relationshipsLoaded = false; state.requirementError = '';
         connectionModal?.close(); renderConnections();
         state.mappings.clear(); state.detailRequest++; traceRequest++;
@@ -278,6 +281,63 @@
             ['mappingMap', 'mappingReviewCards', 'mappingReviewResults'].forEach(id => showPanelState(el(id), error.message || 'Selected context could not be loaded.', true));
         }
     }
+
+    async function loadOutcomes() {
+        const target = el('outcomeMatrix');
+        if (!target) return;
+        const versionId = versionIdInput.value;
+        const request = ++state.outcomeRequest;
+        if (!versionId) { state.outcomeData = null; showPanelState(target, 'Select a BSIT curriculum version to view recorded outcomes.'); return; }
+        showPanelState(target, 'Loading source outcomes and recorded mappings...');
+        try {
+            const data = await ui.fetchJson(api.outcomes, { action: 'workspace', curriculum_version_id: versionId });
+            if (request !== state.outcomeRequest) return;
+            state.outcomeData = data;
+            renderOutcomes();
+        } catch (error) {
+            if (request === state.outcomeRequest) showPanelState(target, error.message || 'Outcome mappings could not be loaded.', true);
+        }
+    }
+
+    function renderOutcomes() {
+        const data = state.outcomeData, target = el('outcomeMatrix');
+        if (!data || !target) return;
+        const context = data.context, outcomes = arr(data.outcomes), placements = arr(data.placements), mappings = arr(data.mappings);
+        el('outcomeVersionScope').textContent = [context.program_code, context.curriculum_name, context.version_label].join(' / ');
+        if (!outcomes.length) { showPanelState(target, 'The source-traceable IT01–IT13 catalog has not been loaded in this environment.'); return; }
+        const canEdit = permission.manageOutcomes && Boolean(context.editable);
+        const labels = { not_assessed: 'Not assessed', incomplete: 'Incomplete', mapped: 'Mapped', unmapped: 'Unmapped' };
+        target.innerHTML = outcomes.map(outcome => {
+            const links = mappings.filter(row => Number(row.outcome_id) === Number(outcome.id));
+            const options = placements.map(row => '<option value="' + Number(row.placement_id) + '">' + esc(row.subject_code + ' · ' + row.subject_title + ' · ' + (row.year_level || 'Year not set') + ' / ' + (row.semester || 'Term not set')) + '</option>').join('');
+            const linkHtml = links.length ? links.map(link => '<li><strong>' + esc(link.subject_code) + ' · ' + esc(link.subject_title) + '</strong><span>' + esc((link.year_level || 'Year not set') + ' / ' + (link.semester || 'Term not set')) + '</span><p>' + esc(link.rationale) + (link.mapping_origin === 'inherited' ? '<small>Inherited from reference mapping #' + Number(link.inherited_from_mapping_id) + '; not independently reassessed.</small>' : '') + '</p>' + (canEdit ? '<button type="button" class="button-muted" data-outcome-remove="' + Number(link.id) + '">Remove link</button>' : '') + '</li>').join('') : '<li class="outcome-no-links">No subject links recorded.</li>';
+            const actions = canEdit ? '<form class="outcome-add-form" data-outcome-add="' + Number(outcome.id) + '"><label>Subject placement<select name="placement_id" required><option value="">Choose placement</option>' + options + '</select></label><label>Academic rationale<textarea name="rationale" maxlength="3000" required></textarea></label><button class="button-primary" type="submit">Record mapping</button></form><form class="outcome-assess-form" data-outcome-assess="' + Number(outcome.id) + '"><label>Coverage note<textarea name="rationale" maxlength="3000"></textarea></label><button class="button-muted" name="assessment_state" value="incomplete">Mark incomplete</button><button class="button-muted" name="assessment_state" value="complete">Mark complete</button></form>' : '';
+            const citation = outcome.document_code + ' · ' + outcome.document_title + ' · ' + outcome.source_section + ' · printed p. ' + outcome.printed_page + ' (PDF p. ' + outcome.pdf_page_index + ')';
+            return '<article class="outcome-card"><header><div><span class="record-code">' + esc(outcome.outcome_code) + '</span><span class="outcome-status outcome-status-' + esc(outcome.coverage_status) + '">' + esc(labels[outcome.coverage_status]) + '</span><p>' + esc(outcome.outcome_text) + '</p><small>' + esc(citation) + '</small>' + (Number(outcome.source_order) === 1 ? '<small>Source PDF SHA-256: ' + esc(outcome.source_sha256) + '</small>' : '') + '</div><strong>' + Number(outcome.mapping_count) + ' recorded subject link' + (Number(outcome.mapping_count) === 1 ? '' : 's') + '</strong></header><ul class="outcome-link-list">' + linkHtml + '</ul>' + actions + '</article>';
+        }).join('');
+    }
+
+    el('mappingPanelOutcomes')?.addEventListener('submit', async event => {
+        const form = event.target.closest('[data-outcome-add], [data-outcome-assess]');
+        if (!form) return;
+        event.preventDefault();
+        const data = new FormData(form);
+        data.set('curriculum_version_id', String(versionIdInput.value));
+        if (form.matches('[data-outcome-add]')) {
+            data.set('action','add'); data.set('outcome_id',form.dataset.outcomeAdd);
+        } else {
+            data.set('action','assess'); data.set('outcome_id',form.dataset.outcomeAssess);
+            data.set('assessment_state',event.submitter?.value || 'incomplete');
+        }
+        try { const result=await ui.postForm(api.outcomes,data); ui.showToast(result.message || 'Outcome record saved.','success'); await loadOutcomes(); }
+        catch(error) { ui.showToast(error.message || 'Outcome record could not be saved.','error'); }
+    });
+    el('mappingPanelOutcomes')?.addEventListener('click', async event => {
+        const button=event.target.closest('[data-outcome-remove]'); if (!button) return;
+        const data=new FormData(); data.set('action','remove'); data.set('curriculum_version_id',String(versionIdInput.value)); data.set('mapping_id',button.dataset.outcomeRemove);
+        try { const result=await ui.postForm(api.outcomes,data); ui.showToast(result.message || 'Mapping removed.','success'); await loadOutcomes(); }
+        catch(error) { ui.showToast(error.message || 'Mapping could not be removed.','error'); }
+    });
     function renderFilteredMap() {
         if (!state.loaded) return;
         el('mappingYearFilter').value = state.year;
@@ -463,7 +523,7 @@
     function setTab(name) {
         state.currentTab = name;
         updateContextMessage();
-        [['map', 'mappingTabMap', 'mappingPanelMap'], ['trace', 'mappingTabTrace', 'mappingPanelTrace'], ['review', 'mappingTabReview', 'mappingPanelReview']].forEach(([key, tabId, panelId]) => {
+        [['map', 'mappingTabMap', 'mappingPanelMap'], ['trace', 'mappingTabTrace', 'mappingPanelTrace'], ['review', 'mappingTabReview', 'mappingPanelReview'], ['outcomes','mappingTabOutcomes','mappingPanelOutcomes']].forEach(([key, tabId, panelId]) => {
             const active = key === name;
             el(tabId).classList.toggle('is-active', active);
             el(tabId).setAttribute('aria-selected', String(active));
@@ -471,6 +531,7 @@
             el(panelId).hidden = !active;
         });
         if (name === 'review') loadReview(false);
+        if (name === 'outcomes') loadOutcomes();
     }
 
     async function initializeContext() {
@@ -494,13 +555,14 @@
                 const placement = state.allMappings.find(p => Number(p.subject_id) === Number(params.get('subject_id')));
                 if (placement) { if (permission.manage) prepareEdit(placement); else openMappingDetails(placement); }
             }
+            if (params.get('outcomes') === '1') setTab('outcomes');
         } catch (error) { if (request === state.mapRequest) showPanelState(mapTarget, error.message || 'Linked curriculum context could not be loaded.', true); }
     }
 
     el('mappingWorkspaceTabs')?.addEventListener('click', event => {
         const tab = event.target.closest('[role="tab"]');
         if (!tab) return;
-        setTab(tab.id === 'mappingTabMap' ? 'map' : tab.id === 'mappingTabTrace' ? 'trace' : 'review');
+        setTab(tab.id === 'mappingTabMap' ? 'map' : tab.id === 'mappingTabTrace' ? 'trace' : tab.id === 'mappingTabOutcomes' ? 'outcomes' : 'review');
     });
     el('mappingWorkspaceTabs')?.addEventListener('keydown', event => {
         const tabs = [...el('mappingWorkspaceTabs').querySelectorAll('[role="tab"]')];
@@ -514,7 +576,7 @@
         else return;
         event.preventDefault();
         const tab = tabs[next];
-        setTab(tab.id === 'mappingTabMap' ? 'map' : tab.id === 'mappingTabTrace' ? 'trace' : 'review');
+        setTab(tab.id === 'mappingTabMap' ? 'map' : tab.id === 'mappingTabTrace' ? 'trace' : tab.id === 'mappingTabOutcomes' ? 'outcomes' : 'review');
         tab.focus();
     });
     mapTarget?.addEventListener('click', event => {

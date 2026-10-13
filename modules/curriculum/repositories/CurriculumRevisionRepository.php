@@ -33,6 +33,7 @@ final class CurriculumRevisionRepository
             'memberships' => $this->rows('SELECT m.* FROM curriculum_elective_group_subjects m JOIN curriculum_elective_groups g ON g.id=m.elective_group_id WHERE m.curriculum_version_id=? OR g.curriculum_version_id=? ORDER BY m.id FOR UPDATE','ii',[$version,$version]),
             'schemes' => $this->rows('SELECT s.* FROM grade_weighting_schemes s JOIN curriculum_version_subjects p ON p.id=s.curriculum_version_subject_id WHERE p.curriculum_version_id=? ORDER BY s.id FOR UPDATE','i',[$version]),
             'components' => $this->rows('SELECT c.* FROM grade_weighting_components c JOIN grade_weighting_schemes s ON s.id=c.scheme_id JOIN curriculum_version_subjects p ON p.id=s.curriculum_version_subject_id WHERE p.curriculum_version_id=? ORDER BY c.id FOR UPDATE','i',[$version]),
+            'outcomes' => $this->rows('SELECT m.* FROM curriculum_version_subject_outcomes m JOIN curriculum_version_subjects p ON p.id=m.curriculum_version_subject_id WHERE p.curriculum_version_id=? ORDER BY m.id FOR UPDATE','i',[$version]),
         ];
     }
 
@@ -56,6 +57,7 @@ final class CurriculumRevisionRepository
             'membership'=>['curriculum_elective_group_subjects',['subject_id']],
             'scheme'=>['grade_weighting_schemes',['description']],
             'component'=>['grade_weighting_components',['component_name','weight_percentage','sequence_order']],
+            'outcome_mapping'=>['curriculum_version_subject_outcomes',['outcome_id','rationale']],
         ];
         if (!isset($definitions[$kind])) throw new InvalidArgumentException('Unsupported clone structure.');
         [$table,$fields] = $definitions[$kind];

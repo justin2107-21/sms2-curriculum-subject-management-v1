@@ -906,6 +906,10 @@
         document.getElementById('workspaceCurriculumCode').href = 'curricula.php?program_id=' + programId + '&curriculum_id=' + curriculumId;
         const exportLink = document.getElementById('versionExportLink');
         if (exportLink) exportLink.href = 'curriculum_export.php';
+        const outcomesLink = document.getElementById('outcomeMappingLink');
+        if (outcomesLink) outcomesLink.href = 'subject_mapping.php?' + new URLSearchParams({
+            program_id: String(programId), curriculum_id: String(curriculumId), version_id: String(state.selectedVersionId)
+        });
         await loadReferenceWorkspace(id);
         await loadPlacements();
     }

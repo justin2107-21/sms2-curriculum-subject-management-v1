@@ -5,9 +5,10 @@ require_once __DIR__.'/version-protection-fixture.php';
 require_once __DIR__.'/../modules/curriculum/services/CurriculumRevisionService.php';
 require_once __DIR__.'/../modules/curriculum/services/ComplianceReferenceService.php';
 
-function revisionFixture(mysqli $db,int $actor,string $suffix,bool $full=true): array
+function revisionFixture(mysqli $db,int $actor,string $suffix,bool $full=true,string $programCode=''): array
 {
-    $program=protectionInsert($db,"INSERT INTO academic_programs(program_code,program_name) VALUES ('T4-$suffix','Synthetic revision test program')");
+    $programCode=$programCode!==''?$programCode:'T4-'.$suffix;
+    $program=protectionInsert($db,"INSERT INTO academic_programs(program_code,program_name) VALUES ('".$db->real_escape_string($programCode)."','Synthetic revision test program')");
     $curriculum=protectionInsert($db,"INSERT INTO curricula(curriculum_code,curriculum_name,academic_program_id) VALUES ('T4-$suffix','Synthetic revision test curriculum',$program)");
     $version=protectionInsert($db,"INSERT INTO curriculum_versions(curriculum_id,version_label) VALUES ($curriculum,'Synthetic reference $suffix')");
     $subjects=[];$placements=[];

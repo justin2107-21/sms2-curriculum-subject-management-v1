@@ -13,7 +13,7 @@ function checkHttp(bool $ok,string $label):void{global $checks;if(!$ok)throw new
 function status(array $r,int $expected,string $label):array{checkHttp($r['status']===$expected,$label.' expected '.$expected.' received '.$r['status'].' '.$r['body']);checkHttp(!preg_match('/Fatal error|Warning:|Stack trace|mysqli_sql_exception/',$r['body']),$label.' safe response');return $r['json']??[];}
 try{
  $db->query("CREATE DATABASE `$name`");$created=true;
- foreach(['users','roles','permissions','user_roles','role_permissions','audit_logs','academic_programs','curricula','curriculum_versions','subjects','curriculum_version_subjects','curriculum_subject_requirements','curriculum_elective_group_subjects','grade_weighting_schemes','curriculum_version_subject_snapshots'] as $table)$db->query("CREATE TABLE `$name`.`$table` LIKE `$source`.`$table`");
+ foreach(['users','roles','permissions','user_roles','role_permissions','audit_logs','academic_programs','curricula','curriculum_versions','subjects','curriculum_version_subjects','curriculum_subject_requirements','curriculum_elective_group_subjects','grade_weighting_schemes','curriculum_version_subject_snapshots','curriculum_outcome_catalog','curriculum_version_subject_outcomes','curriculum_version_outcome_coverage'] as $table)$db->query("CREATE TABLE `$name`.`$table` LIKE `$source`.`$table`");
  $db->select_db($name);
  foreach(['roles','permissions','role_permissions'] as $table)$db->query("INSERT INTO `$table` SELECT * FROM `$source`.`$table`");
  $password=bin2hex(random_bytes(24));$hash=password_hash($password,PASSWORD_DEFAULT);
@@ -60,7 +60,8 @@ try{
  foreach(['SUBJECT_REQUIREMENT_CREATE','SUBJECT_REQUIREMENT_UPDATE','SUBJECT_REQUIREMENT_REMOVE']as $action)checkHttp((int)$db->query("SELECT COUNT(*) FROM audit_logs WHERE action='$action'")->fetch_row()[0]>0,'HTTP audit '.$action);
 
  $mappingPage=$admin->request('modules/curriculum/pages/subject_mapping.php');status($mappingPage,200,'Mapping page');
- checkHttp(substr_count($mappingPage['body'],'role="tab"')===3,'Exactly three mapping tabs');
+ checkHttp(substr_count($mappingPage['body'],'role="tab"')===4,'Existing mapping tabs plus Graduate Outcomes');
+ checkHttp(str_contains($mappingPage['body'],'Graduate Outcomes'),'Graduate Outcomes stays inside Subject Mapping');
  checkHttp(!str_contains($mappingPage['body'],'Relationship View'),'No relationship tab');
  checkHttp(str_contains($mappingPage['body'],'Organize subjects within curriculum versions.'),'Final subtitle');
  status($guest->api('assignment','mapping_list',['curriculum_version_id'=>1]),401,'Mapping guest rejected');

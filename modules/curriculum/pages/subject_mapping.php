@@ -12,6 +12,7 @@ $canViewPrograms = $userId !== null && user_can($userId, 'program.view');
 $canViewSubjects = $userId !== null && user_can($userId, 'subject.view');
 $canViewPrerequisites = $userId !== null && user_can($userId, 'prerequisite.view');
 $canManageMappings = $userId !== null && user_can($userId, 'curriculum.update');
+$canManageOutcomeMappings = $userId !== null && user_can($userId, 'curriculum.outcome_mapping.manage');
 $canAddMappings = $canManageMappings && $canViewSubjects;
 $curriculumCssVersion = (int)filemtime(__DIR__ . '/../assets/curriculum.css');
 $typographyCssVersion = (int)filemtime(__DIR__ . '/../../../css/csms-typography.css');
@@ -50,11 +51,13 @@ require __DIR__ . '/../../../shared/sidebar.php';
         data-version-api="../http/version_actions.php"
         data-subject-api="../http/subject_actions.php"
         data-assignment-api="../http/assignment_actions.php"
+        data-outcome-api="../http/outcome_mapping_actions.php"
         data-requirement-api="../http/requirement_actions.php"
         data-can-view-prerequisites="<?= $canViewPrerequisites ? '1' : '0' ?>"
         data-can-view-programs="<?= $canViewPrograms ? '1' : '0' ?>"
         data-can-view-subjects="<?= $canViewSubjects ? '1' : '0' ?>"
         data-can-manage-mappings="<?= $canManageMappings ? '1' : '0' ?>"
+        data-can-manage-outcomes="<?= $canManageOutcomeMappings ? '1' : '0' ?>"
         data-can-add-mappings="<?= $canAddMappings ? '1' : '0' ?>">
     <header class="mapping-workspace-header">
         <div><h1 class="page-title">Subject Mapping</h1><p class="page-subtitle">Organize subjects within curriculum versions.</p></div>
@@ -81,6 +84,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
         <button type="button" class="is-active" id="mappingTabMap" role="tab" aria-selected="true" aria-controls="mappingPanelMap">Curriculum Map</button>
         <button type="button" id="mappingTabTrace" role="tab" aria-selected="false" aria-controls="mappingPanelTrace">Subject Trace</button>
         <button type="button" id="mappingTabReview" role="tab" aria-selected="false" aria-controls="mappingPanelReview">Mapping Review</button>
+        <button type="button" id="mappingTabOutcomes" role="tab" aria-selected="false" aria-controls="mappingPanelOutcomes">Graduate Outcomes</button>
       </nav>
       <section id="mappingPanelMap" class="mapping-workspace-panel" role="tabpanel" aria-labelledby="mappingTabMap">
         <div class="mapping-year-tabs" id="mappingYearTabs" aria-label="Year / Grade filter"></div>
@@ -106,6 +110,12 @@ require __DIR__ . '/../../../shared/sidebar.php';
         <div class="mapping-review-header"><div><h2>Mapping Review</h2><p>Checks the structure of placements in the selected curriculum version.</p></div><span id="mappingReviewScope">Select a version</span></div>
         <div class="mapping-review-cards" id="mappingReviewCards"><p class="mapping-state">Loading mapping checks…</p></div>
         <div id="mappingReviewResults"><p class="mapping-state">Select a check to inspect affected records.</p></div>
+      </section>
+      <section id="mappingPanelOutcomes" class="mapping-workspace-panel" role="tabpanel" aria-labelledby="mappingTabOutcomes" hidden>
+        <div class="mapping-review-header"><div><p class="eyebrow">CHED BSIT · Section 6.3</p><h2>Graduate Outcomes</h2><p>Manual curriculum-to-outcome associations for the selected BSIT version.</p></div><span id="outcomeVersionScope">Select a version</span></div>
+        <p class="curriculum-notice">Source: CHED Memorandum Order No. 25, series of 2015. The supplied scan is fingerprinted; independent registry validation and current applicability have not been established. Institutional adoption/approval not verified.</p>
+        <p class="mapping-state">Curriculum mapping does not establish student outcome attainment, regulatory compliance, or institutional approval.</p>
+        <div id="outcomeMatrix" class="outcome-matrix"><p class="mapping-state">Select a BSIT curriculum version to view its recorded outcome mappings.</p></div>
       </section>
     </section>
 

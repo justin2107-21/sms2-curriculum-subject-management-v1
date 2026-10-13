@@ -166,11 +166,14 @@ class CurriculumExportService
         $scopeLabel = $yearLabel === ''
             ? ($semesterLabel === '' ? 'Entire Curriculum' : 'All Year Levels · ' . $semesterLabel)
             : ($yearLabel . ' · ' . ($semesterLabel === '' ? 'All Semesters / Terms' : $semesterLabel));
+        $outcomeMappings = strtoupper((string)$context['program_code']) === 'BSIT'
+            ? $this->exports->outcomeMappings($versionId) : [];
         return [
             'context' => $context,
             'scope' => ['year_level' => $yearLabel, 'semester' => $semesterLabel, 'label' => $scopeLabel],
             'summary' => ['total_subjects' => $totalSubjects, 'total_units' => $this->formatHundredths($totalUnitsHundredths)],
             'subjects' => $subjects,
+            'graduate_outcomes' => $outcomeMappings,
             'years' => array_values($years),
             // Retain explicitly requested legacy report sections for existing API
             // consumers. The Curriculum Export page does not select these by default.
@@ -180,7 +183,7 @@ class CurriculumExportService
             'grade_weighting' => $options['grade_weighting'] ? $this->groupWeighting($this->exports->gradeWeightingRows($versionId)) : [],
             'latest_compliance_run' => $options['compliance'] ? $this->decorateComplianceRun($this->exports->latestComplianceRun($versionId)) : null,
             'generated_at' => (new DateTimeImmutable('now'))->format('Y-m-d H:i:s P'),
-            'disclaimer' => 'This report is generated from stored curriculum data in the system and does not by itself constitute official CHED, DepEd, accreditation, or institutional approval.',
+            'disclaimer' => 'This report is generated from stored curriculum data in the system and does not by itself constitute official CHED, DepEd, accreditation, or institutional approval. Curriculum mapping does not establish student outcome attainment, regulatory compliance, or institutional approval.',
         ];
     }
 
@@ -296,6 +299,16 @@ class CurriculumExportService
                 $subject['year_level'] ?? '', $subject['semester'] ?? '',
                 $subject['subject_code'], $subject['subject_title'], $subject['units'], $subject['placement_type'],
             ]);
+        }
+        if (!empty($dataset['graduate_outcomes'])) {
+            $this->csvRow($stream, []);
+            $this->csvRow($stream, ['CHED CMO 25 BSIT Graduate Outcome Mapping — source and coverage; not attainment or compliance evidence']);
+            $this->csvRow($stream, ['Disclaimer','Curriculum mapping does not establish student outcome attainment, regulatory compliance, or institutional approval.']);
+            $this->csvRow($stream, ['Outcome Code','Outcome Description','Source Document','Document Title','Section','Printed Page','PDF Page','Source SHA-256','Coverage Status','Subject Code','Subject Title','Year','Semester','Mapping Rationale','Mapping Origin']);
+            foreach ($dataset['graduate_outcomes'] as $outcome) {
+                if (!$outcome['mappings']) $this->csvRow($stream,[$outcome['outcome_code'],$outcome['outcome_text'],$outcome['document_code'],$outcome['document_title'],$outcome['source_section'],$outcome['printed_page'],$outcome['pdf_page_index'],$outcome['source_sha256'],$outcome['coverage_status']]);
+                foreach($outcome['mappings'] as $mapping)$this->csvRow($stream,[$outcome['outcome_code'],$outcome['outcome_text'],$outcome['document_code'],$outcome['document_title'],$outcome['source_section'],$outcome['printed_page'],$outcome['pdf_page_index'],$outcome['source_sha256'],$outcome['coverage_status'],$mapping['subject_code'],$mapping['subject_title'],$mapping['year_level'],$mapping['semester'],$mapping['rationale'],$mapping['mapping_origin']]);
+            }
         }
     }
 

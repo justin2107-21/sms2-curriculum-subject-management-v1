@@ -223,6 +223,11 @@ class CurriculumVersionSubjectService
                     'Remove the grade weighting configuration before removing this curriculum placement.'
                 );
             }
+            if ($this->assignments->placementHasOutcomeMappings($id, true)) {
+                throw new DomainConflictException(
+                    'Remove recorded graduate outcome mappings before removing this curriculum placement.'
+                );
+            }
             (new CurriculumVersionEditPolicy($this->db))->preparePlacementRemoval($id);
             $this->assignments->delete($id);
             audit_log_required(

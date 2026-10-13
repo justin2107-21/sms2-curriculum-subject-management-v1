@@ -52,7 +52,7 @@ let previewValidation = {valid:true, conflicts:[], relationships:[]};
 let delayedTrace = null, delayNextTrace = false;
 const root = el('subjectMappingWorkspace');
 root.dataset = { programApi: 'programs', curriculumApi: 'curricula', versionApi: 'versions', subjectApi: 'subjects',
-    assignmentApi: 'mappings', requirementApi: 'requirements', canViewPrograms: '1', canViewSubjects: '1', canManageMappings: '1', canAddMappings: '1', canViewPrerequisites: '1' };
+    assignmentApi: 'mappings', requirementApi: 'requirements', outcomeApi: 'outcomes', canViewPrograms: '1', canViewSubjects: '1', canManageMappings: '1', canManageOutcomes: '1', canAddMappings: '1', canViewPrerequisites: '1' };
 el('mappingHighlightPrerequisites').setAttribute('aria-pressed', false);
 function autocomplete(config) {
     let selected = null;
@@ -79,6 +79,9 @@ const ui = {
     },
     async fetchJson(endpoint, params) {
         calls.push({ endpoint, params });
+        if (endpoint === 'outcomes' && params.action === 'workspace') return {context:{version_id:3,version_label:'V1',program_code:'BSIT',curriculum_name:'Information Technology',editable:true},
+            outcomes:[{id:1,outcome_code:'IT01',outcome_text:'Apply knowledge of computing, science, and mathematics appropriate to the discipline',document_code:'CHED Memorandum Order No. 25, series of 2015',source_section:'Section 6.3',printed_page:8,pdf_page_index:8,coverage_status:'not_assessed',mapping_count:2}],
+            placements:[row(1,{placement_id:101}),row(2,{placement_id:102})],mappings:[],limitations:{}};
         if (params.action === 'preview_placement') return {validation: previewValidation};
         if (endpoint === 'mappings' && params.subject_id && delayNextTrace) {
             delayNextTrace = false;
@@ -302,6 +305,12 @@ const displayedUnitCents = () => [...el('mappingMap').innerHTML.matchAll(/<\/div
     assert.match(el('mappingTraceResults').innerHTML,/Placement in Selected Curriculum Version/);
     assert.ok(!el('mappingTraceResults').innerHTML.includes('data-place-trace'));
     tab('mappingTabReview');assert.equal(el('addMappingButton').hidden,true);
+    tab('mappingTabOutcomes');await settle();
+    assert.match(el('outcomeMatrix').innerHTML,/IT01/);
+    assert.match(el('outcomeMatrix').innerHTML,/Not assessed/);
+    assert.match(el('outcomeMatrix').innerHTML,/2 recorded subject links/);
+    assert.match(el('outcomeMatrix').innerHTML,/Academic rationale/);
+    assert.match(el('outcomeMatrix').innerHTML,/CHED Memorandum Order No\. 25/);
     tab('mappingTabMap');assert.equal(el('addMappingButton').hidden,false);assert.equal(el('addMappingButton').disabled,false);
     await selectors.mappingSubjectSelectorSearch.config.search('NEW');
     assert.equal(calls.at(-1).params.action,'placement_subject_options');

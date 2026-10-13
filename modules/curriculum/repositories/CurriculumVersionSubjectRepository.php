@@ -31,6 +31,16 @@ class CurriculumVersionSubjectRepository
         return $exists;
     }
 
+    public function placementHasOutcomeMappings(int $placementId, bool $forUpdate = false): bool
+    {
+        $stmt = $this->db->prepare('SELECT id FROM curriculum_version_subject_outcomes WHERE curriculum_version_subject_id=? ORDER BY id LIMIT 1' . ($forUpdate ? ' FOR UPDATE' : ''));
+        $stmt->bind_param('i', $placementId);
+        $stmt->execute();
+        $exists = $stmt->get_result()->num_rows > 0;
+        $stmt->close();
+        return $exists;
+    }
+
     public function paginateByVersion(int $versionId, array $query): array
     {
         $conditions = ['curriculum_version_subjects.curriculum_version_id = ?'];

@@ -102,7 +102,8 @@
             '<td><span class="history-code">' + esc(row.program_code) + '</span></td>' +
             '<td><span class="history-curriculum-context"><strong>' + esc(row.curriculum_code) + '</strong><span>' + esc(row.version_label) + '</span></span></td>' +
             '<td>' + esc([row.year_level, row.semester].filter(Boolean).join(' · ') || '—') + '</td><td>' + ui.statusBadge(row.version_status) + '</td>' +
-            '<td><button type="button" class="row-action-button history-link" data-history-details="' + index + '">View Details</button></td></tr>';
+            '<td><button type="button" class="row-action-button history-link" data-history-details="' + index + '">View Details</button>' +
+            (String(row.program_code).toUpperCase()==='BSIT' ? '<a class="row-action-button history-link" href="subject_mapping.php?program_id=' + Number(row.academic_program_id) + '&curriculum_id=' + Number(row.curriculum_id) + '&version_id=' + Number(row.curriculum_version_id) + '&outcomes=1">Graduate Outcomes</a>' : '') + '</td></tr>';
     }
     async function loadHistory(page) {
         if (!subjectId.value) { clearHistory(); return; }
@@ -220,7 +221,7 @@
             $('historyDetailsContext').textContent = subjectLabel;
             const entries = [['Historical subject', subjectLabel], ['Current Subject Master (present-day context)', (r.current_subject_code || '—') + ' — ' + (r.current_subject_title || '—')], ['Snapshot captured', Number(r.snapshot_complete) === 1 ? ui.formatDate(r.snapshot_captured_at) + ' · ' + (r.capture_method || '') : 'Unavailable'], ['Program / Strand', r.program_code + ' — ' + r.program_name], ['Curriculum', r.curriculum_code + ' — ' + r.curriculum_name], ['Curriculum Version', r.version_label + ' · ' + r.version_status], ['Year Level', r.year_level || '—'], ['Semester / Term', r.semester || '—'], ['Sequence', r.sequence_order ?? '—'], ['Placement Type', Number(r.is_required) === 1 ? 'Required' : 'Optional'], ['Stored Date', ui.formatDate(r.placement_created_at)], ['Captured units', Number(r.snapshot_complete) === 1 ? ui.formatUnits(r.units) : 'Unavailable'], ['Lecture units', Number(r.snapshot_complete) === 1 ? ui.formatUnits(r.lecture_units) : 'Unavailable'], ['Laboratory units', Number(r.snapshot_complete) === 1 ? ui.formatUnits(r.laboratory_units) : 'Unavailable'], ['Description', Number(r.snapshot_complete) === 1 ? (r.description || '—') : 'Unavailable'], ['Last Updated Date', ui.formatDate(r.placement_updated_at)], ['Program Type', r.program_type || '—']];
             $('historyDetailsBody').innerHTML = entries.map(([k,v]) => '<div><dt class="eyebrow">' + esc(k) + '</dt><dd>' + esc(v) + '</dd></div>').join('');
-            $('historyMappingLink').href = 'subject_mapping.php?curriculum_version_id=' + Number(r.curriculum_version_id) + '&subject_id=' + Number(r.subject_id);
+            $('historyMappingLink').href = 'subject_mapping.php?version_id=' + Number(r.curriculum_version_id) + '&subject_id=' + Number(r.subject_id);
             detailsModal.open();
         } catch (error) { ui.showToast(error.message || 'History details could not be loaded.', 'error'); }
     }

@@ -87,6 +87,10 @@ $exportCssVersion = (int)filemtime(__DIR__ . '/../assets/curriculum-export.css')
         <p class="export-year-total">Year Total Units: <strong><?= curriculum_export_units($year['total_units']) ?></strong></p>
       </section>
     <?php endforeach; ?>
+    <?php if (!empty($report['graduate_outcomes'])): ?><section class="export-outcomes"><h2>CHED BSIT Graduate Outcome Mapping</h2><p>CHED Memorandum Order No. 25, series of 2015 · Section 6.3. Institutional adoption/approval not verified. Curriculum mapping does not establish student outcome attainment, regulatory compliance, or institutional approval.</p>
+      <?php foreach ($report['graduate_outcomes'] as $outcome): ?><article><h3><?= curriculum_export_html($outcome['outcome_code']) ?> · <?= curriculum_export_html(str_replace('_',' ',$outcome['coverage_status'])) ?></h3><p><?= curriculum_export_html($outcome['outcome_text']) ?></p><small><?= curriculum_export_html($outcome['document_code'].' · '.$outcome['document_title'].' · '.$outcome['source_section'].' · printed p. '.$outcome['printed_page'].' / PDF p. '.$outcome['pdf_page_index'].' · SHA-256 '.$outcome['source_sha256']) ?></small>
+        <?php if ($outcome['mappings']): ?><ul><?php foreach ($outcome['mappings'] as $mapping): ?><li><strong><?= curriculum_export_html($mapping['subject_code'].' · '.$mapping['subject_title']) ?></strong> — <?= curriculum_export_html($mapping['rationale']) ?></li><?php endforeach; ?></ul><?php else: ?><p>No subject links recorded.</p><?php endif; ?></article><?php endforeach; ?>
+    </section><?php endif; ?>
     <footer class="export-document-footer"><strong>Total Subjects: <?= (int)$report['summary']['total_subjects'] ?></strong><strong>Total Units: <?= curriculum_export_units($report['summary']['total_units']) ?></strong><p><?= curriculum_export_html($report['disclaimer']) ?></p><small>Generated from CSMS · <?= curriculum_export_html($report['generated_at']) ?></small></footer>
   </article>
   <?php endif; ?>
