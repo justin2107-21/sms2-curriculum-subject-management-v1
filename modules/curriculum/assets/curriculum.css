@@ -1620,6 +1620,7 @@ body.curriculum-modal-open { overflow: hidden; }
 .record-autocomplete-code { overflow-wrap:anywhere; min-width:0; }
 
 /* Scoped lifecycle/reference corrections; preserve semester table layout. */
+#compareBaselineLink[hidden] { display:none !important; }
 .curriculum-content .reference-baseline-panel .domain-card-header { display:flex; flex-wrap:wrap; padding:18px 22px; }
 .reference-baseline-panel .domain-card-header > div { min-width:0; }
 .reference-baseline-panel .compliance-subtext { display:block; margin-top:7px; line-height:1.65; color:#64748b; font-size:.8rem; }
