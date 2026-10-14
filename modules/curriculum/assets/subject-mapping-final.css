@@ -209,13 +209,48 @@
 .mapping-workspace-panel[hidden] { display:none !important; }
 @media(max-width:900px) { .mapping-semester-grid { grid-template-columns:1fr; } }
 @media(max-width:500px) { .mapping-detail-facts { grid-template-columns:1fr; } .mapping-details-modal .modal-footer { gap:8px; } }
-.outcome-matrix{display:grid;gap:1rem}.outcome-card{border:1px solid var(--line,#d9e1ea);border-radius:12px;background:#fff;padding:1rem}.outcome-card>header{display:flex;justify-content:space-between;gap:1rem;align-items:flex-start}.outcome-card>header p{margin:.65rem 0}.outcome-card>header small{color:var(--muted,#64748b)}.outcome-status{display:inline-flex;margin-left:.55rem;padding:.2rem .55rem;border-radius:999px;background:#edf2f7;font-size:.78rem}.outcome-status-mapped{background:#e7f5ec;color:#176b37}.outcome-status-incomplete{background:#fff3cd;color:#805b00}.outcome-link-list{list-style:none;padding:0;margin:.8rem 0}.outcome-link-list li{border-top:1px solid #edf0f4;padding:.65rem 0;display:grid;gap:.25rem}.outcome-link-list li p{margin:.15rem 0}.outcome-link-list small{display:block;color:#805b00}.outcome-add-form,.outcome-assess-form{display:grid;grid-template-columns:minmax(15rem,1fr) minmax(15rem,2fr) auto;align-items:end;gap:.7rem;border-top:1px solid #edf0f4;padding-top:.8rem;margin-top:.6rem}.outcome-assess-form{grid-template-columns:minmax(15rem,2fr) auto auto}.outcome-add-form label,.outcome-assess-form label{display:grid;gap:.3rem}.outcome-add-form textarea,.outcome-assess-form textarea{min-height:2.7rem;resize:vertical}@media(max-width:760px){.outcome-card>header{display:grid}.outcome-add-form,.outcome-assess-form{grid-template-columns:1fr}.outcome-add-form button,.outcome-assess-form button{width:100%}}
-
-/* Reuse mapping controls for the Task 7/8 placement planning section. */
-.clo-assessment-workspace { margin-top:24px; display:grid; gap:12px; min-width:0; }
-.clo-assessment-workspace label { display:grid; gap:6px; color:#36506f; font-size:.82rem; }
-.clo-assessment-workspace form { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr)); gap:12px; padding:14px 0; border-top:1px solid #edf0f4; }
-.clo-assessment-workspace input,.clo-assessment-workspace select,.clo-assessment-workspace textarea,.outcome-add-form select { box-sizing:border-box; min-width:0; max-width:100%; width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:10px 12px; font:inherit; color:#1e293b; background:#fff; }
-.clo-assessment-workspace textarea { min-height:80px; resize:vertical; }
-.clo-assessment-workspace input:focus,.clo-assessment-workspace select:focus,.clo-assessment-workspace textarea:focus { outline:2px solid #93c5fd; outline-offset:1px; }
-.clo-assessment-workspace form button { align-self:end; justify-self:start; }
+/* Outcome and planning layouts reuse foundation cards, forms, badges and actions. */
+#mappingPanelOutcomes { min-width:0; }
+#mappingPanelOutcomes .mapping-review-header { flex-wrap:wrap; }
+#mappingPanelOutcomes .mapping-review-header > * { min-width:0; overflow-wrap:anywhere; }
+#mappingPanelOutcomes .curriculum-notice { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; color:#475569; padding:12px 14px; font-size:.82rem; line-height:1.6; }
+#outcomeOverview { margin:18px 0; }
+#outcomeSourceDetails { margin-bottom:16px; }
+.outcome-toolbar { display:flex; flex-wrap:wrap; align-items:end; gap:12px; padding:12px 0; }
+.outcome-toolbar .search-control { flex:1 1 240px; }
+.outcome-toolbar .form-field { flex:0 1 210px; margin:0; }
+.outcome-toolbar input { width:100%; }
+#outcomeResultCount { color:#64748b; font-size:.82rem; padding-bottom:10px; }
+.outcome-browse-list { margin:0; padding:0; list-style:none; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; }
+.outcome-browse-list > li { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:start; gap:20px; padding:14px 18px; background:#fff; }
+.outcome-browse-list > li + li { border-top:1px solid #e2e8f0; }
+.outcome-browse-list > li.is-selected { background:#f5f9ff; }
+.outcome-browse-list p { margin:7px 0 0; line-height:1.6; font-size:.86rem; overflow-wrap:anywhere; }
+.outcome-row-actions { display:grid; gap:8px; justify-items:end; color:#64748b; font-size:.8rem; }
+.outcome-detail-card,.clo-record { padding:20px; margin-top:20px; min-width:0; }
+#outcomeDetail:focus-visible { outline:2px solid #2563c5; outline-offset:4px; }
+#mappingPanelOutcomes .section-heading { display:flex; flex-wrap:wrap; gap:12px; }
+#mappingPanelOutcomes .section-heading > * { min-width:0; overflow-wrap:anywhere; }
+#mappingPanelOutcomes .record-detail-grid { padding:8px 0; }
+#mappingPanelOutcomes .record-detail-grid > div { grid-template-columns:1fr; gap:5px; }
+#mappingPanelOutcomes dd { font-weight:400; white-space:pre-wrap; }
+#mappingPanelOutcomes .form-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+#mappingPanelOutcomes .form-field:has(textarea) { grid-column:1 / -1; }
+#mappingPanelOutcomes .domain-form { padding:14px 0 0; }
+#mappingPanelOutcomes .modal-actions { padding:12px 0 0; flex-wrap:wrap; justify-content:flex-start; }
+#mappingPanelOutcomes .status-badge { white-space:normal; line-height:1.5; }
+#mappingPanelOutcomes summary { padding:8px 0; font-size:.86rem; }
+#mappingPanelOutcomes summary:focus-visible { outline:2px solid #2563c5; outline-offset:3px; }
+.outcome-link-list { list-style:none; padding:0; }
+.outcome-link-list > li,.academic-related-record { padding:14px 0; border-top:1px solid #e2e8f0; }
+.academic-actions { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0; }
+.academic-statement,.academic-related-record > p,.outcome-detail-card > p { line-height:1.7; white-space:pre-wrap; overflow-wrap:anywhere; }
+.clo-assessment-workspace { margin-top:28px; padding-top:24px; border-top:1px solid #e2e8f0; min-width:0; }
+.clo-assessment-workspace > .form-field { margin:12px 0; }
+.clo-record .nested-section { margin-top:20px; padding-top:16px; }
+@media(max-width:700px) {
+  .outcome-browse-list > li { grid-template-columns:1fr; gap:10px; padding:14px; }
+  .outcome-row-actions { display:flex; align-items:center; justify-content:space-between; }
+  #mappingPanelOutcomes .record-detail-grid,#mappingPanelOutcomes .form-grid { grid-template-columns:1fr; }
+  .outcome-detail-card,.clo-record { padding:14px; }
+}

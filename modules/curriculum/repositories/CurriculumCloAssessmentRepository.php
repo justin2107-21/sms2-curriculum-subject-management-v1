@@ -27,7 +27,7 @@ final class CurriculumCloAssessmentRepository
     {
         return $this->rows(
             'SELECT p.id placement_id,p.curriculum_version_id,p.subject_id,p.year_level,p.semester,p.sequence_order,
-                    s.subject_code,s.subject_title,v.version_label,v.version_role,v.review_status,v.status,
+                    s.subject_code,s.subject_title,v.version_label,v.version_role,v.review_status,v.status,v.baseline_version_id,
                     c.id curriculum_id,c.curriculum_name,c.academic_program_id,a.program_code,a.program_name
              FROM curriculum_version_subjects p JOIN subjects s ON s.id=p.subject_id
              JOIN curriculum_versions v ON v.id=p.curriculum_version_id JOIN curricula c ON c.id=v.curriculum_id

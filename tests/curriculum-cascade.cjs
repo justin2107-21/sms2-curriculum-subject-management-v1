@@ -22,13 +22,14 @@ class Element {
     replaceChildren(...children) { this.children = children; }
     appendChild(child) { this.children.push(child); }
     querySelectorAll() { return this.children; }
+    closest() { return null; }
     scrollIntoView() {}
     focus() { document.activeElement = this; this.handlers.focus?.(); }
 }
 
 const documentHandlers = {};
-const document = { createElement: () => new Element(), addEventListener(name, handler) { (documentHandlers[name] ||= []).push(handler); }, getElementById: () => null, querySelectorAll: () => [] };
-const context = { window: { innerWidth: 1280, addEventListener() {}, location: { href: 'http://localhost/' } }, document, setTimeout, clearTimeout, Intl, Map, Set, console, URL, fetch };
+const document = { dispatchEvent(event) { (documentHandlers[event.type] || []).forEach(fn=>fn(event)); return true; }, createElement: () => new Element(), addEventListener(name, handler) { (documentHandlers[name] ||= []).push(handler); }, getElementById: () => null, querySelectorAll: () => [] };
+const context = { window: { innerWidth: 1280, addEventListener() {}, location: { href: 'http://localhost/' } }, document, CustomEvent: class {constructor(type,init){this.type=type;this.detail=init?.detail;}}, setTimeout, clearTimeout, Intl, Map, Set, console, URL, fetch };
 vm.runInNewContext(fs.readFileSync('modules/curriculum/assets/curriculum-common.js', 'utf8'), context);
 const ui = context.window.CurriculumUI;
 const levels = ['program', 'curriculum', 'version'].map(name => ({

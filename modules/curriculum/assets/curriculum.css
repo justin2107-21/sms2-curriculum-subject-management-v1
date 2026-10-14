@@ -1618,3 +1618,20 @@ body.curriculum-modal-open { overflow: hidden; }
 .reference-action-details .domain-form { margin-top: .75rem; }
 
 .record-autocomplete-code { overflow-wrap:anywhere; min-width:0; }
+
+/* Scoped lifecycle/reference corrections; preserve semester table layout. */
+.curriculum-content .reference-baseline-panel .domain-card-header { display:flex; flex-wrap:wrap; padding:18px 22px; }
+.reference-baseline-panel .domain-card-header > div { min-width:0; }
+.reference-baseline-panel .compliance-subtext { display:block; margin-top:7px; line-height:1.65; color:#64748b; font-size:.8rem; }
+.reference-baseline-panel .domain-table { table-layout:fixed; width:100%; min-width:640px; }
+.reference-baseline-panel .domain-table th:first-child { width:40%; }
+.reference-baseline-panel .domain-table th:nth-child(3) { width:28%; }
+.reference-baseline-panel .domain-table td { white-space:normal; overflow-wrap:anywhere; vertical-align:top; }
+.reference-baseline-details > div { grid-template-columns:1fr; gap:5px; }
+.reference-baseline-panel .reference-action-details { margin:16px 22px; }
+.reference-baseline-panel .mapping-context-message { margin:8px 0 0; line-height:1.6; }
+.version-workspace > .curriculum-notice,.version-workspace > .reference-action-details { margin:16px 28px; line-height:1.6; }
+@media(max-width:700px) {
+  .reference-baseline-details { grid-template-columns:1fr; }
+  .version-workspace > .curriculum-notice,.version-workspace > .reference-action-details { margin-left:16px; margin-right:16px; }
+}

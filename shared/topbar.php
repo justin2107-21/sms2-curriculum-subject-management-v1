@@ -13,7 +13,7 @@ $topbarIdleTimeoutSeconds = defined('CSMS_IDLE_TIMEOUT_SECONDS') ? CSMS_IDLE_TIM
 $topbarLastActivity = (int)($_SESSION['_last_activity_at'] ?? time());
 $topbarUserId = (int)($_SESSION['user_id'] ?? 0);
 ?>
-<?php if (getenv('CSMS_DISPOSABLE_PREVIEW') === '1'): ?><p class="curriculum-notice" role="status">Disposable synthetic preview — not BCP academic data. Institutional adoption/approval not verified.</p><?php endif; ?>
+<?php if (getenv('CSMS_DISPOSABLE_PREVIEW') === '1'): ?><p class="synthetic-preview-notice" role="status">Disposable synthetic preview — not BCP academic data. Institutional adoption/approval not verified.</p><?php endif; ?>
 <header class="topbar">
   <button class="hamburger" id="hamburgerBtn" type="button" aria-label="Toggle sidebar" aria-controls="sidebar">
     <i class="fa-solid fa-bars" aria-hidden="true"></i>

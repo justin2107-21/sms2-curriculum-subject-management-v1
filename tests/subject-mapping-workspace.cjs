@@ -75,7 +75,7 @@ const ui = {
         const instances = config.levels.map((level, index) => autocomplete({ ...level,
             onSelect(item) { instances.slice(index + 1).forEach(selector => selector.clear(false)); config.onChange(index, item, item.id, 'select'); },
             onClear() { instances.slice(index + 1).forEach(selector => selector.clear(false)); config.onChange(index, null, '', 'clear'); } }));
-        return { get: index => instances[index] };
+        return { get: index => instances[index], setContext(items) { instances.forEach((selector,index)=>selector.setSelected(items[index],false)); }, clear() { instances.forEach(selector=>selector.clear(false)); } };
     },
     async fetchJson(endpoint, params) {
         calls.push({ endpoint, params });
@@ -127,10 +127,10 @@ class FormDataMock extends Map {
         }
     }
 }
-const context = { window: { CurriculumUI: ui, location: { search: '?program_id=1&curriculum_id=2&version_id=3' } },
+const context = { window: { CurriculumUI: ui, location: new URL('http://localhost/?program_id=1&curriculum_id=2&version_id=3'), addEventListener() {}, history: {pushState(_a,_b,url) { context.window.location = new URL(url); }} },
     document: { getElementById: el, createElement: () => new Element('option') },
     Option: class { constructor(text, value) { this.text = text; this.value = value; } },
-    URLSearchParams, FormData: FormDataMock, setTimeout, clearTimeout, console };
+    URL, URLSearchParams, FormData: FormDataMock, setTimeout, clearTimeout, console };
 vm.runInNewContext(fs.readFileSync('modules/curriculum/assets/subject-mapping-data.js', 'utf8'), context);
 vm.runInNewContext(fs.readFileSync('modules/curriculum/assets/subject-mapping-graph.js', 'utf8'), context);
 const data = context.window.SubjectMappingData;
@@ -140,6 +140,7 @@ const issues = data.review(badRows);
 assert.equal(issues.duplicates.length, 2, 'different semester placements are not duplicates');
 assert.equal(issues.missingYear.length, 1); assert.equal(issues.missingSemester.length, 1); assert.equal(issues.placement.length, 1);
 assert.equal(data.edges(mappings, [edge, edge, { ...edge, requirement_type: 'corequisite' }, { ...edge, subject_id: 999 }]).length, 1);
+vm.runInNewContext(fs.readFileSync('modules/curriculum/assets/outcomes-presentation.js', 'utf8'), context);
 vm.runInNewContext(fs.readFileSync('modules/curriculum/assets/subject-mapping-final.js', 'utf8'), context);
 const settle = async () => { for (let i = 0; i < 12; i++) await new Promise(resolve => setImmediate(resolve)); };
 const click = (id, selector, dataset) => el(id).handlers.click({ target: { closest: name => name === selector ? { dataset } : null } });
@@ -308,9 +309,10 @@ const displayedUnitCents = () => [...el('mappingMap').innerHTML.matchAll(/<\/div
     tab('mappingTabOutcomes');await settle();
     assert.match(el('outcomeMatrix').innerHTML,/IT01/);
     assert.match(el('outcomeMatrix').innerHTML,/Not assessed/);
-    assert.match(el('outcomeMatrix').innerHTML,/2 recorded subject links/);
-    assert.match(el('outcomeMatrix').innerHTML,/Academic rationale/);
-    assert.match(el('outcomeMatrix').innerHTML,/CHED Memorandum Order No\. 25/);
+    assert.match(el('outcomeMatrix').innerHTML,/2 subject links/);
+    click('outcomeMatrix', '[data-outcome-open]', {outcomeOpen:1});
+    assert.match(el('outcomeDetail').innerHTML,/Academic rationale/);
+    assert.match(el('outcomeSources').innerHTML,/CHED Memorandum Order No\. 25/);
     tab('mappingTabMap');assert.equal(el('addMappingButton').hidden,false);assert.equal(el('addMappingButton').disabled,false);
     await selectors.mappingSubjectSelectorSearch.config.search('NEW');
     assert.equal(calls.at(-1).params.action,'placement_subject_options');

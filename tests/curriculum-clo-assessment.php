@@ -35,6 +35,7 @@ $clo=$service->createClo($placement,'CLO2','User-authored synthetic course learn
 $alignment=$service->align($placement,$clo,$parent,'Synthetic explicit academic rationale.',$actor);
 $plan=$service->createPlan($placement,$clo,['assessment_method'=>'Portfolio review','planned_task'=>'Prepare synthetic portfolio','evidence_description'=>'Portfolio artifact','performance_indicator'=>'Criterion is stated','rubric_or_standard'=>''], $actor);
 $workspace=$service->workspace($placement);
+cloCheck($workspace['editable'] === true && (int)$workspace['placement']['baseline_version_id'] === (int)$f['version'], 'proposed CLO workspace includes baseline and reports lifecycle editability truthfully');
 cloCheck(count($workspace['clos'])===2 && count($workspace['alignments'])===2 && count($workspace['plans'])===2,'placement workspace returns only owned CLO, alignment, and plan records');
 cloCheck($workspace['plans'][0]['plan_status']==='planned' && str_contains($workspace['disclaimer'],'do not establish student attainment'),'complete plan is planned and explicitly not attainment');
 cloCheck($workspace['alignments'][0]['outcome_code']==='GO1' && (int)$workspace['alignments'][0]['parent_mapping_id']===$parent,'CLO alignment requires the exact existing same-placement graduate-outcome mapping');

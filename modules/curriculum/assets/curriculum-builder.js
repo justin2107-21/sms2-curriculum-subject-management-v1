@@ -887,7 +887,7 @@
         if (exportLink) exportLink.href = 'curriculum_export.php';
         const outcomesLink = document.getElementById('outcomeMappingLink');
         if (outcomesLink) outcomesLink.href = 'subject_mapping.php?' + new URLSearchParams({
-            program_id: String(programId), curriculum_id: String(curriculumId), version_id: String(state.selectedVersionId)
+            program_id: String(programId), curriculum_id: String(curriculumId), version_id: String(state.selectedVersionId), tab: 'outcomes'
         });
         await loadReferenceWorkspace(id);
         await loadPlacements();

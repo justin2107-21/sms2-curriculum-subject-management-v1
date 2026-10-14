@@ -7,6 +7,9 @@ if (!is_authenticated()) {
 }
 require_permission('curriculum.view');
 
+// Durable, allowlisted workspace state; never used for authorization.
+$requestedTab = $_GET['tab'] ?? (($_GET['outcomes'] ?? '') === '1' ? 'outcomes' : 'map');
+$activeTab = is_string($requestedTab) && in_array($requestedTab, ['map', 'trace', 'review', 'outcomes'], true) ? $requestedTab : 'map';
 $userId = current_user_id();
 $canViewPrograms = $userId !== null && user_can($userId, 'program.view');
 $canViewSubjects = $userId !== null && user_can($userId, 'subject.view');
@@ -86,12 +89,12 @@ require __DIR__ . '/../../../shared/sidebar.php';
         </div></label>
       </section>
       <nav class="mapping-workspace-tabs" id="mappingWorkspaceTabs" role="tablist" aria-label="Subject Mapping views">
-        <button type="button" class="is-active" id="mappingTabMap" role="tab" aria-selected="true" aria-controls="mappingPanelMap">Curriculum Map</button>
-        <button type="button" id="mappingTabTrace" role="tab" aria-selected="false" aria-controls="mappingPanelTrace">Subject Trace</button>
-        <button type="button" id="mappingTabReview" role="tab" aria-selected="false" aria-controls="mappingPanelReview">Mapping Review</button>
-        <button type="button" id="mappingTabOutcomes" role="tab" aria-selected="false" aria-controls="mappingPanelOutcomes">Graduate Outcomes</button>
+        <button type="button" class="<?= $activeTab === 'map' ? 'is-active' : '' ?>" id="mappingTabMap" role="tab" tabindex="<?= $activeTab === 'map' ? '0' : '-1' ?>" aria-selected="<?= $activeTab === 'map' ? 'true' : 'false' ?>" aria-controls="mappingPanelMap">Curriculum Map</button>
+        <button type="button" class="<?= $activeTab === 'trace' ? 'is-active' : '' ?>" id="mappingTabTrace" role="tab" tabindex="<?= $activeTab === 'trace' ? '0' : '-1' ?>" aria-selected="<?= $activeTab === 'trace' ? 'true' : 'false' ?>" aria-controls="mappingPanelTrace">Subject Trace</button>
+        <button type="button" class="<?= $activeTab === 'review' ? 'is-active' : '' ?>" id="mappingTabReview" role="tab" tabindex="<?= $activeTab === 'review' ? '0' : '-1' ?>" aria-selected="<?= $activeTab === 'review' ? 'true' : 'false' ?>" aria-controls="mappingPanelReview">Mapping Review</button>
+        <button type="button" class="<?= $activeTab === 'outcomes' ? 'is-active' : '' ?>" id="mappingTabOutcomes" role="tab" tabindex="<?= $activeTab === 'outcomes' ? '0' : '-1' ?>" aria-selected="<?= $activeTab === 'outcomes' ? 'true' : 'false' ?>" aria-controls="mappingPanelOutcomes">Graduate Outcomes</button>
       </nav>
-      <section id="mappingPanelMap" class="mapping-workspace-panel" role="tabpanel" aria-labelledby="mappingTabMap">
+      <section id="mappingPanelMap" class="mapping-workspace-panel" role="tabpanel" aria-labelledby="mappingTabMap" <?= $activeTab === 'map' ? '' : 'hidden' ?>>
         <div class="mapping-year-tabs" id="mappingYearTabs" aria-label="Year / Grade filter"></div>
         <div class="mapping-map-toolbar">
           <label class="search-control"><span class="sr-only">Search subjects</span><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input id="mappingSubjectSearch" type="search" maxlength="100" placeholder="Search subject code or title..."/></label>
@@ -104,27 +107,36 @@ require __DIR__ . '/../../../shared/sidebar.php';
         <div id="mappingConnections" hidden></div>
         <div class="mapping-year-sections" id="mappingMap"><p class="mapping-state">Select a curriculum version to view its map.</p></div>
       </section>
-      <section id="mappingPanelTrace" class="mapping-workspace-panel" role="tabpanel" aria-labelledby="mappingTabTrace" hidden>
+      <section id="mappingPanelTrace" class="mapping-workspace-panel" role="tabpanel" aria-labelledby="mappingTabTrace" <?= $activeTab === 'trace' ? '' : 'hidden' ?>>
         <div class="mapping-trace-search"><p class="eyebrow">Find Subject Usage</p><h2>Where is this subject placed?</h2><p id="mappingTraceHelper">Search a Subject Master record to view all curriculum placements.</p><label class="mapping-context-field"><span>Subject</span><div class="record-autocomplete">
           <input type="search" id="mappingTraceSearch" placeholder="Search code or title..." <?= $canViewSubjects ? '' : 'disabled' ?>/><input type="hidden" id="mappingTraceSubjectId"/>
           <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear subject" hidden><i class="fa-solid fa-xmark"></i></button><div class="record-autocomplete-options" id="mappingTraceOptions" role="listbox" aria-label="Subject options" hidden></div>
         </div></label></div>
         <div id="mappingTraceResults"><p class="mapping-state"><?= $canViewSubjects ? 'Select a subject to view its curriculum placements.' : 'Subject Trace requires Subject Master view permission.' ?></p></div>
       </section>
-      <section id="mappingPanelReview" class="mapping-workspace-panel" role="tabpanel" aria-labelledby="mappingTabReview" hidden>
+      <section id="mappingPanelReview" class="mapping-workspace-panel" role="tabpanel" aria-labelledby="mappingTabReview" <?= $activeTab === 'review' ? '' : 'hidden' ?>>
         <div class="mapping-review-header"><div><h2>Mapping Review</h2><p>Checks the structure of placements in the selected curriculum version.</p></div><span id="mappingReviewScope">Select a version</span></div>
         <div class="mapping-review-cards" id="mappingReviewCards"><p class="mapping-state">Loading mapping checks…</p></div>
         <div id="mappingReviewResults"><p class="mapping-state">Select a check to inspect affected records.</p></div>
       </section>
-      <section id="mappingPanelOutcomes" class="mapping-workspace-panel" role="tabpanel" aria-labelledby="mappingTabOutcomes" hidden>
-        <div class="mapping-review-header"><div><p class="eyebrow">CHED BSIT · Section 6.3</p><h2>Graduate Outcomes</h2><p>Manual curriculum-to-outcome associations for the selected BSIT version.</p></div><span id="outcomeVersionScope">Select a version</span></div>
-        <p class="curriculum-notice">Source: CHED Memorandum Order No. 25, series of 2015. The supplied scan is fingerprinted; independent registry validation and current applicability have not been established. Institutional adoption/approval not verified.</p>
+      <section id="mappingPanelOutcomes" class="mapping-workspace-panel" role="tabpanel" aria-labelledby="mappingTabOutcomes" <?= $activeTab === 'outcomes' ? '' : 'hidden' ?>>
+        <div class="mapping-review-header"><div><p class="eyebrow">CHED BSIT · Section 6.3</p><h2>Graduate Outcomes Mapping</h2><p>Manual curriculum-to-outcome associations for the selected BSIT version.</p></div><span id="outcomeVersionScope">Select a version</span></div>
+        <p class="curriculum-notice">Source: CHED CMO No. 25, s. 2015, Section 6.3. The supplied scan is fingerprinted; independent registry validation and current applicability have not been established. Institutional adoption/approval not verified.</p>
         <p class="mapping-state">Curriculum mapping does not establish student outcome attainment, regulatory compliance, or institutional approval.</p>
+        <div id="outcomeOverview" class="program-summary-grid" aria-label="Recorded coverage overview"></div>
+        <details class="reference-action-details" id="outcomeSourceDetails"><summary>Documentary source details</summary><div id="outcomeSources"></div></details>
+        <div class="list-toolbar outcome-toolbar">
+          <label class="search-control"><span class="sr-only">Search graduate outcomes</span><input type="search" id="outcomeSearch" placeholder="Search code or official description" maxlength="200"/></label>
+          <label class="form-field"><span>Coverage</span><select id="outcomeCoverage"><option value="">All coverage states</option><option value="not_assessed">Not assessed</option><option value="incomplete">Incomplete</option><option value="mapped">Mapped</option><option value="unmapped">Unmapped</option></select></label>
+          <span id="outcomeResultCount" role="status"></span>
+        </div>
         <div id="outcomeMatrix" class="outcome-matrix"><p class="mapping-state">Select a BSIT curriculum version to view its recorded outcome mappings.</p></div>
+        <div id="outcomeDetail" tabindex="-1"></div>
         <section class="clo-assessment-workspace" aria-labelledby="cloAssessmentHeading">
           <h3 id="cloAssessmentHeading">Course Learning Outcomes &amp; Planned Assessment</h3>
           <p class="mapping-state">User-entered academic planning records. A mapping or plan does not establish student attainment, compliance, or approval.</p>
-          <label>Subject placement <select id="cloPlacementSelect"><option value="">Select a placement</option></select></label>
+          <label class="form-field"><span>Search subject placements</span><input type="search" id="cloPlacementSearch" placeholder="Filter by subject code or title"/></label>
+          <label class="form-field"><span>Subject placement</span><select id="cloPlacementSelect"><option value="">Select a placement</option></select></label>
           <div id="cloAssessmentContent"><p class="mapping-state">Select a curriculum version and subject placement.</p></div>
         </section>
       </section>
@@ -254,6 +266,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 <script src="../assets/curriculum-common.js?v=<?= $curriculumCommonVersion ?>"></script>
 <script src="../assets/subject-mapping-data.js?v=<?= (int)filemtime(__DIR__ . '/../assets/subject-mapping-data.js') ?>"></script>
+<script src="../assets/outcomes-presentation.js?v=<?= (int)filemtime(__DIR__ . '/../assets/outcomes-presentation.js') ?>"></script>
 <script src="../assets/subject-mapping-final.js?v=<?= $mappingWorkspaceVersion ?>"></script>
 </body>
 </html>

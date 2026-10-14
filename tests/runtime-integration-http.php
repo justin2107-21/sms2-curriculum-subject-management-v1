@@ -16,6 +16,27 @@ try {
     for($i=0;$i<60;$i++){$socket=@stream_socket_client('tcp://'.$address,$errno,$errstr,.1);if($socket){fclose($socket);break;}usleep(100000);}
     $editor=new FoundationHttpClient('http://'.$address);$viewer=new FoundationHttpClient('http://'.$address);$guest=new FoundationHttpClient('http://'.$address);$clients=[$editor,$viewer,$guest];
     foreach([[$editor,'task9_preview',$password],[$viewer,'task9_viewer',$viewerPassword]] as [$client,$name,$secret]){$client->request('auth/signin.php');runtimeResponse($client->request('shared/auth_actions.php',['action'=>'login','username'=>$name,'password'=>$secret],'POST'),200,'synthetic login');$client->request('modules/curriculum/pages/subject_mapping.php');}
+    // Task 10: assert server-rendered durable tabs before JavaScript can paint a wrong workspace.
+    foreach (['outcomes','map','trace','review','forged'] as $tab) {
+        $page=$editor->request('modules/curriculum/pages/subject_mapping.php',['program_id'=>$f['program_id'],'curriculum_id'=>$f['curriculum_id'],'version_id'=>$f['revision_version_id'],'tab'=>$tab]);
+        runtimeResponse($page,200,'Task 10 direct '.$tab.' tab');
+        $dom=new DOMDocument();@$dom->loadHTML($page['body']);$xpath=new DOMXPath($dom);
+        $expected=in_array($tab,['map','trace','review','outcomes'],true)?ucfirst($tab):'Map';
+        foreach (['Map','Trace','Review','Outcomes'] as $name) {
+            $panel=$xpath->query('//*[@id="mappingPanel'.$name.'"]')->item(0);
+            runtimeCheck($panel !== null && $panel->hasAttribute('hidden')===($name!==$expected),'initial panel visibility '.$tab.' / '.$name);
+        }
+        runtimeCheck(str_contains($page['body'],'synthetic-preview-notice'),'synthetic notice uses explicit preview styling');
+    }
+    $proposed=$editor->api('clo_assessment','workspace',['placement_id'=>$f['revision_placement_id']]);
+    runtimeResponse($proposed,200,'Task 10 proposed CLO workspace');
+    runtimeCheck(($proposed['json']['editable']??false)===true,'proposed CLO lifecycle reports editable with baseline');
+    $protected=$editor->api('clo_assessment','workspace',['placement_id'=>$f['reference_placement_id']]);
+    runtimeCheck(($protected['json']['editable']??true)===false,'reference CLO workspace remains protected');
+    foreach ([['task9_preview',$editor,'1'],['task9_viewer',$viewer,'0']] as [$name,$client,$flag]) {
+        $page=$client->request('modules/curriculum/pages/subject_mapping.php',['tab'=>'outcomes']);
+        foreach (['outcomes','clos','plans'] as $capability) runtimeCheck(str_contains($page['body'],'data-can-manage-'.$capability.'="'.$flag.'"'),$name.' actual '.$capability.' permission');
+    }
     $args=['curriculum_id'=>$f['curriculum_id'],'per_page'=>50];
     $r=runtimeResponse($editor->api('version','list',$args),200,'fresh 001-025 version endpoint');runtimeCheck(count($r['versions'])===2,'actual reference and revision options returned');
     $r=runtimeResponse($editor->api('version','list',$args+['search'=>'Working']),200,'searchable version endpoint');runtimeCheck(count($r['versions'])===1&&(int)$r['versions'][0]['id']===$f['revision_version_id'],'version search preserves exact identity');

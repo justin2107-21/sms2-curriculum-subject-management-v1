@@ -61,7 +61,7 @@ exit($failed?1:0);
     [IO.File]::WriteAllText((Join-Path $taskDir 'runner.php'),$script,$utf8)
     & $Php (Join-Path $taskDir 'runner.php')
     $testExit=$LASTEXITCODE
-    foreach($frontend in @('frontend.cjs','phase2_ui.cjs','cimf-modal.cjs','curriculum-revision-ui.cjs','curriculum-comparison-ui.cjs','runtime-integration-ui.cjs')) {
+    foreach($frontend in @('frontend.cjs','phase2_ui.cjs','cimf-modal.cjs','curriculum-revision-ui.cjs','curriculum-comparison-ui.cjs','runtime-integration-ui.cjs','outcomes-ui.cjs','subject-mapping-workspace.cjs','curriculum-cascade.cjs')) {
         & $Node (Join-Path $root ('tests/'+$frontend))
         $nodeExit=$LASTEXITCODE
         Write-Output "$frontend exit=$nodeExit"

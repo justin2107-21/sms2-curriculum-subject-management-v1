@@ -9,8 +9,8 @@ for(const q of ['GE','ge',' Ge ']) assert.deepEqual(search(q),['GE1','GE2','GE3'
 assert.deepEqual(search('BPM'),['BPM101']);assert.deepEqual(search('CAP'),['CAP101','CAP102']);
 assert.deepEqual(search('CC101'),['CC101']);assert.deepEqual(search('ZZZZ'),[]);
 assert.deepEqual(search(' Business  Process   Management in IT '),['BPM101']);
-assert.equal(ui.searchRank(['CC101','Introduction to Computing'],'Computing'),4);
-assert.equal(ui.searchRank(['CC101','Introduction to Computing'],'put'),4);
+assert.equal(ui.searchRank(['CC101','Introduction to Computing'],'Computing'),2,'word-boundary matches rank before contains');
+assert.equal(ui.searchRank(['CC101','Introduction to Computing'],'put'),3,'substring matches use the established contains tier');
 assert.equal(ui.searchRank(['X','a-b'],'a b'),Infinity);
 assert.deepEqual(search('%'),[]);assert.deepEqual(search('_'),[]);
 records.push({id:99,subject_code:'AAA',subject_title:'General elective'});

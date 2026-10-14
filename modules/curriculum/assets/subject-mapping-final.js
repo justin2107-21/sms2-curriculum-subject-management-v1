@@ -57,6 +57,14 @@
     let selectedTraceSubject = null;
     let selectedReviewIssue = null;
     let reviewIssues = null;
+    let contextRequest = 0;
+    let selectedOutcome = null;
+    const academicSubmissions = new WeakSet();
+    function setAcademicSubmitting(form, busy) {
+        if (busy) academicSubmissions.add(form); else academicSubmissions.delete(form);
+        ui.setFormSubmitting(form,busy);
+        form.querySelectorAll?.('button[type="submit"]').forEach(button=>{button.disabled=busy;});
+    }
 
     function esc(value) { return ui.escapeHtml(value == null ? '' : String(value)); }
     function arr(value) { return Array.isArray(value) ? value : []; }
@@ -161,6 +169,8 @@
             state.year = ''; selectedReviewIssue = null;
             ['mappingSubjectSearch', 'mappingYearFilter', 'mappingSemesterFilter', 'mappingPlacementFilter'].forEach(key => { el(key).value = ''; });
             if (contextReset) return;
+            contextRequest++;
+            writeUrl();
             resetTrace();
             if (index === 0) onProgramChange();
             else if (index === 1) onCurriculumChange();
@@ -243,7 +253,10 @@
     async function loadMap() {
         const request = ++state.mapRequest;
         const version = versionIdInput.value;
-        state.outcomeRequest++; state.cloRequest++; state.outcomeData=null;
+        state.outcomeRequest++; state.cloRequest++; state.outcomeData=null; selectedOutcome=null;
+        ['outcomeOverview','outcomeSources','outcomeDetail','outcomeResultCount'].forEach(id => el(id).replaceChildren());
+        el('outcomeVersionScope').textContent = 'Select a version';
+        el('cloPlacementSearch').value = '';
         el('cloPlacementSelect').replaceChildren(new Option('Select a placement',''));
         showPanelState(el('cloAssessmentContent'), 'Select a curriculum version and subject placement.');
         showPanelState(el('outcomeMatrix'), 'Select a BSIT curriculum version to view its recorded outcome mappings.');
@@ -296,40 +309,62 @@
         const versionId = versionIdInput.value;
         const request = ++state.outcomeRequest;
         if (!versionId) { state.outcomeData = null; showPanelState(target, 'Select a BSIT curriculum version to view recorded outcomes.'); return; }
+        state.outcomeData=null;
+        ['outcomeOverview','outcomeSources','outcomeDetail','outcomeResultCount'].forEach(id=>el(id).replaceChildren());
+        el('cloPlacementSelect').disabled=true;
+        state.cloRequest++;
+        showPanelState(el('cloAssessmentContent'),'Loading selected version workspace...');
         showPanelState(target, 'Loading source outcomes and recorded mappings...');
         try {
             const data = await ui.fetchJson(api.outcomes, { action: 'workspace', curriculum_version_id: versionId });
             if (request !== state.outcomeRequest) return;
             state.outcomeData = data;
+            el('cloPlacementSelect').disabled=false;
             renderOutcomes();
         } catch (error) {
-            if (request === state.outcomeRequest) showPanelState(target, error.message || 'Outcome mappings could not be loaded.', true);
+            if (request === state.outcomeRequest) {
+                showPanelState(target, error.message || 'Outcome mappings could not be loaded.', true);
+                el('cloPlacementSelect').replaceChildren(new Option('Select a placement',''));
+                showPanelState(el('cloAssessmentContent'),'Version workspace unavailable. Reselect an authorized version.',true);
+            }
         }
     }
 
-    function renderOutcomes() {
-        const data = state.outcomeData, target = el('outcomeMatrix');
-        if (!data || !target) return;
-        const context = data.context, outcomes = arr(data.outcomes), placements = arr(data.placements), mappings = arr(data.mappings);
-        el('outcomeVersionScope').textContent = [context.program_code, context.curriculum_name, context.version_label].join(' / ');
-        const placementSelect = el('cloPlacementSelect');
-        const previousPlacement = placementSelect.value;
-        placementSelect.innerHTML = '<option value="">Select a placement</option>' + placements.map(row => '<option value="' + Number(row.placement_id) + '">' + esc(row.subject_code + ' · ' + row.subject_title + ' · ' + (row.year_level || 'Year not set') + ' / ' + (row.semester || 'Term not set')) + '</option>').join('');
-        if (placements.some(row => String(row.placement_id) === previousPlacement)) placementSelect.value = previousPlacement;
-        if (placementSelect.value) loadCloWorkspace();
-        else showPanelState(el('cloAssessmentContent'), 'Select a curriculum version and subject placement.');
-        if (!outcomes.length) { showPanelState(target, 'The source-traceable IT01–IT13 catalog has not been loaded in this environment.'); return; }
-        const canEdit = permission.manageOutcomes && Boolean(context.editable);
-        const labels = { not_assessed: 'Not assessed', incomplete: 'Incomplete', mapped: 'Mapped', unmapped: 'Unmapped' };
-        target.innerHTML = outcomes.map(outcome => {
-            const links = mappings.filter(row => Number(row.outcome_id) === Number(outcome.id));
-            const options = placements.map(row => '<option value="' + Number(row.placement_id) + '">' + esc(row.subject_code + ' · ' + row.subject_title + ' · ' + (row.year_level || 'Year not set') + ' / ' + (row.semester || 'Term not set')) + '</option>').join('');
-            const linkHtml = links.length ? links.map(link => '<li><strong>' + esc(link.subject_code) + ' · ' + esc(link.subject_title) + '</strong><span>' + esc((link.year_level || 'Year not set') + ' / ' + (link.semester || 'Term not set')) + '</span><p>' + esc(link.rationale) + (link.mapping_origin === 'inherited' ? '<small>Inherited from reference mapping #' + Number(link.inherited_from_mapping_id) + '; not independently reassessed.</small>' : '') + '</p>' + (canEdit ? '<button type="button" class="button-muted" data-outcome-remove="' + Number(link.id) + '">Remove link</button>' : '') + '</li>').join('') : '<li class="outcome-no-links">No subject links recorded.</li>';
-            const actions = canEdit ? '<form class="outcome-add-form" data-outcome-add="' + Number(outcome.id) + '"><label>Subject placement<select name="placement_id" required><option value="">Choose placement</option>' + options + '</select></label><label>Academic rationale<textarea name="rationale" maxlength="3000" required></textarea></label><button class="button-primary" type="submit">Record mapping</button></form><form class="outcome-assess-form" data-outcome-assess="' + Number(outcome.id) + '"><label>Coverage note<textarea name="rationale" maxlength="3000"></textarea></label><button class="button-muted" name="assessment_state" value="incomplete">Mark incomplete</button><button class="button-muted" name="assessment_state" value="complete">Mark complete</button></form>' : '';
-            const citation = outcome.document_code + ' · ' + outcome.document_title + ' · ' + outcome.source_section + ' · printed p. ' + outcome.printed_page + ' (PDF p. ' + outcome.pdf_page_index + ')';
-            return '<article class="outcome-card"><header><div><span class="record-code">' + esc(outcome.outcome_code) + '</span><span class="outcome-status outcome-status-' + esc(outcome.coverage_status) + '">' + esc(labels[outcome.coverage_status]) + '</span><p>' + esc(outcome.outcome_text) + '</p><small>' + esc(citation) + '</small>' + (Number(outcome.source_order) === 1 ? '<small>Source PDF SHA-256: ' + esc(outcome.source_sha256) + '</small>' : '') + '</div><strong>' + Number(outcome.mapping_count) + ' recorded subject link' + (Number(outcome.mapping_count) === 1 ? '' : 's') + '</strong></header><ul class="outcome-link-list">' + linkHtml + '</ul>' + actions + '</article>';
-        }).join('');
+    function renderPlacementOptions() {
+        const select = el('cloPlacementSelect'), previous = select.value;
+        const query = el('cloPlacementSearch').value.trim().toLowerCase();
+        const rows = arr(state.outcomeData?.placements).filter(p => String(p.placement_id) === previous || (p.subject_code+' '+p.subject_title).toLowerCase().includes(query));
+        select.innerHTML = '<option value="">Select a placement</option>' + rows.map(row => '<option value="'+Number(row.placement_id)+'">'+esc(row.subject_code+' \u00b7 '+row.subject_title+' \u00b7 '+(row.year_level||'Year not set')+' / '+(row.semester||'Term not set'))+'</option>').join('');
+        if (rows.some(p => String(p.placement_id) === previous)) select.value=previous;
     }
+    function renderOutcomeList() {
+        if (!state.outcomeData) return;
+        const rows=window.OutcomesPresentation.filterOutcomes(state.outcomeData.outcomes,el('outcomeSearch').value,el('outcomeCoverage').value);
+        el('outcomeResultCount').textContent = rows.length+' outcomes shown';
+        el('outcomeMatrix').innerHTML = window.OutcomesPresentation.outcomeList(rows,permission.manageOutcomes && state.outcomeData.context.editable,selectedOutcome);
+    }
+    function renderOutcomes() {
+        const data=state.outcomeData;
+        if (!data) return;
+        el('outcomeVersionScope').textContent = [data.context.program_code,data.context.curriculum_name,data.context.version_label].join(' / ');
+        el('outcomeOverview').innerHTML = window.OutcomesPresentation.overview(data);
+        el('outcomeSources').innerHTML = window.OutcomesPresentation.sources(data);
+        renderPlacementOptions();
+        if (el('cloPlacementSelect').value) loadCloWorkspace();
+        else showPanelState(el('cloAssessmentContent'),'Select a subject placement to view its course learning outcomes.');
+        if (!arr(data.outcomes).length) { showPanelState(el('outcomeMatrix'),'The source-traceable IT01\u2013IT13 catalog has not been loaded in this environment.'); return; }
+        renderOutcomeList();
+        el('outcomeDetail').innerHTML = window.OutcomesPresentation.outcomeDetail(data,selectedOutcome,permission.manageOutcomes);
+    }
+    el('outcomeSearch').addEventListener('input',renderOutcomeList);
+    el('outcomeCoverage').addEventListener('change',renderOutcomeList);
+    el('cloPlacementSearch').addEventListener('input',renderPlacementOptions);
+    el('outcomeMatrix').addEventListener('click',event => {
+        const button=event.target.closest('[data-outcome-open]'); if(!button || !state.outcomeData)return;
+        selectedOutcome=Number(button.dataset.outcomeOpen);
+        el('outcomeDetail').innerHTML=window.OutcomesPresentation.outcomeDetail(state.outcomeData,selectedOutcome,permission.manageOutcomes);
+        renderOutcomeList(); el('outcomeDetail').focus();
+    });
 
     async function loadCloWorkspace() {
         const placementId = el('cloPlacementSelect')?.value, target = el('cloAssessmentContent');
@@ -340,32 +375,21 @@
         try {
             const data = await ui.fetchJson(api.clos, {action:'workspace',placement_id:placementId});
             if (request!==state.cloRequest || version!==versionIdInput.value || String(el('cloPlacementSelect').value) !== String(placementId)) return;
-            const clos = arr(data.clos), alignments = arr(data.alignments), plans = arr(data.plans), parents = arr(data.parent_mappings);
-            const editable = Boolean(data.editable), canClo = editable && permission.manageClos, canPlan = editable && permission.managePlans;
-            const parentOptions = parents.map(p => '<option value="' + Number(p.mapping_id) + '">' + esc(p.outcome_code + ' · ' + p.outcome_text) + '</option>').join('');
-            target.innerHTML = '<p><strong>' + esc(data.placement.subject_code + ' · ' + data.placement.subject_title) + '</strong> — ' + esc(data.placement.version_label) + (editable ? ' · Editable draft' : ' · Read only') + '</p><p class="curriculum-notice">' + esc(data.disclaimer) + '</p>' +
-                (canClo ? '<form class="clo-create-form"><input type="hidden" name="placement_id" value="' + Number(placementId) + '"><label>CLO code<input name="clo_code" maxlength="40" required></label><label>Sequence<input name="sequence_order" type="number" min="1" max="65535" required></label><label>Course learning outcome<textarea name="clo_statement" maxlength="12000" required></textarea></label><button class="button-primary">Record CLO</button></form>' : '') +
-                (clos.length ? clos.map(clo => {
-                    const links = alignments.filter(a => Number(a.clo_id) === Number(clo.id));
-                    const ownPlans = plans.filter(p => Number(p.clo_id) === Number(clo.id));
-                    const activeClo = clo.record_state === 'active';
-                    return '<article class="outcome-card"><header><div><span class="record-code">' + esc(clo.clo_code) + '</span><span class="outcome-status">' + esc(clo.record_state === 'withdrawn' ? 'Withdrawn · history retained' : (clo.review_state === 'awaiting_review' ? 'Awaiting academic review' : (clo.origin === 'inherited' ? 'Inherited · review required' : 'User authored'))) + '</span><p>' + esc(clo.clo_statement) + '</p></div><span>Sequence ' + Number(clo.sequence_order) + '</span>' + (canClo && activeClo ? '<button type="button" class="button-muted" data-clo-action="clo_withdraw" data-id="' + Number(clo.id) + '">Withdraw CLO</button>' : '') + '</header>' +
-                        '<h4>Graduate outcome alignments</h4>' + (links.length ? '<ul>' + links.map(a => '<li><strong>' + esc(a.outcome_code) + '</strong> ' + esc(a.outcome_text) + '<p>' + esc(a.rationale) + '</p>' + (a.review_state === 'awaiting_review' ? '<small>Awaiting academic review</small>' : '') + (canClo && a.record_state === 'active' ? '<button type="button" class="button-muted" data-clo-action="alignment_withdraw" data-id="' + Number(a.id) + '" data-clo="' + Number(clo.id) + '">Withdraw alignment</button>' : '') + '</li>').join('') + '</ul>' : '<p>No graduate outcome alignment recorded.</p>') +
-                        (canClo && activeClo && parentOptions ? '<form class="clo-alignment-form"><input type="hidden" name="clo_id" value="' + Number(clo.id) + '"><label>Existing graduate outcome mapping<select name="parent_mapping_id" required><option value="">Choose mapped outcome</option>' + parentOptions + '</select></label><label>Academic rationale<textarea name="rationale" maxlength="3000" required></textarea></label><button class="button-muted">Align CLO</button></form>' : (canClo ? '<p class="mapping-state">Record a subject-to-graduate-outcome mapping above before aligning a CLO.</p>' : '')) +
-                        '<h4>Planned assessment</h4>' + (ownPlans.length ? ownPlans.map(p => '<p><strong>' + esc(p.plan_status === 'planned' ? 'Planned' : 'Incomplete plan') + '</strong> · ' + esc(p.assessment_method || 'Method not recorded') + '<br>' + esc(p.performance_indicator || 'Performance indicator not recorded') + '<br>' + esc(p.planned_task || p.evidence_description || 'Task/evidence not recorded') + (p.review_state === 'awaiting_review' ? '<br>Awaiting academic review' : '') + (canPlan && p.record_state === 'active' ? ' <button type="button" class="button-muted" data-clo-action="plan_withdraw" data-id="' + Number(p.id) + '" data-clo="' + Number(clo.id) + '">Withdraw plan</button>' : '') + '</p>').join('') : '<p>No assessment plan recorded.</p>') +
-                        (canPlan && activeClo ? '<form class="clo-plan-form"><input type="hidden" name="clo_id" value="' + Number(clo.id) + '"><label>Assessment method<input name="assessment_method" maxlength="180"></label><label>Planned task<textarea name="planned_task" maxlength="12000"></textarea></label><label>Evidence description<textarea name="evidence_description" maxlength="12000"></textarea></label><label>Performance indicator / criterion<textarea name="performance_indicator" maxlength="6000"></textarea></label><label>Rubric / standard (optional)<textarea name="rubric_or_standard" maxlength="12000"></textarea></label><button class="button-muted">Record planned assessment</button></form>' : '') +
-                        '</article>';
-                }).join('') : '<p class="mapping-state">No course learning outcomes recorded for this placement.</p>');
+            if (String(data.placement.curriculum_version_id) !== String(version)) throw new Error('Placement does not belong to the selected version.');
+            target.innerHTML = window.OutcomesPresentation.cloWorkspace(data,permission);
         } catch (error) { if(request===state.cloRequest && version===versionIdInput.value) showPanelState(target, error.message || 'CLO workspace could not be loaded.', true); }
     }
 
     el('cloPlacementSelect')?.addEventListener('change', loadCloWorkspace);
     el('cloAssessmentContent')?.addEventListener('submit', async event => {
         const form = event.target.closest('.clo-create-form,.clo-edit-form,.clo-alignment-form,.clo-alignment-edit-form,.clo-plan-form,.clo-plan-edit-form'); if (!form) return;
-        event.preventDefault(); const body = new FormData(form); body.set('placement_id',el('cloPlacementSelect').value);
+        event.preventDefault(); if (academicSubmissions.has(form)) return;
+        const body = new FormData(form); body.set('placement_id',el('cloPlacementSelect').value);
         body.set('action',form.matches('.clo-create-form')?'clo_create':form.matches('.clo-edit-form')?'clo_update':form.matches('.clo-alignment-form')?'alignment_add':form.matches('.clo-alignment-edit-form')?'alignment_update':form.matches('.clo-plan-edit-form')?'plan_update':'plan_add');
+        ui.clearFormError(form); setAcademicSubmitting(form,true);
         try { const result=await ui.postForm(api.clos,body); ui.showToast(result.message || 'Academic planning record saved.','success'); await loadCloWorkspace(); }
-        catch(error) { ui.showToast(error.message || 'Record could not be saved.','error'); }
+        catch(error) { ui.showFormError(form,error.message || 'Record could not be saved.'); }
+        finally { setAcademicSubmitting(form,false); }
     });
     el('cloAssessmentContent')?.addEventListener('click', async event => {
         const button=event.target.closest('[data-clo-action]'); if (!button) return;
@@ -387,11 +411,14 @@
             data.set('action','assess'); data.set('outcome_id',form.dataset.outcomeAssess);
             data.set('assessment_state',event.submitter?.value || 'incomplete');
         }
+        ui.clearFormError(form); setAcademicSubmitting(form,true);
         try { const result=await ui.postForm(api.outcomes,data); ui.showToast(result.message || 'Outcome record saved.','success'); await loadOutcomes(); }
-        catch(error) { ui.showToast(error.message || 'Outcome record could not be saved.','error'); }
+        catch(error) { ui.showFormError(form,error.message || 'Outcome record could not be saved.'); }
+        finally { setAcademicSubmitting(form,false); }
     });
     el('mappingPanelOutcomes')?.addEventListener('click', async event => {
         const button=event.target.closest('[data-outcome-remove]'); if (!button) return;
+        if (!window.confirm('Remove this subject outcome mapping? Dependent CLO alignments will be withdrawn and coverage will require review.')) return;
         const data=new FormData(); data.set('action','remove'); data.set('curriculum_version_id',String(versionIdInput.value)); data.set('mapping_id',button.dataset.outcomeRemove);
         try { const result=await ui.postForm(api.outcomes,data); ui.showToast(result.message || 'Mapping removed.','success'); await loadOutcomes(); }
         catch(error) { ui.showToast(error.message || 'Mapping could not be removed.','error'); }
@@ -578,8 +605,10 @@
         el('mappingReviewResults').innerHTML = '<section class="mapping-issue-list"><h3>' + title + '<span>' + items.length + ' affected mappings</span></h3>' + items.map(row => '<div class="mapping-issue-row"><strong>' + esc(row.subject_code) + '</strong><span>' + esc(row.subject_title) + '<small>' + esc((row.year_level || 'No year / grade') + ' \u00b7 ' + (row.semester || 'No semester')) + '</small></span>' + (permission.manage ? '<button type="button" class="button-muted" data-edit-review-mapping="' + Number(row.id) + '">Edit Placement</button>' : '<button type="button" class="button-muted" data-open-review-mapping="' + Number(row.id) + '">View Details</button>') + '</div>').join('') + '</section>';
     }
 
-    function setTab(name) {
+    function setTab(name, persist = true) {
+        name = ['map','trace','review','outcomes'].includes(name) ? name : 'map';
         state.currentTab = name;
+        if (persist) writeUrl(true);
         updateContextMessage();
         [['map', 'mappingTabMap', 'mappingPanelMap'], ['trace', 'mappingTabTrace', 'mappingPanelTrace'], ['review', 'mappingTabReview', 'mappingPanelReview'], ['outcomes','mappingTabOutcomes','mappingPanelOutcomes']].forEach(([key, tabId, panelId]) => {
             const active = key === name;
@@ -592,30 +621,52 @@
         if (name === 'outcomes') loadOutcomes();
     }
 
-    async function initializeContext() {
-        updateContextMessage(); await loadMap();
-        if (!permission.programs) { showPanelState(mapTarget, 'Program context is not available with your current permissions.'); return; }
+    function urlTab() {
         const params = new URLSearchParams(window.location.search);
+        const name = params.has('tab') ? params.get('tab') : (params.get('outcomes') === '1' ? 'outcomes' : 'map');
+        return ['map','trace','review','outcomes'].includes(name) ? name : 'map';
+    }
+    function writeUrl(tabOnly = false) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('tab', state.currentTab);
+        if (!tabOnly) for (const [key, input] of [['program_id',programIdInput],['curriculum_id',curriculumIdInput],['version_id',versionIdInput]]) {
+            if (input.value) url.searchParams.set(key,input.value); else url.searchParams.delete(key);
+        }
+        ['outcomes','placement_id','subject_id'].forEach(key => url.searchParams.delete(key));
+        if (url.href !== window.location.href) window.history.pushState(null,'',url);
+    }
+    async function initializeContext() {
+        const request = ++contextRequest;
+        const params = new URLSearchParams(window.location.search);
+        state.program = null; state.curriculum = null; state.version = null;
+        contextReset = true; mappingContextCascade.clear(); contextReset = false;
+        resetTrace();
+        setTab(urlTab(), false);
+        updateContextMessage(); await loadMap();
+        const fail = message => {
+            ['mappingMap','mappingTraceResults','mappingReviewResults','outcomeMatrix'].forEach(id => showPanelState(el(id),message,true));
+        };
+        if (!permission.programs) { fail('Program context is not available with your current permissions.'); return; }
         if (!params.get('version_id')) return;
-        const request = state.mapRequest;
         try {
             const version = (await ui.fetchJson(api.versions, { action: 'get', id: params.get('version_id') })).version;
             const curriculum = (await ui.fetchJson(api.curricula, { action: 'get', id: version.curriculum_id })).curriculum;
             const program = (await ui.fetchJson(api.programs, { action: 'get', id: curriculum.academic_program_id })).program;
-            if (request !== state.mapRequest) return;
-            if ((params.get('program_id') && Number(params.get('program_id')) !== Number(program.id)) || (params.get('curriculum_id') && Number(params.get('curriculum_id')) !== Number(curriculum.id))) throw new Error('The linked mapping context is inconsistent. Please choose a context.');
+            if (request !== contextRequest) return;
+            if ((params.has('program_id') && params.get('program_id') !== String(program.id)) || (params.has('curriculum_id') && params.get('curriculum_id') !== String(curriculum.id))) throw new Error('The linked mapping context is inconsistent. Please choose a context.');
             state.program = program; state.curriculum = curriculum; state.version = version;
             mappingContextCascade.setContext([program,curriculum,version]);
             resetTrace();
             updateContextMessage(); await loadMap();
+            if (request !== contextRequest) return;
             if (params.get('placement_id')) openMappingDetails(state.mappings.get(Number(params.get('placement_id'))));
             else if (params.get('subject_id')) {
                 const placement = state.allMappings.find(p => Number(p.subject_id) === Number(params.get('subject_id')));
                 if (placement) { if (permission.manage) prepareEdit(placement); else openMappingDetails(placement); }
             }
-            if (params.get('outcomes') === '1') setTab('outcomes');
-        } catch (error) { if (request === state.mapRequest) showPanelState(mapTarget, error.message || 'Linked curriculum context could not be loaded.', true); }
+        } catch (error) { if (request === contextRequest) fail(error.message || 'Linked curriculum context could not be loaded.'); }
     }
+    window.addEventListener('popstate', initializeContext);
 
     el('mappingWorkspaceTabs')?.addEventListener('click', event => {
         const tab = event.target.closest('[role="tab"]');
@@ -742,6 +793,5 @@
         el('mappingConnectionManage').href = contextUrl('prerequisite_configuration.php', rule);
         connectionModal.open();
     });
-    setTab('map');
     initializeContext();
 }());

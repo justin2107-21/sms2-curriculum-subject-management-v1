@@ -1606,3 +1606,7 @@ body:has(.sidebar.collapsed) .toast {
   }
   .sidebar-overlay.active { display: block; }
 }
+
+/* Shown only by the explicit disposable-preview flag in shared/topbar.php. */
+.synthetic-preview-notice { margin:12px 24px; padding:12px 16px; border:1px solid #e2e8f0; border-radius:8px; background:#f8fafc; color:#475569; font-size:13px; line-height:1.6; overflow-wrap:anywhere; }
+@media(max-width:700px) { .synthetic-preview-notice { margin:10px 12px; } }
