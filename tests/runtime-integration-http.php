@@ -27,6 +27,24 @@ try {
             runtimeCheck($panel !== null && $panel->hasAttribute('hidden')===($name!==$expected),'initial panel visibility '.$tab.' / '.$name);
         }
         runtimeCheck(str_contains($page['body'],'synthetic-preview-notice'),'synthetic notice uses explicit preview styling');
+        if($tab==='outcomes') {
+            runtimeCheck($xpath->query('//*[@id="mappingPanelOutcomes"]//*[contains(concat(" ",normalize-space(@class)," ")," curriculum-notice ")]')->length===1,'F10-01 one academic notice');
+            $notice=$xpath->query('//*[@id="academicNoticeTitle"]/..')->item(0)->textContent;
+            foreach(['CHED CMO No. 25','independent registry verification','current applicability','institutional adoption/approval','student outcome attainment','regulatory compliance','assessment plans'] as $text) runtimeCheck(str_contains($notice,$text),'F10-01 limitation retained: '.$text);
+            runtimeCheck($xpath->query('//*[@id="viewSourceDetails" and self::button]')->length===1 && $xpath->query('//*[@id="outcomeSourceDetails"]')->length===0,'F10-02 button replaces source disclosure');
+            foreach(['sourceDetailsModal'=>'outcomeSources','outcomeViewModal'=>'outcomeDetail','cloViewModal'=>'cloDetail'] as $modal=>$body) {
+                $root=$xpath->query('//*[@id="'.$modal.'"]')->item(0);
+                runtimeCheck($root!==null&&$root->hasAttribute('hidden')&&$root->getAttribute('aria-hidden')==='true','F10-05 modal initially hidden: '.$modal);
+                runtimeCheck($xpath->query('//*[@id="'.$modal.'"]/*[@data-modal-close and contains(@class,"modal-backdrop")]')->length===1,'foundation backdrop: '.$modal);
+                runtimeCheck($xpath->query('//*[@id="'.$modal.'"]/*[@role="dialog" and @aria-modal="true" and contains(@class,"modal-dialog-scroll")]')->length===1,'foundation scrolling dialog: '.$modal);
+                runtimeCheck($xpath->query('//*[@id="'.$modal.'"]//*[@id="'.$body.'" and contains(@class,"modal-body")]')->length===1,'detail belongs to modal: '.$body);
+                runtimeCheck($xpath->query('//*[@id="mappingPanelOutcomes"]//*[@id="'.$body.'"]')->length===0,'F10-03 no detached bottom detail: '.$body);
+                runtimeCheck($xpath->query('//*[@id="'.$modal.'"]//*[@data-modal-close]')->length===3,'standard close icon, footer and backdrop: '.$modal);
+            }
+            runtimeCheck($xpath->query('//*[@id="cloPlacementOptions" and @role="listbox"]')->length===1 && $xpath->query('//*[@id="cloPlacementSelect" and @type="hidden"]')->length===1,'F10-09 foundation searchable placement picker');
+            runtimeCheck($xpath->query('//*[@id="cloAssessmentHeading"]/../p[contains(text(),"planning records")]')->length===0,'no repeated CLO limitation box');
+        }
+
     }
     $proposed=$editor->api('clo_assessment','workspace',['placement_id'=>$f['revision_placement_id']]);
     runtimeResponse($proposed,200,'Task 10 proposed CLO workspace');

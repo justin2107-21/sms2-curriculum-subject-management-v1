@@ -1,0 +1,88 @@
+'use strict';
+// Executes the shipped controller and the real CSMS modal helper with a deterministic DOM double.
+// Authenticated PHP DOM checks independently verify the actual modal markup and placement.
+const assert=require('node:assert/strict');
+const harness=require('./outcomes-ui-fixture.cjs');
+let checks=0;
+const check=(ok,label)=>{assert.ok(ok,label);checks++;};
+const url='http://localhost/subject_mapping.php?program_id=1&curriculum_id=2&version_id=3&tab=outcomes';
+const outcomes=Array.from({length:13},(_,i)=>({id:i+1,outcome_code:'IT'+String(i+1).padStart(2,'0'),outcome_text:'Synthetic recorded description <'+(i+1)+'>',coverage_status:i===0?'mapped':'not_assessed',mapping_count:i===0?1:0,source_key:'SYNTHETIC',document_code:'Recorded CMO code',document_title:'Recorded <title> & full text',issuing_authority:'Recorded issuer',source_sha256:'a'.repeat(64),source_section:'Section 6.3',printed_page:i<9?8:9,pdf_page_index:i<9?8:9,source_order:i+1,coverage_rationale:'Recorded <coverage note>'}));
+const workspace={context:{version_id:3,program_code:'BSIT',curriculum_name:'Synthetic curriculum',version_label:'Synthetic revision',editable:true},outcomes,placements:[{placement_id:101,subject_code:'S1',subject_title:'Subject one',year_level:'1st Year',semester:'1st Semester'},{placement_id:102,subject_code:'S2',subject_title:'Subject two'}],mappings:[{id:99,outcome_id:1,placement_id:101,subject_code:'S1',subject_title:'Subject one',mapping_origin:'inherited',inherited_from_mapping_id:55,rationale:'Recorded <rationale>'}],limitations:{authenticity:'Identity not independently verified.',applicability:'Applicability unassessed.',institutional_adoption:'Adoption/approval not verified.',mapping:'No attainment or compliance conclusion.'}};
+const clo={placement:{placement_id:101,curriculum_version_id:3,subject_code:'S1',subject_title:'Synthetic subject',version_label:'Synthetic revision',year_level:'1st Year',semester:'1st Semester'},editable:true,disclaimer:'Planning records do not establish student attainment, compliance or approval.',clos:[{id:5,clo_code:'CLO1',clo_statement:'Recorded <CLO statement>',sequence_order:1,record_state:'active',origin:'inherited',source_clo_id:4,review_state:'awaiting_review'},{id:6,clo_code:'CLO2',clo_statement:'Second recorded CLO',sequence_order:2,record_state:'active',origin:'manual'}],alignments:[{id:7,clo_id:5,parent_mapping_id:99,outcome_code:'IT01',outcome_text:'Recorded outcome text',rationale:'Recorded <alignment rationale>',origin:'inherited',record_state:'active',review_state:'awaiting_review'}],plans:[{id:8,clo_id:5,assessment_method:'Recorded method',planned_task:'Recorded <task>',evidence_description:'Recorded <evidence>',performance_indicator:'',rubric_or_standard:'Recorded <rubric>',plan_status:'incomplete',record_state:'active',origin:'manual'}],parent_mappings:[{mapping_id:99,outcome_code:'IT01',outcome_text:'Recorded description'}]};
+const fetcher=(endpoint)=>endpoint==='outcomes'?workspace:endpoint==='clos'?clo:undefined;
+const modalIds=['sourceDetailsModal','outcomeViewModal','cloViewModal'];
+const formFromHtml=(html,cls,values={})=>{
+    const found=[...html.matchAll(/<form\b([^>]*)>([\s\S]*?)<\/form>/g)].find(m=>m[1].includes(cls));assert.ok(found,'form rendered: '+cls);
+    const fields={};
+    for(const m of found[2].matchAll(/<input\b[^>]*name="([^"]+)"[^>]*value="([^"]*)"[^>]*>/g))fields[m[1]]=m[2];
+    for(const m of found[2].matchAll(/<textarea\b[^>]*name="([^"]+)"[^>]*>([\s\S]*?)<\/textarea>/g))fields[m[1]]=m[2];
+    for(const m of found[1].matchAll(/data-([\w-]+)="([^"]*)"/g))fields['data-'+m[1]]=m[2];
+    const dataset={};for(const [k,v] of Object.entries(fields))if(k.startsWith('data-')){dataset[k.slice(5).replace(/-([a-z])/g,(_,c)=>c.toUpperCase())]=v;delete fields[k];}
+    return {fields:{...fields,...values},dataset,matches:selector=>selector.includes(cls)||selector==='[data-outcome-add]'&&cls==='outcome-add-form',querySelectorAll:()=>[]};
+};
+(async()=>{
+    const h=harness({url,realModals:true,fetch:fetcher});await h.settle();
+    check(h.el('mappingPanelMap').hidden&&!h.el('mappingPanelOutcomes').hidden,'F10-11 deep-link workspace preserved');
+    check(h.el('viewSourceDetails').disabled===false,'source action enabled only after real source data loads');
+    const trigger=h.el('source-trigger');trigger.focus();h.el('viewSourceDetails').handlers.click();
+    check(!h.el('sourceDetailsModal').hidden&&h.el('sourceDetailsModal').attributes['aria-hidden']==='false','F10-02 source action actually opens dialog');
+    check(h.context.document.body.classes.has('curriculum-modal-open'),'background scroll is locked by real helper');
+    check(h.context.document.activeElement.id==='sourceDetailsModal-icon','real helper moves focus into dialog');
+    for(const text of ['Document Information','Source Reference','Document Integrity','Source Verification and Applicability','Detailed Outcome Locations','Recorded &lt;title&gt; &amp; full text','a'.repeat(64),'IT13','<td>9</td>'])check(h.el('outcomeSources').innerHTML.includes(text),'source modal preserves '+text);
+    const modal=h.el('sourceDetailsModal'),icon=h.el('sourceDetailsModal-icon'),footer=h.el('sourceDetailsModal-footer');
+    footer.focus();let prevented=false;modal.handlers.keydown({key:'Tab',preventDefault(){prevented=true;}});
+    check(prevented&&h.context.document.activeElement===icon,'F10-05 forward Tab traps focus');
+    icon.focus();modal.handlers.keydown({key:'Tab',shiftKey:true,preventDefault(){}});check(h.context.document.activeElement===footer,'reverse Tab traps focus');
+    modal.handlers.keydown({key:'Escape',preventDefault(){}});check(modal.hidden&&!h.context.document.body.classes.has('curriculum-modal-open')&&h.context.document.activeElement===trigger,'Escape closes, unlocks scroll and restores focus');
+    h.el('viewSourceDetails').handlers.click();h.el('sourceDetailsModal-backdrop').handlers.click();check(modal.hidden,'backdrop closes through standard helper');
+    h.el('viewSourceDetails').handlers.click();footer.handlers.click();check(modal.hidden,'standard footer closes through helper');
+    for(let i=1;i<=13;i++){
+        h.click('outcomeMatrix','[data-outcome-open]',{outcomeOpen:i});
+        check(!h.el('outcomeViewModal').hidden,'F10-03 immediate modal for IT'+String(i).padStart(2,'0'));
+        check(h.el('outcomeViewModalTitle').textContent.startsWith(outcomes[i-1].outcome_code+' -'),'F10-04 correct heading '+i);
+        check(h.el('outcomeDetail').innerHTML.includes('&lt;'+i+'&gt;'),'correct escaped source description '+i);
+        check(modalIds.filter(id=>!h.el(id).hidden).length===1,'no nested academic dialogs '+i);
+    }
+    h.click('outcomeMatrix','[data-outcome-open]',{outcomeOpen:999});check(h.el('outcomeViewModal').hidden&&h.el('outcomeDetail').innerHTML==='','unknown ID cannot display stale details');
+    h.el('outcomeSearch').value='IT01';h.el('outcomeSearch').handlers.input();h.click('outcomeMatrix','[data-outcome-open]',{outcomeOpen:1});h.el('outcomeViewModal-footer').handlers.click();check(h.el('outcomeSearch').value==='IT01'&&h.el('outcomeMatrix').innerHTML.includes('IT01'),'search state retained after close');
+    h.click('outcomeMatrix','[data-outcome-open]',{outcomeOpen:1});
+    check(h.el('outcomeDetail').innerHTML.includes('Inherited from mapping #55')&&h.el('outcomeDetail').innerHTML.includes('Recorded &lt;rationale&gt;'),'mapping lineage and rationale retained');
+    const add=formFromHtml(h.el('outcomeDetail').innerHTML,'outcome-add-form',{placement_id:'102',rationale:'Synthetic new rationale'});
+    await h.el('outcomeDetail').handlers.submit({preventDefault(){},target:{closest:()=>add}});
+    check(h.posted.at(-1).action==='add'&&h.posted.at(-1).outcome_id==='1'&&h.posted.at(-1).placement_id==='102'&&h.posted.at(-1).rationale==='Synthetic new rationale','F10-06 actual rendered mapping form fields dispatched');
+    const originalPost=h.ui.postForm;let releaseSave;let saveCalls=0;
+    h.ui.postForm=()=>{saveCalls++;return new Promise(resolve=>{releaseSave=resolve;});};
+    const firstSave=h.el('outcomeDetail').handlers.submit({preventDefault(){},target:{closest:()=>add}});
+    await h.el('outcomeDetail').handlers.submit({preventDefault(){},target:{closest:()=>add}});
+    check(saveCalls===1,'pending mapping save suppresses duplicate submission');releaseSave({message:'Saved'});await firstSave;h.ui.postForm=originalPost;
+    const forgedForm={...add,dataset:{outcomeAdd:'13'}};const postCount=h.posted.length;
+    await h.el('outcomeDetail').handlers.submit({preventDefault(){},target:{closest:()=>forgedForm}});check(h.posted.length===postCount,'form outcome identity must match the viewed record');
+    const assess=formFromHtml(h.el('outcomeDetail').innerHTML,'outcome-assess-form',{rationale:'Synthetic coverage note'});
+    await h.el('outcomeDetail').handlers.submit({preventDefault(){},submitter:{value:'complete'},target:{closest:()=>assess}});check(h.posted.at(-1).assessment_state==='complete','coverage-complete dispatch preserved');
+    await h.el('outcomeDetail').handlers.submit({preventDefault(){},submitter:{value:'incomplete'},target:{closest:()=>assess}});check(h.posted.at(-1).assessment_state==='incomplete','coverage-incomplete dispatch preserved');
+    await h.click('outcomeDetail','[data-outcome-remove]',{outcomeRemove:99});check(h.posted.at(-1).mapping_id===99||h.posted.at(-1).mapping_id==='99','remove dispatch retains mapping identity');
+    const replacedTrigger=h.el('replaced-trigger');replacedTrigger.focus();h.click('outcomeMatrix','[data-outcome-open]',{outcomeOpen:1});replacedTrigger.isConnected=false;h.el('outcomeViewModal-footer').handlers.click();check(h.context.document.activeElement===h.el('outcomeSearch'),'closing after refreshed rows restores focus to stable search control');
+    h.el('viewSourceDetails').handlers.click();check(h.el('outcomeViewModal').hidden&&!h.el('sourceDetailsModal').hidden,'source View closes outcome View before opening');
+    h.selectors.cloPlacementSearch.setSelected(workspace.placements[0]);await h.settle();
+    check(h.el('cloAssessmentContent').innerHTML.includes('CLO1')&&!h.el('cloAssessmentContent').innerHTML.includes('<form')&&!h.el('cloAssessmentContent').innerHTML.includes('Recorded &lt;task&gt;'),'F10-09 compact CLO list does not expand nested detail or forms');
+    check(h.el('cloAssessmentContent').innerHTML.includes('1 incomplete')&&h.el('cloAssessmentContent').innerHTML.includes('IT01'),'CLO list retains alignment and incomplete assessment count');
+    h.click('cloAssessmentContent','[data-clo-open],[data-clo-edit],[data-clo-create]',{cloOpen:5});
+    check(!h.el('cloViewModal').hidden&&h.el('sourceDetailsModal').hidden,'CLO View opens actual modal without nesting');
+    for(const text of ['Recorded &lt;CLO statement&gt;','Recorded &lt;alignment rationale&gt;','Recorded &lt;task&gt;','Recorded &lt;evidence&gt;','Recorded &lt;rubric&gt;','Missing: performance indicator','Awaiting academic review'])check(h.el('cloDetail').innerHTML.includes(text),'CLO modal preserves '+text);
+    h.click('cloAssessmentContent','[data-clo-open],[data-clo-edit],[data-clo-create]',{cloOpen:6});check(h.el('cloViewModalTitle').textContent.startsWith('CLO2')&&!h.el('cloDetail').innerHTML.includes('Recorded &lt;task&gt;'),'changing viewed CLO clears older plan details');
+    h.click('cloAssessmentContent','[data-clo-open],[data-clo-edit],[data-clo-create]',{cloEdit:5});check(h.el('cloDetail').innerHTML.includes('<details class="reference-action-details" open>'),'explicit Edit reveals form');
+    const edit=formFromHtml(h.el('cloDetail').innerHTML,'clo-edit-form',{clo_statement:'Synthetic edited statement'});await h.el('cloDetail').handlers.submit({preventDefault(){},target:{closest:()=>edit}});check(h.posted.at(-1).clo_id==='5'&&h.posted.at(-1).placement_id==='101'&&h.posted.at(-1).action==='clo_update','rendered CLO edit fields preserve ownership');
+    h.click('cloAssessmentContent','[data-clo-open],[data-clo-edit],[data-clo-create]',{cloCreate:''});check(h.el('cloDetail').innerHTML.includes('clo-create-form'),'explicit Create opens form');
+    const P=h.context.window.OutcomesPresentation;
+    check((P.overview(workspace).match(/status-badge/g)||[]).length===4,'coverage overview uses semantic badges for all four states');
+    for(const [state,css] of [['required','status-active'],['editable','status-active'],['draft','status-draft'],['reference','read-only-pill'],['protected','status-inactive'],['under_review','status-draft'],['approved','status-active'],['archived','status-archived'],['optional','status-inactive']])check(h.ui.statusBadge(state).includes(css),'F10-08 existing semantic palette '+state);
+    check(!h.ui.statusBadge('not_started').includes('not_started')&&h.ui.statusBadge('required').includes('required')&&!h.ui.statusBadge('required').includes('approved'),'human labels retain distinct academic meaning');
+    clo.clos[1].record_state='withdrawn';h.click('cloAssessmentContent','[data-clo-open],[data-clo-edit],[data-clo-create]',{cloOpen:6});check(h.el('cloDetailsStatus').innerHTML.includes('Read only')&&h.el('cloDetail').innerHTML.includes('Withdrawn; history retained'),'withdrawn CLO header reports read only despite editable parent version');clo.clos[1].record_state='active';
+    const protectedWorkspace={...workspace,context:{...workspace.context,editable:false}};
+    const readonly=harness({url,realModals:true,fetch:endpoint=>endpoint==='outcomes'?protectedWorkspace:endpoint==='clos'?{...clo,editable:false}:undefined});await readonly.settle();readonly.click('outcomeMatrix','[data-outcome-open]',{outcomeOpen:1});check(!readonly.el('outcomeDetail').innerHTML.includes('<form')&&!readonly.el('outcomeDetail').innerHTML.includes('data-outcome-remove'),'protected outcome modal read only');
+    readonly.selectors.cloPlacementSearch.setSelected(workspace.placements[0]);await readonly.settle();readonly.click('cloAssessmentContent','[data-clo-open],[data-clo-edit],[data-clo-create]',{cloOpen:5});check(!readonly.el('cloDetail').innerHTML.includes('<form')&&!readonly.el('cloDetail').innerHTML.includes('data-clo-action'),'protected CLO modal read only');
+    const viewer=harness({url,realModals:true,fetch:fetcher,permissions:{canManageOutcomes:'0',canManageClos:'0',canManagePlans:'0'}});await viewer.settle();viewer.click('outcomeMatrix','[data-outcome-open]',{outcomeOpen:1});check(!viewer.el('outcomeDetail').innerHTML.includes('<form'),'viewer outcome controls absent');
+    viewer.selectors.cloPlacementSearch.setSelected(workspace.placements[0]);await viewer.settle();viewer.click('cloAssessmentContent','[data-clo-open],[data-clo-edit],[data-clo-create]',{cloOpen:5});check(!viewer.el('cloDetail').innerHTML.includes('<form'),'viewer CLO controls absent');
+    h.context.window.location=new URL(url.replace('version_id=3','version_id=999').replace('program_id=1','program_id=999'));await h.windowEvents.popstate();await h.settle();check(modalIds.every(id=>h.el(id).hidden)&&h.el('outcomeDetail').innerHTML===''&&h.el('cloPlacementSelect').value==='','context changes close dialogs and clear outdated details');
+    console.log('PASS: '+checks+' Task 10.1 foundation modal/controller checks; browser visual QA pending.');
+})().catch(error=>{console.error(error);process.exitCode=1;});

@@ -58,16 +58,16 @@ const url='http://localhost/modules/curriculum/pages/subject_mapping.php?program
     check(!h.el('outcomeMatrix').innerHTML.includes('<form'),'list has no expanded edit forms');
     h.click('outcomeMatrix','[data-outcome-open]',{outcomeOpen:1});check(h.el('outcomeDetail').innerHTML.includes('data-outcome-add="1"'),'Manage opens outcome-owned form');
     const add={dataset:{outcomeAdd:'1'},matches:selector=>selector==='[data-outcome-add]'};
-    await h.el('mappingPanelOutcomes').handlers.submit({preventDefault(){},target:{closest:()=>add}});
+    await h.el('outcomeDetail').handlers.submit({preventDefault(){},target:{closest:()=>add}});
     check(h.posted.at(-1).action==='add'&&h.posted.at(-1).outcome_id==='1'&&h.posted.at(-1).curriculum_version_id==='3','mapping form retains mutation action and context');
     check(h.toasts.at(-1).type==='success','successful mutation reports feedback');
     const assess={dataset:{outcomeAssess:'1'},matches:()=>false};
-    await h.el('mappingPanelOutcomes').handlers.submit({preventDefault(){},submitter:{value:'complete'},target:{closest:()=>assess}});
+    await h.el('outcomeDetail').handlers.submit({preventDefault(){},submitter:{value:'complete'},target:{closest:()=>assess}});
     check(h.posted.at(-1).assessment_state==='complete','coverage submitter state preserved');
     h.ui.postForm=async()=>{throw new Error('Rejected by server');};
-    await h.el('mappingPanelOutcomes').handlers.submit({preventDefault(){},target:{closest:()=>add}});
+    await h.el('outcomeDetail').handlers.submit({preventDefault(){},target:{closest:()=>add}});
     check(add.error==='Rejected by server','failure stays in form, no fake success');
-    const canceled=harness({url,confirm:false});await canceled.settle();await canceled.click('mappingPanelOutcomes','[data-outcome-remove]',{outcomeRemove:1});check(canceled.posted.length===0,'remove requires confirmation');
+    const canceled=harness({url,confirm:false});await canceled.settle();await canceled.click('outcomeDetail','[data-outcome-remove]',{outcomeRemove:1});check(canceled.posted.length===0,'remove requires confirmation');
     const stale=harness({url});await stale.settle();stale.ui.fetchJson=async()=>{throw new Error('Outcome request failed');};
     stale.el('mappingWorkspaceTabs').handlers.click({target:{closest:()=>({id:'mappingTabOutcomes'})}});await stale.settle();
     stale.el('outcomeSearch').value='IT01';stale.el('outcomeSearch').handlers.input();
@@ -76,27 +76,28 @@ const url='http://localhost/modules/curriculum/pages/subject_mapping.php?program
     const outcome={id:1,outcome_code:'IT01',outcome_text:'<script>"official" & full long text</script>'.repeat(25),coverage_status:'not_assessed',mapping_count:1,document_title:'<source>',source_key:'key',document_code:'CMO',issuing_authority:'CHED',source_section:'6.3',printed_page:8,pdf_page_index:8,source_sha256:'a'.repeat(64)};
     const data={context:{editable:true},outcomes:[outcome],placements:[],mappings:[],limitations:{truth:'<unverified>'}};
     check(!P.outcomeList([outcome],false).includes('<script>')&&P.outcomeList([outcome],false).includes('&lt;script&gt;'),'official text escaped without truncation');
-    check(P.sources(data).includes('a'.repeat(64))&&P.sources(data).includes('printed p. 8')&&P.sources(data).includes('&lt;source&gt;'),'source fingerprint pages and escaped title accessible');
+    check(P.sources(data).includes('a'.repeat(64))&&P.sources(data).includes('Printed page')&&P.sources(data).includes('<td>8</td>')&&P.sources(data).includes('&lt;source&gt;'),'source fingerprint pages and escaped title accessible');
     check(!P.outcomeDetail(data,1,false).includes('<form'),'view-only outcome has no mutations');
     data.context.editable=false;check(!P.outcomeDetail(data,1,true).includes('<form'),'lifecycle restriction overrides mapping permission');
     const clo={placement:{curriculum_version_id:3,subject_code:'S1',subject_title:'<subject>',version_label:'V1',version_role:'proposed',review_status:'not_started'},editable:true,disclaimer:'No attainment',clos:[{id:5,clo_code:'CLO1',clo_statement:'<statement>',origin:'inherited',review_state:'awaiting_review',record_state:'active'}],alignments:[{id:6,clo_id:5,outcome_code:'IT01',outcome_text:'<outcome>',rationale:'<rationale>',origin:'manual',record_state:'active'}],plans:[{id:7,clo_id:5,assessment_method:'',planned_task:'<task>',evidence_description:'<evidence>',performance_indicator:'',rubric_or_standard:'<rubric>',record_state:'active',plan_status:'incomplete'}],parent_mappings:[]};
-    const full=P.cloWorkspace(clo,{manageClos:true,managePlans:true});
+    const full=P.cloDetail(clo,5,{manageClos:true,managePlans:true});
+    check(!P.cloWorkspace(clo,{manageClos:true,managePlans:true}).includes('<form'),'compact CLO list does not expand mutation forms');
     for(const token of ['clo-edit-form','clo-plan-edit-form','clo-alignment-edit-form','clo_create','<statement>']) {if(token==='clo_create'||token==='<statement>')continue;check(full.includes(token),token+' available');}
     for(const token of ['&lt;statement&gt;','&lt;rationale&gt;','&lt;task&gt;','&lt;evidence&gt;','&lt;rubric&gt;','Awaiting academic review','Missing: assessment method, performance indicator'])check(full.includes(token),'organized escaped CLO field: '+token);
-    check(!P.cloWorkspace(clo,{manageClos:false,managePlans:false}).includes('<form'),'read-only CLO has no mutation forms');
-    const plansOnly=P.cloWorkspace(clo,{manageClos:false,managePlans:true});check(!plansOnly.includes('clo-edit-form')&&plansOnly.includes('clo-plan-edit-form'),'separate plan permission honored');
-    const closOnly=P.cloWorkspace(clo,{manageClos:true,managePlans:false});check(closOnly.includes('clo-edit-form')&&!closOnly.includes('clo-plan-edit-form'),'separate CLO permission honored');
+    check(!P.cloDetail(clo,5,{manageClos:false,managePlans:false}).includes('<form'),'read-only CLO has no mutation forms');
+    const plansOnly=P.cloDetail(clo,5,{manageClos:false,managePlans:true});check(!plansOnly.includes('clo-edit-form')&&plansOnly.includes('clo-plan-edit-form'),'separate plan permission honored');
+    const closOnly=P.cloDetail(clo,5,{manageClos:true,managePlans:false});check(closOnly.includes('clo-edit-form')&&!closOnly.includes('clo-plan-edit-form'),'separate CLO permission honored');
     const ch=harness({url,fetch:(endpoint)=>endpoint==='clos'?clo:undefined});await ch.settle();
     ch.el('cloPlacementSelect').value='101';await ch.el('cloPlacementSelect').handlers.change();
     check(ch.el('cloAssessmentContent').innerHTML.includes('&lt;statement&gt;'),'CLO controller renders actual selected placement response');
     for(const [cls,action] of [['.clo-create-form','clo_create'],['.clo-edit-form','clo_update'],['.clo-alignment-form','alignment_add'],['.clo-alignment-edit-form','alignment_update'],['.clo-plan-form','plan_add'],['.clo-plan-edit-form','plan_update']]) {
-        const form={matches:selector=>selector===cls};await ch.el('cloAssessmentContent').handlers.submit({preventDefault(){},target:{closest:()=>form}});
+        const form={matches:selector=>selector===cls};await ch.el('cloDetail').handlers.submit({preventDefault(){},target:{closest:()=>form}});
         check(ch.posted.at(-1).action===action&&ch.posted.at(-1).placement_id==='101','CLO form dispatch '+action+' preserves placement');
     }
     let releaseClo;ch.ui.fetchJson=()=>new Promise(resolve=>{releaseClo=resolve;});
     const pending=ch.el('cloPlacementSelect').handlers.change();ch.el('cloPlacementSelect').value='102';releaseClo(clo);await pending;
     check(!ch.el('cloAssessmentContent').innerHTML.includes('&lt;statement&gt;'),'stale CLO result is ignored after selection changes');
-    clo.editable=false;check(!P.cloWorkspace(clo,{manageClos:true,managePlans:true}).includes('<form'),'protected CLO version never exposes edits');
-    clo.editable=true;clo.clos[0].record_state='withdrawn';const withdrawn=P.cloWorkspace(clo,{manageClos:true,managePlans:true});check(!withdrawn.includes('clo-edit-form')&&!withdrawn.includes('clo-plan-edit-form'),'withdrawn CLO descendants have no unusable edits');
+    clo.editable=false;check(!P.cloDetail(clo,5,{manageClos:true,managePlans:true}).includes('<form'),'protected CLO version never exposes edits');
+    clo.editable=true;clo.clos[0].record_state='withdrawn';const withdrawn=P.cloDetail(clo,5,{manageClos:true,managePlans:true});check(!withdrawn.includes('clo-edit-form')&&!withdrawn.includes('clo-plan-edit-form'),'withdrawn CLO descendants have no unusable edits');
     console.log('PASS: '+checks+' Task 10 controller/presentation checks (mock DOM; no browser visual claim).');
 })().catch(e=>{console.error(e);process.exitCode=1;});

@@ -121,22 +121,26 @@ require __DIR__ . '/../../../shared/sidebar.php';
       </section>
       <section id="mappingPanelOutcomes" class="mapping-workspace-panel" role="tabpanel" aria-labelledby="mappingTabOutcomes" <?= $activeTab === 'outcomes' ? '' : 'hidden' ?>>
         <div class="mapping-review-header"><div><p class="eyebrow">CHED BSIT · Section 6.3</p><h2>Graduate Outcomes Mapping</h2><p>Manual curriculum-to-outcome associations for the selected BSIT version.</p></div><span id="outcomeVersionScope">Select a version</span></div>
-        <p class="curriculum-notice">Source: CHED CMO No. 25, s. 2015, Section 6.3. The supplied scan is fingerprinted; independent registry validation and current applicability have not been established. Institutional adoption/approval not verified.</p>
-        <p class="mapping-state">Curriculum mapping does not establish student outcome attainment, regulatory compliance, or institutional approval.</p>
+        <aside class="curriculum-notice academic-notice" role="note" aria-labelledby="academicNoticeTitle">
+          <i class="fa-solid fa-circle-info" aria-hidden="true"></i><div><strong id="academicNoticeTitle">Important Academic Notice</strong>
+          <p><strong>Source:</strong> CHED CMO No. 25, s. 2015, Section 6.3. The supplied scan is fingerprinted; independent registry verification, current applicability, and institutional adoption/approval have not been established.</p>
+          <p><strong>Limitation:</strong> Curriculum mapping, course outcome alignments, and assessment plans do not establish student outcome attainment, regulatory compliance, or institutional approval.</p></div>
+        </aside>
         <div id="outcomeOverview" class="program-summary-grid" aria-label="Recorded coverage overview"></div>
-        <details class="reference-action-details" id="outcomeSourceDetails"><summary>Documentary source details</summary><div id="outcomeSources"></div></details>
+        <div class="card-header-actions"><button type="button" class="secondary-action-button" id="viewSourceDetails" disabled><i class="fa-solid fa-file-lines" aria-hidden="true"></i> View Source Details</button></div>
         <div class="list-toolbar outcome-toolbar">
           <label class="search-control"><span class="sr-only">Search graduate outcomes</span><input type="search" id="outcomeSearch" placeholder="Search code or official description" maxlength="200"/></label>
           <label class="form-field"><span>Coverage</span><select id="outcomeCoverage"><option value="">All coverage states</option><option value="not_assessed">Not assessed</option><option value="incomplete">Incomplete</option><option value="mapped">Mapped</option><option value="unmapped">Unmapped</option></select></label>
           <span id="outcomeResultCount" role="status"></span>
         </div>
         <div id="outcomeMatrix" class="outcome-matrix"><p class="mapping-state">Select a BSIT curriculum version to view its recorded outcome mappings.</p></div>
-        <div id="outcomeDetail" tabindex="-1"></div>
         <section class="clo-assessment-workspace" aria-labelledby="cloAssessmentHeading">
           <h3 id="cloAssessmentHeading">Course Learning Outcomes &amp; Planned Assessment</h3>
-          <p class="mapping-state">User-entered academic planning records. A mapping or plan does not establish student attainment, compliance, or approval.</p>
-          <label class="form-field"><span>Search subject placements</span><input type="search" id="cloPlacementSearch" placeholder="Filter by subject code or title"/></label>
-          <label class="form-field"><span>Subject placement</span><select id="cloPlacementSelect"><option value="">Select a placement</option></select></label>
+          <div class="list-toolbar clo-selection-toolbar"><label class="form-field"><span>Subject placement</span><div class="record-autocomplete">
+            <input type="search" id="cloPlacementSearch" placeholder="Search subject code or title" disabled/><input type="hidden" id="cloPlacementSelect"/>
+            <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear subject placement" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+            <div class="record-autocomplete-options" id="cloPlacementOptions" role="listbox" aria-label="Subject placements" hidden></div>
+          </div></label></div>
           <div id="cloAssessmentContent"><p class="mapping-state">Select a curriculum version and subject placement.</p></div>
         </section>
       </section>
@@ -145,6 +149,31 @@ require __DIR__ . '/../../../shared/sidebar.php';
   </main>
 
   <div class="footer">eLearning Commons &copy; 2026</div>
+</div>
+
+<div class="curriculum-modal record-details-modal" id="sourceDetailsModal" hidden aria-hidden="true">
+  <div class="modal-backdrop" data-modal-close></div>
+  <section class="modal-dialog modal-dialog-large modal-dialog-scroll" role="dialog" aria-modal="true" aria-labelledby="sourceDetailsModalTitle">
+    <div class="modal-header"><div><h2 id="sourceDetailsModalTitle">Documentary Source Details</h2><p class="modal-context" id="sourceDetailsModalContext">CHED CMO No. 25, s. 2015</p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close Documentary Source Details"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
+    <div class="modal-body academic-modal-body" id="outcomeSources"></div>
+    <div class="modal-footer"><button type="button" class="button-muted" data-modal-close>Close</button></div>
+  </section>
+</div>
+<div class="curriculum-modal record-details-modal" id="outcomeViewModal" hidden aria-hidden="true">
+  <div class="modal-backdrop" data-modal-close></div>
+  <section class="modal-dialog modal-dialog-large modal-dialog-scroll" role="dialog" aria-modal="true" aria-labelledby="outcomeViewModalTitle">
+    <div class="modal-header"><div><h2 id="outcomeViewModalTitle">Graduate Outcome Details</h2><p class="modal-context" id="outcomeViewModalContext"></p></div><span id="outcomeDetailsStatus"></span><button type="button" class="modal-close-button" data-modal-close aria-label="Close Graduate Outcome Details"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
+    <div class="modal-body academic-modal-body" id="outcomeDetail"></div>
+    <div class="modal-footer"><button type="button" class="button-muted" data-modal-close>Close</button></div>
+  </section>
+</div>
+<div class="curriculum-modal record-details-modal" id="cloViewModal" hidden aria-hidden="true">
+  <div class="modal-backdrop" data-modal-close></div>
+  <section class="modal-dialog modal-dialog-large modal-dialog-scroll" role="dialog" aria-modal="true" aria-labelledby="cloViewModalTitle">
+    <div class="modal-header"><div><h2 id="cloViewModalTitle">Course Learning Outcome Details</h2><p class="modal-context" id="cloViewModalContext"></p></div><span id="cloDetailsStatus"></span><button type="button" class="modal-close-button" data-modal-close aria-label="Close Course Learning Outcome Details"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
+    <div class="modal-body academic-modal-body" id="cloDetail"></div>
+    <div class="modal-footer"><button type="button" class="button-muted" data-modal-close>Close</button></div>
+  </section>
 </div>
 
   <div class="curriculum-modal mapping-details-modal" id="mappingDetailsModal" hidden aria-hidden="true">

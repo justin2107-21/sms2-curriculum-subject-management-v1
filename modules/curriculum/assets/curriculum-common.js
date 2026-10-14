@@ -171,7 +171,7 @@
             : (button.dataset.defaultLabel || button.innerHTML);
     }
 
-    function createModal(element) {
+    function createModal(element, options) {
         if (!element) return null;
         let previousFocus = null;
 
@@ -198,7 +198,9 @@
             if (!document.querySelector('.curriculum-modal:not([hidden])')) {
                 document.body.classList.remove('curriculum-modal-open');
             }
-            previousFocus?.focus();
+            // Record lists may be refreshed while a View dialog is open.
+            const focusTarget = previousFocus?.isConnected === false ? options?.restoreFocus?.() : previousFocus;
+            focusTarget?.focus();
         }
 
         element.querySelectorAll('[data-modal-close]').forEach(function (button) {
@@ -599,12 +601,23 @@
         };
     }
 
-    function statusBadge(status) {
+    // Presentation labels and existing foundation palette; never an authorization decision.
+    function statusLabel(status) {
+        return ({not_started:'Not started', awaiting_review:'Awaiting academic review', under_review:'Under review',
+            proposed:'Proposed revision', reference:'Reference', unclassified:'Unclassified', editable:'Editable',
+            protected:'Protected', read_only:'Read only', not_assessed:'Not assessed', incomplete:'Incomplete',
+            mapped:'Mapped', unmapped:'Unmapped', school_curriculum:'Curriculum source'})[status]
+            || String(status || 'Unknown').replaceAll('_', ' ');
+    }
+    function statusBadge(status, label) {
         const normalized = String(status || '').toLowerCase();
-        const safeClass = ['active', 'inactive', 'draft', 'archived'].includes(normalized)
-            ? normalized
-            : 'inactive';
-        return '<span class="status-badge status-' + safeClass + '">' + escapeHtml(status || 'Unknown') + '</span>';
+        const positive = ['active','required','editable','approved','mapped','planned','complete'];
+        const pending = ['draft','under_review','awaiting_review','incomplete','returned'];
+        const css = normalized === 'reference' ? 'read-only-pill'
+            : positive.includes(normalized) ? 'status-active'
+            : pending.includes(normalized) ? 'status-draft'
+            : normalized === 'archived' ? 'status-archived' : 'status-inactive';
+        return '<span class="status-badge ' + css + '">' + escapeHtml(label || statusLabel(normalized)) + '</span>';
     }
 
     function formatDate(value) {
@@ -703,7 +716,7 @@
             .map(row => row.item);
     }
     window.CurriculumUI = {
-        normalizeSearch, searchRank, searchRecords,
+        normalizeSearch, searchRank, searchRecords, statusLabel,
         escapeHtml,
         fetchJson,
         postForm,

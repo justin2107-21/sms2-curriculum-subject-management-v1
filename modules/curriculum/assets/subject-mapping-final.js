@@ -45,6 +45,13 @@
     const addModal = ui.createModal(el('addMappingModal'));
     const editModal = ui.createModal(el('editMappingModal'));
     const removeModal = ui.createModal(el('removeMappingModal'));
+    const sourceModal = ui.createModal(el('sourceDetailsModal'));
+    const outcomeModal = ui.createModal(el('outcomeViewModal'),{restoreFocus:()=>el('outcomeSearch')});
+    const cloModal = ui.createModal(el('cloViewModal'),{restoreFocus:()=>el('cloPlacementSearch')});
+    const academicDialogs = [[sourceModal,'sourceDetailsModal'],[outcomeModal,'outcomeViewModal'],[cloModal,'cloViewModal']];
+    function closeAcademicDialogs(except) {
+        academicDialogs.forEach(([dialog,id])=>{if(id!==except&&!el(id).hidden)dialog.close();});
+    }
     const addForm = el('addMappingForm');
     const editForm = el('editMappingForm');
     const addSubjectInput = el('mappingSubjectSelectorSearch');
@@ -59,6 +66,8 @@
     let reviewIssues = null;
     let contextRequest = 0;
     let selectedOutcome = null;
+    let selectedClo = null;
+    let cloData = null;
     const academicSubmissions = new WeakSet();
     function setAcademicSubmitting(form, busy) {
         if (busy) academicSubmissions.add(form); else academicSubmissions.delete(form);
@@ -253,11 +262,13 @@
     async function loadMap() {
         const request = ++state.mapRequest;
         const version = versionIdInput.value;
-        state.outcomeRequest++; state.cloRequest++; state.outcomeData=null; selectedOutcome=null;
+        state.outcomeRequest++; state.cloRequest++; state.outcomeData=null; selectedOutcome=null; selectedClo=null; cloData=null;
+        closeAcademicDialogs();
+        el('viewSourceDetails').disabled=true;
         ['outcomeOverview','outcomeSources','outcomeDetail','outcomeResultCount'].forEach(id => el(id).replaceChildren());
         el('outcomeVersionScope').textContent = 'Select a version';
-        el('cloPlacementSearch').value = '';
-        el('cloPlacementSelect').replaceChildren(new Option('Select a placement',''));
+        cloPlacementAutocomplete.clear(false);
+        el('cloPlacementSearch').disabled=true;
         showPanelState(el('cloAssessmentContent'), 'Select a curriculum version and subject placement.');
         showPanelState(el('outcomeMatrix'), 'Select a BSIT curriculum version to view its recorded outcome mappings.');
         if (state.currentTab === 'outcomes') loadOutcomes();
@@ -309,9 +320,13 @@
         const versionId = versionIdInput.value;
         const request = ++state.outcomeRequest;
         if (!versionId) { state.outcomeData = null; showPanelState(target, 'Select a BSIT curriculum version to view recorded outcomes.'); return; }
-        state.outcomeData=null;
+        state.outcomeData=null; cloData=null;
         ['outcomeOverview','outcomeSources','outcomeDetail','outcomeResultCount'].forEach(id=>el(id).replaceChildren());
-        el('cloPlacementSelect').disabled=true;
+        el('cloPlacementSearch').disabled=true;
+        el('viewSourceDetails').disabled=true;
+        if(!el('outcomeViewModal').hidden)showPanelState(el('outcomeDetail'),'Refreshing recorded outcome mappings...');
+        if(!el('sourceDetailsModal').hidden)showPanelState(el('outcomeSources'),'Refreshing documentary source details...');
+        if(!el('cloViewModal').hidden)showPanelState(el('cloDetail'),'Refreshing academic planning records...');
         state.cloRequest++;
         showPanelState(el('cloAssessmentContent'),'Loading selected version workspace...');
         showPanelState(target, 'Loading source outcomes and recorded mappings...');
@@ -319,79 +334,116 @@
             const data = await ui.fetchJson(api.outcomes, { action: 'workspace', curriculum_version_id: versionId });
             if (request !== state.outcomeRequest) return;
             state.outcomeData = data;
-            el('cloPlacementSelect').disabled=false;
+            el('cloPlacementSearch').disabled=false;
+            el('viewSourceDetails').disabled=!arr(data.outcomes).length;
             renderOutcomes();
         } catch (error) {
             if (request === state.outcomeRequest) {
                 showPanelState(target, error.message || 'Outcome mappings could not be loaded.', true);
-                el('cloPlacementSelect').replaceChildren(new Option('Select a placement',''));
+                cloPlacementAutocomplete.clear(false);
+                cloData=null; selectedOutcome=null; selectedClo=null; closeAcademicDialogs();
                 showPanelState(el('cloAssessmentContent'),'Version workspace unavailable. Reselect an authorized version.',true);
             }
         }
     }
 
-    function renderPlacementOptions() {
-        const select = el('cloPlacementSelect'), previous = select.value;
-        const query = el('cloPlacementSearch').value.trim().toLowerCase();
-        const rows = arr(state.outcomeData?.placements).filter(p => String(p.placement_id) === previous || (p.subject_code+' '+p.subject_title).toLowerCase().includes(query));
-        select.innerHTML = '<option value="">Select a placement</option>' + rows.map(row => '<option value="'+Number(row.placement_id)+'">'+esc(row.subject_code+' \u00b7 '+row.subject_title+' \u00b7 '+(row.year_level||'Year not set')+' / '+(row.semester||'Term not set'))+'</option>').join('');
-        if (rows.some(p => String(p.placement_id) === previous)) select.value=previous;
-    }
+    const cloPlacementAutocomplete = ui.createAutocomplete({
+        input:el('cloPlacementSearch'),valueInput:el('cloPlacementSelect'),list:el('cloPlacementOptions'),
+        minimumLength:0,showSuggestionsOnFocus:true,
+        helpText:'Search subject placements in the selected version.',noResultsText:'No matching subject placements.',
+        search:async()=>arr(state.outcomeData?.placements),
+        searchFields:row=>[row.subject_code,row.subject_title,row.year_level,row.semester],
+        getId:row=>row.placement_id,
+        format:row=>({label:row.subject_code+' / '+row.subject_title+' / '+(row.year_level||'Year not set')+' / '+(row.semester||'Term not set'),code:row.subject_code,title:row.subject_title}),
+        onSelect:()=>loadCloWorkspace(),
+        onClear:()=>{state.cloRequest++;cloData=null;selectedClo=null;closeAcademicDialogs();showPanelState(el('cloAssessmentContent'),'Select a subject placement to view its course learning outcomes.');}
+    });
     function renderOutcomeList() {
         if (!state.outcomeData) return;
         const rows=window.OutcomesPresentation.filterOutcomes(state.outcomeData.outcomes,el('outcomeSearch').value,el('outcomeCoverage').value);
-        el('outcomeResultCount').textContent = rows.length+' outcomes shown';
-        el('outcomeMatrix').innerHTML = window.OutcomesPresentation.outcomeList(rows,permission.manageOutcomes && state.outcomeData.context.editable,selectedOutcome);
+        el('outcomeResultCount').textContent=rows.length+' outcomes shown';
+        el('outcomeMatrix').innerHTML=window.OutcomesPresentation.outcomeList(rows,permission.manageOutcomes&&state.outcomeData.context.editable,selectedOutcome);
+    }
+    function refreshOutcomeDetails() {
+        const data=state.outcomeData,o=arr(data?.outcomes).find(o=>Number(o.id)===selectedOutcome);
+        if(!o){if(!el('outcomeViewModal').hidden)outcomeModal.close();el('outcomeDetail').replaceChildren();return false;}
+        el('outcomeViewModalTitle').textContent=o.outcome_code+' - Graduate Outcome Details';
+        el('outcomeViewModalContext').textContent=[data.context.program_code,data.context.curriculum_name,data.context.version_label].join(' / ');
+        el('outcomeDetailsStatus').innerHTML=ui.statusBadge(o.coverage_status);
+        el('outcomeDetail').innerHTML=window.OutcomesPresentation.outcomeDetail(data,selectedOutcome,permission.manageOutcomes);
+        return true;
+    }
+    function refreshCloDetails(edit=false) {
+        if(!cloData){if(!el('cloViewModal').hidden)cloModal.close();el('cloDetail').replaceChildren();return false;}
+        const c=arr(cloData.clos).find(c=>Number(c.id)===selectedClo);
+        const html=selectedClo==='create'?window.OutcomesPresentation.cloCreate(cloData,permission):window.OutcomesPresentation.cloDetail(cloData,selectedClo,permission,edit);
+        if(!html){if(!el('cloViewModal').hidden)cloModal.close();el('cloDetail').replaceChildren();return false;}
+        el('cloViewModalTitle').textContent=c?c.clo_code+' - Course Learning Outcome Details':'Create Course Learning Outcome';
+        el('cloViewModalContext').textContent=[cloData.placement.subject_code,cloData.placement.version_label,cloData.placement.year_level,cloData.placement.semester].filter(Boolean).join(' / ');
+        el('cloDetailsStatus').innerHTML=ui.statusBadge(cloData.editable&&(selectedClo==='create'||c?.record_state==='active')&&(permission.manageClos||permission.managePlans)?'editable':'read_only');
+        el('cloDetail').innerHTML=html;return true;
     }
     function renderOutcomes() {
-        const data=state.outcomeData;
-        if (!data) return;
-        el('outcomeVersionScope').textContent = [data.context.program_code,data.context.curriculum_name,data.context.version_label].join(' / ');
-        el('outcomeOverview').innerHTML = window.OutcomesPresentation.overview(data);
-        el('outcomeSources').innerHTML = window.OutcomesPresentation.sources(data);
-        renderPlacementOptions();
-        if (el('cloPlacementSelect').value) loadCloWorkspace();
-        else showPanelState(el('cloAssessmentContent'),'Select a subject placement to view its course learning outcomes.');
-        if (!arr(data.outcomes).length) { showPanelState(el('outcomeMatrix'),'The source-traceable IT01\u2013IT13 catalog has not been loaded in this environment.'); return; }
-        renderOutcomeList();
-        el('outcomeDetail').innerHTML = window.OutcomesPresentation.outcomeDetail(data,selectedOutcome,permission.manageOutcomes);
+        const data=state.outcomeData;if(!data)return;
+        el('outcomeVersionScope').textContent=[data.context.program_code,data.context.curriculum_name,data.context.version_label].join(' / ');
+        el('outcomeOverview').innerHTML=window.OutcomesPresentation.overview(data);
+        el('outcomeSources').innerHTML=window.OutcomesPresentation.sources(data);
+        const placement=arr(data.placements).find(p=>String(p.placement_id)===el('cloPlacementSelect').value);
+        if(placement){cloPlacementAutocomplete.setSelected(placement,false);loadCloWorkspace();}
+        else{cloPlacementAutocomplete.clear(false);cloData=null;selectedClo=null;refreshCloDetails();showPanelState(el('cloAssessmentContent'),'Select a subject placement to view its course learning outcomes.');}
+        if(!arr(data.outcomes).length){showPanelState(el('outcomeMatrix'),'The source-traceable IT01-IT13 catalog has not been loaded in this environment.');return;}
+        renderOutcomeList();refreshOutcomeDetails();
     }
     el('outcomeSearch').addEventListener('input',renderOutcomeList);
     el('outcomeCoverage').addEventListener('change',renderOutcomeList);
-    el('cloPlacementSearch').addEventListener('input',renderPlacementOptions);
-    el('outcomeMatrix').addEventListener('click',event => {
-        const button=event.target.closest('[data-outcome-open]'); if(!button || !state.outcomeData)return;
+    el('viewSourceDetails').addEventListener('click',()=>{
+        if(!state.outcomeData||!arr(state.outcomeData.outcomes).length)return;
+        closeAcademicDialogs('sourceDetailsModal');
+        el('outcomeSources').innerHTML=window.OutcomesPresentation.sources(state.outcomeData);sourceModal.open();
+    });
+    el('outcomeMatrix').addEventListener('click',event=>{
+        const button=event.target.closest('[data-outcome-open]');if(!button||!state.outcomeData)return;
         selectedOutcome=Number(button.dataset.outcomeOpen);
-        el('outcomeDetail').innerHTML=window.OutcomesPresentation.outcomeDetail(state.outcomeData,selectedOutcome,permission.manageOutcomes);
-        renderOutcomeList(); el('outcomeDetail').focus();
+        if(!refreshOutcomeDetails())return;
+        closeAcademicDialogs('outcomeViewModal');outcomeModal.open();
+    });
+    el('cloAssessmentContent').addEventListener('click',event=>{
+        const button=event.target.closest('[data-clo-open],[data-clo-edit],[data-clo-create]');if(!button||!cloData)return;
+        selectedClo=button.dataset.cloCreate!==undefined?'create':Number(button.dataset.cloOpen||button.dataset.cloEdit);
+        if(!refreshCloDetails(Boolean(button.dataset.cloEdit)))return;
+        closeAcademicDialogs('cloViewModal');cloModal.open();
     });
 
     async function loadCloWorkspace() {
         const placementId = el('cloPlacementSelect')?.value, target = el('cloAssessmentContent');
         const request=++state.cloRequest, version=versionIdInput.value;
         if (!target) return;
-        if (!placementId) { showPanelState(target, 'Select a subject placement to view its course learning outcomes.'); return; }
+        if(!placementId){cloData=null;selectedClo=null;refreshCloDetails();showPanelState(target,'Select a subject placement to view its course learning outcomes.');return;}
+        if(cloData&&String(cloData.placement.placement_id)!==String(placementId)){cloData=null;selectedClo=null;refreshCloDetails();}
+        if(!el('cloViewModal').hidden)showPanelState(el('cloDetail'),'Loading academic planning records...');
         showPanelState(target, 'Loading placement-owned CLO and planned assessment records...');
         try {
             const data = await ui.fetchJson(api.clos, {action:'workspace',placement_id:placementId});
             if (request!==state.cloRequest || version!==versionIdInput.value || String(el('cloPlacementSelect').value) !== String(placementId)) return;
             if (String(data.placement.curriculum_version_id) !== String(version)) throw new Error('Placement does not belong to the selected version.');
+            cloData=data;
             target.innerHTML = window.OutcomesPresentation.cloWorkspace(data,permission);
-        } catch (error) { if(request===state.cloRequest && version===versionIdInput.value) showPanelState(target, error.message || 'CLO workspace could not be loaded.', true); }
+            refreshCloDetails();
+        } catch (error) { if(request===state.cloRequest && version===versionIdInput.value){cloData=null;selectedClo=null;refreshCloDetails();showPanelState(target,error.message||'CLO workspace could not be loaded.',true);} }
     }
 
     el('cloPlacementSelect')?.addEventListener('change', loadCloWorkspace);
-    el('cloAssessmentContent')?.addEventListener('submit', async event => {
+    el('cloDetail')?.addEventListener('submit', async event => {
         const form = event.target.closest('.clo-create-form,.clo-edit-form,.clo-alignment-form,.clo-alignment-edit-form,.clo-plan-form,.clo-plan-edit-form'); if (!form) return;
-        event.preventDefault(); if (academicSubmissions.has(form)) return;
+        event.preventDefault(); if (academicSubmissions.has(form)||!cloData||!cloData.editable) return;
         const body = new FormData(form); body.set('placement_id',el('cloPlacementSelect').value);
         body.set('action',form.matches('.clo-create-form')?'clo_create':form.matches('.clo-edit-form')?'clo_update':form.matches('.clo-alignment-form')?'alignment_add':form.matches('.clo-alignment-edit-form')?'alignment_update':form.matches('.clo-plan-edit-form')?'plan_update':'plan_add');
         ui.clearFormError(form); setAcademicSubmitting(form,true);
-        try { const result=await ui.postForm(api.clos,body); ui.showToast(result.message || 'Academic planning record saved.','success'); await loadCloWorkspace(); }
+        try { const result=await ui.postForm(api.clos,body); if(body.get('action')==='clo_create')selectedClo=Number(result.clo_id)||null; ui.showToast(result.message || 'Academic planning record saved.','success'); await loadCloWorkspace(); }
         catch(error) { ui.showFormError(form,error.message || 'Record could not be saved.'); }
         finally { setAcademicSubmitting(form,false); }
     });
-    el('cloAssessmentContent')?.addEventListener('click', async event => {
+    el('cloDetail')?.addEventListener('click', async event => {
         const button=event.target.closest('[data-clo-action]'); if (!button) return;
         if (!window.confirm('Withdraw this record? Its historical record will be retained.')) return;
         const body=new FormData(); body.set('placement_id',el('cloPlacementSelect').value); body.set('action',button.dataset.cloAction); body.set('clo_id',button.dataset.clo || button.dataset.id); if (button.dataset.cloAction==='alignment_withdraw') body.set('alignment_id',button.dataset.id); if (button.dataset.cloAction==='plan_withdraw') body.set('plan_id',button.dataset.id);
@@ -399,10 +451,12 @@
         catch(error) { ui.showToast(error.message || 'Record could not be withdrawn.','error'); }
     });
 
-    el('mappingPanelOutcomes')?.addEventListener('submit', async event => {
+    el('outcomeDetail')?.addEventListener('submit', async event => {
         const form = event.target.closest('[data-outcome-add], [data-outcome-assess]');
         if (!form) return;
         event.preventDefault();
+        if(academicSubmissions.has(form)||!state.outcomeData?.context.editable||!permission.manageOutcomes)return;
+        if(String(form.dataset.outcomeAdd||form.dataset.outcomeAssess)!==String(selectedOutcome))return;
         const data = new FormData(form);
         data.set('curriculum_version_id', String(versionIdInput.value));
         if (form.matches('[data-outcome-add]')) {
@@ -416,7 +470,7 @@
         catch(error) { ui.showFormError(form,error.message || 'Outcome record could not be saved.'); }
         finally { setAcademicSubmitting(form,false); }
     });
-    el('mappingPanelOutcomes')?.addEventListener('click', async event => {
+    el('outcomeDetail')?.addEventListener('click', async event => {
         const button=event.target.closest('[data-outcome-remove]'); if (!button) return;
         if (!window.confirm('Remove this subject outcome mapping? Dependent CLO alignments will be withdrawn and coverage will require review.')) return;
         const data=new FormData(); data.set('action','remove'); data.set('curriculum_version_id',String(versionIdInput.value)); data.set('mapping_id',button.dataset.outcomeRemove);
@@ -608,6 +662,7 @@
     function setTab(name, persist = true) {
         name = ['map','trace','review','outcomes'].includes(name) ? name : 'map';
         state.currentTab = name;
+        if(name!=='outcomes')closeAcademicDialogs();
         if (persist) writeUrl(true);
         updateContextMessage();
         [['map', 'mappingTabMap', 'mappingPanelMap'], ['trace', 'mappingTabTrace', 'mappingPanelTrace'], ['review', 'mappingTabReview', 'mappingPanelReview'], ['outcomes','mappingTabOutcomes','mappingPanelOutcomes']].forEach(([key, tabId, panelId]) => {

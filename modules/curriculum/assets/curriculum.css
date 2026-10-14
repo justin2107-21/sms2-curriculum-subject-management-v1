@@ -45,6 +45,7 @@
 }
 
 .curriculum-content > .curriculum-notice,
+.curriculum-content .curriculum-notice.academic-notice,
 .curriculum-content > .technical-note {
   align-self: flex-start;
   align-items: flex-start;
@@ -64,6 +65,7 @@
 }
 
 .curriculum-content > .curriculum-notice > i,
+.curriculum-content .academic-notice > i,
 .curriculum-content > .technical-note > i {
   color: #9a6700;
   flex: 0 0 auto;
@@ -1488,7 +1490,7 @@ body.curriculum-modal-open { overflow: hidden; }
   padding: 12px 14px;
 }
 .program-summary-grid strong { color: #1e293b; font-size: 21px; line-height: 1.15; }
-.program-summary-grid span { color: #64748b; font-size: 13px; }
+.program-summary-grid span:not(.status-badge) { color: #64748b; font-size: 13px; }
 .program-related-section { border-top: 0; }
 .program-related-section .section-heading { padding: 0 0 10px; }
 .program-related-section .eyebrow { font-size: 11px; letter-spacing: .08em; }
@@ -1594,23 +1596,32 @@ body.curriculum-modal-open { overflow: hidden; }
 .year-tab:hover { background: #eef4ff; }
 .year-tab.is-active { background: #eaf2ff; border-color: #c5d9ff; color: #1d5fc7; }
 .version-workspace > #placementRows,
-.version-workspace > #placementPagination { margin-left: 54px; margin-right: 54px; }
+.version-workspace > #placementPagination,
+.version-workspace > .reference-baseline-panel,
+.version-workspace > .curriculum-notice,
+.version-workspace > .reference-action-details { margin-left:54px; margin-right:54px; }
 @media (max-width: 1100px) {
   .version-workspace > .text-back-button { padding-left: 28px; padding-right: 28px; }
   .version-workspace-header { padding-left: 28px; padding-right: 28px; }
   .year-tabs { margin-left: 28px; margin-right: 28px; }
   .version-workspace > #placementRows,
-  .version-workspace > #placementPagination { margin-left: 28px; margin-right: 28px; }
+  .version-workspace > #placementPagination,
+  .version-workspace > .reference-baseline-panel,
+  .version-workspace > .curriculum-notice,
+  .version-workspace > .reference-action-details { margin-left:28px; margin-right:28px; }
 }
 @media (max-width: 700px) {
   .version-workspace > .text-back-button { padding: 14px 16px 8px; }
   .version-workspace-header { padding: 10px 16px 18px; }
   .year-tabs { margin-left: 16px; margin-right: 16px; }
   .version-workspace > #placementRows,
-  .version-workspace > #placementPagination { margin-left: 16px; margin-right: 16px; }
+  .version-workspace > #placementPagination,
+  .version-workspace > .reference-baseline-panel,
+  .version-workspace > .curriculum-notice,
+  .version-workspace > .reference-action-details { margin-left:16px; margin-right:16px; }
 }
 .curriculum-content button[hidden]{display:none!important}
-.reference-baseline-panel { margin: 1.25rem 0; }
+.reference-baseline-panel { margin-top:20px; margin-bottom:20px; }
 .reference-baseline-details { margin: 0 0 1rem; }
 .reference-action-details { border-top: 1px solid var(--border-color, #e5e7eb); padding-top: .85rem; margin-top: .85rem; }
 .reference-action-details > summary { cursor: pointer; color: var(--primary-color, #174a7e); font-weight: 700; }
@@ -1631,8 +1642,13 @@ body.curriculum-modal-open { overflow: hidden; }
 .reference-baseline-details > div { grid-template-columns:1fr; gap:5px; }
 .reference-baseline-panel .reference-action-details { margin:16px 22px; }
 .reference-baseline-panel .mapping-context-message { margin:8px 0 0; line-height:1.6; }
-.version-workspace > .curriculum-notice,.version-workspace > .reference-action-details { margin:16px 28px; line-height:1.6; }
+.version-workspace > .curriculum-notice,.version-workspace > .reference-action-details { margin-top:16px; margin-bottom:16px; line-height:1.6; }
 @media(max-width:700px) {
   .reference-baseline-details { grid-template-columns:1fr; }
-  .version-workspace > .curriculum-notice,.version-workspace > .reference-action-details { margin-left:16px; margin-right:16px; }
+
 }
+
+.reference-baseline-panel > .table-scroll { margin:0 22px 18px; }
+.version-workspace-actions .button-muted { font-size:14px; min-height:44px; }
+.version-workspace-actions,.reference-baseline-panel .card-header-actions { flex-wrap:wrap; }
+@media(max-width:700px) { .reference-baseline-panel > .table-scroll { margin-left:16px; margin-right:16px; } }

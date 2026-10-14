@@ -209,48 +209,44 @@
 .mapping-workspace-panel[hidden] { display:none !important; }
 @media(max-width:900px) { .mapping-semester-grid { grid-template-columns:1fr; } }
 @media(max-width:500px) { .mapping-detail-facts { grid-template-columns:1fr; } .mapping-details-modal .modal-footer { gap:8px; } }
-/* Outcome and planning layouts reuse foundation cards, forms, badges and actions. */
+/* Academic workspaces use foundation components; only their local layout is scoped here. */
 #mappingPanelOutcomes { min-width:0; }
 #mappingPanelOutcomes .mapping-review-header { flex-wrap:wrap; }
 #mappingPanelOutcomes .mapping-review-header > * { min-width:0; overflow-wrap:anywhere; }
-#mappingPanelOutcomes .curriculum-notice { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; color:#475569; padding:12px 14px; font-size:.82rem; line-height:1.6; }
-#outcomeOverview { margin:18px 0; }
-#outcomeSourceDetails { margin-bottom:16px; }
-.outcome-toolbar { display:flex; flex-wrap:wrap; align-items:end; gap:12px; padding:12px 0; }
+#mappingPanelOutcomes .academic-notice { margin:12px 0 16px; max-width:100%; width:auto; }
+.academic-notice p { margin:3px 0 0; }
+#outcomeOverview { margin:16px 0; }
+.outcome-toolbar { display:flex; flex-wrap:wrap; align-items:end; gap:12px; }
 .outcome-toolbar .search-control { flex:1 1 240px; }
-.outcome-toolbar .form-field { flex:0 1 210px; margin:0; }
+.outcome-toolbar .form-field { flex:0 1 190px; margin:0; }
 .outcome-toolbar input { width:100%; }
-#outcomeResultCount { color:#64748b; font-size:.82rem; padding-bottom:10px; }
+#outcomeResultCount { color:#64748b; font-size:.82rem; padding-bottom:8px; }
 .outcome-browse-list { margin:0; padding:0; list-style:none; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; }
-.outcome-browse-list > li { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:start; gap:20px; padding:14px 18px; background:#fff; }
+.outcome-browse-list > li { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:start; gap:16px; padding:12px 18px; background:#fff; }
 .outcome-browse-list > li + li { border-top:1px solid #e2e8f0; }
-.outcome-browse-list > li.is-selected { background:#f5f9ff; }
-.outcome-browse-list p { margin:7px 0 0; line-height:1.6; font-size:.86rem; overflow-wrap:anywhere; }
+.outcome-browse-list p { margin:6px 0 0; line-height:1.5; font-size:.86rem; overflow-wrap:anywhere; }
 .outcome-row-actions { display:grid; gap:8px; justify-items:end; color:#64748b; font-size:.8rem; }
-.outcome-detail-card,.clo-record { padding:20px; margin-top:20px; min-width:0; }
-#outcomeDetail:focus-visible { outline:2px solid #2563c5; outline-offset:4px; }
-#mappingPanelOutcomes .section-heading { display:flex; flex-wrap:wrap; gap:12px; }
-#mappingPanelOutcomes .section-heading > * { min-width:0; overflow-wrap:anywhere; }
-#mappingPanelOutcomes .record-detail-grid { padding:8px 0; }
-#mappingPanelOutcomes .record-detail-grid > div { grid-template-columns:1fr; gap:5px; }
-#mappingPanelOutcomes dd { font-weight:400; white-space:pre-wrap; }
-#mappingPanelOutcomes .form-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
-#mappingPanelOutcomes .form-field:has(textarea) { grid-column:1 / -1; }
-#mappingPanelOutcomes .domain-form { padding:14px 0 0; }
-#mappingPanelOutcomes .modal-actions { padding:12px 0 0; flex-wrap:wrap; justify-content:flex-start; }
-#mappingPanelOutcomes .status-badge { white-space:normal; line-height:1.5; }
-#mappingPanelOutcomes summary { padding:8px 0; font-size:.86rem; }
-#mappingPanelOutcomes summary:focus-visible { outline:2px solid #2563c5; outline-offset:3px; }
-.outcome-link-list { list-style:none; padding:0; }
-.outcome-link-list > li,.academic-related-record { padding:14px 0; border-top:1px solid #e2e8f0; }
-.academic-actions { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0; }
-.academic-statement,.academic-related-record > p,.outcome-detail-card > p { line-height:1.7; white-space:pre-wrap; overflow-wrap:anywhere; }
-.clo-assessment-workspace { margin-top:28px; padding-top:24px; border-top:1px solid #e2e8f0; min-width:0; }
-.clo-assessment-workspace > .form-field { margin:12px 0; }
-.clo-record .nested-section { margin-top:20px; padding-top:16px; }
+.clo-assessment-workspace { margin-top:24px; padding-top:18px; border-top:1px solid #e2e8f0; min-width:0; }
+.clo-selection-toolbar .form-field { flex:1; margin:0; }
+.clo-selection-toolbar { overflow:visible; }
+.clo-assessment-workspace .card-header-actions { margin:10px 0; }
+.record-details-modal .academic-modal-body { padding:16px 20px; }
+.academic-modal-body > .subject-description-section:first-child { border-top:0; margin-top:0; padding-top:0; }
+.academic-modal-body .record-detail-grid { padding:8px 0; }
+.academic-modal-body .record-detail-grid dd { font-weight:400; white-space:pre-wrap; }
+.academic-modal-body code { font-family:Consolas,monospace; overflow-wrap:anywhere; }
+.academic-modal-body p,.academic-modal-body td { overflow-wrap:anywhere; }
+.academic-modal-body .subject-usage-list li { align-items:flex-start; flex-wrap:wrap; }
+.academic-modal-body .subject-usage-context { flex:1 1 220px; }
+.academic-modal-body .reference-action-details { margin:14px 0; }
+.academic-modal-body .domain-form { padding:14px 0 0; }
+.academic-modal-body .form-field:has(textarea) { grid-column:1 / -1; }
+.academic-modal-body .modal-actions,.academic-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.academic-related-record { padding:12px 0; border-bottom:1px solid #e2e8f0; }
+.academic-actions { margin:10px 0; }
+.academic-modal-body .status-badge,.clo-assessment-workspace .status-badge { white-space:normal; }
 @media(max-width:700px) {
-  .outcome-browse-list > li { grid-template-columns:1fr; gap:10px; padding:14px; }
+  .outcome-browse-list > li { grid-template-columns:1fr; gap:8px; padding:12px 14px; }
   .outcome-row-actions { display:flex; align-items:center; justify-content:space-between; }
-  #mappingPanelOutcomes .record-detail-grid,#mappingPanelOutcomes .form-grid { grid-template-columns:1fr; }
-  .outcome-detail-card,.clo-record { padding:14px; }
+  .academic-modal-body .record-detail-grid,.academic-modal-body .form-grid { grid-template-columns:1fr; }
 }

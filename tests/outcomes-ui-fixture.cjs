@@ -28,11 +28,13 @@ class Element {
     getAttribute(name) { return this.attributes[name]; }
     replaceChildren(...items) { this.children = items; this.innerHTML = ''; }
     add(item) { this.children.push(item); }
-    focus() {}
+    focus() { context.document.activeElement=this; }
     reset() {}
     reportValidity() { return true; }
     querySelector(selector) { return el(this.id + '-save'); }
-    querySelectorAll(selector) { return (this.graphElements || []).filter(node => selector === '[data-graph-link]' ? node.dataset.graphLink != null : selector === '[data-open-relationship-mapping]' && node.dataset.openRelationshipMapping != null); }
+    querySelectorAll(selector) {
+        if(this.modalCloseNodes) return selector==='[data-modal-close]' ? this.modalCloseNodes : this.modalCloseNodes.filter(n=>n.id.endsWith('-icon')||n.id.endsWith('-footer'));
+        return (this.graphElements || []).filter(node => selector === '[data-graph-link]' ? node.dataset.graphLink != null : selector === '[data-open-relationship-mapping]' && node.dataset.openRelationshipMapping != null); }
     setPointerCapture() {}
 }
 const elements = new Map();
@@ -116,6 +118,7 @@ const ui = {
 class FormDataMock extends Map {
     constructor(form) {
         super();
+        if(form?.fields)for(const [key,value] of Object.entries(form.fields))this.set(key,value);
         if (form?.id === 'editMappingForm') {
             this.set('id', el('editMappingId').value); this.set('year_level', el('editMappingYear').value);
             this.set('semester', el('editMappingSemester').value); this.set('is_required', el('editMappingRequired').value);
@@ -132,10 +135,23 @@ const historyEntries=[], windowEvents={}, toasts=[];
 ui.showToast=(message,type)=>toasts.push({message,type});
 const originalFetch=ui.fetchJson;
 ui.fetchJson=async (endpoint,params)=>{ if(options.fetch) {const result=await options.fetch(endpoint,params);if(result!==undefined)return result;} return originalFetch(endpoint,params); };
+Object.assign(root.dataset,options.permissions || {});
 const context = { window: { CurriculumUI: ui, location: new URL(options.url || 'http://localhost/?program_id=1&curriculum_id=2&version_id=3'), confirm:()=>options.confirm !== false, addEventListener(name,fn) { windowEvents[name]=fn; }, history: {pushState(_a,_b,url) { historyEntries.push(String(url));context.window.location = new URL(url); }} },
-    document: { getElementById: el, createElement: () => new Element('option') },
+    document: {activeElement:null,body:new Element('body'),getElementById:el,createElement:()=>new Element('option'),querySelector(selector){return selector==='.curriculum-modal:not([hidden])'?[...elements.values()].find(e=>e.id.endsWith('Modal')&&!e.hidden):null;},querySelectorAll:()=>[],addEventListener(){},dispatchEvent(){} },
+    requestAnimationFrame:fn=>fn(),
     Option: class { constructor(text, value) { this.text = text; this.value = value; } },
     URL, URLSearchParams, FormData: FormDataMock, setTimeout, clearTimeout, console };
+if(options.realModals){
+    const modalContext={...context,window:{addEventListener(){}},CustomEvent:class{constructor(type,init){this.type=type;this.detail=init?.detail;}}};
+    context.document.getElementById=()=>null;
+    vm.runInNewContext(fs.readFileSync('modules/curriculum/assets/curriculum-common.js','utf8'),modalContext);
+    context.document.getElementById=el;
+    ui.createModal=(element,settings)=>{
+        element.hidden=true;
+        element.modalCloseNodes=['backdrop','icon','footer'].map(name=>el(element.id+'-'+name));
+        return modalContext.window.CurriculumUI.createModal(element,settings);
+    };
+}
 vm.runInNewContext(fs.readFileSync('modules/curriculum/assets/subject-mapping-data.js', 'utf8'), context);
 vm.runInNewContext(fs.readFileSync('modules/curriculum/assets/subject-mapping-graph.js', 'utf8'), context);
 const data = context.window.SubjectMappingData;

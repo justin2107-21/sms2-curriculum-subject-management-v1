@@ -923,10 +923,10 @@
             }
             document.getElementById('referenceProgram').textContent = record.program_code + ' — ' + record.program_name;
             document.getElementById('referenceCurriculumVersion').textContent = record.curriculum_code + ' — ' + record.curriculum_name + ' / ' + record.version_label;
-            document.getElementById('referenceVersionRole').textContent = record.version_role;
-            document.getElementById('referenceReviewStatus').textContent = record.review_status + ' (workflow state; not proof of adoption)';
+            document.getElementById('referenceVersionRole').innerHTML = ui.statusBadge(record.version_role);
+            document.getElementById('referenceReviewStatus').innerHTML = ui.statusBadge(record.review_status) + '<span class="compliance-subtext">Workflow state; not proof of adoption.</span>';
             document.getElementById('referenceBaseline').textContent = record.baseline_version_id
-                ? record.baseline_version_label + ' (' + record.baseline_version_role + ')' : 'None';
+                ? record.baseline_version_label + ' (' + ui.statusLabel(record.baseline_version_role) + ')' : 'None';
             const summary = record.snapshot_summary;
             document.getElementById('referenceSnapshotStatus').textContent = summary.placements > 0 && summary.complete_snapshots === summary.placements
                 ? summary.complete_snapshots + '/' + summary.placements + ' complete; captured ' + (summary.last_capture || 'date unavailable')
@@ -936,7 +936,7 @@
             document.getElementById('referenceBasis').textContent = primary
                 ? sourceKindLabel(primary.source_kind_snapshot) + (primary.source_kind_snapshot === 'institutional_curriculum' ? ' · declared-origin assessment: ' + originResult : '')
                 : 'Unknown / no curriculum source attached';
-            document.getElementById('referenceVersionContext').textContent = 'Technical status: ' + record.status + ' · Review status is a workflow state only.' +
+            document.getElementById('referenceVersionContext').textContent = 'Technical status: ' + ui.statusLabel(record.status) + ' · Review status is a workflow state only.' +
                 (record.references_inherited_from_version_id ? ' Documentary provenance inherited through baseline #' + record.references_inherited_from_version_id + '; no new verification implied.' : '');
             document.getElementById('referenceProtectionBadge').innerHTML = record.editable
                 ? ui.statusBadge('editable') : ui.statusBadge('protected');
@@ -957,7 +957,7 @@
                 const currentWarning = item.verification_status === 'inactive' ? ' · CURRENT SOURCE INACTIVE/WITHDRAWN' : '';
                 const currentSource = [item.current_reference_code || item.current_title || 'Current source', item.current_issuing_body || 'Issuer unavailable'].join(' · ');
                 return '<tr><td><strong>' + ui.escapeHtml(sourceName) + '</strong><span class="compliance-subtext">Attachment-time snapshot: ' + ui.escapeHtml(title) + ' · ' + ui.escapeHtml(item.issuing_body_snapshot || 'Issuer unavailable at attachment') + '<br>' + locator + '<br>Current source: ' + ui.escapeHtml(currentSource) + ' · ' + currentLocator + '</span></td>' +
-                    '<td>' + ui.escapeHtml(item.reference_purpose) + '</td><td>' + ui.escapeHtml(sourceKindLabel(item.source_kind_snapshot)) + '<span class="compliance-subtext">Current source assessments: ' + ui.escapeHtml(assess) + attachmentWarning + currentWarning + '</span></td>' +
+                    '<td>' + ui.escapeHtml(ui.statusLabel(item.reference_purpose)) + '</td><td>' + ui.escapeHtml(sourceKindLabel(item.source_kind_snapshot)) + '<span class="compliance-subtext">Current source assessments: ' + ui.escapeHtml(assess) + attachmentWarning + currentWarning + '</span></td>' +
                     '<td>' + ui.escapeHtml(item.linked_by_username || 'Unknown user') + '<span class="compliance-subtext">' + ui.escapeHtml(item.linked_at) + '</span></td></tr>';
             }).join('') : '<tr><td colspan="4" class="empty-cell">No documentary references are attached.</td></tr>';
             document.querySelectorAll('#attachVersionReferenceForm [name="curriculum_version_id"],#classifyReferenceForm [name="curriculum_version_id"]').forEach(el => { el.value = record.id; });
@@ -1123,8 +1123,7 @@
                 ui.escapeHtml(ui.formatUnits(semester.cents / 100)) + ' Units</span></header><div class="table-scroll"><table class="domain-table placement-table"><thead><tr><th>Code</th><th>Subject</th><th>Units</th><th>Placement</th>' +
                 '</tr></thead><tbody>' + semester.rows.map(row => '<tr><td><span class="record-code">' +
                     ui.escapeHtml(row.subject_code) + '</span></td><td><span class="record-name">' + ui.escapeHtml(row.subject_title) + '</span></td><td>' +
-                    ui.escapeHtml(ui.formatUnits(row.units)) + '</td><td><span class="placement-indicator ' + (Number(row.is_required) === 1 ? 'placement-required' : 'placement-optional') + '">' +
-                    (Number(row.is_required) === 1 ? 'Required' : 'Optional') + '</span></td>' +
+                    ui.escapeHtml(ui.formatUnits(row.units)) + '</td><td>' + ui.statusBadge(Number(row.is_required) === 1 ? 'required' : 'optional') + '</td>' +
                     '</tr>').join('') + '</tbody></table></div></section>').join('') + '</div>';
     }
 
