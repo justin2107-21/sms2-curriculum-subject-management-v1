@@ -2,8 +2,9 @@
 // CLI maintenance only: operator invocation or explicitly enabled startup gate, never HTTP.
 if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 require_once __DIR__ . '/../shared/database_config.php';
+require_once __DIR__ . '/legacy_baseline.php';
 
-$options = getopt('', ['apply', 'status', 'confirm-database:']);
+$options = getopt('', ['apply', 'status', 'confirm-database:', 'until:']);
 $apply = array_key_exists('apply', $options);
 $db = null;
 $lockName = null;
@@ -19,6 +20,10 @@ try {
     }
     if ($apply && array_key_exists('status', $options)) {
         throw new RuntimeException('Choose either --apply or --status.');
+    }
+    $until = $options['until'] ?? null;
+    if ($until !== null && !$apply) {
+        throw new RuntimeException('--until requires --apply.');
     }
 
     // Extract only the two existing baseline CREATE TABLE definitions. Do not
@@ -61,10 +66,27 @@ try {
     }
     $tables = array_column($db->query('SHOW TABLES')->fetch_all(MYSQLI_NUM), 0);
     $hasLedger = in_array('schema_migrations', $tables, true);
-    if (!$hasLedger && $tables) {
+    $hasAdoption = in_array('schema_baseline_adoptions', $tables, true);
+    $baselineAdopted = false;
+    if (!$hasLedger && $tables && !$hasAdoption) {
         throw new RuntimeException('Untracked existing schema: refusing automatic adoption. Back up and review it manually.');
     }
+    if ($hasAdoption) {
+        $adoptions = $db->query('SELECT adoption_key,schema_fingerprint,covered_through FROM schema_baseline_adoptions ORDER BY adoption_key')->fetch_all(MYSQLI_ASSOC);
+        if (count($adoptions) !== 1 || $adoptions[0]['adoption_key'] !== 'legacy_schema_v1'
+            || $adoptions[0]['covered_through'] !== '020_assign_prototype_rbac_roles.sql'
+            || !hash_equals(strtolower($adoptions[0]['schema_fingerprint']), strtolower(csms_legacy_baseline_fingerprint($db)))) {
+            throw new RuntimeException('Legacy baseline adoption record is invalid; manual review required.');
+        }
+        $baselineAdopted = true;
+    }
     $applied = [];
+    if ($baselineAdopted) {
+        foreach (array_keys($scripts) as $name) {
+            $applied[$name] = true;
+            if ($name === '020_assign_prototype_rbac_roles.sql') { break; }
+        }
+    }
     if ($hasLedger) {
         foreach ($db->query('SELECT migration, checksum, status FROM schema_migrations ORDER BY migration')->fetch_all(MYSQLI_ASSOC) as $row) {
             if (!isset($scripts[$row['migration']])) {
@@ -102,6 +124,13 @@ try {
         }
     }
     $pending = array_diff_key($scripts, $applied);
+    if ($until !== null) {
+        if (!isset($pending[$until])) {
+            throw new RuntimeException('--until must name the next unapplied migration.');
+        }
+        $pendingKeys = array_keys($pending);
+        $pending = array_slice($pending, 0, array_search($until, $pendingKeys, true) + 1, true);
+    }
     if (!$apply) {
         echo json_encode(['applied' => count($applied), 'pending' => array_keys($pending)], JSON_PRETTY_PRINT) . PHP_EOL;
         exit(0);
