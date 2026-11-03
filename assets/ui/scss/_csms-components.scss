@@ -1,0 +1,11 @@
+// Status badges: tinted background + dark text + icon + word (never color alone).
+.csms-badge {
+  display: inline-flex; align-items: center; gap: .3rem;
+  padding: .2rem .5rem; border-radius: 999px;
+  font-size: .75rem; font-weight: 600; line-height: 1.2;   // 12px floor
+  &--success { background: $csms-success-bg; color: $csms-success-text; }
+  &--warning { background: $csms-warning-bg; color: $csms-warning-text; }
+  &--danger  { background: $csms-danger-bg;  color: $csms-danger-text; }
+  &--info    { background: $csms-info-bg;    color: $csms-info-text; }
+  &--neutral { background: $csms-neutral-bg; color: $csms-neutral-text; }
+}

@@ -67,3 +67,10 @@ $breadcrumb-font-size: .875rem;
 $enable-shadows: false;
 $enable-negative-margins: false;
 $enable-dark-mode: false;
+
+// Status badge tokens: dark text on tinted background (>= 4.5:1, see MASTER 10)
+$csms-success-bg:   #e3f4ea;  $csms-success-text: #17653a;   // 6.22
+$csms-warning-bg:   #fdf1d6;  $csms-warning-text: #6b4600;   // 7.49
+$csms-danger-bg:    #fbe5e3;  $csms-danger-text:  #8f1d17;   // 7.39
+$csms-info-bg:      #e0f0f8;  $csms-info-text:    #0b5c8a;   // 6.18
+$csms-neutral-bg:   #e9ecf2;  $csms-neutral-text: #374151;   // 8.71
