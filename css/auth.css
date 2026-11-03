@@ -288,15 +288,15 @@ h2 {
 }
 
 .auth-error {
-  background: #fee2e2;
-  color: #dc2626;
-  border: 1px solid #fca5a5;
+  background: #fbe5e3;
+  color: #8f1d17;   /* 7.39:1 (was #dc2626 on #fee2e2, 3.95:1) */
+  border: 1px solid #f1b2ac;
 }
 
 .auth-success {
-  background: #dcfce7;
-  color: #16a34a;
-  border: 1px solid #86efac;
+  background: #e3f4ea;
+  color: #17653a;   /* 6.22:1 (was #16a34a, 3.30:1) */
+  border: 1px solid #9fd5b5;
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -382,3 +382,52 @@ h2 {
   .btn-done,
   .btn-signin { height: 52px; font-size: 1rem; margin-top: 12px; }
 }
+
+/* ── Sign-in accessibility and password helpers (UI_Audit F1-F4, C7b) ── */
+.csms-signin .left .subtitle { color: #8cc4ff; }   /* 5.6:1 on navy (was #4da6ff, 4.05:1) */
+.csms-signin .required-mark { color: #8f1d17; font-weight: 700; }
+.csms-signin .auth-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.csms-signin .auth-error[hidden] { display: none; }
+.csms-signin .auth-error i { margin-top: 2px; }
+.csms-signin .form-group input[aria-invalid="true"] { border-color: #b3261e; }
+
+.csms-signin .password-field { position: relative; width: 100%; }
+.csms-signin .password-field input { padding-right: 48px; }
+.csms-signin .password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #4b5563;
+  font-size: 1rem;
+  cursor: pointer;
+}
+.csms-signin .password-toggle:hover { background: #eef1f7; color: #1a3a8c; }
+.csms-signin .password-toggle:focus-visible { outline: 2px solid #1a3a8c; outline-offset: 0; }
+
+.csms-signin .caps-lock-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 0;
+  color: #6b4600;   /* 7.49:1 on the warning tint */
+  background: #fdf1d6;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: .8125rem;
+  font-weight: 600;
+}
+.csms-signin .caps-lock-hint[hidden] { display: none; }

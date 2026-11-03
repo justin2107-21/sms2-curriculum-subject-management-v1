@@ -1,7 +1,12 @@
 <?php
 // Authentication helpers for the existing PHP-session browser application.
 
-const CSMS_IDLE_TIMEOUT_SECONDS = 180;
+// Single source of truth for the idle timeout (5 minutes). The topbar passes it to
+// js/session-timeout.js through data-timeout-seconds; the server check below is authoritative.
+const CSMS_IDLE_TIMEOUT_SECONDS = 300;
+// Length of the "you'll be signed out" warning before the timeout; the client warns at
+// CSMS_IDLE_TIMEOUT_SECONDS - CSMS_IDLE_WARNING_SECONDS idle seconds (240). Display only: the server never relies on it.
+const CSMS_IDLE_WARNING_SECONDS = 60;
 
 function expire_authenticated_session_if_idle(): bool
 {

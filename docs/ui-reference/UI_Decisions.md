@@ -31,6 +31,8 @@ Stack: plain PHP + Bootstrap 5.3 (custom Sass build, compiled CSS committed), va
 | Search with keyboard shortcut (later phase) | Three dropdowns in the header |
 | | Prototype and "synthetic data" banners |
 
+**D5 override (approved by the user, 2026-11-03):** the "one sans font, no serif headings" rule is replaced, starting with the **dashboard only**: **DM Sans** for the interface and **Newsreader** (serif) for page and card titles. Both are self-hosted (variable woff2 or ttf) under `assets/ui/dist/fonts/` with their SIL Open Font Licence files; no Google Fonts or other CDN link. Other pages keep the current system font until the user extends the override.
+
 ## D6. Text size floor
 - Body 16px, tables and menus 14px, nothing below 12px. Contrast at least 4.5:1.
 
@@ -43,6 +45,16 @@ Stack: plain PHP + Bootstrap 5.3 (custom Sass build, compiled CSS committed), va
 - Remove the duplicate year filter (keep the pills or the dropdown, not both).
 - Show "52 placements" next to the heading and unit totals.
 - Reserve space for the floating CIMF button so it does not cover content.
+
+## D9. Session idle timeout: 5 minutes, with a 60-second warning (approved 2026-11-03)
+- Replaces the open "3 vs 5 minutes" question. Idle timeout is **300 seconds**.
+- **One source of truth:** `CSMS_IDLE_TIMEOUT_SECONDS` in `shared/auth.php`, with the warning window `CSMS_IDLE_WARNING_SECONDS = 60` next to it. The topbar (and the Bootstrap layout) pass both to `js/session-timeout.js` through `data-timeout-seconds` and `data-warning-seconds`; the script has no numbers of its own. Warning time = timeout − window = **240 s**.
+- **Server stays authoritative:** a request after 300 s idle is signed out and redirected to sign-in even with JavaScript off. The warning is display only.
+- **Warning modal** (native `<dialog>`, `role="alertdialog"`, focus trapped, background inert): "You'll be signed out in N seconds due to inactivity", a per-second countdown, **Stay signed in** (primary, focused) and **Sign out**. Screen readers get the message on open and announcements at 30 s and 10 s, not every tick. Escape means "Stay signed in" (it never signs out or silently hides the warning).
+- **Stay signed in** POSTs `action=activity` to `shared/auth_actions.php`, the existing keep-alive: POST only, CSRF-checked, authenticated, refreshes the server's last-activity time, answers 401 once the session has expired (the client then goes to sign-in). No new endpoint. If the request fails (network, 403) the modal shows an error, the countdown continues and the user can retry or sign out.
+- While the warning is open, ordinary mouse/keyboard activity is ignored; only the buttons, or activity in another tab of the same user, dismiss it.
+- The keep-alive heartbeat now has a trailing call, so the server's clock is never more than a moment behind the browser's. Without it the "60 seconds" could be up to 30 s too long.
+- Tests: `tests/session-timeout-config.php` (DB-free) and the logged-in idle checks (`tools/uitest/run.ps1 -IdleSeconds 300 [-Stay]`).
 
 ## Constraints that still apply
 - Functionality is never sacrificed. No page may load both legacy and Bootstrap CSS. Migrate page by page; pilot page = Pre-requisite Configuration. The legacy UI stays the default until a page is approved.

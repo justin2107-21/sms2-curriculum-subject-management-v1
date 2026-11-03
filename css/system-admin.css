@@ -54,7 +54,7 @@
 .system-admin-table th,
 .system-admin-table td {
   border-bottom: 1px solid #eef2f7;
-  font-size: .73rem;
+  font-size: var(--csms-text-xs, .75rem);
   padding: 11px 13px;
   text-align: left;
   vertical-align: top;
@@ -63,7 +63,7 @@
 .system-admin-table th {
   background: #f8fafc;
   color: #64748b;
-  font-size: .64rem;
+  font-size: var(--csms-text-xs, .75rem);
   letter-spacing: .04em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -73,7 +73,7 @@
 .system-admin-table tbody tr:hover { background: #f8fbff; }
 .system-admin-name { color: #1e293b; font-weight: 700; overflow-wrap: anywhere; }
 .system-admin-code { color: #1a3a8c; font-family: Consolas, monospace; font-weight: 700; }
-.system-admin-muted { color: #94a3b8; }
+.system-admin-muted { color: var(--csms-text-muted, #4b5563); }
 .system-admin-description { color: #475569; line-height: 1.45; max-width: 340px; overflow-wrap: anywhere; }
 
 .system-admin-empty {

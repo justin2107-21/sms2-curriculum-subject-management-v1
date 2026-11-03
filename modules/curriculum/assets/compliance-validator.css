@@ -23,7 +23,7 @@
   padding: 10px 12px;
 }
 
-.compliance-summary span { color: #64748b; display: block; font-size: .62rem; font-weight: 750; }
+.compliance-summary span { color: #64748b; display: block; font-size: var(--csms-text-xs, .75rem); font-weight: 750; }
 .compliance-summary strong { color: #172554; display: block; font-size: 1rem; margin-top: 4px; }
 .compliance-summary .is-pass { background: #f0fdf4; border-color: #bbf7d0; }
 .compliance-summary .is-pass strong { color: #166534; }
@@ -36,9 +36,9 @@
 .compliance-reference-table { min-width: 980px; }
 .compliance-history-table { min-width: 1220px; }
 
-.compliance-name { color: #172554; display: block; font-size: .73rem; font-weight: 800; min-width: 150px; }
-.compliance-subtext { color: #64748b; display: block; font-size: .64rem; line-height: 1.4; margin-top: 3px; max-width: 260px; overflow-wrap: anywhere; }
-.compliance-reference-link { color: var(--sms2-sidebar-blue); font-size: .68rem; font-weight: 750; text-decoration: none; }
+.compliance-name { color: #172554; display: block; font-size: var(--csms-text-xs, .75rem); font-weight: 800; min-width: 150px; }
+.compliance-subtext { color: #64748b; display: block; font-size: var(--csms-text-xs, .75rem); line-height: 1.4; margin-top: 3px; max-width: 260px; overflow-wrap: anywhere; }
+.compliance-reference-link { color: var(--sms2-sidebar-blue); font-size: var(--csms-text-xs, .75rem); font-weight: 750; text-decoration: none; }
 .compliance-reference-link:hover { text-decoration: underline; }
 .compliance-row-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 
@@ -47,7 +47,7 @@
   border: 1px solid transparent;
   border-radius: 999px;
   display: inline-flex;
-  font-size: .62rem;
+  font-size: var(--csms-text-xs, .75rem);
   font-weight: 800;
   gap: 5px;
   padding: 4px 7px;
@@ -73,7 +73,7 @@
   color: #5f6f85;
   display: flex;
   flex: 0 1 205px;
-  font-size: .66rem;
+  font-size: var(--csms-text-xs, .75rem);
   font-weight: 700;
   gap: 7px;
   white-space: nowrap;
@@ -90,7 +90,7 @@
   border-radius: 7px;
   color: #73510d;
   display: flex;
-  font-size: .68rem;
+  font-size: var(--csms-text-xs, .75rem);
   gap: 7px;
   line-height: 1.45;
   margin: 0 0 14px;

@@ -9,10 +9,15 @@ $topbarSessionTimeoutPath = __DIR__ . '/../js/session-timeout.js';
 $topbarSessionTimeoutVersion = is_file($topbarSessionTimeoutPath) ? (string)filemtime($topbarSessionTimeoutPath) : '1';
 $topbarCurriculumContextPath = __DIR__ . '/../js/curriculum-context.js';
 $topbarCurriculumContextVersion = is_file($topbarCurriculumContextPath) ? (string)filemtime($topbarCurriculumContextPath) : '1';
-$topbarIdleTimeoutSeconds = defined('CSMS_IDLE_TIMEOUT_SECONDS') ? CSMS_IDLE_TIMEOUT_SECONDS : 180;
+require_once __DIR__ . '/auth.php';
+$topbarIdleTimeoutSeconds = CSMS_IDLE_TIMEOUT_SECONDS;
 $topbarLastActivity = (int)($_SESSION['_last_activity_at'] ?? time());
 $topbarUserId = (int)($_SESSION['user_id'] ?? 0);
+$topbarTokensPath = __DIR__ . '/../css/csms-tokens.css';
+$topbarTokensVersion = is_file($topbarTokensPath) ? (string)filemtime($topbarTokensPath) : '1';
 ?>
+<link rel="stylesheet" href="<?= htmlspecialchars($topbarAppRoot . 'css/csms-tokens.css?v=' . $topbarTokensVersion, ENT_QUOTES, 'UTF-8') ?>">
+<link rel="stylesheet" href="<?= htmlspecialchars($topbarAppRoot . 'css/session-warning.css?v=' . (is_file(__DIR__ . '/../css/session-warning.css') ? filemtime(__DIR__ . '/../css/session-warning.css') : '1'), ENT_QUOTES, 'UTF-8') ?>">
 <?php if (getenv('CSMS_DISPOSABLE_PREVIEW') === '1'): ?><p class="synthetic-preview-notice" role="status">Disposable synthetic preview — not BCP academic data. Institutional adoption/approval not verified.</p><?php endif; ?>
 <header class="topbar">
   <button class="hamburger" id="hamburgerBtn" type="button" aria-label="Toggle sidebar" aria-controls="sidebar">
@@ -34,6 +39,7 @@ $topbarUserId = (int)($_SESSION['user_id'] ?? 0);
 <script src="<?= htmlspecialchars($topbarAppRoot . 'js/topbar-clock.js?v=' . $topbarClockVersion, ENT_QUOTES, 'UTF-8') ?>"></script>
 <script src="<?= htmlspecialchars($topbarAppRoot . 'js/session-timeout.js?v=' . $topbarSessionTimeoutVersion, ENT_QUOTES, 'UTF-8') ?>"
         data-timeout-seconds="<?= $topbarIdleTimeoutSeconds ?>"
+        data-warning-seconds="<?= CSMS_IDLE_WARNING_SECONDS ?>"
         data-last-activity="<?= $topbarLastActivity ?>"
         data-user-id="<?= $topbarUserId ?>"
         data-logout-url="<?= htmlspecialchars($topbarAppRoot . 'shared/auth_actions.php', ENT_QUOTES, 'UTF-8') ?>"

@@ -1,0 +1,138 @@
+/* CSMS shared design tokens (docs/ui-reference/UI_Audit.md, design-system/csms-sms2/MASTER.md).
+   Loaded once by shared/topbar.php (and directly by auth/signin.php), after every page
+   stylesheet, so the legacy --sms2-* overrides below take effect without editing pages. */
+
+:root {
+  /* Color: brand */
+  --csms-navy: #1a3a8c;
+  --csms-navy-700: #122a68;
+  --csms-navy-50: #e4eafa;
+  --csms-action: #1d4ed8;
+
+  /* Color: neutrals */
+  --csms-text: #1f2937;
+  --csms-text-secondary: #374151;
+  --csms-text-muted: #4b5563;      /* 6.99:1 on page bg */
+  --csms-placeholder: #6b7280;     /* 4.83:1 on white, hints only */
+  --csms-border: #dfe4ee;
+  --csms-border-strong: #cbd5e1;
+  --csms-surface: #ffffff;
+  --csms-surface-muted: #f4f6fb;
+  --csms-table-head: #eef1f7;
+
+  /* Color: sidebar */
+  --csms-sidebar-bg: var(--csms-navy);
+  --csms-sidebar-text: #ffffff;
+  --csms-sidebar-heading: #c9d4f2;  /* 6.99:1 on navy (D7) */
+  --csms-sidebar-hover: rgba(255, 255, 255, .10);
+  --csms-sidebar-active: rgba(255, 255, 255, .18);
+
+  /* Color: status (text on tint) */
+  --csms-success: #17653a;  --csms-success-bg: #e3f4ea;
+  --csms-warning: #6b4600;  --csms-warning-bg: #fdf1d6;
+  --csms-danger: #8f1d17;   --csms-danger-bg: #fbe5e3;  --csms-danger-solid: #b3261e;
+  --csms-info: #0b5c8a;     --csms-info-bg: #e0f0f8;
+  --csms-neutral: #374151;  --csms-neutral-bg: #e9ecf2;
+
+  /* Focus */
+  --csms-focus-color: #1a3a8c;
+  --csms-focus-ring: 0 0 0 3px rgba(26, 58, 140, .45);
+
+  /* Type */
+  --csms-font: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --csms-font-mono: Consolas, "Cascadia Mono", monospace;
+  --csms-text-xs: .75rem;     /* 12px floor */
+  --csms-text-sm: .875rem;    /* 14px tables, menus, labels */
+  --csms-text-md: 1rem;       /* 16px body (D6) */
+  --csms-text-lg: 1.125rem;   /* 18px card titles */
+  --csms-text-xl: 1.25rem;    /* 20px section titles */
+  --csms-text-2xl: 1.5rem;    /* 24px page title */
+  --csms-weight-regular: 400;
+  --csms-weight-medium: 500;
+  --csms-weight-semibold: 600;
+  --csms-weight-bold: 700;
+  --csms-leading: 1.5;
+  --csms-leading-tight: 1.25;
+
+  /* Spacing (4px scale) */
+  --csms-space-1: 4px;  --csms-space-2: 8px;  --csms-space-3: 12px; --csms-space-4: 16px;
+  --csms-space-5: 20px; --csms-space-6: 24px; --csms-space-8: 32px; --csms-space-12: 48px;
+
+  /* Shape and elevation */
+  --csms-radius-sm: 6px;
+  --csms-radius-md: 8px;
+  --csms-radius-lg: 12px;
+  --csms-radius-pill: 999px;
+  --csms-shadow-sm: 0 1px 3px rgba(15, 23, 42, .06);
+  --csms-shadow-md: 0 4px 14px rgba(15, 23, 42, .10);
+  --csms-shadow-overlay: 0 12px 32px rgba(15, 23, 42, .18);
+
+  /* Controls and icons */
+  --csms-control-h: 36px;
+  --csms-control-h-sm: 32px;
+  --csms-disabled-opacity: .5;
+  --csms-icon-sm: 14px;
+  --csms-icon-md: 16px;
+  --csms-icon-lg: 20px;
+
+  /* Layers */
+  --csms-z-base: 1; --csms-z-sticky: 100; --csms-z-dropdown: 200; --csms-z-topbar: 300;
+  --csms-z-overlay: 900; --csms-z-modal: 1000; --csms-z-toast: 1100;
+
+  /* Motion */
+  --csms-duration-fast: 120ms;
+  --csms-duration: 200ms;
+  --csms-ease: cubic-bezier(.2, 0, 0, 1);
+
+  /* Legacy variables mapped onto the tokens (read by csms-typography.css and module CSS). */
+  --sms2-font-family: var(--csms-font);
+  --sms2-text-xs: var(--csms-text-xs);               /* was 13px */
+  --sms2-text-sm: var(--csms-text-sm);
+  --sms2-text-base: var(--csms-text-md);             /* was 15px; D6 */
+  --sms2-text-md: var(--csms-text-md);
+  --sms2-text-lg: var(--csms-text-lg);
+  --sms2-text-xl: var(--csms-text-xl);               /* was 22px */
+  --sms2-text-page-title: clamp(1.375rem, 1.6vw, 1.625rem); /* was 26-32px; compact */
+  --sms2-topbar-height: 56px;                        /* was 64px */
+  --sms2-sidebar-nav-size: 14px;                     /* was 14.5px */
+  --sms2-sidebar-nav-padding-y: 10px;                /* was 14px */
+  --sms2-sidebar-section-color: var(--csms-sidebar-heading); /* was #818cf8, 3.47:1 (C1) */
+  --sms2-sidebar-section-size: 12px;                 /* was 13px */
+  --sms2-control-height: var(--csms-control-h);      /* was 38px */
+  --sms2-control-radius: var(--csms-radius-sm);      /* was 7px */
+}
+
+/* Compact page chrome: less vertical space before content (fit more on screen). */
+.page-title-bar {
+  padding: 16px 24px;
+  margin-bottom: 16px;
+}
+.page-subtitle,
+.dashboard-subtitle,
+.system-admin-subtitle {
+  font-size: var(--csms-text-sm);
+  margin-top: 2px;
+}
+.domain-card-header { padding: 12px 16px 10px; }
+
+/* One visible keyboard focus indicator everywhere (F6). Several legacy rules set
+   outline:none on inputs, so this needs !important to win on keyboard focus only. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--csms-focus-color) !important;
+  outline-offset: 2px;
+}
+.sidebar :where(a, button):focus-visible {
+  outline-color: #ffffff !important;
+}
+
+/* Disabled controls look and behave disabled (ST5). */
+:where(button, input, select, textarea):disabled { cursor: not-allowed; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

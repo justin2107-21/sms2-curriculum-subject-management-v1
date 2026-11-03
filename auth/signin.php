@@ -15,6 +15,7 @@ if (is_authenticated()) {
   <title>CSMS | Sign In</title>
   <link rel="stylesheet" href="../css/auth.css?v=<?= (int)filemtime(__DIR__ . '/../css/auth.css') ?>" />
   <link rel="stylesheet" href="../css/page-loader.css"/>
+  <link rel="stylesheet" href="../css/csms-tokens.css?v=<?= (int)filemtime(__DIR__ . '/../css/csms-tokens.css') ?>" />
   <meta name="loader-logo" content="../images/BCP_LOGO.png"/>
   <meta name="csrf-token" content="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>"/>
   <script src="../js/page-loader.js"></script>
@@ -44,28 +45,42 @@ if (is_authenticated()) {
 
       <h2>Sign In to CSMS</h2>
 
-      <div class="auth-error" id="authError" style="display:none;"></div>
+      <div class="auth-error" id="authError" role="alert" hidden>
+        <i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+        <span id="authErrorText"></span>
+      </div>
 
-      <form id="signinForm" style="width:100%">
+      <form id="signinForm" style="width:100%" novalidate>
         <div class="form-group">
           <label for="username">
-            <i class="fa-solid fa-user"></i>
-            Username
+            <i class="fa-solid fa-user" aria-hidden="true"></i>
+            Username <span class="required-mark" aria-hidden="true">*</span>
           </label>
-          <input type="text" id="username" autocomplete="username" />
+          <input type="text" id="username" name="username" autocomplete="username"
+                 autocapitalize="none" spellcheck="false" required aria-required="true" />
         </div>
 
         <div class="form-group">
           <label for="password">
-            <i class="fa-solid fa-lock"></i>
-            Password
+            <i class="fa-solid fa-lock" aria-hidden="true"></i>
+            Password <span class="required-mark" aria-hidden="true">*</span>
           </label>
-          <input type="password" id="password" autocomplete="current-password" />
+          <div class="password-field">
+            <input type="password" id="password" name="password" autocomplete="current-password"
+                   required aria-required="true" aria-describedby="capsLockHint" />
+            <button type="button" class="password-toggle" id="passwordToggle"
+                    aria-label="Show password" aria-pressed="false" aria-controls="password">
+              <i class="fa-solid fa-eye" aria-hidden="true"></i>
+            </button>
+          </div>
+          <p class="caps-lock-hint" id="capsLockHint" aria-live="polite" hidden>
+            <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> Caps Lock is on.
+          </p>
         </div>
 
         <button type="submit" class="btn-signin" id="btnSignin">
           Sign In
-          <i class="fa-solid fa-arrow-right"></i>
+          <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
         </button>
       </form>
 
@@ -75,18 +90,57 @@ if (is_authenticated()) {
 </div>
 
 <script>
+// Password visibility toggle and Caps Lock hint (presentation only).
+(function () {
+    const input  = document.getElementById('password');
+    const toggle = document.getElementById('passwordToggle');
+    const hint   = document.getElementById('capsLockHint');
+    toggle.addEventListener('click', function () {
+        const show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        toggle.setAttribute('aria-pressed', show ? 'true' : 'false');
+        toggle.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+        toggle.querySelector('i').className = show ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
+        input.focus();
+    });
+    function capsLock(event) {
+        if (typeof event.getModifierState === 'function') hint.hidden = !event.getModifierState('CapsLock');
+    }
+    input.addEventListener('keydown', capsLock);
+    input.addEventListener('keyup', capsLock);
+    input.addEventListener('blur', function () { hint.hidden = true; });
+    ['username', 'password'].forEach(function (id) {
+        document.getElementById(id).addEventListener('input', function () { this.removeAttribute('aria-invalid'); });
+    });
+})();
+
 document.getElementById('signinForm').addEventListener('submit', async function (e) {
     e.preventDefault();
-    const username = document.getElementById('username').value.trim();
-    const password = document.getElementById('password').value;
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+    const username = usernameInput.value.trim();
+    const password = passwordInput.value;
     const errorBox = document.getElementById('authError');
     const btn      = document.getElementById('btnSignin');
     const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
 
-    errorBox.style.display = 'none';
-    if (!username || !password) return showError('Please enter your username and password.');
+    errorBox.hidden = true;
+    [usernameInput, passwordInput].forEach(function (field) {
+        field.removeAttribute('aria-invalid');
+        if (field === passwordInput) field.setAttribute('aria-describedby', 'capsLockHint');
+        else field.removeAttribute('aria-describedby');
+    });
+    if (!username || !password) {
+        if (!username) markInvalid(usernameInput);
+        if (!password) markInvalid(passwordInput);
+        showError('Please enter your username and password.');
+        (!username ? usernameInput : passwordInput).focus();
+        return;
+    }
 
+    passwordInput.type = 'password';
     btn.disabled    = true;
+    btn.setAttribute('aria-busy', 'true');
     btn.textContent = 'Signing in…';
 
     const fd = new FormData();
@@ -101,18 +155,25 @@ document.getElementById('signinForm').addEventListener('submit', async function 
             window.location.href = data.redirect || '../dashboard/loading.php';
         } else {
             showError(data.message);
-            btn.disabled  = false;
-            btn.innerHTML = 'Sign In <i class="fa-solid fa-arrow-right"></i>';
+            resetButton();
         }
     } catch {
         showError('Request failed. Please try again.');
-        btn.disabled  = false;
-        btn.innerHTML = 'Sign In <i class="fa-solid fa-arrow-right"></i>';
+        resetButton();
     }
 
+    function resetButton() {
+        btn.disabled  = false;
+        btn.removeAttribute('aria-busy');
+        btn.innerHTML = 'Sign In <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>';
+    }
+    function markInvalid(field) {
+        field.setAttribute('aria-invalid', 'true');
+        field.setAttribute('aria-describedby', field === passwordInput ? 'authError capsLockHint' : 'authError');
+    }
     function showError(msg) {
-        errorBox.textContent   = msg;
-        errorBox.style.display = 'block';
+        document.getElementById('authErrorText').textContent = msg;
+        errorBox.hidden = false;
     }
 });
 </script>

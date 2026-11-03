@@ -101,31 +101,31 @@ require __DIR__ . '/../shared/sidebar.php';
       <form id="passwordForm">
         <div class="form-grid">
           <div class="form-field full">
-            <label>Current Password</label>
+            <label for="fCurrentPw">Current Password</label>
             <div class="password-wrap">
               <input type="password" name="current_password" id="fCurrentPw" placeholder="Enter current password" autocomplete="current-password"/>
-              <button type="button" class="toggle-pw" data-target="fCurrentPw">
-                <i class="fa-solid fa-eye"></i>
+              <button type="button" class="toggle-pw" data-target="fCurrentPw" aria-controls="fCurrentPw" aria-label="Show password" aria-pressed="false">
+                <i class="fa-solid fa-eye" aria-hidden="true"></i>
               </button>
             </div>
             <span class="field-error"></span>
           </div>
           <div class="form-field">
-            <label>New Password</label>
+            <label for="fNewPw">New Password</label>
             <div class="password-wrap">
               <input type="password" name="new_password" id="fNewPw" placeholder="New password (min <?= current_user()['must_change_password'] ? 12 : 6 ?>)" minlength="<?= current_user()['must_change_password'] ? 12 : 6 ?>" maxlength="72" autocomplete="new-password"/>
-              <button type="button" class="toggle-pw" data-target="fNewPw">
-                <i class="fa-solid fa-eye"></i>
+              <button type="button" class="toggle-pw" data-target="fNewPw" aria-controls="fNewPw" aria-label="Show password" aria-pressed="false">
+                <i class="fa-solid fa-eye" aria-hidden="true"></i>
               </button>
             </div>
             <span class="field-error"></span>
           </div>
           <div class="form-field">
-            <label>Confirm New Password</label>
+            <label for="fConfirmPw">Confirm New Password</label>
             <div class="password-wrap">
               <input type="password" name="confirm_password" id="fConfirmPw" placeholder="Repeat new password" autocomplete="new-password"/>
-              <button type="button" class="toggle-pw" data-target="fConfirmPw">
-                <i class="fa-solid fa-eye"></i>
+              <button type="button" class="toggle-pw" data-target="fConfirmPw" aria-controls="fConfirmPw" aria-label="Show password" aria-pressed="false">
+                <i class="fa-solid fa-eye" aria-hidden="true"></i>
               </button>
             </div>
             <span class="field-error"></span>
@@ -245,7 +245,12 @@ document.querySelectorAll('.form-field input').forEach(i => {
 document.querySelectorAll('.toggle-pw').forEach(btn => {
     btn.addEventListener('click', () => {
         const inp = document.getElementById(btn.dataset.target);
-        inp.type  = inp.type === 'password' ? 'text' : 'password';
+        const show = inp.type === 'password';
+        inp.type  = show ? 'text' : 'password';
+        btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+        btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+        const icon = btn.querySelector('i');
+        if (icon) icon.className = show ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
     });
 });
 

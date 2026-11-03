@@ -131,7 +131,7 @@ body {
 
 .avatar-role {
   font-size: 0.78rem;
-  color: #888;
+  color: var(--csms-text-muted, #4b5563);
 }
 
 .btn-avatar-change {
@@ -165,7 +165,7 @@ body {
 .form-field.full { grid-column: 1 / -1; }
 
 .form-field label {
-  font-size: 0.72rem;
+  font-size: var(--csms-text-xs, .75rem);
   color: #555;
   font-weight: 500;
 }
@@ -192,7 +192,7 @@ body {
 .form-field input.input-error { border-color: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,0.12); }
 
 .field-error {
-  font-size: 0.7rem;
+  font-size: var(--csms-text-xs, .75rem);
   color: #ef4444;
   margin-top: 2px;
   display: none;
@@ -267,7 +267,7 @@ body {
 
 .danger-info p {
   font-size: 0.78rem;
-  color: #888;
+  color: var(--csms-text-muted, #4b5563);
 }
 
 .btn-danger {

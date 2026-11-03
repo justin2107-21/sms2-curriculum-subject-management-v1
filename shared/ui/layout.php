@@ -45,11 +45,14 @@ if (!function_exists('ui_session_scripts')) {
             $p = __DIR__ . '/../../js/' . $f;
             return is_file($p) ? (string)filemtime($p) : '1';
         };
-        $timeout = defined('CSMS_IDLE_TIMEOUT_SECONDS') ? CSMS_IDLE_TIMEOUT_SECONDS : 180;
+        require_once __DIR__ . '/../auth.php';
+        $timeout = CSMS_IDLE_TIMEOUT_SECONDS;
         ?>
+<link rel="stylesheet" href="<?= ui_e($appRoot . 'css/session-warning.css?v=' . (is_file(__DIR__ . '/../../css/session-warning.css') ? filemtime(__DIR__ . '/../../css/session-warning.css') : '1')) ?>">
 <script src="<?= ui_e($appRoot . 'js/topbar-clock.js?v=' . $v('topbar-clock.js')) ?>"></script>
 <script src="<?= ui_e($appRoot . 'js/session-timeout.js?v=' . $v('session-timeout.js')) ?>"
         data-timeout-seconds="<?= (int)$timeout ?>"
+        data-warning-seconds="<?= (int)CSMS_IDLE_WARNING_SECONDS ?>"
         data-last-activity="<?= (int)($_SESSION['_last_activity_at'] ?? time()) ?>"
         data-user-id="<?= (int)($_SESSION['user_id'] ?? 0) ?>"
         data-logout-url="<?= ui_e($appRoot . 'shared/auth_actions.php') ?>"
