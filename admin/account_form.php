@@ -10,10 +10,10 @@ $prototypeDefinitions=ProvisionalRoles::definitions();
 <div class="modal-header"><div><h2 id="adminAccountTitle">Create User</h2><p class="modal-context">Provisional user roles used for prototype development and evaluation, subject to client validation.</p></div><button class="modal-close-button" type="button" data-modal-close aria-label="Close">&times;</button></div>
 <form id="adminAccountForm" class="domain-form"><input type="hidden" name="action" value="save"><input type="hidden" name="id">
 <div class="form-grid">
-<div class="form-field"><label for="adminUsername">Username</label><input id="adminUsername" name="username" required maxlength="60" pattern="[A-Za-z0-9_.-]{3,60}"></div>
-<div class="form-field"><label for="adminEmail">Email</label><input id="adminEmail" name="email" type="email" required maxlength="150"></div>
-<div class="form-field"><label for="adminFirstName">First Name</label><input id="adminFirstName" name="first_name" required maxlength="100"></div>
-<div class="form-field"><label for="adminLastName">Last Name</label><input id="adminLastName" name="last_name" required maxlength="100"></div>
+<div class="form-field"><label for="adminUsername">Username</label><input id="adminUsername" name="username" autocomplete="off" required maxlength="60" pattern="[A-Za-z0-9_.-]{3,60}"></div>
+<div class="form-field"><label for="adminEmail">Email</label><input id="adminEmail" name="email" type="email" autocomplete="off" required maxlength="150"></div>
+<div class="form-field"><label for="adminFirstName">First Name</label><input id="adminFirstName" name="first_name" autocomplete="off" required maxlength="100"></div>
+<div class="form-field"><label for="adminLastName">Last Name</label><input id="adminLastName" name="last_name" autocomplete="off" required maxlength="100"></div>
 <div class="form-field"><label for="adminRole">Role</label><select id="adminRole" name="role_id" required><option value="">Select role</option>
 <?php foreach($adminRoles as $role): if(!isset($prototypeDefinitions[$role['name']]))continue; ?><option value="<?= (int)$role['id'] ?>"><?= htmlspecialchars($role['display_name'],ENT_QUOTES,'UTF-8') ?></option><?php endforeach; ?>
 </select></div><div class="form-field"><label for="adminActive">Account Status</label><select id="adminActive" name="is_active"><option value="1">Active</option><option value="0">Inactive</option></select></div>

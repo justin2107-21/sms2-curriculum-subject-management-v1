@@ -2,7 +2,7 @@
   --sms2-sidebar-blue: #1a3a8c;
   --sms2-sidebar-blue-hover: #142f73;
   --sms2-control-border: #aeb9c8;
-  --sms2-control-height: 38px;
+  --sms2-control-height: var(--csms-control-h, 36px);
   --sms2-control-radius: 7px;
 }
 
@@ -643,7 +643,7 @@ body.curriculum-modal-open { overflow: hidden; }
   width: 100%;
 }
 .form-field input,
-.form-field select { min-height: 38px; }
+.form-field select { min-height: var(--csms-control-h, 36px); }
 .form-field textarea {
   line-height: 1.45;
   min-height: 76px;
@@ -796,7 +796,7 @@ body.curriculum-modal-open { overflow: hidden; }
 .modal-actions .button-primary,
 .modal-actions .button-muted,
 .modal-actions .button-danger {
-  min-height: 38px;
+  min-height: var(--csms-control-h, 36px);
   padding: 8px 16px;
 }
 .modal-actions-padded {
@@ -1080,7 +1080,7 @@ body.curriculum-modal-open { overflow: hidden; }
 .subject-list-controls { align-items: center; background: #fff; border: 1px solid #e1e8f1; border-radius: 11px; box-shadow: 0 3px 10px rgba(15, 23, 42, .035); display: grid; gap: 12px; grid-template-columns: minmax(250px, 1.5fr) repeat(3, minmax(145px, .55fr)); margin-bottom: 22px; padding: 14px; }
 .subject-list-controls .search-control { min-width: 0; }
 .subject-list-controls .search-control input,
-.subject-list-controls select { border-color: #cbd5e1; border-radius: 8px; height: 44px; }
+.subject-list-controls select { border-color: #cbd5e1; border-radius: 8px; height: var(--csms-control-h, 36px); }
 .subject-group-list { display: grid; gap: 22px; min-width: 0; }
 .subject-year-group { min-width: 0; }
 .subject-year-heading { color: #52647f; font-size: var(--csms-text-xs, .75rem); letter-spacing: .045em; margin: 0 0 10px; text-transform: uppercase; }
@@ -1389,11 +1389,11 @@ body.curriculum-modal-open { overflow: hidden; }
 .curriculum-content .record-count { font-size: 13px; }
 .curriculum-content .list-toolbar { gap: 10px; padding: 10px 14px; }
 .curriculum-content .list-toolbar input,
-.curriculum-content .list-toolbar select { font-size: 13px; min-height: 38px; }
-.curriculum-content .list-toolbar .select-control select { height: 38px; }
+.curriculum-content .list-toolbar select { font-size: var(--csms-text-sm, .875rem); min-height: var(--csms-control-h, 36px); }
+.curriculum-content .list-toolbar .select-control select { height: var(--csms-control-h, 36px); }
 .curriculum-content .manuscript-primary,
 .curriculum-content .version-workspace-actions .primary-action-button,
-.curriculum-content .version-workspace-actions .secondary-action-button { font-size: 14px; min-height: 44px; }
+.curriculum-content .version-workspace-actions .secondary-action-button { font-size: var(--csms-text-sm, .875rem); min-height: var(--csms-control-h, 36px); }
 .curriculum-content .domain-table th {
   font-size: 12px;
   line-height: 1.4;
@@ -1419,11 +1419,11 @@ body.curriculum-modal-open { overflow: hidden; }
   outline-offset: -2px;
 }
 .curriculum-content .pagination-bar { font-size: 13px; padding: 12px 18px; }
-.curriculum-content .pagination-bar button { font-size: 14px; min-height: 38px; }
-.curriculum-content .row-action-button { font-size: 13px; min-height: 34px; padding: 5px 9px; }
+.curriculum-content .pagination-bar button { font-size: var(--csms-text-sm, .875rem); min-height: var(--csms-control-h, 36px); }
+.curriculum-content .row-action-button { font-size: 13px; min-height: var(--csms-control-h-sm, 32px); padding: 4px 10px; }
 .curriculum-content .domain-table .row-action-button,
 .curriculum-content .domain-table .remove-action-button,
-.curriculum-content .domain-table .view-button { font-size: 12px; gap: 5px; min-height: 30px; padding: 4px 8px; }
+.curriculum-content .domain-table .view-button { font-size: 13px; gap: 6px; min-height: var(--csms-control-h-sm, 32px); padding: 4px 10px; }
 .curriculum-content .version-workspace {
   margin: 0 44px 30px;
   padding: 0;
@@ -1441,7 +1441,7 @@ body.curriculum-modal-open { overflow: hidden; }
 .record-details-modal .modal-footer { gap: 8px; padding: 12px 20px; }
 .record-details-modal .modal-footer .button-muted,
 .record-details-modal .modal-footer .button-primary,
-.record-details-modal .modal-footer .button-danger { font-size: 13px; min-height: 34px; padding: 6px 11px; }
+.record-details-modal .modal-footer .button-danger { font-size: var(--csms-text-sm, .875rem); min-height: var(--csms-control-h, 36px); padding: 6px 14px; }
 .record-detail-grid {
   display: grid;
   gap: 0 28px;
@@ -1649,6 +1649,6 @@ body.curriculum-modal-open { overflow: hidden; }
 }
 
 .reference-baseline-panel > .table-scroll { margin:0 22px 18px; }
-.version-workspace-actions .button-muted { font-size:14px; min-height:44px; }
+.version-workspace-actions .button-muted { font-size:14px; min-height:var(--csms-control-h, 36px); }
 .version-workspace-actions,.reference-baseline-panel .card-header-actions { flex-wrap:wrap; }
 @media(max-width:700px) { .reference-baseline-panel > .table-scroll { margin-left:16px; margin-right:16px; } }

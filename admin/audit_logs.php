@@ -44,22 +44,6 @@ function audit_page_url(int $pageNumber): string
   <link rel="stylesheet" href="../css/dashboard.css"/>
   <link rel="stylesheet" href="../css/system-admin.css?v=<?= $systemStyleVersion ?>"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
-  <style>
-    .audit-card{background:#fff;border-radius:12px;box-shadow:0 2px 10px rgba(15,23,42,.06);overflow:hidden}
-    .audit-summary{padding:14px 18px;border-bottom:1px solid #eef2f7;color:#64748b;font-size:.82rem}
-    .audit-table-wrap{overflow-x:auto}
-    .audit-table{width:100%;border-collapse:collapse;min-width:1050px}
-    .audit-table th,.audit-table td{padding:12px 14px;text-align:left;border-bottom:1px solid #eef2f7;font-size:.78rem;vertical-align:top}
-    .audit-table th{background:#f8fafc;color:#475569;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em}
-    .audit-table td{color:#334155}
-    .audit-action{font-family:Consolas,monospace;font-size:.72rem;font-weight:700;color:#1d4ed8;background:#eff6ff;border-radius:6px;padding:4px 7px;white-space:nowrap}
-    .audit-muted{color:#94a3b8}
-    .audit-description{max-width:300px;line-height:1.45}
-    .audit-pagination{display:flex;align-items:center;justify-content:center;gap:8px;padding:16px}
-    .audit-pagination a,.audit-pagination span{padding:7px 11px;border:1px solid #dbe3ee;border-radius:7px;text-decoration:none;color:#475569;font-size:.78rem}
-    .audit-pagination .current{background:#1a3a8c;color:#fff;border-color:#1a3a8c}
-    .audit-pagination .disabled{color:#cbd5e1}
-  </style>
   <link rel="stylesheet" href="../css/csms-typography.css?v=<?= $typographyVersion ?>"/>
 </head>
 <body>
@@ -90,7 +74,7 @@ require_once __DIR__ . '/../shared/sidebar.php';
               <th>User</th>
               <th>Action</th>
               <th>Entity</th>
-              <th>Entity ID</th>
+              <th class="num">Entity ID</th>
               <th>Description</th>
               <th>IP Address</th>
             </tr>
@@ -109,7 +93,7 @@ require_once __DIR__ . '/../shared/sidebar.php';
                 <td><?= htmlspecialchars($userLabel, ENT_QUOTES, 'UTF-8') ?></td>
                 <td><span class="audit-action"><?= htmlspecialchars((string)$row['action'], ENT_QUOTES, 'UTF-8') ?></span></td>
                 <td><?= htmlspecialchars((string)$row['entity_type'], ENT_QUOTES, 'UTF-8') ?></td>
-                <td><?= $row['entity_id'] === null ? '<span class="audit-muted">—</span>' : (int)$row['entity_id'] ?></td>
+                <td class="num"><?= $row['entity_id'] === null ? '<span class="audit-muted">—</span>' : (int)$row['entity_id'] ?></td>
                 <td class="audit-description"><?= htmlspecialchars((string)$row['description'], ENT_QUOTES, 'UTF-8') ?></td>
                 <td><?= $row['ip_address'] === null ? '<span class="audit-muted">—</span>' : htmlspecialchars((string)$row['ip_address'], ENT_QUOTES, 'UTF-8') ?></td>
               </tr>

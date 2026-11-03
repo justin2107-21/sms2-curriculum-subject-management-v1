@@ -11,6 +11,7 @@ param(
     [int]$CdpPort = 9340,
     [switch]$NoJs,
     [switch]$Picker,
+    [string]$Probe = "",
     [int]$Height = 0,
     [switch]$WarnPreview,
     [string]$Out = ''
@@ -65,6 +66,7 @@ try {
         $nodeArgs += "--cdp-port=$CdpPort"
         if ($IdleSeconds -gt 0) { $nodeArgs += "--idle=$IdleSeconds" }
         if ($Height -gt 0) { $nodeArgs += "--height=$Height" }
+        if ($Probe) { $nodeArgs += "--probe=$Probe" }
         if ($Picker) { $nodeArgs += '--picker=1' }
         if ($WarnPreview) { $nodeArgs += "--warnpreview=1" }
         if ($NoJs) { $nodeArgs += '--nojs=1' }

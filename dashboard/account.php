@@ -65,22 +65,22 @@ require __DIR__ . '/../shared/sidebar.php';
         <div class="form-grid">
           <div class="form-field">
             <label>First Name</label>
-            <input type="text" name="first_name" value="<?= $first_name ?>" placeholder="First name"/>
+            <input type="text" name="first_name" value="<?= $first_name ?>" placeholder="First name" autocomplete="given-name"/>
             <span class="field-error"></span>
           </div>
           <div class="form-field">
             <label>Last Name</label>
-            <input type="text" name="last_name" value="<?= $last_name ?>" placeholder="Last name"/>
+            <input type="text" name="last_name" value="<?= $last_name ?>" placeholder="Last name" autocomplete="family-name"/>
             <span class="field-error"></span>
           </div>
           <div class="form-field full">
             <label>Email Address</label>
-            <input type="email" name="email" value="<?= $email ?>" placeholder="email@example.com"/>
+            <input type="email" name="email" value="<?= $email ?>" placeholder="email@example.com" autocomplete="email"/>
             <span class="field-error"></span>
           </div>
           <div class="form-field full">
             <label>Username</label>
-            <input type="text" name="username" value="<?= $username ?>" placeholder="Username"/>
+            <input type="text" name="username" value="<?= $username ?>" placeholder="Username" autocomplete="username"/>
             <span class="field-error"></span>
           </div>
         </div>

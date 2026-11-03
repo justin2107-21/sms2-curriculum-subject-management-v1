@@ -18,6 +18,7 @@ $topbarTokensVersion = is_file($topbarTokensPath) ? (string)filemtime($topbarTok
 ?>
 <link rel="stylesheet" href="<?= htmlspecialchars($topbarAppRoot . 'css/csms-tokens.css?v=' . $topbarTokensVersion, ENT_QUOTES, 'UTF-8') ?>">
 <link rel="stylesheet" href="<?= htmlspecialchars($topbarAppRoot . 'css/session-warning.css?v=' . (is_file(__DIR__ . '/../css/session-warning.css') ? filemtime(__DIR__ . '/../css/session-warning.css') : '1'), ENT_QUOTES, 'UTF-8') ?>">
+<link rel="stylesheet" href="<?= htmlspecialchars($topbarAppRoot . 'css/csms-components.css?v=' . (is_file(__DIR__ . '/../css/csms-components.css') ? filemtime(__DIR__ . '/../css/csms-components.css') : '1'), ENT_QUOTES, 'UTF-8') ?>">
 <?php if (getenv('CSMS_DISPOSABLE_PREVIEW') === '1'): ?><p class="synthetic-preview-notice" role="status">Disposable synthetic preview — not BCP academic data. Institutional adoption/approval not verified.</p><?php endif; ?>
 <header class="topbar">
   <button class="hamburger" id="hamburgerBtn" type="button" aria-label="Toggle sidebar" aria-controls="sidebar">

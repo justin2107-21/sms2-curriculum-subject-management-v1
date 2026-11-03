@@ -456,7 +456,7 @@ a.sidebar-item > i {
 .view-button,
 .remove-action-button {
   font-size: 13px;
-  min-height: 34px;
+  min-height: var(--csms-control-h-sm, 32px);
   padding: 6px 10px;
 }
 .row-action-button i,

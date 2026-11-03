@@ -87,3 +87,19 @@
   .system-admin-content > *:not(.page-title-bar) { padding-left: 0; padding-right: 0; }
   .system-admin-card { margin-left: 12px; margin-right: 12px; }
 }
+
+/* Audit Logs page (moved from an inline <style> in admin/audit_logs.php). */
+.audit-card{background:#fff;border-radius:12px;box-shadow:0 2px 10px rgba(15,23,42,.06);overflow:hidden}
+.audit-summary{padding:14px 18px;border-bottom:1px solid #eef2f7;color:#64748b;font-size:.82rem}
+.audit-table-wrap{overflow-x:auto}
+.audit-table{width:100%;border-collapse:collapse;min-width:1050px}
+.audit-table th,.audit-table td{padding:12px 14px;text-align:left;border-bottom:1px solid #eef2f7;font-size:.78rem;vertical-align:top}
+.audit-table th{background:#f8fafc;color:#475569;font-size:.75rem;text-transform:uppercase;letter-spacing:.04em}
+.audit-table td{color:#334155}
+.audit-action{font-family:Consolas,monospace;font-size:.75rem;font-weight:700;color:#1d4ed8;background:#eff6ff;border-radius:6px;padding:4px 7px;white-space:nowrap}
+.audit-muted{color:#64748b}
+.audit-description{max-width:300px;line-height:1.45}
+.audit-pagination{display:flex;align-items:center;justify-content:center;gap:8px;padding:16px}
+.audit-pagination a,.audit-pagination span{padding:7px 11px;border:1px solid #dbe3ee;border-radius:7px;text-decoration:none;color:#475569;font-size:.78rem}
+.audit-pagination .current{background:#1a3a8c;color:#fff;border-color:#1a3a8c}
+.audit-pagination .disabled{color:#cbd5e1}

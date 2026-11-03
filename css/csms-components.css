@@ -1,0 +1,116 @@
+/* Shared component layer (UI_Audit Batch 4: buttons, forms, tables, states).
+   Loaded from shared/topbar.php after the page stylesheets, so these rules win at equal weight. Existing class
+   names stay (JS and tests select on them); this file only gives them one geometry and one colour set.
+   Sizes and colours come from css/csms-tokens.css; the fallbacks mirror those token values. */
+
+/* ---- Buttons: one variant set (primary / secondary / danger / small row action) ---- */
+body :is(.primary-action-button, .button-primary, .btn-save, .secondary-action-button, .button-muted, .btn-danger, .button-danger) {
+  align-items: center;
+  border-radius: var(--csms-radius-sm, 6px);
+  cursor: pointer;
+  display: inline-flex;
+  font-family: inherit;
+  font-size: var(--csms-text-sm, .875rem);
+  font-weight: 600;
+  gap: 8px;
+  justify-content: center;
+  line-height: 1.25;
+  min-height: var(--csms-control-h, 36px);
+  padding: 6px 16px;
+  text-decoration: none;
+}
+/* Primary: filled navy. */
+body :is(.primary-action-button, .button-primary, .btn-save) {
+  background: var(--csms-navy, #1a3a8c);
+  border: 1px solid var(--csms-navy, #1a3a8c);
+  color: #fff;
+}
+body :is(.primary-action-button, .button-primary, .btn-save):hover:not(:disabled, [aria-disabled="true"]) {
+  background: var(--csms-navy-700, #122a68);
+  border-color: var(--csms-navy-700, #122a68);
+}
+/* Secondary: white with a border. */
+body :is(.secondary-action-button, .button-muted) {
+  background: #fff;
+  border: 1px solid var(--csms-border-strong, #cbd5e1);
+  color: var(--csms-text, #1f2937);
+}
+body :is(.secondary-action-button, .button-muted):hover:not(:disabled, [aria-disabled="true"]) {
+  background: #f1f5f9;
+}
+/* Danger: red text on a light red tint (text contrast above 4.5:1). */
+body :is(.btn-danger, .button-danger) {
+  background: var(--csms-danger-bg, #fbe5e3);
+  border: 1px solid #f3c3bf;
+  color: var(--csms-danger, #8f1d17);
+}
+body :is(.btn-danger, .button-danger):hover:not(:disabled, [aria-disabled="true"]) {
+  background: #f8d3cf;
+}
+
+/* Small row actions (tables, lists): same radius and weight, 32px high. Their own tint colours are kept. */
+body :is(.row-action-button, .remove-action-button, .view-button) {
+  align-items: center;
+  border-radius: var(--csms-radius-sm, 6px);
+  display: inline-flex;
+  font-family: inherit;
+  font-size: .8125rem;
+  font-weight: 600;
+  gap: 6px;
+  justify-content: center;
+  line-height: 1.25;
+  min-height: var(--csms-control-h-sm, 32px);
+  min-width: var(--csms-control-h-sm, 32px);
+  padding: 4px 10px;
+}
+body :is(.system-admin-table, .domain-table) td :is(.button-muted, .secondary-action-button, .row-action-button, .remove-action-button, .view-button) {
+  white-space: nowrap;
+}
+/* Pagination buttons share the control height. */
+body .page-button { min-height: var(--csms-control-h, 36px); }
+
+/* Disabled looks the same everywhere. */
+body :is(.primary-action-button, .button-primary, .btn-save, .secondary-action-button, .button-muted, .btn-danger, .button-danger,
+         .row-action-button, .remove-action-button, .view-button, .page-button):is(:disabled, [aria-disabled="true"]) {
+  cursor: not-allowed;
+  opacity: var(--csms-disabled-opacity, .5);
+}
+
+/* ---- Keyboard focus: one visible ring (UI_Audit F6). Only :focus-visible, so mouse clicks stay quiet. ---- */
+body :is(a, button, summary, [tabindex]):focus-visible {
+  outline: 3px solid var(--csms-focus, #2563eb);
+  outline-offset: 2px;
+}
+body :is(input, select, textarea):focus-visible {
+  outline: 2px solid var(--csms-focus, #2563eb);
+  outline-offset: 1px;
+}
+/* The dark sidebar needs a light ring. */
+body .sidebar :is(a, button):focus-visible { outline-color: #fff; outline-offset: -3px; }
+
+/* ---- Form fields: one height and text size in page content and dialogs ---- */
+:is(.content, .modal-dialog, dialog) :is(input:not([type="hidden"], [type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="button"], [type="submit"]), select) {
+  font-size: var(--csms-text-sm, .875rem);
+  height: var(--csms-control-h, 36px);
+}
+:is(.content, .modal-dialog, dialog) textarea {
+  font-size: var(--csms-text-sm, .875rem);
+}
+
+/* ---- Tables: numbers line up on the right (add class="num" to the th and td of a numeric column) ---- */
+body :is(th, td).num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+/* One header text colour for every table family (was #64748b in some, #475569 in others). */
+body :is(.system-admin-table, .audit-table, .domain-table) th { color: var(--csms-text-secondary, #374151); }
+
+/* ---- Empty and error states: same text size, colour and line height wherever they appear ---- */
+body :is(.state-cell, .mapping-state, .pr-empty, .equivalency-empty-context, .elective-empty p, .grade-weighting-empty p, .export-empty-state p) {
+  color: var(--csms-text-muted, #4b5563);
+  font-size: var(--csms-text-sm, .875rem);
+  line-height: 1.5;
+}
+body :is(.state-cell.error-state, .mapping-state.is-error) {
+  color: var(--csms-danger, #8f1d17);
+}

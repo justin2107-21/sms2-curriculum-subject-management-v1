@@ -187,11 +187,11 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <div class="form-error" role="alert" hidden>
 </div>
 <div id="targetField">
-<label class="form-field"><span>Target Subject *</span>
+<label class="form-field"><span>Target Subject <span aria-hidden="true">*</span><span class="sr-only">(required)</span></span>
 <div class="record-autocomplete">
-<input type="search" id="targetSearch" placeholder="Search target subject *" />
+<input type="search" id="targetSearch" placeholder="Search target subject" aria-required="true" />
 <input type="hidden" id="targetId"/>
-<button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Target Subject *" hidden>&times;</button>
+<button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear target subject" hidden>&times;</button>
 <div class="record-autocomplete-options" id="targetOptions" role="listbox" hidden>
 </div>
 </div>
@@ -202,11 +202,11 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <div id="existingRequired">
 </div>
 <div id="requiredField">
-<label class="form-field"><span>Required Subject *</span>
+<label class="form-field"><span>Required Subject <span aria-hidden="true">*</span><span class="sr-only">(required)</span></span>
 <div class="record-autocomplete">
-<input type="search" id="requiredSearch" placeholder="Search required subject *" />
+<input type="search" id="requiredSearch" placeholder="Search required subject" aria-required="true" />
 <input type="hidden" id="requiredId"/>
-<button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Required Subject *" hidden>&times;</button>
+<button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear required subject" hidden>&times;</button>
 <div class="record-autocomplete-options" id="requiredOptions" role="listbox" hidden>
 </div>
 </div>

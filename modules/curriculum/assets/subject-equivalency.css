@@ -26,7 +26,7 @@
 
 .equivalency-subject-selector { display: grid; gap: 10px; min-width: 0; }
 .equivalency-compare-action { display: flex; }
-.equivalency-compare-action .button-primary { justify-content: center; min-height: 38px; width: 100%; }
+.equivalency-compare-action .button-primary { justify-content: center; min-height: var(--csms-control-h, 36px); width: 100%; }
 .equivalency-comparison-table { min-width: 980px; }
 .equivalency-records-table { min-width: 1080px; }
 .equivalency-comparison-table th, .equivalency-comparison-table td,

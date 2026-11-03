@@ -206,7 +206,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
         </form>
         <div class="table-scroll">
           <table class="domain-table">
-            <thead><tr><th>Code</th><th><?= $programCategory === 'shs' ? 'Strand' : 'Program' ?></th><?php if ($programCategory !== 'shs'): ?><th>Degree Level</th><?php endif; ?><th>Curricula</th><th>Status</th><?php if ($canUpdatePrograms): ?><th>Actions</th><?php endif; ?></tr></thead>
+            <thead><tr><th>Code</th><th><?= $programCategory === 'shs' ? 'Strand' : 'Program' ?></th><?php if ($programCategory !== 'shs'): ?><th>Degree Level</th><?php endif; ?><th class="num">Curricula</th><th>Status</th><?php if ($canUpdatePrograms): ?><th>Actions</th><?php endif; ?></tr></thead>
             <tbody id="programRows"><tr><td colspan="<?= $programColumnCount ?>" class="state-cell">Loading academic programs…</td></tr></tbody>
           </table>
         </div>
@@ -233,7 +233,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
           <label class="select-control"><span class="sr-only">Program status</span><select id="curriculumProgramStatus"><option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
         </form>
         <div class="table-scroll"><table class="domain-table curriculum-program-table">
-          <thead><tr><th>Program Code</th><th>Program Name</th><th>No. of Curricula</th><th>Status</th><?php if ($canUpdatePrograms): ?><th>Actions</th><?php endif; ?></tr></thead>
+          <thead><tr><th>Program Code</th><th>Program Name</th><th class="num">No. of Curricula</th><th>Status</th><?php if ($canUpdatePrograms): ?><th>Actions</th><?php endif; ?></tr></thead>
           <tbody id="curriculumProgramRows"><tr><td colspan="<?= $canUpdatePrograms ? 5 : 4 ?>" class="state-cell">Loading programs...</td></tr></tbody>
         </table></div>
         <div class="pagination-bar" id="curriculumProgramPagination"></div>

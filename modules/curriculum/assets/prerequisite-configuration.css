@@ -68,7 +68,7 @@
 .pr-chain-layout { display:grid; grid-template-columns:265px minmax(0,1fr); gap:20px; margin-top:20px; }
 .pr-chain-layout aside { align-self:start; }
 .pr-chain-header { display:flex; align-items:center; justify-content:space-between; gap:10px; }
-.pr-chain-header .button-muted { padding:7px 10px; font-size:var(--csms-text-xs, .75rem); }
+.pr-chain-header .button-muted { padding:7px 10px; font-size:var(--csms-text-sm, .875rem); }
 #chainViewport { height:520px; overflow:auto; margin:16px -8px; background:#fcfdff; border:1px solid #f1f4f8; border-radius:6px; }
 #chainCanvas { position:relative; min-height:150px; }
 #chainCanvas svg { position:absolute; inset:0; pointer-events:none; }

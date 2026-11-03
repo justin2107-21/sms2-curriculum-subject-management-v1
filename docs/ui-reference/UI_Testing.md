@@ -51,3 +51,9 @@ powershell -ExecutionPolicy Bypass -File tools\uitest\run.ps1 -Role viewer -Widt
 powershell -ExecutionPolicy Bypass -File tools\uitest\run.ps1 -Role staff -IdleSeconds 300 -NoJs
 ```
 Runs can go in parallel if each gets its own `-ServerPort` and `-CdpPort` (and a different role). `report.idle` lists `warnings` (time opened, countdown, text, buttons, focus, modal), `afterStay`, `aliveAfterOriginalTimeout`, `loggedOutAt` and `serverAfterIdle`. Note: the alive check makes one authenticated request, which refreshes the server's clock; it does not affect the client's timer.
+
+## Style probe (before/after a styling batch)
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\uitest\run.ps1 -Role admin -Urls "/dashboard/dashboard.php,/admin/users.php" -Widths 1440 -Probe styles
+```
+Adds `styleProbe` to `report-<role>.json`: per page, the computed size, font, radius and colours of every button, form control, table header and cell and empty-state block, plus (`focus`) which focusable controls show no outline or shadow when focused after a Tab press. Static state only: modals and panels opened by a click are not included. Compare two runs to measure a change.

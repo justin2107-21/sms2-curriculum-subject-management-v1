@@ -163,6 +163,36 @@ async function main() {
       }
     }
 
+    if (arg('probe', '') === 'styles') {
+      // Design-consistency probe: computed styles of buttons, form controls and tables on each page (static
+      // state only; modals and JS-opened panels are not opened). Used to measure before/after a styling batch.
+      const collector = '(() => {' +
+        'const rgb = v => v;' +
+        'const fp = (el, extra) => { const c = getComputedStyle(el), r = el.getBoundingClientRect();' +
+        ' return Object.assign({ cls: (el.className && el.className.baseVal === undefined ? String(el.className) : "").trim().split(/\\s+/).slice(0, 3).join("."), tag: el.tagName.toLowerCase(),' +
+        ' h: Math.round(r.height), fs: c.fontSize, fw: c.fontWeight, pad: c.padding, rad: c.borderRadius, bg: c.backgroundColor, fg: c.color, bd: c.borderTopWidth + " " + c.borderTopColor, vis: r.width > 0 && r.height > 0, id: el.id || "", txt: (el.textContent || "").trim().replace(/ +/g, " ").slice(0, 22), par: (el.parentElement && typeof el.parentElement.className === "string" ? el.parentElement.className : "").trim().split(/ +/).slice(0, 2).join("."), dis: !!el.disabled }, extra || {}); };' +
+        'const out = { buttons: [], fields: [], th: [], td: [], tables: [], empties: [] };' +
+        'document.querySelectorAll("button, a[class*=button], a[class*=btn], input[type=submit], input[type=button]").forEach(el => { const f = fp(el); if (f.vis) out.buttons.push(f); });' +
+        'document.querySelectorAll("input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=search]), select, textarea").forEach(el => { const f = fp(el, { type: el.type || "" }); if (f.vis) out.fields.push(f); });' +
+        'document.querySelectorAll("table").forEach(t => { const f = fp(t); if (f.vis) out.tables.push(f); });' +
+        'document.querySelectorAll("th").forEach(el => { const f = fp(el, { ta: getComputedStyle(el).textAlign }); if (f.vis) out.th.push(f); });' +
+        'document.querySelectorAll("td").forEach(el => { const t = el.textContent.trim(); const f = fp(el, { ta: getComputedStyle(el).textAlign, numeric: /^[-+]?[0-9][0-9,.]*%?$/.test(t), tab: getComputedStyle(el).fontVariantNumeric }); if (f.vis) out.td.push(f); });' +
+        'document.querySelectorAll("[class*=empty], [class*=state]").forEach(el => { const c = String(el.className); if (!/empty|no-results|state/.test(c) || el.children.length > 8) return; const f = fp(el); if (f.vis) out.empties.push(f); });' +
+        'return out; })()';
+      report.styleProbe = {};
+      for (const url of urls) {
+        issues = [];
+        await setWidth(widths[0]);
+        await navigate(base + url);
+        await sleep(2200);
+        report.styleProbe[url] = await evaluate(collector);
+        // Keyboard focus: after one real Tab press (so :focus-visible applies), focus each control and check that
+        // an outline or box-shadow shows. Sidebar and the page's own skip targets are included on purpose.
+        for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+        report.styleProbe[url].focus = await evaluate('(() => { const els = [...document.querySelectorAll("a[href], button, input:not([type=hidden]), select, textarea, summary, [tabindex=\\"0\\"]")].filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && !e.disabled; }).slice(0, 80); const missing = []; for (const e of els) { e.focus({ focusVisible: true }); const c = getComputedStyle(e); const ring = (c.outlineStyle !== "none" && parseFloat(c.outlineWidth) > 0) || (c.boxShadow && c.boxShadow !== "none"); if (!ring) missing.push({ tag: e.tagName.toLowerCase(), cls: String(e.className).split(" ")[0], id: e.id || "" }); } return { checked: els.length, missing }; })()');
+      }
+    }
+
     if (arg('warnpreview', '') === '1') {
       // Quick look at the timeout warning: a second copy of session-timeout.js with short timers is added to the
       // real, logged-in page (16 s timeout, 12 s warning window => opens after 4 s idle). Visual and keyboard

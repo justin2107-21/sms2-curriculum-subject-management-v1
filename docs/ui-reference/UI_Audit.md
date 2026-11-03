@@ -124,6 +124,26 @@ Severity: **H** = accessibility failure or broken rule from D1–D8; **M** = vis
 | I5 | Done. 193 decorative `<i>` icons in 28 files now carry `aria-hidden="true"`. Icons that already had `aria-hidden`, `aria-label`, `role` or `title` were left alone. |
 | I6 | Done. 16 icon rules moved onto one scale: `--csms-icon-sm` 14px (inline/search/row actions), `-md` 16px (sidebar, page titles), `-lg` 20px (hamburger, status icons, program icons), `-xl` 28px (empty-state illustrations; a fourth size added to the audit's three). All other icons inherit their text size. |
 
+### Batch 4 status (buttons, forms, tables)
+Measured with `tools/uitest/run.ps1 -Probe styles` on 25 real pages (admin, 1440 px), before and after.
+
+| ID | Status |
+|---|---|
+| B1 | Done without renaming anything. `css/csms-components.css` gives the existing classes one variant set: **primary** (`.primary-action-button`, `.button-primary`, `.btn-save`: navy), **secondary** (`.secondary-action-button`, `.button-muted`: white, bordered), **danger** (`.btn-danger`, `.button-danger`), **small row action** (`.row-action-button`, `.remove-action-button`, `.view-button`). Content buttons went from heights 30/34/36/38/47 px, fonts 12/14 px, weights 400-700 and radii 6/7/8 px to **36 px (32 px for row actions), 14 px (13 px), weight 600, radius 6 px**. `.btn-save` is navy instead of a second blue. |
+| B2 | No change needed. No real page has more than 3 filled primary buttons ("Save Permissions" x3 is one per role card). The "13 primary buttons" were in the legacy `curriculum_builder.php` redirect path. |
+| B3 | Moves to Batch 5 (page headers). |
+| B4 | Done in Batch 2 (sign-in). |
+| F5, F7, F8 | F5 was Batch 2. F7: the two prerequisite pickers no longer put `*` in the placeholder; the label carries `*` (hidden from screen readers) plus "(required)" for them, and the input has `aria-required="true"` (no native validation added). F8: own-profile fields have `given-name`/`family-name`/`email`/`username`; the admin account form (editing other people) uses `autocomplete="off"`. |
+| F6 | Done. One shared `:focus-visible` ring (3 px on buttons and links, 2 px on fields, white on the dark sidebar). Probe: every focusable control on the 25 pages shows an outline or shadow when focused by keyboard (the 268 sidebar submenu links inside closed, `inert` panels cannot take focus and are not counted). |
+| Form fields | Heights were 36/38/39 px and text 12/13/14 px. Now **36 px and 14 px** in page content and dialogs. Pinned heights in `curriculum.css`, `account.css`, `dashboard.css`, `subject-mapping.css` and `subject-equivalency.css` use the control-height token. Sign-in (44 px) and the print/manuscript call to action were left alone on purpose. |
+| TB1 | Done for the places found: Entity ID (audit log) and "Curricula" counts (programs tables) use `class="num"` (right-aligned, tabular figures). Audit-log IP addresses are text and stay left-aligned. |
+| TB2 | Header text colour is now one value (#374151) across admin, audit and domain tables; header size/weight and padding were already shared. Row heights are left content-driven. |
+| TB3 | Empty and error text is one size (14 px), colour (#4b5563) and line height; error text uses the danger token. Per-component boxes (dashed card, icon) keep their layout. Error states are not yet announced to screen readers (`role="alert"`); that is a separate item (ST2). |
+| TB4 | Done. The inline `<style>` in `admin/audit_logs.php` moved into `css/system-admin.css` (same rules and order; two 11.5 px sizes raised to 12 px; the "no value" dash colour raised from 2.6:1 to 4.6:1). |
+| ST5 | Done for the button variants: disabled is `opacity .5` with `cursor: not-allowed`. |
+
+Not changed in this batch: tab strips (a separate component), the floating CIMF button, sign-in controls, and tables built only after a user action (they were not on screen for the probe).
+
 ### Placement and layout
 | ID | Page / file | Problem | Rule | Sev | Proposed fix |
 |---|---|---|---|---|---|

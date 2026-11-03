@@ -467,7 +467,7 @@
             '<td><span class="record-code">' + ui.escapeHtml(program.program_code) + '</span></td>' +
             '<td><span class="record-name">' + ui.escapeHtml(program.program_name) + '</span></td>' +
             degreeLevelCell +
-            '<td>' + (permissions.viewCurricula ? (Number(program.curriculum_count) || 0) : '—') + '</td>' +
+            '<td class="num">' + (permissions.viewCurricula ? (Number(program.curriculum_count) || 0) : '—') + '</td>' +
             '<td>' + ui.statusBadge(program.status) + '</td>' + actions +
             '</tr>';
     }
@@ -523,7 +523,7 @@
             ui.escapeHtml(program.program_name + ' ' + program.program_code) + '">' +
             '<td><span class="record-code">' + ui.escapeHtml(program.program_code) + '</span></td>' +
             '<td><span class="record-name">' + ui.escapeHtml(program.program_name) + '</span></td>' +
-            '<td>' + (Number(program.curriculum_count) || 0) + '</td>' +
+            '<td class="num">' + (Number(program.curriculum_count) || 0) + '</td>' +
             '<td>' + ui.statusBadge(program.status) + '</td>' + actions + '</tr>';
     }
 

@@ -197,7 +197,7 @@
 .mapping-workspace-header .page-subtitle { margin: 7px 0 0; }
 .mapping-context-bar { align-items: end; background: #fff; border: 1px solid #dbe3ee; border-radius: 10px; box-shadow: 0 4px 14px rgba(15, 23, 42, .035); display: grid; gap: 10px; grid-template-columns: minmax(150px, 1fr) 12px minmax(180px, 1.15fr) 12px minmax(150px, 1fr); padding: 13px 15px; }
 .mapping-context-field { color: #52647f; display: grid; font-size: var(--csms-text-xs, .75rem); font-weight: 700; gap: 5px; min-width: 0; }
-.mapping-context-field .record-autocomplete input { background: #fff; font-size: .76rem; min-height: 39px; }
+.mapping-context-field .record-autocomplete input { background: #fff; font-size: var(--csms-text-sm, .875rem); min-height: var(--csms-control-h, 36px); }
 .mapping-context-field .record-autocomplete input:disabled { background: #f1f5f9; }
 .mapping-context-separator { align-self: center; color: #94a3b8; font-size: 1rem; padding-top: 15px; text-align: center; }
 .mapping-context-current { color: #64748b; font-size: var(--csms-text-xs, .75rem); grid-column: 1 / -1; margin: 0; min-height: 1em; overflow-wrap: anywhere; }
