@@ -140,7 +140,7 @@
             ched: 'fa-building-columns', deped: 'fa-school', institutional: 'fa-building', other: 'fa-book'
         };
         return '<span class="compliance-badge ' + ui.escapeHtml(normalized) + '"><i class="fa-solid ' +
-            (icons[normalized] || 'fa-circle') + '"></i> ' + ui.escapeHtml(label || value) + '</span>';
+            (icons[normalized] || 'fa-circle') + '" aria-hidden="true"></i> ' + ui.escapeHtml(label || value) + '</span>';
     }
 
     async function loadPrograms() {
@@ -210,7 +210,7 @@
 
     function resultRow(result) {
         const source = result.reference_url_snapshot
-            ? '<a class="compliance-reference-link" href="' + ui.escapeHtml(result.reference_url_snapshot) + '" target="_blank" rel="noopener noreferrer">' + ui.escapeHtml(result.reference_identifier_snapshot) + ' <i class="fa-solid fa-arrow-up-right-from-square"></i></a>'
+            ? '<a class="compliance-reference-link" href="' + ui.escapeHtml(result.reference_url_snapshot) + '" target="_blank" rel="noopener noreferrer">' + ui.escapeHtml(result.reference_identifier_snapshot) + ' <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>'
             : '<span class="compliance-subtext">' + ui.escapeHtml(result.reference_identifier_snapshot) + '</span>';
         return '<tr><td><span class="compliance-name">' + ui.escapeHtml(result.rule_name_snapshot) + '</span><span class="compliance-subtext">' + ui.escapeHtml(ruleTypeLabel(result.rule_type_snapshot)) + '</span></td>' +
             '<td>' + source + '</td><td>' + ui.escapeHtml(result.requirement_snapshot) + '</td>' +
@@ -240,7 +240,7 @@
         if (!canRun) return;
         if (!version.value) return;
         if (runButton) runButton.disabled = true;
-        runButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Running...';
+        runButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Running...';
         const data = new FormData();
         data.set('action', 'validation_run');
         data.set('curriculum_version_id', version.value);
@@ -258,7 +258,7 @@
             ui.showToast(error.message, 'error');
         } finally {
             if (runButton) runButton.disabled = !canRun || !version.value;
-            runButton.innerHTML = '<i class="fa-solid fa-play"></i> Run Validation';
+            runButton.innerHTML = '<i class="fa-solid fa-play" aria-hidden="true"></i> Run Validation';
         }
     }
 
@@ -296,7 +296,7 @@
         const scope = rule.academic_program_id
             ? rule.program_code + ' - ' + rule.program_name
             : rule.curriculum_code + ' - ' + rule.curriculum_name;
-        const actions = canManage ? '<td><div class="compliance-row-actions"><button type="button" class="row-action-button" data-edit-compliance-rule="' + Number(rule.id) + '"><i class="fa-solid fa-pen"></i> Edit</button></div></td>' : '';
+        const actions = canManage ? '<td><div class="compliance-row-actions"><button type="button" class="row-action-button" data-edit-compliance-rule="' + Number(rule.id) + '"><i class="fa-solid fa-pen" aria-hidden="true"></i> Edit</button></div></td>' : '';
         return '<tr><td><span class="compliance-name">' + ui.escapeHtml(rule.rule_name) + '</span><span class="compliance-subtext">' + ui.escapeHtml(rule.description || 'No description') + '</span></td>' +
             '<td><span class="compliance-name">' + ui.escapeHtml(rule.reference_code || rule.reference_title || 'Reference') + '</span><span class="compliance-subtext">' + ui.escapeHtml(rule.issuing_body) + ' / ' + badge(rule.verification_status, rule.verification_status) + '</span></td>' +
             '<td>' + ui.escapeHtml(ruleTypeLabel(rule.rule_type)) + '</td><td><span class="compliance-subtext">' + ui.escapeHtml(scope) + '</span></td>' +
@@ -329,8 +329,8 @@
 
     function referenceRow(reference) {
         const source = reference.source_url
-            ? '<a class="compliance-reference-link" href="' + ui.escapeHtml(reference.source_url) + '" target="_blank" rel="noopener noreferrer">Open source <i class="fa-solid fa-arrow-up-right-from-square"></i></a>' : '<span class="compliance-subtext">No URL stored</span>';
-        const actions = (canManage || canVerifyReferences) ? '<td>' + (canManage ? '<button type="button" class="row-action-button" data-edit-compliance-reference="' + Number(reference.id) + '"><i class="fa-solid fa-pen"></i> Edit</button> ' : '') + (canVerifyReferences ? '<button type="button" class="row-action-button" data-assess-compliance-reference="' + Number(reference.id) + '"><i class="fa-solid fa-clipboard-check"></i> Assess</button>' : '') + '</td>' : '';
+            ? '<a class="compliance-reference-link" href="' + ui.escapeHtml(reference.source_url) + '" target="_blank" rel="noopener noreferrer">Open source <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>' : '<span class="compliance-subtext">No URL stored</span>';
+        const actions = (canManage || canVerifyReferences) ? '<td>' + (canManage ? '<button type="button" class="row-action-button" data-edit-compliance-reference="' + Number(reference.id) + '"><i class="fa-solid fa-pen" aria-hidden="true"></i> Edit</button> ' : '') + (canVerifyReferences ? '<button type="button" class="row-action-button" data-assess-compliance-reference="' + Number(reference.id) + '"><i class="fa-solid fa-clipboard-check" aria-hidden="true"></i> Assess</button>' : '') + '</td>' : '';
         const assessments = 'Identity: ' + (reference.document_identity_assessment || 'not assessed') + ' · Origin: ' + (reference.declared_origin_assessment || 'not assessed') + ' · Applicability: ' + (reference.applicability_assessment || 'not assessed');
         return '<tr><td><span class="compliance-name">' + ui.escapeHtml(reference.reference_code || reference.title || 'Reference') + '</span><span class="compliance-subtext">' + ui.escapeHtml(reference.title || 'No title') + (reference.effective_date ? ' / ' + ui.escapeHtml(reference.effective_date) : '') + '</span></td>' +
             '<td>' + badge(reference.reference_type, reference.reference_type === 'DEPED' ? 'DepEd' : reference.reference_type) + '<span class="compliance-subtext">' + ui.escapeHtml(reference.source_kind || 'unknown') + '</span></td><td>' + ui.escapeHtml(reference.issuing_body) + '</td>' +
@@ -366,7 +366,7 @@
         return '<tr data-record-view="' + Number(run.id) + '" tabindex="0" aria-label="View validation run on ' + ui.escapeHtml(formatDateTime(run.created_at)) + '"><td>' + ui.escapeHtml(formatDateTime(run.created_at)) + '</td><td><span class="compliance-name">' + ui.escapeHtml(run.program_code) + '</span><span class="compliance-subtext">' + ui.escapeHtml(run.program_name) + '</span></td>' +
             '<td><span class="compliance-name">' + ui.escapeHtml(run.curriculum_code) + '</span><span class="compliance-subtext">' + ui.escapeHtml(run.curriculum_name) + '</span></td><td>' + ui.escapeHtml(run.version_label) + '</td>' +
             '<td>' + Number(run.rules_evaluated) + '</td><td>' + Number(run.passed_count) + '</td><td>' + Number(run.failed_count) + '</td><td>' + Number(run.not_evaluated_count) + '</td><td>' + ui.escapeHtml(runner) + '</td>' +
-            '<td><button type="button" class="row-action-button" data-view-compliance-run="' + Number(run.id) + '"><i class="fa-solid fa-eye"></i> View</button></td></tr>';
+            '<td><button type="button" class="row-action-button" data-view-compliance-run="' + Number(run.id) + '"><i class="fa-solid fa-eye" aria-hidden="true"></i> View</button></td></tr>';
     }
 
     async function loadHistory(page) {

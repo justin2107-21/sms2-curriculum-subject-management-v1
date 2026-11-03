@@ -114,6 +114,16 @@ Severity: **H** = accessibility failure or broken rule from D1–D8; **M** = vis
 | I5 | many pages | Decorative `<i>` icons beside text lack `aria-hidden="true"` (e.g. `signin.php:52,60,68`, `sidebar.php` items) | `icon-context` | M | add `aria-hidden` |
 | I6 | all CSS | Icon sizes vary (`.9em`, 15px, 14px, 13px, 1rem…) | `Consistent Icon Sizing` | L | `--csms-icon-sm 14px / md 16px / lg 20px` |
 
+### Batch 3 status (icons)
+| ID | Status |
+|---|---|
+| I1 | Done. The 3 remaining `fa-regular` icons (topbar clock, Subjects "view" button, Subject Mapping success tick) are now solid. No regular/brand/light icons are left in PHP or JS. |
+| I2 | Done. Reports header uses `fa-chart-column`. |
+| I3 | Done. Audit Logs → `fa-clipboard-list`; System Settings → `fa-sliders`. Every sidebar item now has its own icon. |
+| I4 | Done in Batch 2. A static scan finds 79 icon-only buttons/links in PHP and JS and all 79 have an `aria-label` (no unnamed "×" buttons either). |
+| I5 | Done. 193 decorative `<i>` icons in 28 files now carry `aria-hidden="true"`. Icons that already had `aria-hidden`, `aria-label`, `role` or `title` were left alone. |
+| I6 | Done. 16 icon rules moved onto one scale: `--csms-icon-sm` 14px (inline/search/row actions), `-md` 16px (sidebar, page titles), `-lg` 20px (hamburger, status icons, program icons), `-xl` 28px (empty-state illustrations; a fourth size added to the audit's three). All other icons inherit their text size. |
+
 ### Placement and layout
 | ID | Page / file | Problem | Rule | Sev | Proposed fix |
 |---|---|---|---|---|---|

@@ -46,7 +46,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
   <main class="content curriculum-content mapping-content electives-content" id="electivesWorkspace" data-group-api="../http/elective_group_actions.php" data-can-manage-electives="<?= $canManageElectives ? '1' : '0' ?>">
     <div class="mapping-workspace-header">
       <div><h1 class="page-title">Electives Manager</h1><p class="page-subtitle">Manage elective subject groups within curriculum versions.</p></div>
-      <?php if ($canManageElectives): ?><button class="primary-action-button" id="createElectiveGroupButton" disabled><i class="fa-solid fa-plus"></i> Create Elective Group</button><?php endif; ?>
+      <?php if ($canManageElectives): ?><button class="primary-action-button" id="createElectiveGroupButton" disabled><i class="fa-solid fa-plus" aria-hidden="true"></i> Create Elective Group</button><?php endif; ?>
     </div>
     <section class="mapping-workspace-shell">
     <section class="mapping-context-bar elective-context" aria-label="Curriculum context">
@@ -54,17 +54,17 @@ require __DIR__ . '/../../../shared/sidebar.php';
       <div class="mapping-context-field"><label for="<?= $key ?>Search"><?= $label ?></label><div class="record-autocomplete">
         <input type="search" id="<?= $key ?>Search" placeholder="<?= $key === 'program' ? 'Search program code or name' : ($key === 'curriculum' ? 'Choose program first' : 'Choose curriculum first') ?>" <?= $key !== 'program' ? 'disabled' : '' ?> autocomplete="off"/>
         <input type="hidden" id="<?= $key ?>Id"/>
-        <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear <?= $label ?>" hidden><i class="fa-solid fa-xmark"></i></button>
+        <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear <?= $label ?>" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
         <div class="record-autocomplete-options" id="<?= $key ?>Options" role="listbox" aria-label="<?= $label ?> suggestions" hidden></div>
       </div></div>
-      <?php if ($key !== 'version'): ?><span class="mapping-context-separator" aria-hidden="true"><i class="fa-solid fa-chevron-right"></i></span><?php endif; ?>
+      <?php if ($key !== 'version'): ?><span class="mapping-context-separator" aria-hidden="true"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span><?php endif; ?>
       <?php endforeach; ?>
     </section>
     <div class="elective-tabs" role="tablist" aria-label="Electives Manager">
       <button id="groupsTab" role="tab" aria-selected="true" aria-controls="groupsPanel">Elective Groups</button>
       <button id="reviewTab" role="tab" aria-selected="false" aria-controls="reviewPanel" tabindex="-1">Validation Review</button>
     </div>
-    <div id="electiveState" class="elective-empty" role="status"><i class="fa-solid fa-bullseye"></i><h2>Select a Program, Curriculum, and Version</h2><p>Select context to view elective groups.</p></div>
+    <div id="electiveState" class="elective-empty" role="status"><i class="fa-solid fa-bullseye" aria-hidden="true"></i><h2>Select a Program, Curriculum, and Version</h2><p>Select context to view elective groups.</p></div>
     <section id="groupsPanel" role="tabpanel" aria-labelledby="groupsTab" hidden>
       <div class="elective-filters">
         <input type="search" id="groupSearch" placeholder="Search elective group…" aria-label="Search elective group"/>
@@ -81,7 +81,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 </div>
 <div class="curriculum-modal" id="viewGroupModal" hidden><div class="modal-backdrop" data-modal-close></div>
   <section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="viewGroupTitle">
-    <div class="modal-header"><h2 id="viewGroupTitle">Elective Group</h2><button class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="modal-header"><h2 id="viewGroupTitle">Elective Group</h2><button class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
     <div id="viewGroupBody" class="elective-modal-body"></div>
     <div class="modal-actions modal-actions-padded"><button class="button-muted" data-modal-close>Close</button><?php if ($canManageElectives): ?><button class="button-muted" id="viewEdit">Edit</button><button class="button-danger" id="viewArchive">Archive</button><?php endif; ?></div>
   </section>
@@ -89,7 +89,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <?php if ($canManageElectives): ?>
 <div class="curriculum-modal" id="groupFormModal" hidden><div class="modal-backdrop" data-modal-close></div>
   <section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="groupFormTitle">
-    <div class="modal-header"><div><h2 id="groupFormTitle">Create Elective Group</h2><p class="modal-context">Define alternative subject choices for this curriculum version.</p></div><button class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="modal-header"><div><h2 id="groupFormTitle">Create Elective Group</h2><p class="modal-context">Define alternative subject choices for this curriculum version.</p></div><button class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
     <form id="groupForm" class="domain-form">
       <div class="form-error" role="alert" hidden></div>
       <div class="form-grid">
@@ -111,7 +111,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 </div>
 <div class="curriculum-modal" id="archiveGroupModal" hidden><div class="modal-backdrop" data-modal-close></div>
   <section class="modal-dialog modal-dialog-small" role="alertdialog" aria-modal="true" aria-labelledby="archiveGroupTitle">
-    <div class="modal-header"><h2 id="archiveGroupTitle">Archive Record</h2><button class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="modal-header"><h2 id="archiveGroupTitle">Archive Record</h2><button class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
     <div class="confirmation-body"><p>Are you sure you want to archive this elective group?</p><p>The record will be removed from active views but retained in Archives.</p><strong id="archiveGroupName"></strong><div class="form-error" role="alert" hidden></div></div>
     <div class="modal-actions modal-actions-padded"><button class="button-muted" data-modal-close>Cancel</button><button class="button-danger" id="confirmArchive">Archive</button></div>
   </section>

@@ -38,7 +38,7 @@
   text-align: center;
 }
 
-.export-empty-state i { color: #94a3b8; font-size: 2.1rem; margin-bottom: 12px; }
+.export-empty-state i { color: #94a3b8; font-size: var(--csms-icon-xl, 28px); margin-bottom: 12px; }
 .export-empty-state h3 { color: #445269; font-size: .94rem; margin-bottom: 6px; }
 .export-empty-state p { font-size: .76rem; line-height: 1.55; max-width: 430px; }
 

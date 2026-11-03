@@ -238,7 +238,7 @@
     if (subjectView) {
         $('moreHistoryFilters').addEventListener('click', function () {
             const open = this.getAttribute('aria-expanded') !== 'true'; this.setAttribute('aria-expanded', String(open)); $('historyMoreFilters').hidden = !open;
-            this.innerHTML = 'More Filters <i class="fa-solid fa-chevron-' + (open ? 'up' : 'down') + '"></i>';
+            this.innerHTML = 'More Filters <i class="fa-solid fa-chevron-' + (open ? 'up' : 'down') + '" aria-hidden="true"></i>';
         });
         $('historyProgram').addEventListener('change', async () => { await loadCurricula($('historyProgram'), $('historyCurriculum'), false); disableHistoryVersion(); loadHistory(1); });
         $('historyCurriculum').addEventListener('change', () => { disableHistoryVersion(); loadHistory(1); });

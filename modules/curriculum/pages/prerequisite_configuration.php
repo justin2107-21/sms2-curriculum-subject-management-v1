@@ -72,7 +72,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 </div>
 </div>
 </label>
-<span class="pr-context-separator" aria-hidden="true"><i class="fa-solid fa-chevron-right"></i></span>
+<span class="pr-context-separator" aria-hidden="true"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span>
 <label class="form-field"><span>Curriculum</span>
 <div class="record-autocomplete">
 <input type="search" id="curriculumSearch" placeholder="Search curriculum" disabled/>
@@ -82,7 +82,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 </div>
 </div>
 </label>
-<span class="pr-context-separator" aria-hidden="true"><i class="fa-solid fa-chevron-right"></i></span>
+<span class="pr-context-separator" aria-hidden="true"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span>
 <label class="form-field"><span>Curriculum Version</span>
 <div class="record-autocomplete">
 <input type="search" id="versionSearch" placeholder="Search curriculum version" disabled/>

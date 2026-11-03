@@ -74,7 +74,7 @@ require_once __DIR__ . '/../shared/sidebar.php';
 
   <div class="content">
     <div class="page-title-bar">
-      <h2 class="page-title"><i class="fa-solid fa-clock-rotate-left"></i> Audit Logs</h2>
+      <h2 class="page-title"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> Audit Logs</h2>
     </div>
 
     <div class="audit-card">

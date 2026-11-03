@@ -150,37 +150,37 @@ require __DIR__ . '/../../../shared/sidebar.php';
     <?php elseif ($isCurriculaProgramView): ?>
     <div class="page-title-bar curriculum-title-bar">
       <div><a class="program-back-link" href="curricula.php"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Back to Curricula</a><h1 class="page-title"><span id="selectedProgramCode">Loading...</span></h1><p class="page-subtitle" id="selectedProgramName"></p><p class="page-subtitle" id="selectedProgramCurriculumCount">Loading curricula...</p></div>
-      <?php if ($canCreateCurricula): ?><button type="button" class="primary-action-button manuscript-primary" id="newCurriculumButton" disabled><i class="fa-solid fa-plus"></i> New Curriculum</button><?php endif; ?>
+      <?php if ($canCreateCurricula): ?><button type="button" class="primary-action-button manuscript-primary" id="newCurriculumButton" disabled><i class="fa-solid fa-plus" aria-hidden="true"></i> New Curriculum</button><?php endif; ?>
     </div>
     <?php elseif ($isCurriculumWorkspaceView): ?>
     <div class="page-title-bar curriculum-title-bar curriculum-workspace-title-bar">
       <div><a class="program-back-link" id="backToProgramCurricula" href="curricula.php"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Back to <span id="backProgramCurriculaLabel">Program Curricula</span></a><h1 class="page-title" id="workspaceCurriculumName">Loading curriculum...</h1><p class="page-subtitle"><span id="curriculumHeaderCode"></span> <span id="workspaceCurriculumStatus"></span></p></div>
-      <div class="curriculum-header-actions"><?php if ($canUpdateCurricula): ?><button type="button" class="secondary-action-button" id="editCurriculumButton"><i class="fa-solid fa-pen"></i> Edit Curriculum</button><button type="button" class="button-danger" id="archiveCurriculumButton" hidden><i class="fa-solid fa-box-archive"></i> Archive</button><?php endif; ?><?php if ($canCreateVersions): ?><button type="button" class="primary-action-button manuscript-primary" id="newVersionButton" disabled><i class="fa-solid fa-plus"></i> New Version</button><?php endif; ?></div>
+      <div class="curriculum-header-actions"><?php if ($canUpdateCurricula): ?><button type="button" class="secondary-action-button" id="editCurriculumButton"><i class="fa-solid fa-pen" aria-hidden="true"></i> Edit Curriculum</button><button type="button" class="button-danger" id="archiveCurriculumButton" hidden><i class="fa-solid fa-box-archive" aria-hidden="true"></i> Archive</button><?php endif; ?><?php if ($canCreateVersions): ?><button type="button" class="primary-action-button manuscript-primary" id="newVersionButton" disabled><i class="fa-solid fa-plus" aria-hidden="true"></i> New Version</button><?php endif; ?></div>
     </div>
     <?php else: ?>
     <div class="page-title-bar curriculum-title-bar">
       <div>
         <?php if ($isProgramPage && !$isProgramLanding): ?><a class="program-back-link" href="academic_programs.php"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Back to Academic Programs</a><?php endif; ?>
-        <h1 class="page-title"><i class="fa-solid <?= $pageIcon ?>"></i> <?= htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8') ?></h1>
+        <h1 class="page-title"><i class="fa-solid <?= $pageIcon ?>" aria-hidden="true"></i> <?= htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8') ?></h1>
         <p class="page-subtitle"><?= htmlspecialchars($pageSubtitle, ENT_QUOTES, 'UTF-8') ?></p>
       </div>
-      <?php if ($isProgramPage && !$isProgramLanding && $canCreatePrograms): ?><button type="button" class="primary-action-button manuscript-primary" id="newProgramButton"><i class="fa-solid fa-plus"></i> New Program</button><?php endif; ?>
+      <?php if ($isProgramPage && !$isProgramLanding && $canCreatePrograms): ?><button type="button" class="primary-action-button manuscript-primary" id="newProgramButton"><i class="fa-solid fa-plus" aria-hidden="true"></i> New Program</button><?php endif; ?>
     </div>
     <?php endif; ?>
 
     <?php if ($isProgramLanding): ?>
     <section class="program-category-grid" aria-label="Academic program categories">
       <a class="program-category-card" href="academic_programs.php?category=college">
-        <span class="program-category-icon" aria-hidden="true"><i class="fa-solid fa-graduation-cap"></i></span>
+        <span class="program-category-icon" aria-hidden="true"><i class="fa-solid fa-graduation-cap" aria-hidden="true"></i></span>
         <span class="program-category-kicker">Higher Education</span>
         <span class="program-category-copy"><strong>College Programs</strong><span>Bachelor's and other higher-education programs</span></span>
-        <span class="program-category-footer"><small id="collegeProgramCount" hidden></small><span class="program-category-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span></span>
+        <span class="program-category-footer"><small id="collegeProgramCount" hidden></small><span class="program-category-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></span></span>
       </a>
       <a class="program-category-card program-category-card-shs" href="academic_programs.php?category=shs">
-        <span class="program-category-icon" aria-hidden="true"><i class="fa-solid fa-book-open"></i></span>
+        <span class="program-category-icon" aria-hidden="true"><i class="fa-solid fa-book-open" aria-hidden="true"></i></span>
         <span class="program-category-kicker">Grades 11–12</span>
         <span class="program-category-copy"><strong>Senior High School Strands</strong><span>Academic and applied pathways for senior high learners</span></span>
-        <span class="program-category-footer"><small id="shsProgramCount" hidden></small><span class="program-category-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span></span>
+        <span class="program-category-footer"><small id="shsProgramCount" hidden></small><span class="program-category-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></span></span>
       </a>
     </section>
     <?php else: ?>
@@ -191,7 +191,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
         <form class="list-toolbar" id="programSearchForm" role="search">
           <label class="search-control">
             <span class="sr-only">Search academic programs</span>
-            <i class="fa-solid fa-magnifying-glass"></i>
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
             <input type="search" id="programSearch" placeholder="Search programs..." maxlength="100"/>
           </label>
           <?php if ($programCategory === 'college'): ?><label class="select-control"><span class="sr-only">Degree level</span><select id="programDegreeLevelFilter"><option value="">All degree levels</option><option value="Bachelor&#39;s Degree">Bachelor's Degree</option><option value="Associate Degree">Associate Degree</option><option value="Diploma / Certificate">Diploma / Certificate</option><option value="Other">Other</option></select></label><?php endif; ?>
@@ -228,7 +228,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
       <article class="domain-card curriculum-list-card" id="curriculumProgramsPanel">
         <span class="sr-only" id="curriculumProgramCount" aria-live="polite"></span>
         <form class="list-toolbar" id="curriculumProgramSearchForm" role="search">
-          <label class="search-control"><span class="sr-only">Search programs or strands</span><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="curriculumProgramSearch" placeholder="Search program or strand..." maxlength="100"/></label>
+          <label class="search-control"><span class="sr-only">Search programs or strands</span><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input type="search" id="curriculumProgramSearch" placeholder="Search program or strand..." maxlength="100"/></label>
           <label class="select-control"><span class="sr-only">Academic level</span><select id="curriculumAcademicLevel"><option value="">All levels</option><option value="college">College</option><option value="shs">Senior High School</option></select></label>
           <label class="select-control"><span class="sr-only">Program status</span><select id="curriculumProgramStatus"><option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
         </form>
@@ -245,8 +245,8 @@ require __DIR__ . '/../../../shared/sidebar.php';
 
     <?php if ($isCurriculaPage): ?>
     <section class="version-workspace" id="versionWorkspace" hidden aria-labelledby="workspaceVersionTitle">
-      <a class="text-back-button" id="backToCurricula" href="curricula.php?program_id=<?= $initialProgramId === false ? '' : (int)$initialProgramId ?>&amp;curriculum_id=<?= $initialCurriculumId === false ? '' : (int)$initialCurriculumId ?>"><i class="fa-solid fa-arrow-left"></i> Back to <span id="versionBackCurriculumLabel">Curriculum</span></a>
-      <div class="version-workspace-header"><div class="version-heading"><div class="version-title-line"><h2 id="workspaceVersionTitle"></h2><span id="workspaceVersionStatus"></span></div><nav class="subject-breadcrumb" aria-label="Curriculum context"><a id="workspaceProgramCode" href="curricula.php"></a><span class="breadcrumb-separator" aria-hidden="true">›</span><a id="workspaceCurriculumCode" href="curricula.php"></a><span class="breadcrumb-separator" aria-hidden="true">›</span><strong id="workspaceBreadcrumbVersion"></strong></nav></div><div class="version-workspace-actions"><?php if ($canExportCurricula): ?><a class="secondary-action-button" id="versionExportLink" href="curriculum_export.php"><i class="fa-solid fa-download"></i> Export</a><?php endif; ?><a class="secondary-action-button" id="outcomeMappingLink" href="subject_mapping.php"><i class="fa-solid fa-graduation-cap" aria-hidden="true"></i> Graduate Outcomes</a><button type="button" class="primary-action-button" id="assignSubjectButton" disabled><i class="fa-solid fa-diagram-project"></i> <?= $canAssignSubjects ? 'Manage Subject Mapping' : 'View Subject Mapping' ?></button></div></div>
+      <a class="text-back-button" id="backToCurricula" href="curricula.php?program_id=<?= $initialProgramId === false ? '' : (int)$initialProgramId ?>&amp;curriculum_id=<?= $initialCurriculumId === false ? '' : (int)$initialCurriculumId ?>"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Back to <span id="versionBackCurriculumLabel">Curriculum</span></a>
+      <div class="version-workspace-header"><div class="version-heading"><div class="version-title-line"><h2 id="workspaceVersionTitle"></h2><span id="workspaceVersionStatus"></span></div><nav class="subject-breadcrumb" aria-label="Curriculum context"><a id="workspaceProgramCode" href="curricula.php"></a><span class="breadcrumb-separator" aria-hidden="true">›</span><a id="workspaceCurriculumCode" href="curricula.php"></a><span class="breadcrumb-separator" aria-hidden="true">›</span><strong id="workspaceBreadcrumbVersion"></strong></nav></div><div class="version-workspace-actions"><?php if ($canExportCurricula): ?><a class="secondary-action-button" id="versionExportLink" href="curriculum_export.php"><i class="fa-solid fa-download" aria-hidden="true"></i> Export</a><?php endif; ?><a class="secondary-action-button" id="outcomeMappingLink" href="subject_mapping.php"><i class="fa-solid fa-graduation-cap" aria-hidden="true"></i> Graduate Outcomes</a><button type="button" class="primary-action-button" id="assignSubjectButton" disabled><i class="fa-solid fa-diagram-project" aria-hidden="true"></i> <?= $canAssignSubjects ? 'Manage Subject Mapping' : 'View Subject Mapping' ?></button></div></div>
       <section class="domain-card reference-baseline-panel" id="versionReferencesPanel" aria-labelledby="versionReferencesTitle">
         <div class="domain-card-header"><div><p class="eyebrow">Documentary provenance</p><h3 id="versionReferencesTitle">References &amp; Baseline</h3><p class="mapping-context-message" id="referenceVersionContext">Loading source and lifecycle details...</p></div><div class="card-header-actions"><span id="referenceProtectionBadge"></span><?php if ($userId !== null && user_can($userId, 'subject_history.view')): ?><a class="button-muted" id="compareBaselineLink" href="curriculum_history_view.php" hidden><i class="fa-solid fa-code-compare" aria-hidden="true"></i> Compare revision with reference</a><?php endif; ?></div></div>
         <dl class="record-detail-grid reference-baseline-details"><div><dt>Program</dt><dd id="referenceProgram"></dd></div><div><dt>Curriculum / version</dt><dd id="referenceCurriculumVersion"></dd></div><div><dt>Version role</dt><dd id="referenceVersionRole"></dd></div><div><dt>Review workflow</dt><dd id="referenceReviewStatus"></dd></div><div><dt>Reference basis</dt><dd id="referenceBasis"></dd></div><div><dt>Baseline</dt><dd id="referenceBaseline"></dd></div><div><dt>Snapshot capture</dt><dd id="referenceSnapshotStatus"></dd></div><div><dt>Institutional adoption</dt><dd>Institutional adoption/approval not verified</dd></div></dl>
@@ -290,11 +290,11 @@ require __DIR__ . '/../../../shared/sidebar.php';
     <div class="modal-header">
       <div><p class="modal-kicker">Academic Program</p><h2 id="programDetailsName">Program Details</h2><p class="modal-context" id="programDetailsCode"></p></div>
       <span id="programDetailsStatusBadge"></span>
-      <button type="button" class="modal-close-button" data-modal-close aria-label="Close academic program details"><i class="fa-solid fa-xmark"></i></button>
+      <button type="button" class="modal-close-button" data-modal-close aria-label="Close academic program details"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
     </div>
     <div class="modal-body">
       <dl class="record-detail-grid program-detail-grid">
-        <div class="program-degree-level"><div><dt>Degree Level</dt><dd id="programDetailsType"></dd></div><?php if ($canViewCurricula): ?><a class="secondary-action-button program-see-curricula" id="programSeeCurricula" href="curricula.php"><i class="fa-solid fa-list"></i> See Curriculas</a><?php endif; ?></div>
+        <div class="program-degree-level"><div><dt>Degree Level</dt><dd id="programDetailsType"></dd></div><?php if ($canViewCurricula): ?><a class="secondary-action-button program-see-curricula" id="programSeeCurricula" href="curricula.php"><i class="fa-solid fa-list" aria-hidden="true"></i> See Curriculas</a><?php endif; ?></div>
       </dl>
       <?php if ($canViewCurricula): ?>
       <p id="programSummaryNotice" class="curriculum-notice" role="status" hidden></p>
@@ -310,14 +310,14 @@ require __DIR__ . '/../../../shared/sidebar.php';
       <p class="subject-placement-detail">Curriculum summary is not available with your current permissions.</p>
       <?php endif; ?>
     </div>
-    <?php if ($canUpdatePrograms): ?><div class="modal-footer program-details-footer"><button type="button" class="button-muted" data-modal-close>Close</button><button type="button" class="button-primary" id="programDetailsEdit"><i class="fa-solid fa-pen"></i> Edit</button><button type="button" class="button-danger" id="programDetailsArchive"><i class="fa-solid fa-box-archive"></i> Archive</button></div><?php endif; ?>
+    <?php if ($canUpdatePrograms): ?><div class="modal-footer program-details-footer"><button type="button" class="button-muted" data-modal-close>Close</button><button type="button" class="button-primary" id="programDetailsEdit"><i class="fa-solid fa-pen" aria-hidden="true"></i> Edit</button><button type="button" class="button-danger" id="programDetailsArchive"><i class="fa-solid fa-box-archive" aria-hidden="true"></i> Archive</button></div><?php endif; ?>
   </section>
 </div>
 <?php if ($canUpdatePrograms): ?>
 <div class="curriculum-modal" id="programArchiveModal" hidden aria-hidden="true">
   <div class="modal-backdrop" data-modal-close></div>
   <section class="modal-dialog program-archive-dialog" role="dialog" aria-modal="true" aria-labelledby="programArchiveTitle">
-    <div class="modal-header"><div><h2 id="programArchiveTitle">Archive Record</h2></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close archive confirmation"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="modal-header"><div><h2 id="programArchiveTitle">Archive Record</h2></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close archive confirmation"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
     <div class="confirmation-body"><p id="programArchiveMessage">Are you sure you want to archive this academic program?</p><p class="program-archive-note">The record will be removed from active views but retained in Archives. Existing related curriculum records will be preserved.</p></div>
     <div class="modal-actions modal-actions-padded"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="button" class="button-danger" id="confirmProgramArchive">Archive</button></div>
   </section>
@@ -331,7 +331,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
   <section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="programModalTitle">
     <div class="modal-header">
       <div><h2 id="programModalTitle">New Program</h2><p class="modal-context">Create an academic program.</p></div>
-      <button type="button" class="modal-close-button" data-modal-close aria-label="Close academic program form"><i class="fa-solid fa-xmark"></i></button>
+      <button type="button" class="modal-close-button" data-modal-close aria-label="Close academic program form"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
     </div>
     <form id="programForm" class="domain-form">
       <input type="hidden" name="id" id="programId"/>
@@ -363,7 +363,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <?php if ($canUpdateCurricula): ?>
 <div class="curriculum-modal" id="curriculumArchiveModal" hidden><div class="modal-backdrop" data-modal-close></div>
   <section class="modal-dialog modal-dialog-small" role="alertdialog" aria-modal="true" aria-labelledby="curriculumArchiveTitle">
-    <div class="modal-header"><h2 id="curriculumArchiveTitle">Archive Record</h2><button type="button" class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="modal-header"><h2 id="curriculumArchiveTitle">Archive Record</h2><button type="button" class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
     <div class="confirmation-body"><p>Are you sure you want to archive this curriculum?</p><p>The record will be removed from active views but retained in Archives.</p><strong id="curriculumArchiveName"></strong><div class="form-error" role="alert" hidden></div></div>
     <div class="modal-actions modal-actions-padded"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="button" class="button-danger" id="confirmCurriculumArchive">Archive</button></div>
   </section>
@@ -374,7 +374,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
   <section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="curriculumModalTitle">
     <div class="modal-header">
       <div><h2 id="curriculumModalTitle">New Curriculum</h2></div>
-      <button type="button" class="modal-close-button" data-modal-close aria-label="Close curriculum form"><i class="fa-solid fa-xmark"></i></button>
+      <button type="button" class="modal-close-button" data-modal-close aria-label="Close curriculum form"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
     </div>
     <form id="curriculumForm" class="domain-form">
       <input type="hidden" name="id" id="curriculumId"/>
@@ -390,7 +390,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
                     required/>
             <input type="hidden" name="academic_program_id" id="curriculumProgramId"/>
             <button type="button" class="record-autocomplete-clear" data-autocomplete-clear
-                    aria-label="Clear academic program" title="Clear selection" hidden><i class="fa-solid fa-xmark"></i></button>
+                    aria-label="Clear academic program" title="Clear selection" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
             <div class="record-autocomplete-options" id="curriculumProgramOptions"
                  role="listbox" aria-label="Academic program suggestions" hidden></div>
           </div>
@@ -410,7 +410,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
   <section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="versionModalTitle">
     <div class="modal-header">
       <div><h2 id="versionModalTitle">New Curriculum Version</h2><p class="modal-context" id="versionCurriculumContext"></p></div>
-      <button type="button" class="modal-close-button" data-modal-close aria-label="Close curriculum version form"><i class="fa-solid fa-xmark"></i></button>
+      <button type="button" class="modal-close-button" data-modal-close aria-label="Close curriculum version form"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
     </div>
     <form id="versionForm" class="domain-form">
       <input type="hidden" name="curriculum_id" id="versionCurriculumId"/>
@@ -433,7 +433,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
   <section class="modal-dialog modal-dialog-small" role="dialog" aria-modal="true" aria-labelledby="versionRenameTitle">
     <div class="modal-header">
       <div><h2 id="versionRenameTitle">Edit Version Name</h2><p class="modal-context">Rename this curriculum version.</p></div>
-      <button type="button" class="modal-close-button" data-modal-close aria-label="Close version rename form"><i class="fa-solid fa-xmark"></i></button>
+      <button type="button" class="modal-close-button" data-modal-close aria-label="Close version rename form"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
     </div>
     <form id="versionRenameForm" class="domain-form">
       <input type="hidden" name="id" id="versionRenameId"/>
@@ -451,7 +451,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
   <section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="assignmentModalTitle">
     <div class="modal-header">
       <div><h2 id="assignmentModalTitle">Assign Subject</h2><p class="modal-context" id="assignmentVersionContext"></p></div>
-      <button type="button" class="modal-close-button" data-modal-close aria-label="Close subject assignment form"><i class="fa-solid fa-xmark"></i></button>
+      <button type="button" class="modal-close-button" data-modal-close aria-label="Close subject assignment form"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
     </div>
     <form id="assignmentForm" class="domain-form">
       <input type="hidden" name="curriculum_version_id" id="assignmentVersionId"/>
@@ -462,7 +462,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
           <div class="record-autocomplete">
             <input type="search" id="assignmentSubjectInput" maxlength="100" placeholder="Search all subjects by code or title" required/>
             <input type="hidden" name="subject_id" id="assignmentSubjectId"/>
-            <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear subject" title="Clear selection" hidden><i class="fa-solid fa-xmark"></i></button>
+            <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear subject" title="Clear selection" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
             <div class="record-autocomplete-options" id="assignmentSubjectOptions" role="listbox" aria-label="Subject suggestions" hidden></div>
           </div>
           <small id="assignmentSubjectHint" role="status">Type a subject code or title, then select a match.</small>
@@ -483,7 +483,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
   <section class="modal-dialog modal-dialog-small" role="alertdialog" aria-modal="true" aria-labelledby="removeAssignmentTitle">
     <div class="modal-header">
       <div><h2 id="removeAssignmentTitle">Remove Subject Assignment?</h2></div>
-      <button type="button" class="modal-close-button" data-modal-close aria-label="Close removal confirmation"><i class="fa-solid fa-xmark"></i></button>
+      <button type="button" class="modal-close-button" data-modal-close aria-label="Close removal confirmation"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
     </div>
     <div class="confirmation-body"><p id="removeAssignmentMessage">This removes only the subject placement from this curriculum version. The Subject Master record will remain.</p><div class="form-error" role="alert" hidden></div></div>
     <div class="modal-actions modal-actions-padded"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="button" class="button-danger" id="confirmRemoveAssignment">Remove Placement</button></div>

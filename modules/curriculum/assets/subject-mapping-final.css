@@ -114,7 +114,7 @@
 .mapping-issue-row { grid-template-columns: minmax(70px, .3fr) minmax(0, 1fr) auto; }
 .mapping-issue-row > span > small { display: block; margin-top: 5px; }
 .mapping-review-success { display: flex; gap: 14px; align-items: start; }
-.mapping-review-success > i { color: #059669; font-size: 1.4rem; }
+.mapping-review-success > i { color: #059669; font-size: var(--csms-icon-lg, 20px); }
 .mapping-review-success strong { color: #263b58; }
 .mapping-review-success p { margin: 5px 0; }
 .mapping-review-success small { display: block; font-size: var(--csms-text-xs, .75rem); }

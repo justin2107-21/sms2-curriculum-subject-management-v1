@@ -179,9 +179,9 @@
         const actions = permissions.manage
             ? '<td><div class="mapping-action-group">' +
                 '<button type="button" class="row-action-button" data-edit-mapping="' + Number(mapping.id) +
-                '"><i class="fa-solid fa-pen"></i> Edit</button>' +
+                '"><i class="fa-solid fa-pen" aria-hidden="true"></i> Edit</button>' +
                 '<button type="button" class="remove-action-button" data-remove-mapping="' + Number(mapping.id) +
-                '"><i class="fa-solid fa-link-slash"></i> Remove</button></div></td>'
+                '"><i class="fa-solid fa-link-slash" aria-hidden="true"></i> Remove</button></div></td>'
             : '';
         return '<tr data-record-view="' + Number(mapping.id) + '" tabindex="0" aria-label="View mapping for ' +
             ui.escapeHtml(mapping.subject_code + ' ' + mapping.subject_title) + '">' +
@@ -363,7 +363,7 @@
         const button = this;
         const originalLabel = button.innerHTML;
         button.disabled = true;
-        button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Removing…';
+        button.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Removing…';
         const formData = new FormData();
         formData.set('action', 'remove');
         formData.set('id', state.pendingRemoval.id);

@@ -19,6 +19,7 @@ const urls = arg('urls', '/dashboard/dashboard.php').split(',').filter(Boolean);
 const widths = arg('widths', '1440,390').split(',').map(Number);
 const idle = arg('idle', '');
 const port = Number(arg('cdp-port', '9340'));
+const viewportHeight = Number(arg('height', '0')); // 0 = 900 (844 on phones)
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 async function main() {
@@ -71,7 +72,7 @@ async function main() {
       await send('Page.navigate', { url });
       await Promise.race([loaded, sleep(15000)]);
     };
-    const setWidth = w => send('Emulation.setDeviceMetricsOverride', { width: w, height: w < 600 ? 844 : 900, deviceScaleFactor: 1, mobile: w < 600 });
+    const setWidth = w => send('Emulation.setDeviceMetricsOverride', { width: w, height: viewportHeight || (w < 600 ? 844 : 900), deviceScaleFactor: 1, mobile: w < 600 });
     const shot = async file => {
       const metrics = await send('Page.getLayoutMetrics');
       const size = metrics.cssContentSize || metrics.contentSize;

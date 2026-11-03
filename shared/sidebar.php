@@ -56,7 +56,7 @@ $sidebarHasSystemItems = $sidebarCanManageRbac || $sidebarCanViewAudit || $sideb
     <div class="sidebar-brand sidebar-brand-2"><div class="brand-title">MAIN</div></div>
     <div class="nav-group">
       <a href="<?= $APP_ROOT ?>dashboard/dashboard.php" class="sidebar-item <?= $ACTIVE_NAV === 'dashboard' ? 'active' : '' ?>">
-        <i class="fa-solid fa-gauge"></i><span>Dashboard</span>
+        <i class="fa-solid fa-gauge" aria-hidden="true"></i><span>Dashboard</span>
       </a>
     </div>
     <?php endif; ?>
@@ -74,7 +74,7 @@ $sidebarHasSystemItems = $sidebarCanManageRbac || $sidebarCanViewAudit || $sideb
               aria-expanded="<?= $sidebarBuilderActive ? 'true' : 'false' ?>"
               aria-controls="curriculumBuilderSubmenu"
               data-sidebar-menu-toggle>
-        <i class="fa-solid fa-table-list"></i><span>Curriculum Builder</span>
+        <i class="fa-solid fa-table-list" aria-hidden="true"></i><span>Curriculum Builder</span>
         <i class="fa-solid fa-chevron-down sidebar-submenu-chevron" aria-hidden="true"></i>
       </button>
       <div class="sidebar-builder-submenu <?= $sidebarBuilderActive ? 'open' : '' ?>"
@@ -98,28 +98,28 @@ $sidebarHasSystemItems = $sidebarCanManageRbac || $sidebarCanViewAudit || $sideb
     <?php if ($sidebarCanViewSubjects): ?>
     <div class="nav-group">
       <a href="<?= $APP_ROOT ?>modules/curriculum/pages/subjects.php" class="sidebar-item <?= $ACTIVE_NAV === 'subjects' ? 'active' : '' ?>">
-        <i class="fa-solid fa-book"></i><span>Subjects</span>
+        <i class="fa-solid fa-book" aria-hidden="true"></i><span>Subjects</span>
       </a>
     </div>
     <?php endif; ?>
     <?php if ($sidebarCanViewCurriculum): ?>
     <div class="nav-group">
       <a href="<?= $APP_ROOT ?>modules/curriculum/pages/subject_mapping.php" class="sidebar-item <?= $ACTIVE_NAV === 'subject-mapping' ? 'active' : '' ?>">
-        <i class="fa-solid fa-diagram-project"></i><span>Subject Mapping</span>
+        <i class="fa-solid fa-diagram-project" aria-hidden="true"></i><span>Subject Mapping</span>
       </a>
     </div>
     <?php endif; ?>
     <?php if ($sidebarCanViewPrerequisites): ?>
     <div class="nav-group">
       <a href="<?= $APP_ROOT ?>modules/curriculum/pages/prerequisite_configuration.php" class="sidebar-item <?= $ACTIVE_NAV === 'prerequisite-configuration' ? 'active' : '' ?>">
-        <i class="fa-solid fa-code-branch"></i><span class="sidebar-long-label">Pre-requisite Configuration</span>
+        <i class="fa-solid fa-code-branch" aria-hidden="true"></i><span class="sidebar-long-label">Pre-requisite Configuration</span>
       </a>
     </div>
     <?php endif; ?>
     <?php if ($sidebarCanViewElectives): ?>
     <div class="nav-group">
       <a href="<?= $APP_ROOT ?>modules/curriculum/pages/electives_manager.php" class="sidebar-item <?= $ACTIVE_NAV === 'electives-manager' ? 'active' : '' ?>">
-        <i class="fa-solid fa-layer-group"></i><span class="sidebar-long-label">Electives Manager</span>
+        <i class="fa-solid fa-layer-group" aria-hidden="true"></i><span class="sidebar-long-label">Electives Manager</span>
       </a>
     </div>
     <?php endif; ?>
@@ -130,7 +130,7 @@ $sidebarHasSystemItems = $sidebarCanManageRbac || $sidebarCanViewAudit || $sideb
               aria-expanded="<?= $sidebarProgramAssignmentActive ? 'true' : 'false' ?>"
               aria-controls="programAssignmentSubmenu"
               data-sidebar-menu-toggle>
-        <i class="fa-solid fa-share-nodes"></i><span class="sidebar-long-label"><span class="sidebar-no-break">Academic Strand</span>/Course Assignment</span>
+        <i class="fa-solid fa-share-nodes" aria-hidden="true"></i><span class="sidebar-long-label"><span class="sidebar-no-break">Academic Strand</span>/Course Assignment</span>
         <i class="fa-solid fa-chevron-down sidebar-submenu-chevron" aria-hidden="true"></i>
       </button>
       <div class="sidebar-builder-submenu <?= $sidebarProgramAssignmentActive ? 'open' : '' ?>"
@@ -154,7 +154,7 @@ $sidebarHasSystemItems = $sidebarCanManageRbac || $sidebarCanViewAudit || $sideb
               aria-expanded="<?= $sidebarSubjectHistoryActive ? 'true' : 'false' ?>"
               aria-controls="subjectHistorySubmenu"
               data-sidebar-menu-toggle>
-        <i class="fa-solid fa-clock-rotate-left"></i><span class="sidebar-long-label">Subject Offering History</span>
+        <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><span class="sidebar-long-label">Subject Offering History</span>
         <i class="fa-solid fa-chevron-down sidebar-submenu-chevron" aria-hidden="true"></i>
       </button>
       <div class="sidebar-builder-submenu <?= $sidebarSubjectHistoryActive ? 'open' : '' ?>"
@@ -176,7 +176,7 @@ $sidebarHasSystemItems = $sidebarCanManageRbac || $sidebarCanViewAudit || $sideb
               aria-expanded="<?= $sidebarEquivalencyActive ? 'true' : 'false' ?>"
               aria-controls="subjectEquivalencySubmenu"
               data-sidebar-menu-toggle>
-        <i class="fa-solid fa-right-left"></i><span class="sidebar-long-label">Subject Equivalency Tool</span>
+        <i class="fa-solid fa-right-left" aria-hidden="true"></i><span class="sidebar-long-label">Subject Equivalency Tool</span>
         <i class="fa-solid fa-chevron-down sidebar-submenu-chevron" aria-hidden="true"></i>
       </button>
       <div class="sidebar-builder-submenu <?= $sidebarEquivalencyActive ? 'open' : '' ?>"
@@ -194,7 +194,7 @@ $sidebarHasSystemItems = $sidebarCanManageRbac || $sidebarCanViewAudit || $sideb
     <?php if ($sidebarCanViewGradeWeighting): ?>
     <div class="nav-group">
       <a href="<?= $APP_ROOT ?>modules/curriculum/pages/grade_weighting_setup.php" class="sidebar-item <?= $ACTIVE_NAV === 'grade-weighting' ? 'active' : '' ?>">
-        <i class="fa-solid fa-chart-pie"></i><span class="sidebar-long-label">Grade Weighting Setup</span>
+        <i class="fa-solid fa-chart-pie" aria-hidden="true"></i><span class="sidebar-long-label">Grade Weighting Setup</span>
       </a>
     </div>
     <?php endif; ?>
@@ -205,7 +205,7 @@ $sidebarHasSystemItems = $sidebarCanManageRbac || $sidebarCanViewAudit || $sideb
               aria-expanded="<?= $sidebarComplianceActive ? 'true' : 'false' ?>"
               aria-controls="complianceValidatorSubmenu"
               data-sidebar-menu-toggle>
-        <i class="fa-solid fa-shield-halved"></i><span class="sidebar-long-label">CHED / DepEd Compliance Validator</span>
+        <i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span class="sidebar-long-label">CHED / DepEd Compliance Validator</span>
         <i class="fa-solid fa-chevron-down sidebar-submenu-chevron" aria-hidden="true"></i>
       </button>
       <div class="sidebar-builder-submenu <?= $sidebarComplianceActive ? 'open' : '' ?>"
@@ -227,7 +227,7 @@ $sidebarHasSystemItems = $sidebarCanManageRbac || $sidebarCanViewAudit || $sideb
     <?php if ($sidebarCanViewCurriculumExport): ?>
     <div class="nav-group">
       <a href="<?= $APP_ROOT ?>modules/curriculum/pages/curriculum_export.php" class="sidebar-item <?= $ACTIVE_NAV === 'curriculum-export' ? 'active' : '' ?>">
-        <i class="fa-solid fa-file-export"></i><span class="sidebar-long-label">Curriculum Export Tool</span>
+        <i class="fa-solid fa-file-export" aria-hidden="true"></i><span class="sidebar-long-label">Curriculum Export Tool</span>
       </a>
     </div>
     <?php endif; ?>
@@ -239,27 +239,27 @@ $sidebarHasSystemItems = $sidebarCanManageRbac || $sidebarCanViewAudit || $sideb
     <?php if ($sidebarCanManageRbac): ?>
     <div class="nav-group">
       <a href="<?= $APP_ROOT ?>admin/users.php" class="sidebar-item <?= $ACTIVE_NAV === 'users' ? 'active' : '' ?>">
-        <i class="fa-solid fa-users"></i><span>Users</span>
+        <i class="fa-solid fa-users" aria-hidden="true"></i><span>Users</span>
       </a>
     </div>
     <div class="nav-group">
       <a href="<?= $APP_ROOT ?>admin/permissions.php" class="sidebar-item <?= $ACTIVE_NAV === 'permissions' ? 'active' : '' ?>">
-        <i class="fa-solid fa-user-shield"></i><span>Permissions</span>
+        <i class="fa-solid fa-user-shield" aria-hidden="true"></i><span>Permissions</span>
       </a>
     </div>
     <?php endif; ?>
     <?php if ($sidebarCanViewAudit): ?>
     <div class="nav-group">
       <a href="<?= $APP_ROOT ?>admin/audit_logs.php" class="sidebar-item <?= $ACTIVE_NAV === 'audit' ? 'active' : '' ?>">
-        <i class="fa-solid fa-clock-rotate-left"></i><span>Audit Logs</span>
+        <i class="fa-solid fa-clipboard-list" aria-hidden="true"></i><span>Audit Logs</span>
       </a>
     </div>
     <?php endif; ?>
-    <?php if ($sidebarCanViewSystemSettings): ?><div class="nav-group"><a href="<?= $APP_ROOT ?>admin/settings.php" class="sidebar-item <?= $ACTIVE_NAV === 'system-settings' ? 'active' : '' ?>"><i class="fa-solid fa-shield-halved"></i><span>System Settings</span></a></div><?php endif; ?>
+    <?php if ($sidebarCanViewSystemSettings): ?><div class="nav-group"><a href="<?= $APP_ROOT ?>admin/settings.php" class="sidebar-item <?= $ACTIVE_NAV === 'system-settings' ? 'active' : '' ?>"><i class="fa-solid fa-sliders" aria-hidden="true"></i><span>System Settings</span></a></div><?php endif; ?>
     <?php if ($sidebarCanViewSettings): ?>
     <div class="nav-group">
       <a href="<?= $APP_ROOT ?>dashboard/account.php" class="sidebar-item <?= $ACTIVE_NAV === 'settings' ? 'active' : '' ?>">
-        <i class="fa-solid fa-gear"></i><span>Account Settings</span>
+        <i class="fa-solid fa-gear" aria-hidden="true"></i><span>Account Settings</span>
       </a>
     </div>
     <?php endif; ?>

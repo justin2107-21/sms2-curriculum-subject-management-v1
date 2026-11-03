@@ -93,14 +93,14 @@ require __DIR__ . '/../../../shared/sidebar.php';
         data-reference-columns="<?= $referenceColumns ?>">
     <div class="page-title-bar curriculum-title-bar">
       <div>
-        <h1 class="page-title"><i class="fa-solid fa-shield-halved"></i> <?= htmlspecialchars($viewLabel, ENT_QUOTES, 'UTF-8') ?></h1>
+        <h1 class="page-title"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> <?= htmlspecialchars($viewLabel, ENT_QUOTES, 'UTF-8') ?></h1>
         <p class="page-subtitle"><?= htmlspecialchars($viewDescription, ENT_QUOTES, 'UTF-8') ?></p>
       </div>
-      <span class="read-only-pill"><i class="fa-solid fa-list-check"></i> Deterministic checks</span>
+      <span class="read-only-pill"><i class="fa-solid fa-list-check" aria-hidden="true"></i> Deterministic checks</span>
     </div>
 
     <p class="curriculum-notice compliance-disclaimer" role="note">
-      <i class="fa-solid fa-circle-info"></i>
+      <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
       Results are internal decision-support output only. They are not official CHED, DepEd, or Bestlink College approval, certification, or legal advice.
     </p>
 
@@ -109,7 +109,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
       <section class="domain-card mapping-filter-card" aria-labelledby="validationContextTitle">
         <div class="domain-card-header">
           <div><p class="eyebrow">Validation context</p><h2 id="validationContextTitle">Select a curriculum version</h2></div>
-          <?php if ($canRunCompliance): ?><button type="button" class="primary-action-button" id="runComplianceValidation" disabled><i class="fa-solid fa-play"></i> Run Validation</button><?php endif; ?>
+          <?php if ($canRunCompliance): ?><button type="button" class="primary-action-button" id="runComplianceValidation" disabled><i class="fa-solid fa-play" aria-hidden="true"></i> Run Validation</button><?php endif; ?>
         </div>
         <div class="mapping-filter-grid compliance-context-grid">
           <label class="mapping-filter-field"><span>Academic Program</span><select id="complianceProgram"><option value="">Loading programs...</option></select></label>
@@ -135,9 +135,9 @@ require __DIR__ . '/../../../shared/sidebar.php';
     <?php elseif ($complianceView === 'rules'): ?>
     <section class="compliance-panel" id="rulesPanel">
       <section class="domain-card compliance-list-card">
-        <div class="domain-card-header"><div><p class="eyebrow">Configurable deterministic checks</p><h2>Compliance Rules</h2><p class="mapping-context-message">Only active rules linked to verified references are evaluated.</p></div><?php if ($canManageCompliance): ?><button type="button" class="primary-action-button" id="newComplianceRule"><i class="fa-solid fa-plus"></i> New Rule</button><?php endif; ?></div>
+        <div class="domain-card-header"><div><p class="eyebrow">Configurable deterministic checks</p><h2>Compliance Rules</h2><p class="mapping-context-message">Only active rules linked to verified references are evaluated.</p></div><?php if ($canManageCompliance): ?><button type="button" class="primary-action-button" id="newComplianceRule"><i class="fa-solid fa-plus" aria-hidden="true"></i> New Rule</button><?php endif; ?></div>
         <div class="list-toolbar compliance-toolbar">
-          <label class="search-control"><span class="sr-only">Search rules</span><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="ruleSearch" maxlength="100" placeholder="Rule or reference"/></label>
+          <label class="search-control"><span class="sr-only">Search rules</span><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input type="search" id="ruleSearch" maxlength="100" placeholder="Rule or reference"/></label>
           <label class="select-control"><span>Type</span><select id="ruleTypeFilter"><option value="">All types</option><option value="MIN_TOTAL_UNITS">Minimum total units</option><option value="MAX_TOTAL_UNITS">Maximum total units</option><option value="REQUIRED_SUBJECT">Required subject</option><option value="MIN_SUBJECT_UNITS">Minimum subject units</option><option value="MAX_SUBJECT_UNITS">Maximum subject units</option></select></label>
           <label class="select-control"><span>Status</span><select id="ruleStatusFilter"><option value="">All</option><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
           <label class="select-control compact-select"><span>Rows</span><select id="rulePerPage"><option value="10">10</option><option value="20" selected>20</option><option value="50">50</option></select></label>
@@ -150,9 +150,9 @@ require __DIR__ . '/../../../shared/sidebar.php';
     <?php elseif ($complianceView === 'references'): ?>
     <section class="compliance-panel" id="referencesPanel">
       <section class="domain-card compliance-list-card">
-        <div class="domain-card-header"><div><p class="eyebrow">Traceable source registry</p><h2>Compliance References</h2><p class="mapping-context-message">“Verified” means internally confirmed as the intended source; it is not external regulatory certification.</p></div><?php if ($canManageCompliance): ?><button type="button" class="primary-action-button" id="newComplianceReference"><i class="fa-solid fa-plus"></i> New Reference</button><?php endif; ?></div>
+        <div class="domain-card-header"><div><p class="eyebrow">Traceable source registry</p><h2>Compliance References</h2><p class="mapping-context-message">“Verified” means internally confirmed as the intended source; it is not external regulatory certification.</p></div><?php if ($canManageCompliance): ?><button type="button" class="primary-action-button" id="newComplianceReference"><i class="fa-solid fa-plus" aria-hidden="true"></i> New Reference</button><?php endif; ?></div>
         <div class="list-toolbar compliance-toolbar">
-          <label class="search-control"><span class="sr-only">Search references</span><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="referenceSearch" maxlength="100" placeholder="Code, title, or issuing body"/></label>
+          <label class="search-control"><span class="sr-only">Search references</span><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input type="search" id="referenceSearch" maxlength="100" placeholder="Code, title, or issuing body"/></label>
           <label class="select-control"><span>Category</span><select id="referenceTypeFilter"><option value="">All</option><option value="CHED">CHED</option><option value="DEPED">DepEd</option><option value="INSTITUTIONAL">Institutional</option><option value="OTHER">Other</option></select></label>
           <label class="select-control"><span>Status</span><select id="referenceStatusFilter"><option value="">All</option><option value="draft">Draft</option><option value="verified">Verified</option><option value="inactive">Inactive</option></select></label>
           <label class="select-control compact-select"><span>Rows</span><select id="referencePerPage"><option value="10">10</option><option value="20" selected>20</option><option value="50">50</option></select></label>
@@ -166,7 +166,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
     <section class="compliance-panel" id="historyPanel">
       <section class="domain-card compliance-list-card">
         <div class="domain-card-header"><div><p class="eyebrow">Append-only validation snapshots</p><h2>Validation History</h2><p class="mapping-context-message">Historical results retain the rule and reference wording used at run time.</p></div></div>
-        <div class="list-toolbar compliance-toolbar"><label class="search-control"><span class="sr-only">Search validation history</span><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="historySearch" maxlength="100" placeholder="Program, curriculum, or version"/></label><label class="select-control compact-select"><span>Rows</span><select id="historyPerPage"><option value="10">10</option><option value="20" selected>20</option><option value="50">50</option></select></label></div>
+        <div class="list-toolbar compliance-toolbar"><label class="search-control"><span class="sr-only">Search validation history</span><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input type="search" id="historySearch" maxlength="100" placeholder="Program, curriculum, or version"/></label><label class="select-control compact-select"><span>Rows</span><select id="historyPerPage"><option value="10">10</option><option value="20" selected>20</option><option value="50">50</option></select></label></div>
         <div class="table-scroll" tabindex="0" aria-label="Scrollable validation history"><table class="domain-table compliance-history-table"><thead><tr><th>Run Date</th><th>Program</th><th>Curriculum</th><th>Version</th><th>Evaluated</th><th>Pass</th><th>Fail</th><th>Not Evaluated</th><th>Run By</th><th>Results</th></tr></thead><tbody id="complianceHistoryRows"><tr><td colspan="10" class="empty-cell">Loading validation history...</td></tr></tbody></table></div>
         <div class="pagination-bar" id="historyPagination"></div>
       </section>
@@ -179,7 +179,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <div class="curriculum-modal" id="complianceReferenceModal" hidden>
   <div class="modal-backdrop" data-modal-close></div>
   <section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="complianceReferenceModalTitle">
-    <div class="modal-header"><div><h2 id="complianceReferenceModalTitle">New Compliance Reference</h2><p class="modal-context">Register a traceable source without asserting official endorsement.</p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close reference form"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="modal-header"><div><h2 id="complianceReferenceModalTitle">New Compliance Reference</h2><p class="modal-context">Register a traceable source without asserting official endorsement.</p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close reference form"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
     <form class="domain-form" id="complianceReferenceForm">
       <input type="hidden" name="id" id="complianceReferenceId"/><div class="form-error" role="alert" hidden></div>
       <div class="form-grid">
@@ -204,7 +204,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <div class="curriculum-modal" id="complianceEvidenceModal" hidden>
   <div class="modal-backdrop" data-modal-close></div>
   <section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="complianceEvidenceTitle">
-    <div class="modal-header"><div><h2 id="complianceEvidenceTitle">Internal Source Assessment</h2><p class="modal-context">Record the evidence and scope of this internal assessment. It does not certify legal applicability or BCP adoption.</p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close assessment"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="modal-header"><div><h2 id="complianceEvidenceTitle">Internal Source Assessment</h2><p class="modal-context">Record the evidence and scope of this internal assessment. It does not certify legal applicability or BCP adoption.</p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close assessment"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
     <form class="domain-form" id="complianceEvidenceForm"><input type="hidden" name="id" id="complianceEvidenceReferenceId"/><div class="form-error" role="alert" hidden></div>
       <p id="complianceEvidenceReferenceLabel" class="curriculum-notice"></p><div id="complianceEvidenceHistory" class="compliance-evidence-history" aria-live="polite"></div>
       <div class="form-grid"><label class="form-field"><span>Assessment subject <strong>*</strong></span><select name="verification_subject" required><option value="document_identity">Document identity</option><option value="declared_origin">Declared origin</option><option value="applicability">Applicability</option></select></label><label class="form-field"><span>Result <strong>*</strong></span><select name="result" required><option value="not_assessed">Not assessed</option><option value="confirmed">Confirmed</option><option value="not_confirmed">Not confirmed</option></select></label><label class="form-field form-field-wide"><span>Evidence locator</span><input name="evidence_locator" maxlength="1000" placeholder="Local document identifier or page/section; no server URL fetch"/></label><label class="form-field form-field-wide"><span>Evidence SHA-256</span><input name="evidence_sha256" maxlength="64" pattern="[a-fA-F0-9]{64}" placeholder="Optional 64-character digest"/></label><label class="form-field form-field-wide"><span>Rationale <strong>*</strong></span><textarea name="rationale" maxlength="2000" rows="3" required></textarea></label></div>
@@ -218,10 +218,10 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <div class="curriculum-modal" id="complianceRuleModal" hidden>
   <div class="modal-backdrop" data-modal-close></div>
   <section class="modal-dialog modal-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="complianceRuleModalTitle">
-    <div class="modal-header"><div><h2 id="complianceRuleModalTitle">New Compliance Rule</h2><p class="modal-context">Configure one deterministic check from a registered source.</p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close rule form"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="modal-header"><div><h2 id="complianceRuleModalTitle">New Compliance Rule</h2><p class="modal-context">Configure one deterministic check from a registered source.</p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close rule form"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
     <form class="domain-form" id="complianceRuleForm">
       <input type="hidden" name="id" id="complianceRuleId"/><div class="form-error" role="alert" hidden></div>
-      <p class="compliance-history-lock" id="complianceRuleHistoryNotice" hidden><i class="fa-solid fa-lock"></i> This rule has history. Its reference, scope, type, subject, and threshold are locked to preserve traceability.</p>
+      <p class="compliance-history-lock" id="complianceRuleHistoryNotice" hidden><i class="fa-solid fa-lock" aria-hidden="true"></i> This rule has history. Its reference, scope, type, subject, and threshold are locked to preserve traceability.</p>
       <div class="form-grid">
         <label class="form-field form-field-wide"><span>Rule Name <strong>*</strong></span><input type="text" name="rule_name" id="complianceRuleName" maxlength="180" required/></label>
         <div class="form-field">
@@ -229,7 +229,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
           <div class="record-autocomplete">
             <input type="search" id="complianceRuleReferenceInput" maxlength="100" placeholder="Search reference code or title" required/>
             <input type="hidden" name="compliance_reference_id" id="complianceRuleReference"/>
-            <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear compliance reference" title="Clear selection" hidden><i class="fa-solid fa-xmark"></i></button>
+            <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear compliance reference" title="Clear selection" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
             <div class="record-autocomplete-options" id="complianceRuleReferenceOptions" role="listbox" aria-label="Compliance reference suggestions" hidden></div>
           </div>
         </div>
@@ -240,7 +240,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
           <div class="record-autocomplete">
             <input type="search" id="complianceRuleScopeInput" maxlength="100" placeholder="Select scope type first" required disabled/>
             <input type="hidden" name="scope_id" id="complianceRuleScope"/>
-            <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear scope record" title="Clear selection" hidden><i class="fa-solid fa-xmark"></i></button>
+            <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear scope record" title="Clear selection" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
             <div class="record-autocomplete-options" id="complianceRuleScopeOptions" role="listbox" aria-label="Scope record suggestions" hidden></div>
           </div>
         </div>
@@ -251,7 +251,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
           <div class="record-autocomplete">
             <input type="search" id="complianceRuleSubjectInput" maxlength="100" placeholder="Search all subjects by code or title"/>
             <input type="hidden" name="subject_id" id="complianceRuleSubject"/>
-            <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear configured subject" title="Clear selection" hidden><i class="fa-solid fa-xmark"></i></button>
+            <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear configured subject" title="Clear selection" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
             <div class="record-autocomplete-options" id="complianceRuleSubjectOptions" role="listbox" aria-label="Configured subject suggestions" hidden></div>
           </div>
         </div>
@@ -266,7 +266,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <div class="curriculum-modal record-details-modal" id="complianceRunModal" hidden>
   <div class="modal-backdrop" data-modal-close></div>
   <section class="modal-dialog modal-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="complianceRunModalTitle">
-    <div class="modal-header"><div><p class="modal-kicker">Compliance Validation History</p><h2 id="complianceRunModalTitle">Validation Run Results</h2><p class="modal-context" id="complianceRunModalContext"></p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close validation results"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="modal-header"><div><p class="modal-kicker">Compliance Validation History</p><h2 id="complianceRunModalTitle">Validation Run Results</h2><p class="modal-context" id="complianceRunModalContext"></p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close validation results"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
     <div class="modal-body"><div class="compliance-run-detail"><div class="compliance-summary" id="historyRunSummary"></div><div class="table-scroll" tabindex="0" aria-label="Scrollable historical compliance results"><table class="domain-table compliance-results-table"><thead><tr><th>Rule</th><th>Reference</th><th>Requirement</th><th>Actual</th><th>Result</th><th>Explanation</th></tr></thead><tbody id="historyRunResultRows"></tbody></table></div></div></div>
     <div class="modal-footer"><button type="button" class="button-muted" data-modal-close>Close</button></div>
   </section>

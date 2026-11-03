@@ -36,11 +36,11 @@ require __DIR__ . '/../shared/sidebar.php';
   <main class="content system-admin-content">
     <div class="page-title-bar">
       <div>
-        <h1 class="page-title"><i class="fa-solid fa-users"></i> Users</h1>
+        <h1 class="page-title"><i class="fa-solid fa-users" aria-hidden="true"></i> Users</h1>
         <p class="system-admin-subtitle">Manage prototype accounts and authoritative RBAC role assignments.</p>
       </div>
     </div>
-    <div class="system-admin-summary"><button class="primary-action-button" type="button" id="adminNewUser"><i class="fa-solid fa-plus"></i> Create User</button></div>
+    <div class="system-admin-summary"><button class="primary-action-button" type="button" id="adminNewUser"><i class="fa-solid fa-plus" aria-hidden="true"></i> Create User</button></div>
     <section class="system-admin-card" aria-label="User accounts">
       <p class="system-admin-summary">
         <?= number_format($totalUsers) ?> account<?= $totalUsers === 1 ? '' : 's' ?>.

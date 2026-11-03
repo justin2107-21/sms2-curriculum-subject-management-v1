@@ -167,7 +167,7 @@
         if (submitting) button.dataset.defaultLabel = button.innerHTML;
         button.disabled = submitting;
         button.innerHTML = submitting
-            ? '<i class="fa-solid fa-spinner fa-spin"></i> ' + escapeHtml(busyLabel || 'Saving…')
+            ? '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> ' + escapeHtml(busyLabel || 'Saving…')
             : (button.dataset.defaultLabel || button.innerHTML);
     }
 

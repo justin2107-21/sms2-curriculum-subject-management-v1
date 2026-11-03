@@ -35,7 +35,7 @@ require __DIR__ . '/../shared/sidebar.php';
   <main class="content system-admin-content">
     <div class="page-title-bar">
       <div>
-        <h1 class="page-title"><i class="fa-solid fa-user-shield"></i> Permissions</h1>
+        <h1 class="page-title"><i class="fa-solid fa-user-shield" aria-hidden="true"></i> Permissions</h1>
         <p class="system-admin-subtitle">Database-backed permissions for provisional roles, subject to client validation.</p>
       </div>
     </div>

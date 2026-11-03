@@ -363,7 +363,7 @@
 .dashboard-empty i {
   color: #9badd4;
   display: block;
-  font-size: 1.35rem;
+  font-size: var(--csms-icon-xl, 28px);
   margin-bottom: 8px;
 }
 

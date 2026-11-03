@@ -48,7 +48,7 @@ require_once __DIR__ . '/../shared/sidebar.php';
   <!-- Topbar -->
   <div class="topbar">
     <button class="hamburger" id="hamburgerBtn" aria-label="Toggle sidebar">
-      <i class="fa-solid fa-bars"></i>
+      <i class="fa-solid fa-bars" aria-hidden="true"></i>
     </button>
     <span class="topbar-spacer"></span>
     <div class="topbar-right">
@@ -63,7 +63,7 @@ require_once __DIR__ . '/../shared/sidebar.php';
     <!-- Page title -->
     <div class="page-title-bar">
       <h2 class="page-title">
-        <i class="fa-solid fa-house"></i>
+        <i class="fa-solid fa-chart-column" aria-hidden="true"></i>
         Reports
       </h2>
     </div>
@@ -74,7 +74,7 @@ require_once __DIR__ . '/../shared/sidebar.php';
       <!-- Welcome card -->
       <div class="info-card">
         <div class="card-label">
-          <i class="fa-solid fa-user-graduate"></i>
+          <i class="fa-solid fa-user-graduate" aria-hidden="true"></i>
           Welcome back
         </div>
         <div class="card-name"><?= $sess_first . ' ' . $sess_last ?></div>
@@ -88,7 +88,7 @@ require_once __DIR__ . '/../shared/sidebar.php';
       <?php if ($canViewStudents): ?>
       <div class="info-card">
         <div class="card-label">
-          <i class="fa-solid fa-users"></i>
+          <i class="fa-solid fa-users" aria-hidden="true"></i>
           Total Students
         </div>
         <div class="card-amount"><?= $total ?></div>
@@ -100,7 +100,7 @@ require_once __DIR__ . '/../shared/sidebar.php';
       <?php if ($canViewStudents): ?>
       <div class="info-card">
         <div class="card-label">
-          <i class="fa-solid fa-circle-dot"></i>
+          <i class="fa-solid fa-circle-dot" aria-hidden="true"></i>
           Status Breakdown
         </div>
         <div class="card-detail" style="margin-top:6px;">
@@ -121,13 +121,13 @@ require_once __DIR__ . '/../shared/sidebar.php';
            style="display:inline-flex; align-items:center; gap:8px; background:#eff6ff;
                   border-radius:8px; padding:12px 20px; text-decoration:none;
                   color:#2563eb; font-size:0.85rem; font-weight:600;">
-          <i class="fa-solid fa-gauge"></i> Dashboard
+          <i class="fa-solid fa-gauge" aria-hidden="true"></i> Dashboard
         </a>
         <a href="../dashboard/account.php"
            style="display:inline-flex; align-items:center; gap:8px; background:#f5f3ff;
                   border-radius:8px; padding:12px 20px; text-decoration:none;
                   color:#7c3aed; font-size:0.85rem; font-weight:600;">
-          <i class="fa-solid fa-user-gear"></i> Account Settings
+          <i class="fa-solid fa-user-gear" aria-hidden="true"></i> Account Settings
         </a>
       </div>
     </div>

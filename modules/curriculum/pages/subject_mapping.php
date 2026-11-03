@@ -75,17 +75,17 @@ require __DIR__ . '/../../../shared/sidebar.php';
       <section class="mapping-context-bar" aria-label="Curriculum mapping context">
         <label class="mapping-context-field"><span>Program / Strand</span><div class="record-autocomplete">
           <input type="search" id="mappingProgramInput" placeholder="Choose program" <?= $canViewPrograms ? '' : 'disabled' ?>/><input type="hidden" id="mappingProgramFilter"/>
-          <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear program" hidden><i class="fa-solid fa-xmark"></i></button><div class="record-autocomplete-options" id="mappingProgramOptions" role="listbox" aria-label="Program options" hidden></div>
+          <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear program" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button><div class="record-autocomplete-options" id="mappingProgramOptions" role="listbox" aria-label="Program options" hidden></div>
         </div></label>
-        <span class="mapping-context-separator" aria-hidden="true"><i class="fa-solid fa-chevron-right"></i></span>
+        <span class="mapping-context-separator" aria-hidden="true"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span>
         <label class="mapping-context-field"><span>Curriculum</span><div class="record-autocomplete">
           <input type="search" id="mappingCurriculumInput" placeholder="Choose curriculum"/><input type="hidden" id="mappingCurriculumFilter"/>
-          <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear curriculum" hidden><i class="fa-solid fa-xmark"></i></button><div class="record-autocomplete-options" id="mappingCurriculumOptions" role="listbox" aria-label="Curriculum options" hidden></div>
+          <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear curriculum" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button><div class="record-autocomplete-options" id="mappingCurriculumOptions" role="listbox" aria-label="Curriculum options" hidden></div>
         </div></label>
-        <span class="mapping-context-separator" aria-hidden="true"><i class="fa-solid fa-chevron-right"></i></span>
+        <span class="mapping-context-separator" aria-hidden="true"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span>
         <label class="mapping-context-field"><span>Curriculum Version</span><div class="record-autocomplete">
           <input type="search" id="mappingVersionInput" placeholder="Choose version" disabled/><input type="hidden" id="mappingVersionFilter"/>
-          <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear version" hidden><i class="fa-solid fa-xmark"></i></button><div class="record-autocomplete-options" id="mappingVersionOptions" role="listbox" aria-label="Version options" hidden></div>
+          <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear version" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button><div class="record-autocomplete-options" id="mappingVersionOptions" role="listbox" aria-label="Version options" hidden></div>
         </div></label>
       </section>
       <nav class="mapping-workspace-tabs" id="mappingWorkspaceTabs" role="tablist" aria-label="Subject Mapping views">
@@ -110,7 +110,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
       <section id="mappingPanelTrace" class="mapping-workspace-panel" role="tabpanel" aria-labelledby="mappingTabTrace" <?= $activeTab === 'trace' ? '' : 'hidden' ?>>
         <div class="mapping-trace-search"><p class="eyebrow">Find Subject Usage</p><h2>Where is this subject placed?</h2><p id="mappingTraceHelper">Search a Subject Master record to view all curriculum placements.</p><label class="mapping-context-field"><span>Subject</span><div class="record-autocomplete">
           <input type="search" id="mappingTraceSearch" placeholder="Search code or title..." <?= $canViewSubjects ? '' : 'disabled' ?>/><input type="hidden" id="mappingTraceSubjectId"/>
-          <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear subject" hidden><i class="fa-solid fa-xmark"></i></button><div class="record-autocomplete-options" id="mappingTraceOptions" role="listbox" aria-label="Subject options" hidden></div>
+          <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear subject" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button><div class="record-autocomplete-options" id="mappingTraceOptions" role="listbox" aria-label="Subject options" hidden></div>
         </div></label></div>
         <div id="mappingTraceResults"><p class="mapping-state"><?= $canViewSubjects ? 'Select a subject to view its curriculum placements.' : 'Subject Trace requires Subject Master view permission.' ?></p></div>
       </section>
@@ -181,7 +181,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
     <section class="modal-dialog modal-dialog-medium modal-dialog-scroll" role="dialog" aria-modal="true" aria-labelledby="mappingDetailsTitle">
       <div class="modal-header">
         <div><p class="modal-kicker">Placement Details</p><h2 id="mappingDetailsCode">Subject Code</h2><p class="modal-context" id="mappingDetailsTitle">Subject title</p></div>
-        <button type="button" class="modal-close-button" data-modal-close aria-label="Close mapping details"><i class="fa-solid fa-xmark"></i></button>
+        <button type="button" class="modal-close-button" data-modal-close aria-label="Close mapping details"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
       </div>
       <div class="modal-body">
         <div class="mapping-detail-chips"><span id="mappingDetailsUnits"></span><span id="mappingDetailsPlacement"></span></div>
@@ -198,7 +198,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
       </div>
       <div class="modal-footer">
         <button type="button" class="button-muted" data-modal-close>Close</button>
-        <?php if ($canManageMappings): ?><button type="button" class="button-primary" id="mappingDetailsEdit"><i class="fa-solid fa-pen"></i> Edit Placement</button><button type="button" class="button-danger" id="mappingDetailsRemove"><i class="fa-solid fa-link-slash"></i> Remove Placement</button><?php endif; ?>
+        <?php if ($canManageMappings): ?><button type="button" class="button-primary" id="mappingDetailsEdit"><i class="fa-solid fa-pen" aria-hidden="true"></i> Edit Placement</button><button type="button" class="button-danger" id="mappingDetailsRemove"><i class="fa-solid fa-link-slash" aria-hidden="true"></i> Remove Placement</button><?php endif; ?>
       </div>
     </section>
   </div>
@@ -212,7 +212,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
         <h2 id="addMappingTitle">Place Subject</h2>
         <p class="modal-context" id="addMappingContext"></p>
       </div>
-      <button type="button" class="modal-close-button" data-modal-close aria-label="Close add subject mapping form"><i class="fa-solid fa-xmark"></i></button>
+      <button type="button" class="modal-close-button" data-modal-close aria-label="Close add subject mapping form"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
     </div>
     <form class="domain-form" id="addMappingForm">
       <input type="hidden" name="curriculum_version_id" id="addMappingVersionId"/>
@@ -225,7 +225,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
           <div class="record-autocomplete">
             <input type="search" id="mappingSubjectSelectorSearch" maxlength="100" placeholder="Search all subjects by code or title" required/>
             <input type="hidden" name="subject_id" id="mappingSubjectId"/>
-            <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear subject" title="Clear selection" hidden><i class="fa-solid fa-xmark"></i></button>
+            <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear subject" title="Clear selection" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
             <div class="record-autocomplete-options" id="mappingSubjectOptions" role="listbox" aria-label="Subject suggestions" hidden></div>
           </div>
           <small id="mappingSubjectHint" role="status">Type a code or title and select a Subject Master record.</small><a href="subjects.php">Go to Subject Master</a>
@@ -246,7 +246,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
   <section class="modal-dialog modal-dialog-scroll" role="dialog" aria-modal="true" aria-labelledby="editMappingTitle">
     <div class="modal-header">
       <div><h2 id="editMappingTitle">Edit Placement</h2><p class="modal-context" id="editMappingContext"></p></div>
-      <button type="button" class="modal-close-button" data-modal-close aria-label="Close edit subject mapping form"><i class="fa-solid fa-xmark"></i></button>
+      <button type="button" class="modal-close-button" data-modal-close aria-label="Close edit subject mapping form"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
     </div>
     <form class="domain-form" id="editMappingForm">
       <input type="hidden" name="id" id="editMappingId"/>
@@ -273,7 +273,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
   <section class="modal-dialog modal-dialog-small" role="alertdialog" aria-modal="true" aria-labelledby="removeMappingTitle">
     <div class="modal-header">
       <div><h2 id="removeMappingTitle">Remove Subject Placement?</h2></div>
-      <button type="button" class="modal-close-button" data-modal-close aria-label="Close removal confirmation"><i class="fa-solid fa-xmark"></i></button>
+      <button type="button" class="modal-close-button" data-modal-close aria-label="Close removal confirmation"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
     </div>
     <div class="confirmation-body">
       <div id="removeMappingMessage"></div><p>This removes only the placement. The Subject Master record will remain.</p>

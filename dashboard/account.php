@@ -50,7 +50,7 @@ require __DIR__ . '/../shared/sidebar.php';
   <!-- Profile card -->
   <div class="settings-card">
     <div class="settings-card-header">
-      <i class="fa-solid fa-user"></i>
+      <i class="fa-solid fa-user" aria-hidden="true"></i>
       <h2>Profile Information</h2>
     </div>
     <div class="settings-card-body">
@@ -94,7 +94,7 @@ require __DIR__ . '/../shared/sidebar.php';
   <!-- Change password card -->
   <div class="settings-card">
     <div class="settings-card-header">
-      <i class="fa-solid fa-lock"></i>
+      <i class="fa-solid fa-lock" aria-hidden="true"></i>
       <h2>Change Password</h2>
     </div>
     <div class="settings-card-body">
@@ -141,7 +141,7 @@ require __DIR__ . '/../shared/sidebar.php';
   <!-- Danger zone -->
   <div class="settings-card">
     <div class="settings-card-header">
-      <i class="fa-solid fa-triangle-exclamation" style="color:#dc2626;"></i>
+      <i class="fa-solid fa-triangle-exclamation" aria-hidden="true" style="color:#dc2626;"></i>
       <h2 style="color:#dc2626;">Danger Zone</h2>
     </div>
     <div class="danger-zone">

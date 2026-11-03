@@ -379,7 +379,7 @@
         const button = document.getElementById('confirmProgramArchive');
         const original = button.innerHTML;
         button.disabled = true;
-        button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Archiving...';
+        button.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Archiving...';
         const formData = new FormData();
         formData.set('action', 'archive');
         formData.set('id', program.id);
@@ -458,8 +458,8 @@
     function programRow(program, category) {
         const actions = permissions.updatePrograms
             ? '<td class="row-actions"><div class="table-actions program-row-actions"><button type="button" class="row-action-button" data-edit-program="' +
-                Number(program.id) + '"><i class="fa-solid fa-pen"></i> Edit</button> ' +
-                '<button type="button" class="remove-action-button" data-archive-program="' + Number(program.id) + '"><i class="fa-solid fa-box-archive"></i> Archive</button></div></td>'
+                Number(program.id) + '"><i class="fa-solid fa-pen" aria-hidden="true"></i> Edit</button> ' +
+                '<button type="button" class="remove-action-button" data-archive-program="' + Number(program.id) + '"><i class="fa-solid fa-box-archive" aria-hidden="true"></i> Archive</button></div></td>'
             : '';
         const degreeLevelCell = category === 'shs' ? '' : '<td>' + ui.escapeHtml(programDegreeLevel(program)) + '</td>';
         return '<tr data-record-view="' + Number(program.id) + '" tabindex="0" aria-label="View academic program ' +
@@ -492,7 +492,7 @@
             if (!payload.programs.length) {
                 if (programCategory === 'shs') {
                     const createAction = permissions.createPrograms
-                        ? '<br><button type="button" class="secondary-action-button shs-empty-create" id="shsEmptyNewProgram"><i class="fa-solid fa-plus"></i> New Program</button>'
+                        ? '<br><button type="button" class="secondary-action-button shs-empty-create" id="shsEmptyNewProgram"><i class="fa-solid fa-plus" aria-hidden="true"></i> New Program</button>'
                         : '';
                     programRows.innerHTML = '<tr class="state-row"><td colspan="' + programColumns + '" class="state-cell">No Senior High School strands found.' + createAction + '</td></tr>';
                     document.getElementById('shsEmptyNewProgram')?.addEventListener('click', openCreateProgram);
@@ -516,8 +516,8 @@
 
     function curriculumProgramRow(program) {
         const actions = permissions.updatePrograms
-            ? '<td class="row-actions"><button type="button" class="row-action-button" data-edit-group-program="' + Number(program.id) + '"><i class="fa-solid fa-pen"></i> Edit</button> ' +
-                '<button type="button" class="remove-action-button" data-archive-group-program="' + Number(program.id) + '"><i class="fa-solid fa-box-archive"></i> Archive</button></td>'
+            ? '<td class="row-actions"><button type="button" class="row-action-button" data-edit-group-program="' + Number(program.id) + '"><i class="fa-solid fa-pen" aria-hidden="true"></i> Edit</button> ' +
+                '<button type="button" class="remove-action-button" data-archive-group-program="' + Number(program.id) + '"><i class="fa-solid fa-box-archive" aria-hidden="true"></i> Archive</button></td>'
             : '';
         return '<tr data-program-view="' + Number(program.id) + '" tabindex="0" role="link" aria-label="Open curricula for ' +
             ui.escapeHtml(program.program_name + ' ' + program.program_code) + '">' +
@@ -562,7 +562,7 @@
         const subjectCount = Number(curriculum.subject_count) || 0;
         return '<a class="subject-program-card curriculum-record-card" href="' + href + '" aria-label="Open curriculum ' +
             ui.escapeHtml(curriculum.curriculum_code + ' ' + curriculum.curriculum_name) + '">' +
-            '<span class="subject-program-icon" aria-hidden="true"><i class="fa-solid fa-book-open"></i></span>' +
+            '<span class="subject-program-icon" aria-hidden="true"><i class="fa-solid fa-book-open" aria-hidden="true"></i></span>' +
             '<strong>' + ui.escapeHtml(curriculum.curriculum_code) + '</strong>' +
             '<span class="subject-program-name">' + ui.escapeHtml(curriculum.curriculum_name) + '</span>' +
             '<span class="curriculum-record-kind">Curriculum</span>' +
@@ -598,7 +598,7 @@
             document.getElementById('selectedProgramCurriculumCount').textContent = count + (count === 1 ? ' Curriculum' : ' Curricula');
             if (!curricula.length) {
                 programCurriculaCards.innerHTML = '<div class="curriculum-empty-state"><p>No curricula created yet.</p>' +
-                    (permissions.createCurricula ? '<button type="button" class="primary-action-button" id="emptyNewCurriculum"><i class="fa-solid fa-plus"></i> New Curriculum</button>' : '') + '</div>';
+                    (permissions.createCurricula ? '<button type="button" class="primary-action-button" id="emptyNewCurriculum"><i class="fa-solid fa-plus" aria-hidden="true"></i> New Curriculum</button>' : '') + '</div>';
                 document.getElementById('emptyNewCurriculum')?.addEventListener('click', openCreateCurriculum);
                 return;
             }
@@ -652,7 +652,7 @@
         const selected = Number(curriculum.id) === state.selectedCurriculumId;
         const edit = permissions.updateCurricula
             ? '<button type="button" class="row-action-button" data-edit-curriculum="' + Number(curriculum.id) +
-                '"><i class="fa-solid fa-pen"></i> Edit</button>'
+                '"><i class="fa-solid fa-pen" aria-hidden="true"></i> Edit</button>'
             : '';
         return '<tr data-record-view="' + Number(curriculum.id) + '" tabindex="0" aria-label="View ' +
             ui.escapeHtml(curriculum.curriculum_code + ' ' + curriculum.curriculum_name) + '">' +
@@ -664,7 +664,7 @@
             '<td>' + (Number(curriculum.subject_count) || 0) + '</td>' +
             '<td>' + ui.statusBadge(curriculum.status) + '</td>' +
             '<td class="row-actions"><button type="button" class="view-button' + (selected ? ' selected' : '') +
-                '" data-view-curriculum="' + Number(curriculum.id) + '"><i class="fa-solid fa-eye"></i> View</button>' +
+                '" data-view-curriculum="' + Number(curriculum.id) + '"><i class="fa-solid fa-eye" aria-hidden="true"></i> View</button>' +
                 edit + '</td></tr>';
     }
 
@@ -1446,7 +1446,7 @@
         const button = this;
         button.disabled = true;
         const original = button.innerHTML;
-        button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Removing…';
+        button.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Removing…';
         const formData = new FormData();
         formData.set('action', 'remove');
         formData.set('id', state.pendingRemoval.id);

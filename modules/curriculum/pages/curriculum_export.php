@@ -49,17 +49,17 @@ require __DIR__ . '/../../../shared/sidebar.php';
     <section class="mapping-context-bar export-context-picker" id="exportContextPicker" aria-label="Select curriculum context">
       <label class="mapping-context-field"><span>Program / Strand</span><div class="record-autocomplete">
         <input type="search" id="exportProgramSearch" placeholder="Search code or program name"/><input type="hidden" id="exportProgram"/>
-        <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear program" hidden><i class="fa-solid fa-xmark"></i></button><div class="record-autocomplete-options" id="exportProgramOptions" role="listbox" aria-label="Program suggestions" hidden></div>
+        <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear program" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button><div class="record-autocomplete-options" id="exportProgramOptions" role="listbox" aria-label="Program suggestions" hidden></div>
       </div></label>
-      <span class="mapping-context-separator" aria-hidden="true"><i class="fa-solid fa-chevron-right"></i></span>
+      <span class="mapping-context-separator" aria-hidden="true"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span>
       <label class="mapping-context-field"><span>Curriculum</span><div class="record-autocomplete">
         <input type="search" id="exportCurriculumSearch" placeholder="Select a program first" disabled/><input type="hidden" id="exportCurriculum"/>
-        <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear curriculum" hidden><i class="fa-solid fa-xmark"></i></button><div class="record-autocomplete-options" id="exportCurriculumOptions" role="listbox" aria-label="Curriculum suggestions" hidden></div>
+        <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear curriculum" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button><div class="record-autocomplete-options" id="exportCurriculumOptions" role="listbox" aria-label="Curriculum suggestions" hidden></div>
       </div></label>
-      <span class="mapping-context-separator" aria-hidden="true"><i class="fa-solid fa-chevron-right"></i></span>
+      <span class="mapping-context-separator" aria-hidden="true"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span>
       <label class="mapping-context-field"><span>Curriculum Version</span><div class="record-autocomplete">
         <input type="search" id="exportVersionSearch" placeholder="Select a curriculum first" disabled/><input type="hidden" id="exportVersion"/>
-        <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear curriculum version" hidden><i class="fa-solid fa-xmark"></i></button><div class="record-autocomplete-options" id="exportVersionOptions" role="listbox" aria-label="Version suggestions" hidden></div>
+        <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear curriculum version" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button><div class="record-autocomplete-options" id="exportVersionOptions" role="listbox" aria-label="Version suggestions" hidden></div>
       </div></label>
     </section>
     <section class="domain-card export-scope-card" aria-label="Export scope">
@@ -78,17 +78,17 @@ require __DIR__ . '/../../../shared/sidebar.php';
     <section class="export-tab-panel" id="exportPanelPreview" role="tabpanel" aria-labelledby="exportTabPreview">
       <div class="domain-card export-preview-card">
         <div class="export-preview-heading"><div><p class="eyebrow">Document Preview</p><h2 id="exportPreviewTitle">Curriculum Structure</h2><p id="exportPreviewSummary" class="export-preview-summary"></p></div>
-          <button type="button" class="primary-action-button" id="generateCurriculumPreview" disabled><i class="fa-solid fa-rotate"></i> Generate</button></div>
+          <button type="button" class="primary-action-button" id="generateCurriculumPreview" disabled><i class="fa-solid fa-rotate" aria-hidden="true"></i> Generate</button></div>
         <div id="curriculumExportPreview" class="export-report-host"><div class="export-empty-state"><p>Select a Program / Strand, Curriculum, and Curriculum Version to preview an export.</p></div></div>
       </div>
     </section>
 
     <section class="export-tab-panel" id="exportPanelCsv" role="tabpanel" aria-labelledby="exportTabCsv" hidden>
-      <div class="domain-card export-format-card"><div><h2>CSV Export</h2><p>Download the selected curriculum scope's stored subjects, placements, and units as a UTF-8 CSV file.</p><p class="export-format-scope">Current scope: <strong data-scope-label>Entire Curriculum</strong></p></div><button type="button" class="primary-action-button" id="downloadCurriculumCsv" disabled><i class="fa-solid fa-download"></i> Download CSV</button></div>
+      <div class="domain-card export-format-card"><div><h2>CSV Export</h2><p>Download the selected curriculum scope's stored subjects, placements, and units as a UTF-8 CSV file.</p><p class="export-format-scope">Current scope: <strong data-scope-label>Entire Curriculum</strong></p></div><button type="button" class="primary-action-button" id="downloadCurriculumCsv" disabled><i class="fa-solid fa-download" aria-hidden="true"></i> Download CSV</button></div>
     </section>
 
     <section class="export-tab-panel" id="exportPanelPrint" role="tabpanel" aria-labelledby="exportTabPrint" hidden>
-      <div class="domain-card export-format-card"><div><h2>Print / Save as PDF</h2><p>Open a print-ready version of the currently selected curriculum scope.</p><p class="export-format-scope">Current scope: <strong data-scope-label>Entire Curriculum</strong></p></div><button type="button" class="primary-action-button" id="printCurriculumExport" disabled><i class="fa-solid fa-print"></i> Print Curriculum</button></div>
+      <div class="domain-card export-format-card"><div><h2>Print / Save as PDF</h2><p>Open a print-ready version of the currently selected curriculum scope.</p><p class="export-format-scope">Current scope: <strong data-scope-label>Entire Curriculum</strong></p></div><button type="button" class="primary-action-button" id="printCurriculumExport" disabled><i class="fa-solid fa-print" aria-hidden="true"></i> Print Curriculum</button></div>
     </section>
     <p class="export-action-status" id="exportActionStatus" role="status" aria-live="polite">Select a Program / Strand, Curriculum, and Curriculum Version to preview an export.</p>
     </section>

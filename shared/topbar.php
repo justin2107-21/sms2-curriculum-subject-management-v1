@@ -26,7 +26,7 @@ $topbarTokensVersion = is_file($topbarTokensPath) ? (string)filemtime($topbarTok
   <span class="topbar-spacer"></span>
   <div class="topbar-right">
     <div class="local-time-display" aria-label="Current local time">
-      <i class="fa-regular fa-clock" aria-hidden="true"></i>
+      <i class="fa-solid fa-clock" aria-hidden="true"></i>
       <time id="localTime">--:--:-- --</time>
     </div>
     <a href="<?= htmlspecialchars($topbarAppRoot . 'dashboard/account.php', ENT_QUOTES, 'UTF-8') ?>"

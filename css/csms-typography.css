@@ -48,7 +48,7 @@ table {
   line-height: 1.2;
 }
 
-.page-title i { font-size: .9em; }
+.page-title i { font-size: var(--csms-icon-md, 16px); }
 
 .page-subtitle,
 .dashboard-subtitle,
@@ -461,7 +461,7 @@ a.sidebar-item > i {
 }
 .row-action-button i,
 .view-button i,
-.remove-action-button i { font-size: 12px; }
+.remove-action-button i { font-size: var(--csms-icon-sm, 14px); }
 
 /* Keep long user names and audit values inside their scrollable table regions. */
 .system-admin-table-wrap,

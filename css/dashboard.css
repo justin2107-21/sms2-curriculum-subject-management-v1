@@ -445,7 +445,7 @@ body:has(.sidebar.collapsed) .main {
 }
 
 .topbar .hamburger > i {
-  font-size: 20px;
+  font-size: var(--csms-icon-lg, 20px);
   transform: rotate(0deg);
   transition: color 200ms ease, text-shadow 200ms ease,
               transform 350ms cubic-bezier(.4, 0, .2, 1);

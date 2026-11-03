@@ -74,14 +74,14 @@ require __DIR__ . '/../../../shared/sidebar.php';
         data-record-column-count="<?= $recordColumnCount ?>">
     <div class="page-title-bar curriculum-title-bar">
       <div>
-        <h1 class="page-title"><i class="fa-solid fa-right-left"></i> <?= htmlspecialchars($viewLabel, ENT_QUOTES, 'UTF-8') ?></h1>
+        <h1 class="page-title"><i class="fa-solid fa-right-left" aria-hidden="true"></i> <?= htmlspecialchars($viewLabel, ENT_QUOTES, 'UTF-8') ?></h1>
         <p class="page-subtitle"><?= htmlspecialchars($viewDescription, ENT_QUOTES, 'UTF-8') ?></p>
       </div>
-      <?php if ($isComparisonView): ?><div class="equivalency-header-actions"><button type="button" class="button-muted" id="reviewWithCimf" disabled><i class="fa-solid fa-sparkles"></i> Review with CIMF</button><?php if ($canManageEquivalencies): ?><button type="button" class="button-primary" id="headerRecordDecision" disabled><i class="fa-solid fa-plus"></i> Record Decision</button><?php endif; ?></div><?php else: ?><span class="read-only-pill"><i class="fa-solid fa-user-check"></i> Human authority required</span><?php endif; ?>
+      <?php if ($isComparisonView): ?><div class="equivalency-header-actions"><button type="button" class="button-muted" id="reviewWithCimf" disabled><i class="fa-solid fa-sparkles" aria-hidden="true"></i> Review with CIMF</button><?php if ($canManageEquivalencies): ?><button type="button" class="button-primary" id="headerRecordDecision" disabled><i class="fa-solid fa-plus" aria-hidden="true"></i> Record Decision</button><?php endif; ?></div><?php else: ?><span class="read-only-pill"><i class="fa-solid fa-user-check" aria-hidden="true"></i> Human authority required</span><?php endif; ?>
     </div>
 
     <p class="curriculum-notice equivalency-authority-notice" role="note">
-      <i class="fa-solid fa-circle-info"></i>
+      <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
       <?php if ($isComparisonView): ?>Objective differences support review only. The system never automatically declares subjects equivalent.<?php else: ?>Human-reviewed records only. Subject pairs are treated as non-directional.<?php endif; ?>
     </p>
 
@@ -90,7 +90,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
       <section class="domain-card equivalency-selector-card" aria-labelledby="subjectSelectorTitle">
         <div class="domain-card-header">
           <div><p class="eyebrow">Read-only comparison</p><h2 id="subjectSelectorTitle">Select two Subject Master records</h2></div>
-          <button type="button" class="button-muted" id="clearSubjectComparison"><i class="fa-solid fa-rotate-left"></i> Clear Comparison</button>
+          <button type="button" class="button-muted" id="clearSubjectComparison"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i> Clear Comparison</button>
         </div>
         <div class="equivalency-selector-grid">
           <div class="equivalency-subject-selector">
@@ -99,7 +99,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
               <div class="record-autocomplete">
                 <input type="search" id="subjectASearch" maxlength="100" placeholder="Search code or title" required/>
                 <input type="hidden" id="subjectASelect"/>
-                <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Subject A" title="Clear selection" hidden><i class="fa-solid fa-xmark"></i></button>
+                <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Subject A" title="Clear selection" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
                 <div class="record-autocomplete-options" id="subjectAOptions" role="listbox" aria-label="Subject A suggestions" hidden></div>
               </div>
             </div>
@@ -110,13 +110,13 @@ require __DIR__ . '/../../../shared/sidebar.php';
               <div class="record-autocomplete">
                 <input type="search" id="subjectBSearch" maxlength="100" placeholder="Search code or title" required/>
                 <input type="hidden" id="subjectBSelect"/>
-                <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Subject B" title="Clear selection" hidden><i class="fa-solid fa-xmark"></i></button>
+                <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Subject B" title="Clear selection" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
                 <div class="record-autocomplete-options" id="subjectBOptions" role="listbox" aria-label="Subject B suggestions" hidden></div>
               </div>
             </div>
           </div>
           <div class="equivalency-compare-action">
-            <button type="button" class="button-primary" id="compareSubjectsButton" disabled><i class="fa-solid fa-scale-balanced"></i> Compare Subjects</button>
+            <button type="button" class="button-primary" id="compareSubjectsButton" disabled><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i> Compare Subjects</button>
           </div>
         </div>
       </section>
@@ -148,7 +148,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
     <?php else: ?>
     <section id="recordsPanel" class="subject-equivalency-panel">
       <section class="domain-card mapping-filter-card" aria-labelledby="equivalencyFiltersTitle">
-        <div class="domain-card-header"><div><p class="eyebrow">Explicit human decisions</p><h2 id="equivalencyFiltersTitle">Find equivalency records</h2></div><button type="button" class="button-muted" id="clearEquivalencyFilters"><i class="fa-solid fa-rotate-left"></i> Clear Filters</button></div>
+        <div class="domain-card-header"><div><p class="eyebrow">Explicit human decisions</p><h2 id="equivalencyFiltersTitle">Find equivalency records</h2></div><button type="button" class="button-muted" id="clearEquivalencyFilters"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i> Clear Filters</button></div>
         <div class="mapping-filter-grid equivalency-filter-grid">
           <label class="mapping-filter-field"><span>Subject Search</span><input type="search" id="equivalencySearch" maxlength="100" placeholder="Subject code or title"/></label>
           <label class="mapping-filter-field"><span>Decision Status</span><select id="equivalencyStatus"><option value="">All Decisions</option><option value="equivalent">Equivalent</option><option value="not_equivalent">Not Equivalent</option><option value="needs_review">Needs Further Review</option></select></label>
@@ -171,7 +171,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <div class="curriculum-modal" id="equivalencyReviewModal" hidden>
   <div class="modal-backdrop" data-modal-close></div>
   <section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="equivalencyReviewTitle">
-    <div class="modal-header"><div><h2 id="equivalencyReviewTitle">Record Equivalency Decision</h2><p class="modal-context" id="equivalencyReviewContext"></p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close equivalency review form"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="modal-header"><div><h2 id="equivalencyReviewTitle">Record Equivalency Decision</h2><p class="modal-context" id="equivalencyReviewContext"></p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close equivalency review form"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
     <form class="domain-form" id="equivalencyReviewForm">
       <input type="hidden" name="id" id="equivalencyRecordId"/>
       <input type="hidden" name="subject_a_id" id="equivalencySubjectAId"/>
@@ -188,9 +188,9 @@ require __DIR__ . '/../../../shared/sidebar.php';
 </div>
 <?php endif; ?>
 
-<div class="curriculum-modal" id="equivalencyDetailsModal" hidden><div class="modal-backdrop" data-modal-close></div><section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="equivalencyDetailsTitle"><div class="modal-header"><div><h2 id="equivalencyDetailsTitle">Equivalency Details</h2></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close details"><i class="fa-solid fa-xmark"></i></button></div><div class="equivalency-details" id="equivalencyDetails"></div><div class="modal-actions"><button type="button" class="button-muted" data-modal-close>Close</button></div></section></div>
+<div class="curriculum-modal" id="equivalencyDetailsModal" hidden><div class="modal-backdrop" data-modal-close></div><section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="equivalencyDetailsTitle"><div class="modal-header"><div><h2 id="equivalencyDetailsTitle">Equivalency Details</h2></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close details"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div><div class="equivalency-details" id="equivalencyDetails"></div><div class="modal-actions"><button type="button" class="button-muted" data-modal-close>Close</button></div></section></div>
 
-<?php if ($canManageEquivalencies): ?><div class="curriculum-modal" id="equivalencyArchiveModal" hidden><div class="modal-backdrop" data-modal-close></div><section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="equivalencyArchiveTitle"><div class="modal-header"><div><h2 id="equivalencyArchiveTitle">Archive Equivalency Record</h2></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close archive confirmation"><i class="fa-solid fa-xmark"></i></button></div><p class="equivalency-archive-copy">This record will no longer appear as active/current. Historical data will be retained.</p><div class="modal-actions"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="button" class="button-danger" id="confirmArchiveEquivalency">Archive Record</button></div></section></div><?php endif; ?>
+<?php if ($canManageEquivalencies): ?><div class="curriculum-modal" id="equivalencyArchiveModal" hidden><div class="modal-backdrop" data-modal-close></div><section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="equivalencyArchiveTitle"><div class="modal-header"><div><h2 id="equivalencyArchiveTitle">Archive Equivalency Record</h2></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close archive confirmation"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div><p class="equivalency-archive-copy">This record will no longer appear as active/current. Historical data will be retained.</p><div class="modal-actions"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="button" class="button-danger" id="confirmArchiveEquivalency">Archive Record</button></div></section></div><?php endif; ?>
 
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 <script src="../assets/curriculum-common.js?v=<?= $curriculumCommonVersion ?>"></script>

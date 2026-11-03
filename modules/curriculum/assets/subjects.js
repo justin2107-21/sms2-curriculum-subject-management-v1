@@ -209,8 +209,8 @@
 
     function subjectRow(subject) {
         const action = '<td class="row-actions subject-row-actions">' +
-            '<button type="button" class="row-action-button" data-view-subject="' + Number(subject.id) + '"><i class="fa-regular fa-eye"></i> View</button>' +
-            (canUpdate ? '<button type="button" class="row-action-button" data-edit-subject="' + Number(subject.id) + '"><i class="fa-solid fa-pen"></i> Edit</button>' : '') +
+            '<button type="button" class="row-action-button" data-view-subject="' + Number(subject.id) + '"><i class="fa-solid fa-eye" aria-hidden="true"></i> View</button>' +
+            (canUpdate ? '<button type="button" class="row-action-button" data-edit-subject="' + Number(subject.id) + '"><i class="fa-solid fa-pen" aria-hidden="true"></i> Edit</button>' : '') +
             '</td>';
         return '<tr data-record-view="' + Number(subject.id) + '" tabindex="0" aria-label="View ' +
             ui.escapeHtml(subject.subject_code + ' ' + subject.subject_title) + '">' +

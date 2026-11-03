@@ -63,7 +63,7 @@
         $('groupsPanel').hidden=!ready || state.tab!=='groups'; $('reviewPanel').hidden=!ready || state.tab!=='review';
         if(!ready) {
             $('groupCards').innerHTML=''; $('reviewCounters').innerHTML=''; $('reviewIssues').innerHTML='';
-            $('electiveState').innerHTML='<i class="fa-solid fa-bullseye"></i><h2>Select a Program, Curriculum, and Version</h2><p>Select context to view elective groups.</p>';
+            $('electiveState').innerHTML='<i class="fa-solid fa-bullseye" aria-hidden="true"></i><h2>Select a Program, Curriculum, and Version</h2><p>Select context to view elective groups.</p>';
             return;
         }
         const groups=ui.searchRecords(state.data.groups,$('groupSearch').value,g=>[g.group_name]).filter(g=> (!$('yearFilter').value || g.year_level===$('yearFilter').value) && (!$('termFilter').value || g.semester===$('termFilter').value) && (!$('statusFilter').value ? g.status!=='archived' : g.status===$('statusFilter').value));

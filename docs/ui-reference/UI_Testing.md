@@ -31,7 +31,7 @@ powershell -ExecutionPolicy Bypass -File tools\uitest\run.ps1 -Role all -Urls "/
 ```
 - Starts `php -S 127.0.0.1:8090 -t C:\xampp\htdocs` (URLs keep `/sms-csms/`, e.g. `http://127.0.0.1:8090/sms-csms/dashboard/dashboard.php`), bound to 127.0.0.1 only, and always stops it.
 - `tools/uitest/screens.cjs` drives headless Edge over the DevTools protocol (no extra packages), signs in through the real form, and saves full-page screenshots.
-- Options: `-Role admin|staff|reviewer|viewer|legacyadmin|all`, `-Widths 1440,390`, `-IdleSeconds 300` (idle sign-out check), `-Out <folder>` (default `%TEMP%\csms-uitest\<timestamp>`).
+- Options: `-Role admin|staff|reviewer|viewer|legacyadmin|all`, `-Widths 1440,390`, `-IdleSeconds 300` (idle sign-out check), `-Out <folder>` (default `%TEMP%\csms-uitest\<timestamp>`). Also `-Height <px>` (taller viewport, e.g. 1500, to see the whole sidebar in a screenshot) and `-ServerPort` / `-CdpPort` for parallel runs.
 
 ## Reading the output
 `report-<role>.json` per role: `login.ok`, and per page `finalPath` (a redirect to sign-in or another page shows here), `horizontalOverflow`, and `issues` (`console`, `exception`, `log`, `http` ≥ 400, `network`). The idle check records the warning (`warnings`), `loggedOutAt` and the server's answer to a request with the expired session.

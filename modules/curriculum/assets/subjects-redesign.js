@@ -171,7 +171,7 @@
         const cards = programs.length ? programs.map(item => {
             const label = item.card_context_label || (Number(item.curriculum_count) ? Number(item.curriculum_count) + ' curricula' : 'No curriculum yet');
             return '<a class="subject-program-card" href="subjects.php?program_id=' + Number(item.id) + '" aria-label="Browse ' + escape(item.program_code + ' ' + item.program_name) + '">' +
-                '<span class="subject-program-icon" aria-hidden="true"><i class="fa-solid ' + (type === 'shs' ? 'fa-book-open' : 'fa-graduation-cap') + '"></i></span>' +
+                '<span class="subject-program-icon" aria-hidden="true"><i class="fa-solid ' + (type === 'shs' ? 'fa-book-open' : 'fa-graduation-cap') + '" aria-hidden="true"></i></span>' +
                 '<strong class="program-code-pill">' + escape(item.program_code) + '</strong><span class="subject-program-name">' + escape(item.program_name) + '</span>' +
                 '<span class="subject-program-meta"><small>' + Number(item.subject_count || 0) + ' Subjects</small><small>' + escape(label) + '</small><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></span></a>';
         }).join('') : '<p class="subject-empty-state">' + (type === 'shs' ? 'No Senior High School strands are currently recorded.' : 'No college programs match this search.') + '</p>';

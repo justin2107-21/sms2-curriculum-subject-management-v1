@@ -138,7 +138,7 @@
         const safe = Object.prototype.hasOwnProperty.call(labels, result) ? result : 'not_available';
         const label = safe === 'same' && field === 'units' ? 'Same Unit Value' : labels[safe][1];
         return '<span class="equivalency-result-badge equivalency-result-' + safe.replaceAll('_', '-') +
-            '"><i class="fa-solid ' + labels[safe][0] + '"></i> ' + label + '</span>';
+            '"><i class="fa-solid ' + labels[safe][0] + '" aria-hidden="true"></i> ' + label + '</span>';
     }
 
     function renderUsage(container, usage) {
@@ -226,7 +226,7 @@
         if (!subjectAId || !subjectBId || subjectAId === subjectBId) return;
         const requestId = ++state.comparisonRequest;
         elements.compareButton.disabled = true;
-        elements.compareButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Comparing...';
+        elements.compareButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Comparing...';
         try {
             const payload = await ui.fetchJson(endpoint, {
                 action: 'compare', subject_a_id: subjectAId, subject_b_id: subjectBId,
@@ -240,7 +240,7 @@
             }
         } finally {
             if (requestId === state.comparisonRequest) {
-                elements.compareButton.innerHTML = '<i class="fa-solid fa-scale-balanced"></i> Compare Subjects';
+                elements.compareButton.innerHTML = '<i class="fa-solid fa-scale-balanced" aria-hidden="true"></i> Compare Subjects';
                 updateCompareButton();
             }
         }

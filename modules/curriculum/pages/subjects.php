@@ -167,7 +167,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
   <section class="modal-dialog modal-dialog-medium modal-dialog-scroll" role="dialog" aria-modal="true" aria-labelledby="subjectDetailsTitle">
     <div class="modal-header">
       <div><h2 id="subjectDetailsTitle">Subject Code</h2><p class="modal-context" id="subjectDetailsCode"></p></div>
-      <button type="button" class="modal-close-button" data-modal-close aria-label="Close subject details"><i class="fa-solid fa-xmark"></i></button>
+      <button type="button" class="modal-close-button" data-modal-close aria-label="Close subject details"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
     </div>
     <div class="modal-body">
       <div class="subject-detail-chips"><span class="subject-unit-chip" id="subjectDetailsUnits"></span><span id="subjectDetailsStatus"></span></div>
@@ -180,7 +180,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
     </div>
     <div class="modal-footer">
       <button type="button" class="button-muted" data-modal-close>Close</button>
-      <?php if ($canUpdateSubjects): ?><button type="button" class="button-primary" id="subjectDetailsEdit"><i class="fa-solid fa-pen"></i> Edit Subject</button><button type="button" class="button-danger" id="subjectDetailsArchive" hidden><i class="fa-solid fa-box-archive"></i> Archive</button><?php endif; ?>
+      <?php if ($canUpdateSubjects): ?><button type="button" class="button-primary" id="subjectDetailsEdit"><i class="fa-solid fa-pen" aria-hidden="true"></i> Edit Subject</button><button type="button" class="button-danger" id="subjectDetailsArchive" hidden><i class="fa-solid fa-box-archive" aria-hidden="true"></i> Archive</button><?php endif; ?>
     </div>
   </section>
 </div>
@@ -189,7 +189,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <?php if ($canUpdateSubjects): ?>
 <div class="curriculum-modal" id="subjectArchiveModal" hidden><div class="modal-backdrop" data-modal-close></div>
   <section class="modal-dialog modal-dialog-small" role="alertdialog" aria-modal="true" aria-labelledby="subjectArchiveTitle">
-    <div class="modal-header"><h2 id="subjectArchiveTitle">Archive Record</h2><button class="modal-close-button" type="button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="modal-header"><h2 id="subjectArchiveTitle">Archive Record</h2><button class="modal-close-button" type="button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
     <div class="confirmation-body"><p>Are you sure you want to archive this subject?</p><p>The record will be removed from active views but retained in Archives.</p><strong id="subjectArchiveName"></strong><div class="form-error" role="alert" hidden></div></div>
     <div class="modal-actions modal-actions-padded"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="button" class="button-danger" id="confirmSubjectArchive">Archive</button></div>
   </section>
@@ -200,7 +200,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
   <section class="modal-dialog modal-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="subjectModalTitle">
     <div class="modal-header">
       <div><h2 id="subjectModalTitle">New Subject</h2><p class="modal-context" id="subjectModalSubtitle">Create the subject record and its curriculum placement together.</p></div>
-      <button type="button" class="modal-close-button" data-modal-close aria-label="Close subject form"><i class="fa-solid fa-xmark"></i></button>
+      <button type="button" class="modal-close-button" data-modal-close aria-label="Close subject form"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
     </div>
     <form id="subjectForm" class="domain-form">
       <input type="hidden" name="id" id="subjectId"/>
@@ -223,19 +223,19 @@ require __DIR__ . '/../../../shared/sidebar.php';
             <div class="form-field"><label for="subjectAssignmentProgramInput">Program / Strand <strong>*</strong></label><div class="record-autocomplete">
               <input type="search" id="subjectAssignmentProgramInput" placeholder="Search program code or name" required/>
               <input type="hidden" id="subjectAssignmentProgramId"/>
-              <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear academic program" title="Clear selection" hidden><i class="fa-solid fa-xmark"></i></button>
+              <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear academic program" title="Clear selection" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
               <div class="record-autocomplete-options" id="subjectAssignmentProgramOptions" role="listbox" aria-label="Academic program suggestions" hidden></div>
             </div></div>
             <div class="form-field"><label for="subjectAssignmentCurriculumInput">Curriculum <strong>*</strong></label><div class="record-autocomplete">
               <input type="search" id="subjectAssignmentCurriculumInput" placeholder="Select a program first" required disabled/>
               <input type="hidden" id="subjectAssignmentCurriculumId"/>
-              <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear curriculum" title="Clear selection" hidden><i class="fa-solid fa-xmark"></i></button>
+              <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear curriculum" title="Clear selection" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
               <div class="record-autocomplete-options" id="subjectAssignmentCurriculumOptions" role="listbox" aria-label="Curriculum suggestions" hidden></div>
             </div></div>
             <div class="form-field"><label for="subjectAssignmentVersionInput">Curriculum Version <strong>*</strong></label><div class="record-autocomplete">
               <input type="search" id="subjectAssignmentVersionInput" placeholder="Select a curriculum first" required disabled/>
               <input type="hidden" name="curriculum_version_id" id="subjectAssignmentVersionId"/>
-              <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear curriculum version" title="Clear selection" hidden><i class="fa-solid fa-xmark"></i></button>
+              <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear curriculum version" title="Clear selection" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
               <div class="record-autocomplete-options" id="subjectAssignmentVersionOptions" role="listbox" aria-label="Curriculum version suggestions" hidden></div>
             </div></div>
             <label class="form-field"><span id="subjectAssignmentYearLabel">Year Level <strong>*</strong></span><select id="subjectAssignmentYear" required><option value="">Select year level</option></select></label>

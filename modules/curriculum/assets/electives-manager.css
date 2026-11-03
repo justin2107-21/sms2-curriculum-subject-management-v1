@@ -4,7 +4,7 @@
 #groupFormModal .record-autocomplete-option { min-height: 64px; }
 .elective-tabs { margin-bottom: 20px; }
 .elective-empty { padding: 36px 24px; text-align: center; border: 1px dashed #cbdcf4; border-radius: 10px; background: #fafcff; color: #64748b; }
-.elective-empty i { font-size: 26px; color: #2563eb; margin-bottom: 16px; }
+.elective-empty i { font-size: var(--csms-icon-xl, 28px); color: #2563eb; margin-bottom: 16px; }
 .elective-empty h2 { font-size: 15px; margin: 0 0 8px; }
 .elective-empty p { margin: 0; }
 .elective-empty button { margin-top: 16px; }

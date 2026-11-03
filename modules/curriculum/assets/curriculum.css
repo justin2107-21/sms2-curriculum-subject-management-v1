@@ -154,7 +154,7 @@
 
 .search-control i {
   color: #94a3b8;
-  font-size: .75rem;
+  font-size: var(--csms-icon-sm, 14px);
   left: 11px;
   position: absolute;
 }
@@ -389,7 +389,7 @@
 
 .detail-shell { margin-bottom: 20px; }
 .selection-state { color: #64748b; padding: 55px 24px; text-align: center; }
-.selection-state i { color: #93c5fd; font-size: 2rem; margin-bottom: 12px; }
+.selection-state i { color: #93c5fd; font-size: var(--csms-icon-xl, 28px); margin-bottom: 12px; }
 .selection-state h2 { color: #334155; font-size: 1rem; margin-bottom: 7px; }
 .selection-state p { font-size: .78rem; line-height: 1.5; }
 
@@ -1051,7 +1051,7 @@ body.curriculum-modal-open { overflow: hidden; }
 .subject-program-card:hover { border-color: #abc7f5; box-shadow: 0 10px 24px rgba(23, 55, 107, .09); transform: translateY(-2px); }
 .subject-program-card:focus-visible { outline: 2px solid #1a3a8c; outline-offset: 3px; }
 .subject-program-icon { align-items: center; background: #edf4ff; border-radius: 11px; color: #2163c5; display: inline-flex; height: 44px; justify-content: center; margin-bottom: 19px; width: 44px; }
-.subject-program-icon i { font-size: 1.08rem; }
+.subject-program-icon i { font-size: var(--csms-icon-lg, 20px); }
 .subject-program-card > strong { color: #2163c5; font-size: 1.15rem; line-height: 1.2; }
 .subject-program-name { color: #334b6c; font-size: .8rem; line-height: 1.5; margin-top: 8px; }
 .subject-program-meta { align-items: center; color: #64748b; display: flex; gap: 8px; justify-content: space-between; margin-top: auto; padding-top: 20px; }
@@ -1143,7 +1143,7 @@ body.curriculum-modal-open { overflow: hidden; }
 }
 .subject-program-card .subject-program-icon { background: var(--academic-college-icon-bg); border-radius: 11px; color: var(--academic-college-icon-color); height: 45px; margin-bottom: 25px; width: 45px; }
 .subject-program-section[data-program-category="shs"] .subject-program-card .subject-program-icon { background: var(--academic-shs-icon-bg); color: var(--academic-shs-icon-color); }
-.subject-program-icon i { font-size: 20px; }
+.subject-program-icon i { font-size: var(--csms-icon-lg, 20px); }
 .subject-program-card > strong.program-code-pill {
   color: #1f5fbf;
   font-family: inherit;
@@ -1155,7 +1155,7 @@ body.curriculum-modal-open { overflow: hidden; }
 .subject-program-card > .subject-program-name { color: #263e60; font-family: inherit; font-size: 13px; line-height: 1.5; margin-top: 10px; }
 .subject-program-meta { color: var(--csms-text-muted, #4b5563); gap: 8px; padding-top: 24px; }
 .subject-program-meta small { color: inherit; font-family: inherit; font-size: 12px; }
-.subject-program-meta > i { color: #1f5fbf; font-size: 15px; margin-left: 2px; }
+.subject-program-meta > i { color: #1f5fbf; font-size: var(--csms-icon-md, 16px); margin-left: 2px; }
 .subject-section-count { background: #eaf2ff; color: #1f5fbf; font-family: inherit; font-size: 12px; min-height: 32px; min-width: 32px; }
 .subject-section-divider { border-color: #e1e8f1; margin: 31px 0 32px; }
 
@@ -1270,7 +1270,7 @@ body.curriculum-modal-open { overflow: hidden; }
 .version-summary { color: #64748b; font-size: .82rem; margin: 8px 0 0; }
 .version-workspace-actions { gap: 10px; }
 .version-breadcrumb { background: #edf4ff; border: 1px solid #d5e3fc; border-radius: 8px; color: #1a3a8c; gap: 12px; margin-bottom: 18px; padding: 12px 16px; }
-.version-breadcrumb i { color: #7891bd; font-size: var(--csms-text-xs, .75rem); }
+.version-breadcrumb i { color: #7891bd; font-size: var(--csms-icon-sm, 14px); }
 .year-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
 .year-tab { background: #fff; border: 1px solid #dbe3ee; border-radius: 8px; color: #334155; cursor: pointer; font: inherit; font-size: .78rem; font-weight: 600; min-height: 42px; padding: 9px 17px; }
 .year-tab.is-active { background: #eaf1ff; border-color: #8fb1f1; color: #1a3a8c; }
@@ -1356,7 +1356,7 @@ body.curriculum-modal-open { overflow: hidden; }
   border-radius: 16px;
   color: var(--academic-college-icon-color);
   display: inline-flex;
-  font-size: 23px;
+  font-size: var(--csms-icon-xl, 28px);
   height: 64px;
   justify-content: center;
   width: 64px;

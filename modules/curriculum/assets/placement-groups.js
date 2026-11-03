@@ -66,7 +66,7 @@
                         (required ? 'Required' : 'Optional') + '</span></td>';
                     if (canRemove) html += '<td class="row-actions"><button type="button" class="row-action-button destructive-action" data-remove-assignment="' +
                         Number(row.id) + '" data-subject-label="' + esc(row.subject_code + ' — ' + row.subject_title) +
-                        '"><i class="fa-solid fa-link-slash"></i> Remove</button></td>';
+                        '"><i class="fa-solid fa-link-slash" aria-hidden="true"></i> Remove</button></td>';
                     html += '</tr>';
                 });
                 html += '</tbody></table></div></details>';
