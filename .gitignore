@@ -39,3 +39,6 @@ Desktop.ini
 *.cookies
 *.cookie
 cookies*.txt
+
+# Dev-only UI build tooling (compiled output lives in assets/ui/dist)
+node_modules/

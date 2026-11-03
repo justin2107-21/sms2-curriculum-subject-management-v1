@@ -1,0 +1,69 @@
+// CSMS-SMS2 BCP theme tokens (see docs/ui-reference/UI_Decisions.md D5-D7).
+// Contrast rule: text on its background >= 4.5:1. Size floor: 12px anywhere.
+
+$csms-navy:        #1a3a8c;   // BCP brand navy (matches legacy sidebar)
+$csms-navy-dark:   #122a68;
+$csms-sidebar-bg:  $csms-navy;
+$csms-sidebar-text:    #ffffff;
+$csms-sidebar-muted:   #c9d4f2;   // section headings on navy (>= 4.5:1)
+$csms-sidebar-hover:   rgba(255, 255, 255, .10);
+$csms-sidebar-active:  rgba(255, 255, 255, .18);
+$csms-sidebar-width:   280px;
+$csms-topbar-height:   56px;
+$csms-contextbar-height: 44px;
+$csms-page-bg:     #f4f6fb;
+
+// Bootstrap overrides
+$primary:   $csms-navy;
+$secondary: #4b5563;
+$success:   #17653a;
+$info:      #0b5c8a;
+$warning:   #8a5a00;
+$danger:    #b3261e;
+$light:     #f4f6fb;
+$dark:      #1f2937;
+
+$body-bg:    $csms-page-bg;
+$body-color: #1f2937;
+$link-color: $csms-navy;
+
+// System sans-serif stack: no web fonts, no CDN.
+$font-family-sans-serif: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+$font-family-base: $font-family-sans-serif;
+$headings-font-family: $font-family-sans-serif;   // one sans font, no serif headings
+$headings-font-weight: 600;
+
+$font-size-root: 16px;
+$font-size-base: 1rem;            // 16px body
+$font-size-sm:   .875rem;         // 14px
+$small-font-size: .875rem;        // 14px (never below 12px)
+$h1-font-size: 1.5rem;
+$h2-font-size: 1.25rem;
+$h3-font-size: 1.125rem;
+$h4-font-size: 1rem;
+$h5-font-size: 1rem;
+$h6-font-size: .875rem;
+
+$table-cell-padding-y: .5rem;
+$table-cell-padding-x: .75rem;
+$table-cell-padding-y-sm: .3rem;
+$table-cell-padding-x-sm: .5rem;
+$table-th-font-weight: 600;
+$table-striped-bg-factor: .03;
+$badge-font-size: .75rem;         // 12px floor
+$badge-font-weight: 600;
+$form-label-font-size: .875rem;
+$input-btn-focus-width: .2rem;
+$input-btn-focus-color-opacity: .35;
+$focus-ring-width: .2rem;
+$border-radius: .375rem;
+$card-border-color: #dfe4ee;
+$card-cap-bg: #fff;
+$card-spacer-y: 1rem;
+$card-spacer-x: 1.25rem;
+$breadcrumb-divider-color: #4b5563;
+$breadcrumb-active-color:  #4b5563;
+$breadcrumb-font-size: .875rem;
+$enable-shadows: false;
+$enable-negative-margins: false;
+$enable-dark-mode: false;
