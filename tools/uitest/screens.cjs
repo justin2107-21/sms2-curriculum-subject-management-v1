@@ -262,12 +262,35 @@ async function main() {
         return { page: key, state: await pickerState(), issues: issues.length };
       };
       report.ctxscenario = [];
-      const step = async (name, fn) => report.ctxscenario.push(Object.assign({ name }, await fn()));
+      // A step that throws is recorded (with its error) and fails the run; it can never silently disappear.
+      const failStep = arg('fail-step', '');   // self-test: --fail-step=I makes that step throw
+      const step = async (name, fn) => {
+        try {
+          if (failStep && name.startsWith(failStep + '.')) throw new Error('injected failure for the self-test');
+          report.ctxscenario.push(Object.assign({ name }, await fn()));
+        } catch (error) {
+          report.ctxscenario.push({ name, error: String(error && error.message || error) });
+          report.failures.push('scenario step "' + name + '" threw: ' + String(error && error.message || error));
+        }
+      };
       await setWidth(widths[0]);
       await navigate(base + '/dashboard/dashboard.php');
       await sleep(800);
+      const api = base + '/modules/curriculum/http/working_context_actions.php';
+      const post = (fields, withToken) => evaluate('((api, fields, withToken) => { const s = document.querySelector("script[src*=\\"curriculum-context.js\\"]"); const b = new URLSearchParams(fields); if (withToken && s) b.set("_csrf_token", s.dataset.csrfToken); return fetch(api, { method: "POST", body: b, credentials: "same-origin" }).then(async r => ({ status: r.status, body: await r.json().catch(() => null) })); })(' + JSON.stringify(api) + ',' + JSON.stringify(fields) + ',' + JSON.stringify(withToken) + ')');
+      const get = query => evaluate('fetch(' + JSON.stringify(api + query) + ', { credentials: "same-origin" }).then(async r => ({ status: r.status, body: await r.json().catch(() => null) }))');
+      const scenarioModule = 'subject_mapping';
+      await navigate(base + pages.mapping);
+      await sleep(1500);
+      await post({ action: 'save', module: scenarioModule, clear: '1' }, true);
+      await navigate(base + '/dashboard/dashboard.php');
+      await sleep(500);
       await evaluate('sessionStorage.clear(); true');
-      await step('A. Subject Mapping, nothing saved', () => visit('mapping', '', 'A-empty'));
+      await step('A. Subject Mapping, nothing saved: server default (rule c or d)', async () => {
+        const r = await visit('mapping', '', 'A-default');
+        r.rule = (await get('?action=read&module=' + scenarioModule)).body.rule;
+        return r;
+      });
       await step('B. choose BSIT / BSIT-DEMO / PREORAL on Subject Mapping', async () => { const picked = await choosePath('BSIT', 'DEMO,PREORAL'); await shot(path.join(out, role + '-ctx-B-chosen-' + widths[0] + '.png')); return { picked, state: await pickerState() }; });
       await step('C1. open Pre-requisite', () => visit('prereq', '', 'C1-prereq'));
       await step('C2. open Electives', () => visit('electives', '', 'C2-electives'));
@@ -287,6 +310,88 @@ async function main() {
       await step('F2. invalid link on Pre-requisite falls back to saved', () => visit('prereq', '?program_id=108&curriculum_id=46&version_id=99999', 'F2-invalid-prereq', 8000));
       await step('F3. invalid link on Subject Mapping falls back to saved', () => visit('mapping', '?program_id=108&curriculum_id=46&version_id=99999', 'F3-invalid-mapping', 8000));
       await step('G. reload (F5) on Subject Mapping', async () => { await send('Page.reload'); await sleep(8000); return { state: await pickerState() }; });
+      await step('H. endpoint guards', async () => ({ guards: {
+        saveWithoutCsrf: (await post({ action: 'save', module: scenarioModule, program_id: '109', curriculum_id: '47', version_id: '43' }, false)).status,
+        readByPost: (await post({ action: 'read', module: scenarioModule }, true)).status,
+        saveMismatchedChain: (await post({ action: 'save', module: scenarioModule, program_id: '108', curriculum_id: '47', version_id: '43' }, true)).status,
+        unknownModule: (await get('?action=read&module=nope')).status,
+        saveGet: (await get('?action=save&module=' + scenarioModule)).status,
+      } }));
+      await step('I. sign out, sign in on an empty session', async () => {
+        const logout = await evaluate('((u) => { const t = document.querySelector("script[src*=\\"curriculum-context.js\\"]").dataset.csrfToken; return fetch(u, { method: "POST", body: new URLSearchParams({ action: "logout", _csrf_token: t }), credentials: "same-origin" }).then(r => ({ status: r.status })); })(' + JSON.stringify(base + '/shared/auth_actions.php') + ')');
+        const anonymous = await get('?action=read&module=' + scenarioModule);
+        await evaluate('sessionStorage.clear(); true');
+        await navigate(base + '/auth/signin.php');
+        await evaluate(`new Promise(r => { const t = setInterval(() => { if (document.getElementById('username')) { clearInterval(t); r(true); } }, 100); })`);
+        for (const [id, value] of [['username', user], ['password', pass]]) {
+          await evaluate(`document.getElementById('${id}').focus(); true`);
+          await send('Input.insertText', { text: value });
+        }
+        const back = new Promise(r => { loadResolve = r; });
+        await evaluate(`document.getElementById('btnSignin').click(); true`);
+        await Promise.race([back, sleep(15000)]);
+        const r = await visit('mapping', '', 'I-after-signin', 5000);
+        r.logoutStatus = logout.status;
+        r.anonymousRead = anonymous.status;
+        await openField(0);
+        const opened = await panelText();
+        r.recentGroups = opened ? opened.groups : null;   // null means the panel did not open: the check below fails, the step still reports
+        return r;
+      });
+    }
+
+    if (arg('probe', '') === 'sidebar') {
+      // Sidebar measurements (D7): headings and their contrast, every label (lines, mid-word breaks), indents, active style.
+      const collect = () => {
+        const parse = c => { const m = c.match(/[\d.]+/g).map(Number); return m.slice(0, 3); };
+        const lum = ([r, g, b]) => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+        const ratio = (fg, bg) => { const a = lum(parse(fg)) + 0.05, b = lum(parse(bg)) + 0.05; return Math.round((Math.max(a, b) / Math.min(a, b)) * 100) / 100; };
+        const side = document.getElementById('sidebar');
+        const bgOf = el => { for (let e = el; e; e = e.parentElement) { const c = getComputedStyle(e).backgroundColor; if (c && !/rgba\(0, 0, 0, 0\)|transparent/.test(c)) return c; } return 'rgb(255, 255, 255)'; };
+        const brokenWords = el => {
+          const out = [];
+          const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+          for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+            const text = n.textContent; const re = /\S+/g; let m;
+            while ((m = re.exec(text))) { const r = document.createRange(); r.setStart(n, m.index); r.setEnd(n, m.index + m[0].length); const tops = new Set([...r.getClientRects()].map(x => Math.round(x.top))); if (tops.size > 1) out.push(m[0]); }
+          }
+          return out;
+        };
+        // Background actually seen behind an element: every translucent layer composited over the sidebar colour.
+        const baseBg = parse(getComputedStyle(side).backgroundColor);
+        const layerOf = e => { const m = getComputedStyle(e).backgroundColor.match(/[\d.]+/g); return m && (m.length < 4 || Number(m[3]) > 0) ? { rgb: m.slice(0, 3).map(Number), a: m.length < 4 ? 1 : Number(m[3]) } : null; };
+        const effective = el => { const layers = []; for (let e = el; e && e !== side; e = e.parentElement) { const l = layerOf(e); if (l) layers.push(l); } let out = baseBg; for (const l of layers.reverse()) out = out.map((v, i) => Math.round(l.rgb[i] * l.a + v * (1 - l.a))); return 'rgb(' + out.join(', ') + ')'; };
+        const radiusOf = el => { for (let e = el; e && e !== side; e = e.parentElement) { if (layerOf(e)) return getComputedStyle(e).borderRadius + ' on ' + (e === el ? 'item' : String(e.className).split(' ')[0]); } return '-'; };
+        const headings = [...side.querySelectorAll('.brand-title')].map(el => { const cs = getComputedStyle(el); return { text: el.textContent.trim(), fs: cs.fontSize, fw: cs.fontWeight, color: cs.color, contrast: ratio(cs.color, bgOf(el)) }; });
+        const items = [...side.querySelectorAll('.sidebar-item, .sidebar-submenu-item')].filter(el => el.getBoundingClientRect().width > 0 && el.getBoundingClientRect().height > 0).map(el => {
+          const cs = getComputedStyle(el); const r = el.getBoundingClientRect(); const sub = el.classList.contains('sidebar-submenu-item');
+          const label = el.querySelector('span:not(.sidebar-submenu-chevron)') || el; const tr = document.createRange(); tr.selectNodeContents(label); const rects = [...tr.getClientRects()].filter(x => x.width > 0); const lr = rects.length ? rects.reduce((a, b) => (b.left < a.left ? b : a)) : label.getBoundingClientRect(); const lcs = getComputedStyle(label); const lineTops = new Set(rects.map(x => Math.round(x.top)));
+          const icon = el.querySelector('i:not(.sidebar-submenu-chevron)');
+          const lines = lineTops.size;
+          return { text: el.textContent.trim().replace(/\s+/g, ' ').slice(0, 40), sub, active: el.classList.contains('active'), fs: cs.fontSize, fw: cs.fontWeight, color: cs.color, bg: cs.backgroundColor, radius: cs.borderRadius, left: Math.round(r.left), iconLeft: icon ? Math.round(icon.getBoundingClientRect().left) : null, iconW: icon ? Math.round(icon.getBoundingClientRect().width) : null, iconFs: icon ? getComputedStyle(icon).fontSize : null, textLeft: Math.round(lr.left), w: Math.round(r.width), h: Math.round(r.height), lines, broken: brokenWords(label), effBg: effective(el), effRadius: radiusOf(el), contrast: ratio(cs.color, effective(el)) };
+        });
+        const burger = document.getElementById('hamburgerBtn');
+        let burgerInfo = null;
+        if (burger) { const r = burger.getBoundingClientRect(); const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); burgerInfo = { x: Math.round(r.left), y: Math.round(r.top), reachable: !!hit && (hit === burger || burger.contains(hit)), hit: hit ? (hit.id || String(hit.className).split(' ')[0] || hit.tagName) : null }; }
+        const sr = side.getBoundingClientRect();
+        return { headings, items, burger: burgerInfo, sidebar: { left: Math.round(sr.left), top: Math.round(sr.top), w: Math.round(sr.width), h: Math.round(sr.height), collapsed: side.classList.contains('collapsed') }, vw: innerWidth };
+      };
+      report.sidebarProbe = {};
+      for (const url of urls) {
+        await setWidth(widths[0]);
+        await navigate(base + url);
+        await sleep(1500);
+        // open every submenu group so their items can be measured
+        await evaluate('(() => { document.querySelectorAll("#sidebar .sidebar-item.dropdown-trigger, #sidebar [data-sidebar-menu-toggle]").forEach(b => { if (b.getAttribute("aria-expanded") !== "true") b.click(); }); return true; })()');
+        await sleep(700);
+        report.sidebarProbe[url] = await evaluate('(' + collect.toString() + ')()');
+        if (widths[0] <= 900) {
+          await evaluate('(() => { const s = document.getElementById("sidebar"); if (s.classList.contains("collapsed")) document.getElementById("hamburgerBtn").click(); return true; })()');
+          await sleep(600);
+          report.sidebarProbe[url].open = await evaluate('(' + collect.toString() + ')()');
+          await shot(path.join(out, role + '-sidebar-open-' + url.split('/').pop().replace('.php', '') + '-' + widths[0] + '.png'));
+        }
+      }
     }
 
     if (arg('probe', '') === 'context') {

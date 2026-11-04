@@ -329,3 +329,36 @@ body .main .csms-ctx-state { color: var(--csms-text-muted, #4b5563); font-size: 
     margin-right: auto;
   }
 }
+
+/* ---- Sidebar (UI_Decisions D7) ---- */
+/* Labels wrap at spaces (and after "/" where the markup has a <wbr>); only a single word wider than the whole row may break. */
+body .sidebar :is(.sidebar-long-label, .sidebar-submenu-item, .sidebar-section-title-long) {
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+/* Sub-item labels start where the labels of top-level items start (icon column + gap). */
+body .sidebar .sidebar-submenu-item,
+body .sidebar .sidebar-builder-group .sidebar-submenu-item {
+  padding-left: calc(var(--sms2-sidebar-nav-padding-x) + var(--sms2-sidebar-icon-column-size) + var(--sms2-sidebar-icon-gap));
+}
+/* Hover is quiet; the active page looks the same at every level: stronger fill, white text, 3px white edge, semibold. */
+body .sidebar .nav-group { border-radius: 8px; }
+body .sidebar .nav-group:hover,
+body .sidebar .nav-group:has(.sidebar-item.open),
+body .sidebar .sidebar-submenu-item:hover {
+  background: var(--csms-sidebar-hover-bg, rgba(255, 255, 255, .09));
+}
+body .sidebar .nav-group:has(.sidebar-item.active),
+body .sidebar .sidebar-submenu-item.active {
+  background: var(--csms-sidebar-active-bg, rgba(255, 255, 255, .17));
+  box-shadow: inset 3px 0 0 #fff;
+  color: #fff;
+}
+body .sidebar .sidebar-item.active,
+body .sidebar .sidebar-submenu-item.active { font-weight: 600; }
+
+/* Phones and tablets: the open drawer starts below the topbar, so the burger stays visible and reachable. */
+@media (max-width: 900px) {
+  body .sidebar { height: calc(100dvh - var(--sms2-topbar-height, 56px)); top: var(--sms2-topbar-height, 56px); }
+  body .sidebar-overlay { top: var(--sms2-topbar-height, 56px); }
+}

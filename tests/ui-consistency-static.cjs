@@ -69,4 +69,12 @@ assert.match(live, /\.error-state/);
 assert.match(live, /aria-live/);
 assert.match(live, /never overwritten/);
 
+// Sidebar (D7): one icon column wide enough for every icon, no break inside "Course", drawer below the topbar on phones.
+assert.match(read('css/csms-tokens.css'), /--sms2-sidebar-icon-column-size:\s*20px/);
+const sidebar = read('shared/sidebar.php');
+assert.ok(sidebar.includes('Academic Strand/<wbr>Course Assignment'), 'the strand label can break after the slash');
+assert.ok(!sidebar.includes('sidebar-no-break">Academic Strand'), 'no no-break span that forces "/Course" to split');
+assert.match(components, /body \.sidebar \{ height: calc\(100dvh - var\(--sms2-topbar-height, 56px\)\); top: var\(--sms2-topbar-height, 56px\); \}/);
+assert.match(components, /overflow-wrap: break-word;\s*word-break: normal;/);
+
 console.log('PASS: Batch 5 wiring (shared header assets, h1 titles, reports on shared topbar, hidden year holder, context bar hooks, live-state helpers)');

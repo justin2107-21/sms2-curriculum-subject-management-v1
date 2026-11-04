@@ -14,6 +14,7 @@ param(
     [switch]$CtxFlow,
     [switch]$CtxNav,
     [switch]$CtxScenario,
+    [string]$FailStep = "",
     [string]$Program = "BSCRIM",
     [string]$Prefer = "",
     [string]$Probe = "",
@@ -72,7 +73,7 @@ try {
         if ($IdleSeconds -gt 0) { $nodeArgs += "--idle=$IdleSeconds" }
         if ($Height -gt 0) { $nodeArgs += "--height=$Height" }
         if ($Probe) { $nodeArgs += "--probe=$Probe" }
-        if ($CtxScenario) { $nodeArgs += "--ctxscenario=1" }
+        if ($CtxScenario) { $nodeArgs += "--ctxscenario=1"; if ($FailStep) { $nodeArgs += "--fail-step=$FailStep" } }
         if ($CtxNav) { $nodeArgs += "--ctxnav=1"; $nodeArgs += "--program=$Program"; if ($Prefer) { $nodeArgs += "--prefer=$Prefer" } }
         if ($CtxFlow) { $nodeArgs += "--ctxflow=1"; $nodeArgs += "--program=$Program"; if ($Prefer) { $nodeArgs += "--prefer=$Prefer" } }
         if ($Picker) { $nodeArgs += '--picker=1' }

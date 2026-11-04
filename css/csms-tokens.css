@@ -99,6 +99,10 @@
   --sms2-topbar-height: 56px;                        /* was 64px */
   --sms2-sidebar-nav-size: 14px;                     /* was 14.5px */
   --sms2-sidebar-icon-size: var(--csms-icon-md);     /* was 15px; one icon scale (I6) */
+  --sms2-sidebar-icon-column-size: 20px;             /* was 10px, narrower than the icons: labels started at 52-60px */
+  --sms2-sidebar-icon-gap: 12px;                     /* was 13px */
+  --csms-sidebar-hover-bg: rgba(255, 255, 255, .09);
+  --csms-sidebar-active-bg: rgba(255, 255, 255, .17);
   --sms2-sidebar-nav-padding-y: 10px;                /* was 14px */
   --sms2-sidebar-section-color: var(--csms-sidebar-heading); /* was #818cf8, 3.47:1 (C1) */
   --sms2-sidebar-section-size: 12px;                 /* was 13px */

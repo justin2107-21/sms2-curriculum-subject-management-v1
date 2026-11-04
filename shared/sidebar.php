@@ -130,7 +130,7 @@ $sidebarHasSystemItems = $sidebarCanManageRbac || $sidebarCanViewAudit || $sideb
               aria-expanded="<?= $sidebarProgramAssignmentActive ? 'true' : 'false' ?>"
               aria-controls="programAssignmentSubmenu"
               data-sidebar-menu-toggle>
-        <i class="fa-solid fa-share-nodes" aria-hidden="true"></i><span class="sidebar-long-label"><span class="sidebar-no-break">Academic Strand</span>/Course Assignment</span>
+        <i class="fa-solid fa-share-nodes" aria-hidden="true"></i><span class="sidebar-long-label">Academic Strand/<wbr>Course Assignment</span>
         <i class="fa-solid fa-chevron-down sidebar-submenu-chevron" aria-hidden="true"></i>
       </button>
       <div class="sidebar-builder-submenu <?= $sidebarProgramAssignmentActive ? 'open' : '' ?>"

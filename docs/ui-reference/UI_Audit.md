@@ -156,6 +156,16 @@ Measured with `tools/uitest/run.ps1 -Probe headers` / `-CtxFlow` / `-Probe live`
 | ST2 | Done. Error messages are `role="alert"`, success / empty / loading messages are `role="status"`; table cells get `aria-live` (assertive / polite) instead, so they stay cells; existing roles are never overwritten. `js/csms-live-states.js` covers the many places that build these messages (60 message elements on the 25 pages, all marked; all 35 error elements are alerts); the toast, inline form error and autocomplete state rows set the role themselves (an error toast is an alert, then switches back to status for success or warning). No CSS depends on these attributes, so nothing changes visually. |
 | Fonts | Newsreader moved from `csms-dashboard.css` to `css/csms-fonts.css` so every page can use it. |
 
+### Batch 6 status (sidebar, D7)
+Measured with `tools/uitest/run.ps1 -Probe sidebar` before and after.
+
+| ID | Status |
+|---|---|
+| P4 | Done. The only mid-word break was "Academic Strand/Course Assignment" ("Cour" / "se"): the label is `overflow-wrap: anywhere` and "Academic Strand" was no-break, so "/Course" could only fit by breaking inside the word. Labels now wrap at spaces, and the markup has a `<wbr>` after the slash ("Academic Strand/" / "Course Assignment"). |
+| P5 | Done. Root cause of the uneven text start: `--sms2-sidebar-icon-column-size` was **10 px**, narrower than every icon, so each icon sized itself (12 to 20 px) and labels started at x = 52, 54, 56, 58 or 60. It is 20 px now (gap 12 px): every top-level and sub-item label starts at x = 59. The active page looks the same at every level (17% white fill, 8 px radius, 3 px white edge, semibold, 6.5:1 text contrast; before: top-level 13% on a 10 px-radius wrapper, sub-items 14% on an 8 px item); hover is a quieter 9%. |
+| Headings | MAIN / CURRICULUM & SUBJECT MANAGEMENT / SYSTEM measure 6.99:1 on the sidebar blue (raised in Batch 1 from 3.47:1); the lowest contrast of any sidebar text is 6.5:1. |
+| Burger at 390 px | Done. With the drawer open the sidebar covered the burger (hit test landed on the logo). The drawer and its overlay now start below the topbar (`top: var(--sms2-topbar-height)`), so the burger stays reachable; the burger check now closes the drawer with the burger itself instead of the overlay. |
+
 ### Placement and layout
 | ID | Page / file | Problem | Rule | Sev | Proposed fix |
 |---|---|---|---|---|---|
