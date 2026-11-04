@@ -1652,3 +1652,8 @@ body.curriculum-modal-open { overflow: hidden; }
 .version-workspace-actions .button-muted { font-size:14px; min-height:var(--csms-control-h, 36px); }
 .version-workspace-actions,.reference-baseline-panel .card-header-actions { flex-wrap:wrap; }
 @media(max-width:700px) { .reference-baseline-panel > .table-scroll { margin-left:16px; margin-right:16px; } }
+
+/* Review panel on the version workspace */
+#versionReviewPanel .domain-form { padding: 0 22px 12px; }
+#versionReviewPanel [data-review-message] { margin: 0 22px 12px; }
+#versionReviewPanel [hidden] { display: none !important; }

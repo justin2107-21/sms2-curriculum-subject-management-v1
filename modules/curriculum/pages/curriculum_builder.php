@@ -62,6 +62,8 @@ $canExportCurricula = $userId !== null && user_can($userId, 'curriculum_export.v
 $canAttachVersionReferences = $userId !== null && user_can($userId, 'curriculum.reference.attach');
 $canClassifyReference = $userId !== null && user_can($userId, 'curriculum.reference.classify');
 $canCloneReference = $userId !== null && user_can($userId, 'curriculum.version.clone');
+$canSubmitReview = $userId !== null && user_can($userId, 'curriculum.review.submit');
+$canDecideReview = $userId !== null && user_can($userId, 'curriculum.review.decide');
 $programColumnCount = ($programCategory === 'shs' ? 4 : 5) + ($canUpdatePrograms ? 1 : 0);
 $curriculumColumnCount = $canUpdateCurricula ? 7 : 6;
 $initialCurriculumId = $isCurriculaPage
@@ -253,6 +255,18 @@ require __DIR__ . '/../../../shared/sidebar.php';
         <div class="table-scroll"><table class="domain-table"><thead><tr><th>Attached source</th><th>Purpose</th><th>Origin and internal assessment</th><th>Attached by / date</th></tr></thead><tbody id="versionReferenceRows"><tr><td colspan="4" class="empty-cell">No documentary references are attached.</td></tr></tbody></table></div>
         <?php if ($canAttachVersionReferences): ?><details class="reference-action-details"><summary>Attach documentary source</summary><form class="domain-form" id="attachVersionReferenceForm"><input type="hidden" name="curriculum_version_id"/><div class="form-error" role="alert" hidden></div><div class="form-grid"><label class="form-field form-field-wide"><span>Source record <strong>*</strong></span><select name="compliance_reference_id" required><option value="">Loading source records...</option></select></label><label class="form-field"><span>Purpose <strong>*</strong></span><select name="reference_purpose" required><option value="school_curriculum">Curriculum source</option><option value="regulatory">Regulatory context</option><option value="institutional_policy">Institutional policy</option><option value="other">Other</option></select></label></div><div class="modal-actions"><button class="button-primary" type="submit">Attach Source</button></div></form></details><?php endif; ?>
         <?php if ($canClassifyReference): ?><details class="reference-action-details" id="classifyReferenceDetails"><summary>Classify as protected reference</summary><form class="domain-form" id="classifyReferenceForm"><input type="hidden" name="curriculum_version_id"/><div class="form-error" role="alert" hidden></div><div class="form-grid"><label class="form-field form-field-wide"><span>Primary curriculum source <strong>*</strong></span><select name="compliance_reference_id" required><option value="">Attach a curriculum source first</option></select></label><label class="form-field"><span>Classification basis <strong>*</strong></span><select name="classification_basis" required><option value="ched_sample">CHED sample / demonstration</option><option value="institutional_source">Institution-provided curriculum source</option><option value="other_document">Other documented source</option></select></label><label class="form-field form-field-wide"><span><input type="checkbox" name="confirm_reference_protection" value="1" required/> I confirm that this action makes the version an immutable reference and does not indicate BCP adoption or approval.</span></label></div><p class="curriculum-notice">Identity, origin, and applicability assessments remain separate. Institutional adoption/approval not verified.</p><div class="modal-actions"><button class="button-primary" type="submit">Capture evidence and classify</button></div></form></details><?php endif; ?>
+      </section>
+      <section class="domain-card reference-baseline-panel" id="versionReviewPanel" aria-labelledby="versionReviewTitle" hidden>
+        <div class="domain-card-header"><div><p class="eyebrow">Review workflow</p><h3 id="versionReviewTitle">Review</h3></div><span data-review-status></span></div>
+        <?php if ($canSubmitReview || $canDecideReview): ?><form class="domain-form">
+          <label class="form-field form-field-wide" data-review-field hidden><span>Comment or reason (a reason is required to approve or return)</span><textarea name="reason" rows="2" maxlength="2000"></textarea></label>
+          <div class="modal-actions">
+            <?php if ($canSubmitReview): ?><button class="button-primary" type="button" data-review-submit hidden>Submit for review</button><?php endif; ?>
+            <?php if ($canDecideReview): ?><button class="button-muted" type="button" data-review-decide="return" hidden>Return</button><button class="button-primary" type="button" data-review-decide="approve" hidden>Approve</button><?php endif; ?>
+          </div>
+        </form><?php else: ?><form hidden></form><?php endif; ?>
+        <p class="form-error" data-review-message hidden></p>
+        <div class="table-scroll"><table class="domain-table"><thead><tr><th>Date</th><th>By</th><th>Action</th><th>Status</th><th>Reason</th></tr></thead><tbody data-review-events></tbody></table></div>
       </section>
       <?php if ($canCloneReference): ?>
       <p class="curriculum-notice" id="cloneReferenceAvailability">No eligible protected reference selected. Open a protected reference to check revision creation eligibility.</p>
@@ -495,5 +509,6 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <script src="../assets/curriculum-common.js?v=<?= $curriculumCommonVersion ?>"></script>
 <script src="../assets/placement-groups.js?v=<?= (int)filemtime(__DIR__ . '/../assets/placement-groups.js') ?>"></script>
 <script src="../assets/curriculum-builder.js?v=<?= $curriculumBuilderVersion ?>"></script>
+<script src="../assets/curriculum-review.js?v=<?= (int)filemtime(__DIR__ . '/../assets/curriculum-review.js') ?>"></script>
 </body>
 </html>

@@ -620,7 +620,7 @@
 
     // Presentation labels and existing foundation palette; never an authorization decision.
     function statusLabel(status) {
-        return ({not_started:'Not started', awaiting_review:'Awaiting academic review', under_review:'Under review',
+        return ({not_started:'Not started', awaiting_review:'Awaiting academic review', under_review:'Under review', approved:'Approved', returned:'Returned',
             proposed:'Proposed revision', reference:'Reference', unclassified:'Unclassified', editable:'Editable',
             protected:'Protected', read_only:'Read only', not_assessed:'Not assessed', incomplete:'Incomplete',
             mapped:'Mapped', unmapped:'Unmapped', school_curriculum:'Curriculum source'})[status]

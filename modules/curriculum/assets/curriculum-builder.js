@@ -916,6 +916,7 @@
             });
             if (Number(state.selectedVersionId) !== Number(versionId)) return;
             const record = payload.workspace;
+            document.dispatchEvent(new CustomEvent('csms:version-workspace', {detail: record}));
             const comparisonLink = document.getElementById('compareBaselineLink');
             if (comparisonLink) {
                 comparisonLink.hidden = record.version_role !== 'proposed' || !record.baseline_version_id;
