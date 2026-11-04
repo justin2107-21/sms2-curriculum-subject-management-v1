@@ -23,6 +23,7 @@ try {
     $raw = json_decode($string('context'), true);
     if (!is_array($raw)) throw new InvalidArgumentException('Invalid CIMF context.');
     $input = CIMFProfileRegistry::contextInput($profile, $raw);
+    CurriculumReadScope::enforceInput($conn, $input);
     $question = $string('question');
     if ($string('action') === 'ask' && ($question === '' || mb_strlen($question) > 600) && $operation === 'analyze')
         throw new InvalidArgumentException('Enter a question about this page of up to 600 characters.');

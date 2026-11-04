@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../../shared/bootstrap.php';
 require_authenticated_user(true);
 require_once __DIR__ . '/../../../shared/db.php';
 require_once __DIR__ . '/../validators/DomainExceptions.php';
+require_once __DIR__ . '/../services/CurriculumReadScope.php';
 
 function curriculum_http_action(): string
 {
@@ -15,6 +16,7 @@ function curriculum_require_read(string $permission): void
 {
     require_http_method(['GET']);
     require_permission($permission, true);
+    CurriculumReadScope::enforceInput(authorization_connection(), $_GET);
 }
 
 function curriculum_require_mutation(string $permission): void
@@ -22,6 +24,7 @@ function curriculum_require_mutation(string $permission): void
     require_http_method(['POST']);
     require_valid_csrf_token();
     require_permission($permission, true);
+    CurriculumReadScope::enforceInput(authorization_connection(), $_POST);
 }
 
 function curriculum_actor_id(): int

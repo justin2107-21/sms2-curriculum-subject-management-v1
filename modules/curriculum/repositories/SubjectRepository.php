@@ -180,6 +180,7 @@ class SubjectRepository
             array_push($params, ...array_fill(0, 3, RepositoryQuery::likePattern($query['search'])));
             $types .= 'sss';
         }
+        if (($readScope = CurriculumReadScope::sql('v')) !== '') $conditions[] = $readScope;
         $where = $conditions ? ' WHERE ' . implode(' AND ', $conditions) : '';
         $joins = ' FROM curriculum_versions v JOIN curricula c ON c.id=v.curriculum_id';
         $stmt = RepositoryQuery::execute($this->db, 'SELECT COUNT(*) AS total' . $joins . $where, $types, $params);

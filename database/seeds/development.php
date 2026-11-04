@@ -82,7 +82,7 @@ function demoCapture(mysqli $db): array
 $locked=false; $transaction=false;
 $lockName='csms_demo_' . substr(hash('sha256',$database),0,40);
 try {
-    if (!in_array('admin',get_user_roles((int)$actor),true)) {
+    if (!array_intersect(['super_admin','admin'],get_user_roles((int)$actor))) {
         throw new RuntimeException('Actor must be an existing temporary development admin. No account will be created.');
     }
     $stmt=$conn->prepare('SELECT GET_LOCK(?,0)'); $stmt->bind_param('s',$lockName); $stmt->execute();

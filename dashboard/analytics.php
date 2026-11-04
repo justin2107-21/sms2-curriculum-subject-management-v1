@@ -6,6 +6,7 @@ require_permission('dashboard.view', true);
 require_permission('curriculum.view', true);
 header('Content-Type: application/json; charset=utf-8');
 $id = filter_input(INPUT_GET, 'version_id', FILTER_VALIDATE_INT);
+if ($id && $id > 0) { CurriculumReadScope::enforceVersion(authorization_connection(), (int)$id); }
 if (!$id || $id < 1) { http_response_code(400); echo json_encode(['success'=>false,'message'=>'Select a curriculum version.']); exit; }
 $db = authorization_connection();
 try {

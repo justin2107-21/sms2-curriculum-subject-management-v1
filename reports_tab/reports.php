@@ -9,16 +9,9 @@ require_once __DIR__ . '/../shared/db.php';
 
 $sess_first   = htmlspecialchars($_SESSION['first_name'] ?? '');
 $sess_last    = htmlspecialchars($_SESSION['last_name']  ?? '');
-$sess_role    = ucfirst(htmlspecialchars($_SESSION['role'] ?? 'student'));
+$sess_role    = ucfirst(htmlspecialchars($_SESSION['role'] ?? ''));
 
-// Quick stats
-$total = $active = 0;
-$canViewStudents = user_can((int)current_user_id(), 'student.view');
-if ($canViewStudents) {
-    $r = $conn->query("SELECT COUNT(*) AS c FROM students"); if ($r) $total  = (int)$r->fetch_assoc()['c'];
-    $r = $conn->query("SELECT COUNT(*) AS c FROM students WHERE status='Active'"); if ($r) $active = (int)$r->fetch_assoc()['c'];
-}
-$inactive = $total - $active;
+// Students are kept for SMS2 integration and are not shown in CSMS.
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -53,7 +46,7 @@ require_once __DIR__ . '/../shared/sidebar.php';
     <div class="page-title-bar">
       <div>
         <h1 class="page-title"><i class="fa-solid fa-chart-column" aria-hidden="true"></i> Reports</h1>
-        <p class="page-subtitle">Your account overview and the student totals you can see.</p>
+        <p class="page-subtitle">Your account overview.</p>
       </div>
     </div>
 
@@ -72,33 +65,6 @@ require_once __DIR__ . '/../shared/sidebar.php';
           You are now viewing the Home Overview.
         </div>
       </div>
-
-      <!-- Total students -->
-      <?php if ($canViewStudents): ?>
-      <div class="info-card">
-        <div class="card-label">
-          <i class="fa-solid fa-users" aria-hidden="true"></i>
-          Total Students
-        </div>
-        <div class="card-amount"><?= $total ?></div>
-        <div class="card-detail">Registered in the system</div>
-      </div>
-      <?php endif; ?>
-
-      <!-- Active / Inactive -->
-      <?php if ($canViewStudents): ?>
-      <div class="info-card">
-        <div class="card-label">
-          <i class="fa-solid fa-circle-dot" aria-hidden="true"></i>
-          Status Breakdown
-        </div>
-        <div class="card-detail" style="margin-top:6px;">
-          <span class="badge-active">Active: <?= $active ?></span>
-          &nbsp;
-          <span class="badge-inactive">Inactive: <?= $inactive ?></span>
-        </div>
-      </div>
-      <?php endif; ?>
 
     </div><!-- end info-row -->
 

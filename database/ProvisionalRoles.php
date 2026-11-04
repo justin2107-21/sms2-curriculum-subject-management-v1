@@ -1,62 +1,52 @@
 <?php
-// Provisional user roles used for prototype development and evaluation, subject to client validation.
+// The final user types. Migration 027 seeds these grants; tests/rbac-final-roles.php keeps both in step.
+// Class name kept: pages and tests already refer to it.
 final class ProvisionalRoles
 {
+    public const SUPER_ADMIN = 'super_admin';
+    /** Roles a user.manage holder without rbac.manage may touch. */
+    public const LIMITED_ROLES = ['staff', 'acad_office', 'acad_faculty'];
+    /** May be granted beyond a role's defaults by a Super Admin. */
+    public const SENSITIVE = ['curriculum.reference.attach', 'compliance.reference.verify', 'curriculum.reference.classify',
+        'curriculum.version.clone', 'curriculum.outcome_mapping.manage', 'curriculum.clo.manage', 'curriculum.assessment_plan.manage'];
+
     public static function definitions(): array
     {
-        $read = ['dashboard.view','account.view','account.update','program.view','curriculum.view',
-            'subject.view','prerequisite.view','elective.view','program_assignment.view',
-            'subject_history.view','equivalency.view','grade_weighting.view','compliance.view','curriculum_export.view'];
-        $academicManage = ['program.create','program.update','curriculum.create','curriculum.update',
-            'curriculum.version.create','subject.create','subject.update','prerequisite.manage',
-            'elective.manage','program_assignment.manage','grade_weighting.manage','compliance.run',
-            'compliance.manage','equivalency.manage','archive.view','archive.restore'];
+        $base = ['dashboard.view', 'account.view', 'account.update'];
         $definitions = [
-            'system_administrator' => ['label'=>'System Administrator','description'=>'Manages accounts, roles, permissions, security, audit logs, and technical system settings.',
-                'permissions'=>array_merge($read,$academicManage,['rbac.manage','audit.view','settings.view']), 'username'=>'csms_admin','name'=>'System Administrator'],
-            'academic_curriculum_staff' => ['label'=>'Academic / Curriculum Staff','description'=>'Operational academic user for curriculum and subject management.',
-                'permissions'=>array_merge($read,['program.create','program.update','curriculum.create','curriculum.update','curriculum.version.create','subject.create','subject.update','prerequisite.manage','elective.manage','program_assignment.manage','grade_weighting.manage','compliance.run','archive.view','archive.restore']), 'username'=>'academic_staff','name'=>'Academic Staff'],
-            'department_head_curriculum_reviewer' => ['label'=>'Department Head / Curriculum Reviewer','description'=>'Reviews curriculum structures, equivalencies, compliance findings, and CIMF recommendations.',
-                'permissions'=>array_merge($read,['equivalency.manage','compliance.run']), 'username'=>'curriculum_reviewer','name'=>'Curriculum Reviewer'],
-            'faculty_academic_viewer' => ['label'=>'Faculty / Academic Viewer','description'=>'Read-only academic curriculum and subject viewer.',
-                'permissions'=>$read, 'username'=>'faculty_viewer','name'=>'Faculty Viewer'],
+            'super_admin' => ['label' => 'Super Admin', 'user_type' => 'Super Admin', 'description' => 'Everything, including all accounts, permissions, settings and audit logs.',
+                'permissions' => array_merge($base, ['rbac.manage', 'user.manage', 'audit.view', 'settings.view',
+                    'program.view', 'program.create', 'program.update', 'program_assignment.view', 'program_assignment.manage',
+                    'curriculum.view', 'curriculum.view_unapproved', 'curriculum.create', 'curriculum.update', 'curriculum.version.create', 'curriculum.version.clone',
+                    'curriculum.review.submit', 'curriculum.review.decide', 'curriculum.reference.attach', 'curriculum.reference.classify', 'compliance.reference.verify',
+                    'subject.view', 'subject.create', 'subject.update', 'subject_history.view', 'prerequisite.view', 'prerequisite.manage', 'elective.view', 'elective.manage',
+                    'curriculum.outcome_mapping.manage', 'curriculum.clo.manage', 'curriculum.assessment_plan.manage', 'grade_weighting.view', 'grade_weighting.manage',
+                    'equivalency.view', 'equivalency.manage', 'compliance.view', 'compliance.run', 'compliance.manage',
+                    'curriculum_export.view', 'curriculum_export.draft', 'curriculum_export.official', 'archive.view', 'archive.restore',
+                    'student.view', 'student.create', 'student.update', 'student.delete', 'student.status.update'])],
+            'admin' => ['label' => 'Admin', 'user_type' => 'Admin', 'description' => 'Manages Staff and Acad accounts, programs and curricula records; views audit logs.',
+                'permissions' => array_merge($base, ['user.manage', 'audit.view', 'program.view', 'program.create', 'program.update', 'program_assignment.view', 'program_assignment.manage',
+                    'curriculum.view', 'curriculum.view_unapproved', 'curriculum.create', 'curriculum.update', 'curriculum.version.create',
+                    'subject.view', 'subject.create', 'subject.update', 'subject_history.view', 'prerequisite.view', 'elective.view', 'grade_weighting.view', 'equivalency.view',
+                    'compliance.view', 'curriculum_export.view', 'curriculum_export.official', 'archive.view', 'archive.restore'])],
+            'staff' => ['label' => 'Staff', 'user_type' => 'Staff', 'description' => 'Prepares curriculum drafts and submits them for review.',
+                'permissions' => array_merge($base, ['program.view', 'program_assignment.view', 'curriculum.view', 'curriculum.view_unapproved', 'curriculum.update',
+                    'curriculum.version.create', 'curriculum.version.clone', 'curriculum.review.submit', 'curriculum.reference.attach',
+                    'subject.view', 'subject.create', 'subject.update', 'subject_history.view', 'prerequisite.view', 'prerequisite.manage', 'elective.view', 'elective.manage',
+                    'curriculum.outcome_mapping.manage', 'curriculum.clo.manage', 'curriculum.assessment_plan.manage', 'grade_weighting.view', 'grade_weighting.manage',
+                    'equivalency.view', 'compliance.view', 'compliance.run', 'curriculum_export.view', 'curriculum_export.draft', 'archive.view', 'archive.restore'])],
+            'acad_office' => ['label' => 'Acad — Office', 'user_type' => 'Acad', 'description' => 'Reviews curricula, decides equivalencies, official export.',
+                'permissions' => array_merge($base, ['program.view', 'program_assignment.view', 'curriculum.view', 'curriculum.view_unapproved', 'curriculum.review.decide',
+                    'curriculum.reference.classify', 'compliance.reference.verify', 'subject.view', 'subject_history.view', 'prerequisite.view', 'elective.view', 'grade_weighting.view',
+                    'equivalency.view', 'equivalency.manage', 'compliance.view', 'compliance.run', 'curriculum_export.view', 'curriculum_export.official'])],
+            'acad_faculty' => ['label' => 'Acad — Faculty', 'user_type' => 'Acad', 'description' => 'Reads curricula, maps and prerequisites.',
+                'permissions' => array_merge($base, ['program.view', 'curriculum.view', 'subject.view', 'prerequisite.view', 'elective.view'])],
         ];
-        // These are available for deliberate RBAC-manager assignment only. They
-        // are not included in the default permissions reconciled by seed().
-        $task3 = ['curriculum.reference.attach','compliance.reference.verify','curriculum.reference.classify','curriculum.version.clone'];
+        // rbac.manage and settings.view stay Super Admin only; user.manage goes no lower than Admin (it is in Admin's defaults).
         foreach ($definitions as &$definition) {
-            $definition['grantable_permissions'] = array_values(array_unique(
-                array_merge($definition['permissions'], $task3)
-            ));
+            $definition['grantable_permissions'] = array_values(array_unique(array_merge($definition['permissions'], self::SENSITIVE)));
         }
         unset($definition);
         return $definitions;
-    }
-    public static function seed(mysqli $db): array
-    {
-        foreach ([['compliance.run','compliance','Run internal configured compliance validation.'],['compliance.manage','compliance','Manage configured compliance rules and references.'],['settings.view','settings','View technical system settings without secrets.']] as [$name,$module,$description]) {
-            $s=$db->prepare('INSERT INTO permissions(name,module,description) VALUES(?,?,?) ON DUPLICATE KEY UPDATE name=VALUES(name)');
-            $s->bind_param('sss',$name,$module,$description);$s->execute();$s->close();
-        }
-        // Retain the established legacy rule-manager capability to run its checks.
-        // New read-only roles do not inherit this grant.
-        $db->query("INSERT IGNORE INTO role_permissions(role_id,permission_id)
-            SELECT rp.role_id,run_permission.id FROM role_permissions rp
-            JOIN permissions existing_permission ON existing_permission.id=rp.permission_id AND existing_permission.name='compliance.manage'
-            JOIN permissions run_permission ON run_permission.name='compliance.run'");
-        $ids=[];
-        foreach (self::definitions() as $key=>$role) {
-            $description=$role['description'].' Provisional; subject to client validation.';
-            $s=$db->prepare('INSERT INTO roles(name,display_name,description,is_system) VALUES(?,?,?,1) ON DUPLICATE KEY UPDATE display_name=VALUES(display_name),description=VALUES(description)');
-            $s->bind_param('sss',$key,$role['label'],$description);$s->execute();$s->close();
-            $s=$db->prepare('SELECT id FROM roles WHERE name=?');$s->bind_param('s',$key);$s->execute();$id=(int)$s->get_result()->fetch_row()[0];$s->close();$ids[$key]=$id;
-            // Only these four managed prototype matrices are reconciled. Legacy roles are retained.
-            $s=$db->prepare('DELETE FROM role_permissions WHERE role_id=?');$s->bind_param('i',$id);$s->execute();$s->close();
-            foreach($role['permissions'] as $permission) {
-                $s=$db->prepare('INSERT INTO role_permissions(role_id,permission_id) SELECT ?,id FROM permissions WHERE name=?');$s->bind_param('is',$id,$permission);$s->execute();
-                if($s->affected_rows!==1)throw new RuntimeException('Required permission missing.');$s->close();
-            }
-        }
-        return $ids;
     }
 }

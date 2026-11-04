@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../services/CurriculumReadScope.php';
 
 /**
  * Small query helpers shared by the plain-PHP curriculum repositories.

@@ -18,7 +18,7 @@ try {
                 }
             }
             $input = $_GET;
-            $input['_include_placement_context'] = user_can(current_user_id(), 'curriculum.view');
+            $input['_include_placement_context'] = user_can(current_user_id(), 'curriculum.view') && !CurriculumReadScope::restricted(current_user_id());
             json_response(true, 'Subjects loaded.', $service->list($input));
 
         case 'contexts':

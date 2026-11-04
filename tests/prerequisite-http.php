@@ -18,10 +18,10 @@ try{
  foreach(['roles','permissions','role_permissions'] as $table)$db->query("INSERT INTO `$table` SELECT * FROM `$source`.`$table`");
  $password=bin2hex(random_bytes(24));$hash=password_hash($password,PASSWORD_DEFAULT);
  foreach(['pradmin','prviewer']as $i=>$username){$id=$i+1;$stmt=$db->prepare("INSERT INTO users(id,username,email,first_name,last_name,password_hash,role) VALUES(?,?,?,'Test','Only',?,'student')");$email=$username.'@example.invalid';$stmt->bind_param('isss',$id,$username,$email,$hash);$stmt->execute();}
- $db->query("INSERT INTO user_roles(user_id,role_id) SELECT 1,id FROM roles WHERE name='admin'");
+ $db->query("INSERT INTO user_roles(user_id,role_id) SELECT 1,id FROM roles WHERE name='super_admin'");
  $db->query("INSERT INTO roles(name,display_name,description) VALUES('pr_test_viewer','Synthetic Viewer','Disposable test fixture')");$viewerRole=(int)$db->insert_id;
  $db->query("INSERT INTO user_roles(user_id,role_id) VALUES(2,$viewerRole)");
- $db->query("INSERT INTO role_permissions(role_id,permission_id) SELECT $viewerRole,id FROM permissions WHERE name IN ('prerequisite.view','program.view','curriculum.view')");
+ $db->query("INSERT INTO role_permissions(role_id,permission_id) SELECT $viewerRole,id FROM permissions WHERE name IN ('prerequisite.view','program.view','curriculum.view','curriculum.view_unapproved')");
  $db->query("INSERT INTO academic_programs(id,program_code,program_name) VALUES(1,'T','Test')");
  $db->query("INSERT INTO curricula(id,curriculum_code,curriculum_name,academic_program_id) VALUES(1,'T','Test',1)");
  $db->query("INSERT INTO curriculum_versions(id,curriculum_id,version_label) VALUES(1,1,'V')");

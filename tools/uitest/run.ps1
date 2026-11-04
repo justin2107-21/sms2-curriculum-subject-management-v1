@@ -1,7 +1,7 @@
 # Logged-in UI check against sms_db_uitest on a separate PHP server (127.0.0.1:8090).
 # XAMPP and sms_db are untouched; DB_NAME is set for the test server process only.
 param(
-    [ValidateSet('admin', 'staff', 'reviewer', 'viewer', 'legacyadmin', 'all')]
+    [ValidateSet('superadmin', 'admin', 'staff', 'acadoffice', 'acadfaculty', 'all')]
     [string]$Role = 'all',
     [string]$Urls = '/dashboard/dashboard.php',
     [string]$Widths = '1440,390',
@@ -14,6 +14,7 @@ param(
     [switch]$CtxFlow,
     [switch]$CtxNav,
     [switch]$CtxScenario,
+    [string]$ReviewFlow = "",
     [string]$FailStep = "",
     [string]$Program = "BSCRIM",
     [string]$Prefer = "",
@@ -60,7 +61,7 @@ try {
         try { $c = New-Object Net.Sockets.TcpClient('127.0.0.1', $Port); $c.Close(); $ready = $true } catch {}
     }
     if (-not $ready) { throw "Test server did not start on 127.0.0.1:$Port." }
-    $roles = if ($Role -eq 'all') { @('admin', 'staff', 'reviewer', 'viewer') } else { @($Role) }
+    $roles = if ($Role -eq 'all') { @('superadmin', 'admin', 'staff', 'acadoffice', 'acadfaculty') } else { @($Role) }
     $failed = 0
     foreach ($r in $roles) {
         $key = $r.ToUpper()
@@ -73,6 +74,7 @@ try {
         if ($IdleSeconds -gt 0) { $nodeArgs += "--idle=$IdleSeconds" }
         if ($Height -gt 0) { $nodeArgs += "--height=$Height" }
         if ($Probe) { $nodeArgs += "--probe=$Probe" }
+        if ($ReviewFlow) { $nodeArgs += "--reviewflow=$ReviewFlow" }
         if ($CtxScenario) { $nodeArgs += "--ctxscenario=1"; if ($FailStep) { $nodeArgs += "--fail-step=$FailStep" } }
         if ($CtxNav) { $nodeArgs += "--ctxnav=1"; $nodeArgs += "--program=$Program"; if ($Prefer) { $nodeArgs += "--prefer=$Prefer" } }
         if ($CtxFlow) { $nodeArgs += "--ctxflow=1"; $nodeArgs += "--program=$Program"; if ($Prefer) { $nodeArgs += "--prefer=$Prefer" } }

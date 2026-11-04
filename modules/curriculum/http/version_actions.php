@@ -28,6 +28,7 @@ try {
         case 'get':
             curriculum_require_read('curriculum.view');
             $id = DomainValidator::positiveId($_GET['id'] ?? null, 'Curriculum version');
+            CurriculumReadScope::enforceVersion($conn, $id);
             json_response(true, 'Curriculum version loaded.', ['version' => $service->get($id)]);
 
         case 'create':

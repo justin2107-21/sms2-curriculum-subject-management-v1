@@ -20,7 +20,7 @@ class SystemAdminRepository
                     GROUP_CONCAT(DISTINCT roles.display_name ORDER BY roles.display_name SEPARATOR ', ') AS role_names
              FROM users
              LEFT JOIN user_roles ON user_roles.user_id = users.id
-             LEFT JOIN roles ON roles.id = user_roles.role_id
+             LEFT JOIN roles ON roles.id = user_roles.role_id AND roles.is_active = 1
              GROUP BY users.id, users.username, users.email, users.first_name,
                       users.last_name, users.created_at, users.is_active
              ORDER BY users.username ASC, users.id ASC
@@ -49,7 +49,7 @@ class SystemAdminRepository
                     GROUP_CONCAT(DISTINCT roles.display_name ORDER BY roles.display_name SEPARATOR ', ') AS role_names
              FROM permissions
              LEFT JOIN role_permissions ON role_permissions.permission_id = permissions.id
-             LEFT JOIN roles ON roles.id = role_permissions.role_id
+             LEFT JOIN roles ON roles.id = role_permissions.role_id AND roles.is_active = 1
              GROUP BY permissions.id, permissions.name, permissions.module, permissions.description
              ORDER BY permissions.module ASC, permissions.name ASC"
         );

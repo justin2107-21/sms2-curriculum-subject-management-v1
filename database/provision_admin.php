@@ -32,22 +32,21 @@ try {
     $stmt->close();
     $conn->begin_transaction();$transaction=true;
     $stage='administrator role verification';
-    $role=$conn->query("SELECT id FROM roles WHERE name='admin' FOR UPDATE")->fetch_assoc();
+    $role=$conn->query("SELECT id FROM roles WHERE name='super_admin' AND is_active=1 FOR UPDATE")->fetch_assoc();
     if (!$role) { throw new RuntimeException('Administrator role unavailable.'); }
     $roleId=(int)$role['id'];
-    $stmt=$conn->prepare('SELECT id,role FROM users WHERE username=? FOR UPDATE');
+    $stmt=$conn->prepare('SELECT id FROM users WHERE username=? FOR UPDATE');
     $stmt->bind_param('s',$username);$stmt->execute();$existing=$stmt->get_result()->fetch_assoc();$stmt->close();
     if ($existing) {
         $stage='existing account verification';$id=(int)$existing['id'];
         $stmt=$conn->prepare('SELECT 1 FROM user_roles WHERE user_id=? AND role_id=?');
         $stmt->bind_param('ii',$id,$roleId);$stmt->execute();$mapped=$stmt->get_result()->num_rows===1;$stmt->close();
-        if (!$mapped || $existing['role']!=='admin') { throw new RuntimeException('Existing account is not an administrator; no promotion permitted.'); }
+        if (!$mapped) { throw new RuntimeException('Existing account is not an administrator; no promotion permitted.'); }
         $conn->commit();$transaction=false;
         echo "Administrator provisioning already complete; account and password unchanged.\n";
     } else {
         $stage='first administrator verification';
-        if ($conn->query("SELECT 1 FROM user_roles INNER JOIN roles ON roles.id=user_roles.role_id WHERE roles.name='admin' LIMIT 1")->num_rows>0
-            || $conn->query("SELECT 1 FROM users WHERE role='admin' LIMIT 1")->num_rows>0) {
+        if ($conn->query("SELECT 1 FROM user_roles INNER JOIN roles ON roles.id=user_roles.role_id WHERE roles.name IN ('super_admin','admin') LIMIT 1")->num_rows>0) {
             throw new RuntimeException('An administrator already exists; use normal account administration.');
         }
         $stage='administrator details validation';

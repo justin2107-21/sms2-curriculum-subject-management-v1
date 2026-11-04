@@ -1,8 +1,8 @@
 <?php
 require_once __DIR__.'/../shared/bootstrap.php';
-require_permission('rbac.manage');
+require_permission('user.manage');
 require_once __DIR__.'/AccountAdministration.php';
-$adminRoles=(new AccountAdministration(authorization_connection()))->roles();
+$adminRoles=(new AccountAdministration(authorization_connection()))->assignableRoles((int)current_user_id());
 $prototypeDefinitions=ProvisionalRoles::definitions();
 ?>
 <div class="curriculum-modal" id="adminAccountModal" hidden><div class="modal-backdrop" data-modal-close></div>
@@ -15,7 +15,7 @@ $prototypeDefinitions=ProvisionalRoles::definitions();
 <div class="form-field"><label for="adminFirstName">First Name</label><input id="adminFirstName" name="first_name" autocomplete="off" required maxlength="100"></div>
 <div class="form-field"><label for="adminLastName">Last Name</label><input id="adminLastName" name="last_name" autocomplete="off" required maxlength="100"></div>
 <div class="form-field"><label for="adminRole">Role</label><select id="adminRole" name="role_id" required><option value="">Select role</option>
-<?php foreach($adminRoles as $role): if(!isset($prototypeDefinitions[$role['name']]))continue; ?><option value="<?= (int)$role['id'] ?>"><?= htmlspecialchars($role['display_name'],ENT_QUOTES,'UTF-8') ?></option><?php endforeach; ?>
+<?php $roleGroups=[];foreach($adminRoles as $role)$roleGroups[$role['user_type']][]=$role;foreach($roleGroups as $type=>$group): if(count($group)>1): ?><optgroup label="<?= htmlspecialchars((string)$type,ENT_QUOTES,'UTF-8') ?>"><?php endif; foreach($group as $role): ?><option value="<?= (int)$role['id'] ?>"><?= htmlspecialchars($role['display_name'],ENT_QUOTES,'UTF-8') ?></option><?php endforeach; if(count($group)>1): ?></optgroup><?php endif; endforeach; ?>
 </select></div><div class="form-field"><label for="adminActive">Account Status</label><select id="adminActive" name="is_active"><option value="1">Active</option><option value="0">Inactive</option></select></div>
 </div><p class="form-error" id="adminAccountMessage" role="alert" hidden></p>
 <div class="modal-actions"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="submit" class="button-primary">Save User</button></div></form>

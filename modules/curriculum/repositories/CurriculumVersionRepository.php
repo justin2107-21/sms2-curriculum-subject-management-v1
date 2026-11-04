@@ -64,6 +64,9 @@ class CurriculumVersionRepository
             $params[] = $query['status'];
         }
 
+        if (($query['scope_sql'] ?? '') !== '') {
+            $conditions[] = $query['scope_sql']; // constant SQL from CurriculumReadScope
+        }
         $where = ' WHERE ' . implode(' AND ', $conditions);
         $countStmt = RepositoryQuery::execute(
             $this->db,

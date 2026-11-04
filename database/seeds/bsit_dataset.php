@@ -61,7 +61,7 @@ final class BsitDataset
     public static function digest(array $m): string { return hash('sha256',json_encode($m,JSON_THROW_ON_ERROR|JSON_UNESCAPED_UNICODE)); }
     public function __construct(mysqli $db, int $actor, array $manifest) {
         $this->db=$db;$this->actor=$actor;$this->manifest=self::manifest($manifest);
-        $s=$db->prepare("SELECT COUNT(*) FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=? AND r.name='admin'");
+        $s=$db->prepare("SELECT COUNT(*) FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=? AND r.name IN ('super_admin','admin')");
         $s->bind_param('i',$actor);$s->execute();self::require((int)$s->get_result()->fetch_row()[0]===1,'Existing local admin actor required.');$s->close();
     }
     public function rows(string $table): array {

@@ -32,7 +32,7 @@ function get_user_role_assignments(int $userId): array
         'SELECT roles.id, roles.name, roles.display_name
          FROM roles
          INNER JOIN user_roles ON user_roles.role_id = roles.id
-         WHERE user_roles.user_id = ?
+         WHERE user_roles.user_id = ? AND roles.is_active = 1
          ORDER BY roles.name'
     );
     $stmt->bind_param('i', $userId);
@@ -75,6 +75,7 @@ function get_user_permissions(int $userId): array
          FROM permissions
          INNER JOIN role_permissions ON role_permissions.permission_id = permissions.id
          INNER JOIN user_roles ON user_roles.role_id = role_permissions.role_id
+         INNER JOIN roles ON roles.id = user_roles.role_id AND roles.is_active = 1
          WHERE user_roles.user_id = ?
          ORDER BY permissions.name'
     );

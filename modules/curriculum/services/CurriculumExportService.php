@@ -48,10 +48,9 @@ class CurriculumExportService
         if (!$this->curricula->findById($curriculumId)) {
             throw new DomainNotFoundException('Curriculum not found.');
         }
-        $result = $this->versions->paginateByCurriculum(
-            $curriculumId,
-            DomainValidator::listQuery($input, ['draft', 'active', 'archived'])
-        );
+        $query = DomainValidator::listQuery($input, ['draft', 'active', 'archived']);
+        $query['scope_sql'] = CurriculumReadScope::exportSql('curriculum_versions');
+        $result = $this->versions->paginateByCurriculum($curriculumId, $query);
         return ['versions' => $result['records'], 'pagination' => $result['pagination']];
     }
 

@@ -36,6 +36,7 @@ class ElectivesWorkspaceRepository
         } else {
             $extra = ', v.status AS status'; $fields = ['v.version_label','v.effective_academic_year']; $from = 'curriculum_versions v JOIN curricula c ON c.id=v.curriculum_id'; $id = 'v.id'; $scope = 'c.academic_program_id=? AND c.id=? AND '; $types = 'ii'; $params = [$program,$curriculum];
         }
+        if ($level !== 'program' && $level !== 'curriculum' && ($readScope = CurriculumReadScope::sql('v')) !== '') $scope .= $readScope . ' AND ';
         $where = implode(' OR ', array_map(fn($field) => RepositoryQuery::searchColumn($field) . " LIKE ? ESCAPE '='", $fields));
         array_push($params, RepositoryQuery::likePattern($search), RepositoryQuery::likePattern($search)); $types .= 'ss';
         $rankParams = [];

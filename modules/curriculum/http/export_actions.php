@@ -6,6 +6,11 @@ require_once __DIR__ . '/../services/CurriculumExportService.php';
 $action = curriculum_http_action();
 $service = new CurriculumExportService($conn);
 require_http_method(['GET', 'POST']);
+$requireExportable = static function (array $input) use ($conn): void {
+    if (!CurriculumReadScope::exportAllowed($conn, $input['curriculum_version_id'] ?? null)) {
+        json_response(false, 'Your role cannot export a curriculum version in this review state.', [], 403);
+    }
+};
 
 try {
     switch ($action) {
@@ -23,14 +28,17 @@ try {
 
         case 'scope_options':
             curriculum_require_read('curriculum_export.view');
+            $requireExportable($_GET);
             json_response(true, 'Curriculum export scope options loaded.', $service->scopeOptions($_GET));
 
         case 'preview':
             curriculum_require_read('curriculum_export.view');
+            $requireExportable($_GET);
             json_response(true, 'Curriculum export preview loaded.', $service->dataset($_GET));
 
         case 'download_csv':
             curriculum_require_mutation('curriculum_export.view');
+            $requireExportable($_POST);
             $dataset = $service->dataset($_POST);
             if ((int)$dataset['summary']['total_subjects'] === 0) {
                 throw new DomainValidationException('No mapped subjects were found for the selected export scope.');

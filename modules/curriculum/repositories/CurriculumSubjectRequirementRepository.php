@@ -275,6 +275,9 @@ class CurriculumSubjectRequirementRepository
         $conditions = [];
         $types = '';
         $params = [];
+        if (($readScope = CurriculumReadScope::sql('scoped')) !== '') {
+            $conditions[] = 'requirements.curriculum_version_id IN (SELECT scoped.id FROM curriculum_versions scoped WHERE ' . $readScope . ')';
+        }
 
         if ($query['academic_program_id'] !== null) {
             $conditions[] = 'academic_programs.id = ?';

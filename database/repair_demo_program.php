@@ -32,7 +32,7 @@ function demoRepairRun(array $args): string {
         $locked=(int)$s->get_result()->fetch_row()[0]===1;$s->close();
         demoRequire($locked,'Another demo import or repair is running.');
         $s=$db->prepare("SELECT 1 FROM users u JOIN user_roles ur ON ur.user_id=u.id
-            JOIN roles r ON r.id=ur.role_id WHERE u.id=? AND u.role='admin' AND r.name='admin'");
+            JOIN roles r ON r.id=ur.role_id WHERE u.id=? AND r.name IN ('super_admin','admin')");
         $s->bind_param('i',$actor);$s->execute();$admin=$s->get_result()->fetch_row();$s->close();
         demoRequire($admin!==null,'Existing admin actor required.');
         $db->begin_transaction();$transaction=true;

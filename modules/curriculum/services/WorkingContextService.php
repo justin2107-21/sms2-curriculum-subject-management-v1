@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../repositories/RepositoryQuery.php';
 require_once __DIR__ . '/../validators/DomainValidator.php';
+require_once __DIR__ . '/CurriculumReadScope.php';
 
 /**
  * The user's shared working context (Program / Curriculum / Version).
@@ -35,6 +36,9 @@ class WorkingContextService
         'GRADE_WEIGHTING_COMPONENT_CREATE', 'GRADE_WEIGHTING_COMPONENT_UPDATE', 'GRADE_WEIGHTING_COMPONENT_REMOVE',
     ];
 
+    private ?int $scopeUser = null;
+    private string $scopeModule = '';
+
     /** @param callable(int,string):bool $can */
     public function __construct(private mysqli $db, private $can) {}
 
@@ -44,6 +48,8 @@ class WorkingContextService
         if (!($this->can)($userId, $this->modulePermission($input))) {
             return ['rule' => null, 'context' => null, 'recent' => []];
         }
+        $this->scopeUser = $userId;
+        $this->scopeModule = (string)$input['module'];
         $stored = $this->stored($userId);
         $context = null;
         $rule = null;
@@ -73,6 +79,8 @@ class WorkingContextService
         if (!($this->can)($userId, $this->modulePermission($input))) {
             throw new DomainValidationException('You cannot use this curriculum context in this module.');
         }
+        $this->scopeUser = $userId;
+        $this->scopeModule = (string)$input['module'];
         $stored = $this->stored($userId);
         $recent = is_array($stored['recent'] ?? null) ? $stored['recent'] : [];
         if (($input['clear'] ?? '') === '1') {
@@ -130,7 +138,7 @@ class WorkingContextService
         $stmt = RepositoryQuery::execute($this->db,
             'SELECT p.id AS program_id, p.program_code, p.program_name,
                     c.id AS curriculum_id, c.curriculum_code, c.curriculum_name,
-                    v.id AS version_id, v.version_label, v.status, v.effective_academic_year
+                    v.id AS version_id, v.version_label, v.status, v.review_status, v.effective_academic_year
              FROM curriculum_versions v
              JOIN curricula c ON c.id = v.curriculum_id
              JOIN academic_programs p ON p.id = c.academic_program_id
@@ -138,6 +146,14 @@ class WorkingContextService
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
         if (!$row || ($curriculum !== null && (int)$row['curriculum_id'] !== $curriculum) || ($program !== null && (int)$row['program_id'] !== $program)) {
+            return null;
+        }
+        $user = (int)$this->scopeUser;
+        if (!($this->can)($user, 'curriculum.view_unapproved') && !CurriculumReadScope::inRestrictedScope($row)) {
+            return null;
+        }
+        $exportKey = $row['review_status'] === 'approved' ? 'curriculum_export.official' : 'curriculum_export.draft';
+        if ($this->scopeModule === 'export' && !($this->can)($user, $exportKey)) {
             return null;
         }
         return [

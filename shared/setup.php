@@ -59,6 +59,8 @@ if (request_method() === 'POST') {
                 // Temporary shared-template role only. Final client-approved
                 // RBAC roles are intentionally not inferred here.
                 $temporaryRole = 'admin';
+                // The first account is a Super Admin in user_roles. users.role is a deprecated legacy column.
+                $rbacRole = 'super_admin';
                 $stmt = $conn->prepare(
                     'INSERT INTO users (username, email, first_name, last_name, password_hash, role)
                      VALUES (?, ?, ?, ?, ?, ?)
@@ -85,6 +87,8 @@ if (request_method() === 'POST') {
                     )->fetch_assoc();
 
                     if ((int)$rbacTables['total'] === 2) {
+                        $hasFinalRoles = $conn->query("SELECT 1 FROM roles WHERE name = 'super_admin'")->num_rows > 0;
+                        if (!$hasFinalRoles) { $rbacRole = 'admin'; }
                         $stmt = $conn->prepare(
                             'INSERT INTO user_roles (user_id, role_id, assigned_by)
                              SELECT users.id, roles.id, NULL
@@ -93,7 +97,7 @@ if (request_method() === 'POST') {
                              WHERE users.username = ?
                              ON DUPLICATE KEY UPDATE user_id = VALUES(user_id)'
                         );
-                        $stmt->bind_param('ss', $temporaryRole, $username);
+                        $stmt->bind_param('ss', $rbacRole, $username);
                         $stmt->execute();
                         $stmt->close();
                     }

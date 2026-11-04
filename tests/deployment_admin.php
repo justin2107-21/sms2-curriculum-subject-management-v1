@@ -15,7 +15,7 @@ try {
     $stmt = $conn->prepare("INSERT INTO users(username,email,first_name,last_name,password_hash,role) VALUES ('admin','test-admin@example.invalid','DISPOSABLE','TEST',?,'admin')");
     $stmt->bind_param('s',$hash); $stmt->execute(); $stmt->close();
     $id = (int)$conn->insert_id;
-    $stmt = $conn->prepare("INSERT INTO user_roles(user_id,role_id) SELECT ?,id FROM roles WHERE name='admin'");
+    $stmt = $conn->prepare("INSERT INTO user_roles(user_id,role_id) SELECT ?,id FROM roles WHERE name='super_admin'");
     $stmt->bind_param('i',$id); $stmt->execute();
     if ($stmt->affected_rows !== 1) { throw new RuntimeException('Test role unavailable.'); }
     $stmt->close(); $conn->commit();

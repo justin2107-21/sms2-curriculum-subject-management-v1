@@ -182,7 +182,13 @@ try {
     try {
         $stmt = $conn->prepare("INSERT INTO users(username,email,first_name,last_name,password_hash,role) VALUES (?,?,'DEV-REGTEST','DISPOSABLE',?,'student')");
         $stmt->bind_param('sss',$prefix,$email,$hash); $stmt->execute(); $fixtureId = (int)$conn->insert_id; $stmt->close();
-        $stmt = $conn->prepare("INSERT INTO user_roles(user_id,role_id,assigned_by) SELECT ?,id,NULL FROM roles WHERE name='student'");
+        // A disposable role with self-service only: the retired student role grants nothing.
+        $minimal = 'dev_regtest_' . bin2hex(random_bytes(4));
+        $conn->query("INSERT INTO roles(name,display_name,description,is_active) VALUES('$minimal','Disposable minimal','Disposable test role',1)");
+        $minimalId = (int)$conn->insert_id;
+        $conn->query("INSERT INTO role_permissions(role_id,permission_id) SELECT $minimalId,id FROM permissions WHERE name IN ('dashboard.view','account.view','account.update')");
+        own('roles',['id'=>$minimalId]);
+        $stmt = $conn->prepare("INSERT INTO user_roles(user_id,role_id,assigned_by) SELECT ?,id,NULL FROM roles WHERE name='$minimal'");
         $stmt->bind_param('i',$fixtureId); $stmt->execute();
         if ($stmt->affected_rows !== 1) { throw new RuntimeException('Temporary student role unavailable.'); }
         $stmt->close(); $conn->commit(); own('users',['id'=>$fixtureId]);
@@ -533,7 +539,7 @@ try {
     $order = ['compliance_validation_results','compliance_validation_runs','compliance_rules','compliance_reference_evidence_events','compliance_references',
         'grade_weighting_components','grade_weighting_schemes','subject_equivalencies',
         'curriculum_elective_group_subjects','curriculum_elective_groups','curriculum_subject_requirements',
-        'program_subject_assignments','curriculum_version_subjects','curriculum_versions','curricula','subjects','academic_programs','users'];
+        'program_subject_assignments','curriculum_version_subjects','curriculum_versions','curricula','subjects','academic_programs','users','roles'];
     try {
         foreach($temporaryTask3PermissionGrants as [$roleId,$permissionId]){$stmt=$conn->prepare('DELETE FROM role_permissions WHERE role_id=? AND permission_id=?');$stmt->bind_param('ii',$roleId,$permissionId);$stmt->execute();$stmt->close();}
         $conn->begin_transaction();

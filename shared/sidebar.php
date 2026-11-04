@@ -20,6 +20,7 @@ $sidebarCanViewGradeWeighting = $sidebarUserId !== null && user_can($sidebarUser
 $sidebarCanViewCompliance = $sidebarUserId !== null && user_can($sidebarUserId, 'compliance.view');
 $sidebarCanViewCurriculumExport = $sidebarUserId !== null && user_can($sidebarUserId, 'curriculum_export.view');
 $sidebarCanManageRbac = $sidebarUserId !== null && user_can($sidebarUserId, 'rbac.manage');
+$sidebarCanManageUsers = $sidebarUserId !== null && user_can($sidebarUserId, 'user.manage');
 $sidebarCanViewAudit = $sidebarUserId !== null && user_can($sidebarUserId, 'audit.view');
 $sidebarCanViewSystemSettings = $sidebarUserId !== null && user_can($sidebarUserId, 'settings.view');
 $sidebarCanViewSettings = $sidebarUserId !== null && user_can($sidebarUserId, 'account.view');
@@ -40,7 +41,7 @@ $sidebarHasCurriculumItems = $sidebarHasBuilderItems
     || $sidebarCanViewGradeWeighting
     || $sidebarCanViewCompliance
     || $sidebarCanViewCurriculumExport;
-$sidebarHasSystemItems = $sidebarCanManageRbac || $sidebarCanViewAudit || $sidebarCanViewSettings || $sidebarCanViewSystemSettings;
+$sidebarHasSystemItems = $sidebarCanManageRbac || $sidebarCanManageUsers || $sidebarCanViewAudit || $sidebarCanViewSettings || $sidebarCanViewSystemSettings;
 ?>
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-header">
@@ -236,12 +237,14 @@ $sidebarHasSystemItems = $sidebarCanManageRbac || $sidebarCanViewAudit || $sideb
     <?php if ($sidebarHasSystemItems): ?>
     <div class="sidebar-divider"></div>
     <div class="sidebar-brand sidebar-brand-2"><div class="brand-title">SYSTEM</div></div>
-    <?php if ($sidebarCanManageRbac): ?>
+    <?php if ($sidebarCanManageUsers): ?>
     <div class="nav-group">
       <a href="<?= $APP_ROOT ?>admin/users.php" class="sidebar-item <?= $ACTIVE_NAV === 'users' ? 'active' : '' ?>">
         <i class="fa-solid fa-users" aria-hidden="true"></i><span>Users</span>
       </a>
     </div>
+    <?php endif; ?>
+    <?php if ($sidebarCanManageRbac): ?>
     <div class="nav-group">
       <a href="<?= $APP_ROOT ?>admin/permissions.php" class="sidebar-item <?= $ACTIVE_NAV === 'permissions' ? 'active' : '' ?>">
         <i class="fa-solid fa-user-shield" aria-hidden="true"></i><span>Permissions</span>

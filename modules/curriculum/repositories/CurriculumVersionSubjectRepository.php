@@ -278,6 +278,9 @@ class CurriculumVersionSubjectRepository
         $types = '';
         $params = [];
 
+        if (($readScope = CurriculumReadScope::sql('curriculum_versions')) !== '') {
+            $conditions[] = $readScope;
+        }
         if (($query['subject_id'] ?? null) !== null) {
             $conditions[] = 'cvs.subject_id = ?';
             $types .= 'i';

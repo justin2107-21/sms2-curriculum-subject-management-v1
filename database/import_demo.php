@@ -97,9 +97,9 @@ function demoRun(array $args): string {
         $tables=array_keys($inspection['counts']??[]);
         foreach(array_merge(array_keys(DEMO_TABLES),DEMO_PROTECTED,['audit_logs']) as $table)
             demoRequire(in_array($table,$tables,true),'Required table missing.');
-        $s=$db->prepare("SELECT id FROM users WHERE id=? AND role='admin'");
+        $s=$db->prepare("SELECT id FROM users WHERE id=?");
         $s->bind_param('i',$actor);$s->execute();$user=$s->get_result()->fetch_assoc();$s->close();
-        $s=$db->prepare("SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=? AND r.name='admin'");
+        $s=$db->prepare("SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=? AND r.name IN ('super_admin','admin')");
         $s->bind_param('i',$actor);$s->execute();$role=$s->get_result()->fetch_row();$s->close();
         demoRequire($user!==null && $role!==null,'Existing active admin actor required.');
         $db->begin_transaction();$transaction=true;

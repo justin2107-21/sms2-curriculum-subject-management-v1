@@ -38,6 +38,7 @@ class CurriculumVersionService
             throw new DomainValidationException('The selected curriculum does not belong to this program.');
         }
         $query = DomainValidator::listQuery($input, ['draft', 'active', 'archived']);
+        $query['scope_sql'] = CurriculumReadScope::sql('curriculum_versions');
         $result = $this->versions->paginateByCurriculum($curriculumId, $query);
         return ['versions' => $result['records'], 'pagination' => $result['pagination']];
     }

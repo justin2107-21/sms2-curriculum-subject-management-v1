@@ -47,7 +47,7 @@ if (!function_exists('ui_sidebar')) {
             ['Curriculum Export Tool', $page('curriculum_export.php'), 'file-earmark-arrow-down', 'curriculum-export', 'curriculum_export.view'],
         ];
         $setup = [
-            ['Users', $appRoot . 'admin/users.php', 'people', 'users', 'rbac.manage'],
+            ['Users', $appRoot . 'admin/users.php', 'people', 'users', 'user.manage'],
             ['Permissions', $appRoot . 'admin/permissions.php', 'person-lock', 'permissions', 'rbac.manage'],
             ['Audit Logs', $appRoot . 'admin/audit_logs.php', 'journal-text', 'audit', 'audit.view'],
             ['System Settings', $appRoot . 'admin/settings.php', 'sliders', 'system-settings', 'settings.view'],

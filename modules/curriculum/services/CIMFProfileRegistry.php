@@ -38,7 +38,7 @@ final class CIMFProfileRegistry
         $base = 'modules/curriculum/pages/';
         $out = ['dashboard/dashboard.php' => ['dashboard', 'dashboard.view'],
             'dashboard/account.php' => ['admin_help', 'account.view'],
-            'admin/settings.php' => ['admin_help', 'settings.view'], 'admin/users.php' => ['admin_help', 'rbac.manage'], 'admin/permissions.php' => ['admin_help', 'rbac.manage'],
+            'admin/settings.php' => ['admin_help', 'settings.view'], 'admin/users.php' => ['admin_help', 'user.manage'], 'admin/permissions.php' => ['admin_help', 'rbac.manage'],
             'admin/audit_logs.php' => ['admin_help', 'audit.view'], 'archives.php' => ['admin_help', 'archive.view']];
         foreach (['curriculum_builder' => ['curriculum_builder', 'curricula', 'academic_programs'],
             'subject_master' => ['subjects'], 'subject_mapping' => ['subject_mapping'],

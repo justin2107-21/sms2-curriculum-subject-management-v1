@@ -7,6 +7,12 @@ if (!is_authenticated()) {
 }
 require_permission('curriculum_export.view');
 require_once __DIR__ . '/../services/CurriculumExportService.php';
+require_once __DIR__ . '/../services/CurriculumReadScope.php';
+if (!CurriculumReadScope::exportAllowed(authorization_connection(), $_GET['curriculum_version_id'] ?? null)) {
+    http_response_code(403);
+    require __DIR__ . '/../../../shared/access_denied.php';
+    exit;
+}
 
 try {
     $service = new CurriculumExportService(authorization_connection());

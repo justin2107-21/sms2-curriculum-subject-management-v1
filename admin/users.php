@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../shared/bootstrap.php';
-require_permission('rbac.manage');
+require_permission('user.manage');
+require_once __DIR__ . '/AccountAdministration.php';
 require_once __DIR__ . '/SystemAdminRepository.php';
 require_once __DIR__ . '/../database/ProvisionalRoles.php';
 
@@ -60,7 +61,7 @@ require __DIR__ . '/../shared/sidebar.php';
               <td><?= $user['role_names'] === null ? '<span class="system-admin-muted">No RBAC role</span>' : htmlspecialchars((string)$user['role_names'], ENT_QUOTES, 'UTF-8') ?></td>
               <td><?= $user['is_active'] ? 'Active' : 'Inactive' ?></td>
               <td><?= htmlspecialchars((string)$user['created_at'], ENT_QUOTES, 'UTF-8') ?></td>
-            <td><?php if((int)$user['id'] !== (int)current_user_id() && in_array($user['role_names'], array_column(ProvisionalRoles::definitions(), 'label'), true)): ?><button class="button-muted" type="button" data-admin-edit="<?= (int)$user['id'] ?>">Edit User</button><?php endif; ?></td></tr>
+            <td><?php if((int)$user['id'] !== (int)current_user_id() && in_array($user['role_names'], array_column(ProvisionalRoles::definitions(), 'label'), true) && (new AccountAdministration(authorization_connection()))->manageableBy((int)current_user_id(), get_user_roles((int)$user['id']))): ?><button class="button-muted" type="button" data-admin-edit="<?= (int)$user['id'] ?>">Edit User</button><?php endif; ?></td></tr>
           <?php endforeach; ?>
           </tbody>
         </table>

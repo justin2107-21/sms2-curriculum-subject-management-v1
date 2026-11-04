@@ -33,6 +33,7 @@ final class DashboardAnalyticsService
         }
 
         $versions = $allow('curriculum.view') ? $this->repo->versions($programId) : [];
+        $versions = array_values(array_filter($versions, static fn(array $v): bool => CurriculumReadScope::allows($v, $userId)));
         $representative = DashboardShaper::representativeVersions($versions);
         $repIds = array_map(static fn($v) => (int)$v['id'], array_values($representative));
         $selected = $programId === null ? null : $this->selectVersion($versions, $representative, $versionId);

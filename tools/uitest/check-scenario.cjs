@@ -4,6 +4,33 @@
 const fs = require('fs'), path = require('path');
 const EXPECTED = ['A', 'B', 'C1', 'C2', 'D1', 'D2', 'D3', 'E1', 'E2', 'F1', 'F2', 'F3', 'G', 'H', 'I'];
 const roots = process.argv.slice(2);
+const FULL = new Set(['superadmin', 'staff']);          // may read and export drafts
+const OFFICIAL_ONLY = new Set(['admin', 'acadoffice']); // read drafts; export approved versions only
+const iRestored = (role, has) => FULL.has(role) ? has('I', 'BSCRIM', 0) && has('I', 'ROTC', 2)
+  : OFFICIAL_ONLY.has(role) ? has('I', 'BSIT', 0) && has('I', 'FINAL', 2) : has('I', 'BSIT', 0) && has('I', 'Active', 2);
+// Denials are asserted, never skipped: a role that gains access it should not have fails here.
+function roleChecks(role, by, has, v) {
+  const blank = k => (v(k)[2] || '') === 'Choose version' && (v(k)[0] || '') === 'Choose program';
+  const forbidden = k => !!(by[k] && by[k].forbidden) && !by[k].state;
+  if (FULL.has(role)) return [
+    ['B', has('B', 'BSIT', 0) && has('B', 'PREORAL', 2)], ['C1', has('C1', 'PREORAL', 2)], ['C2 status', has('C2', 'PREORAL-2026 · Draft', 2)],
+    ['D1 status', has('D1', 'FINAL · Draft', 2)], ['D2', has('D2', 'FINAL', 2)], ['D3', has('D3', 'FINAL', 2)],
+    ['E1', has('E1', 'BSCRIM', 0)], ['E2', has('E2', 'BSCRIM', 0)], ['F1', has('F1', 'BSCRIM', 0)], ['F2', has('F2', 'BSCRIM', 0)], ['F3', has('F3', 'BSCRIM', 0)], ['G', has('G', 'BSCRIM', 0)],
+  ];
+  if (OFFICIAL_ONLY.has(role)) return [
+    ['B', has('B', 'BSIT', 0) && has('B', 'PREORAL', 2)], ['C1', has('C1', 'PREORAL', 2)], ['C2 status', has('C2', 'PREORAL-2026 · Draft', 2)],
+    ['D1 status', has('D1', 'FINAL · Draft', 2)], ['D2', has('D2', 'FINAL', 2)],
+    ['D3 export denies the draft', blank('D3')], ['E1 export denies an unapproved link', blank('E1')],
+    ['E2 context kept, link not adopted', has('E2', 'FINAL', 2) && !has('E2', 'BSCRIM', 0)], ['F1 export stays blank', blank('F1')],
+    ['F2', has('F2', 'FINAL', 2)], ['F3', has('F3', 'FINAL', 2)], ['G', has('G', 'FINAL', 2)],
+  ];
+  const active = k => has(k, 'BSIT', 0) && has(k, 'Active', 2) && !has(k, 'Draft', 2);
+  return [ // Acad Faculty
+    ['B draft version denied', (v('B')[2] || '') === 'Choose version'], ['C1', active('C1')], ['C2 status', active('C2')], ['D1 status', active('D1')], ['D2', active('D2')],
+    ['D3 export 403', forbidden('D3')], ['E1 export 403', forbidden('E1')], ['E2 grade weighting 403', forbidden('E2')], ['F1 export 403', forbidden('F1')],
+    ['F2', active('F2')], ['F3', active('F3')], ['G', active('G')],
+  ];
+}
 let bad = 0;
 const files = [];
 (function walk(d) { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (/^report-.*\.json$/.test(e.name)) files.push(p); } })(roots[0]);
@@ -21,11 +48,9 @@ for (const file of files.sort()) {
   const g = (by.H || {}).guards || {};
   const checks = [
     ['A default', v('A')[2] && v('A')[2] !== 'Choose version' && ['last_edited', 'newest_active'].includes(by.A && by.A.rule)],
-    ['B', has('B', 'BSIT', 0) && has('B', 'PREORAL', 2)], ['C1', has('C1', 'PREORAL', 2)], ['C2 status', has('C2', 'PREORAL-2026 · Draft', 2)],
-    ['D1 status', has('D1', 'FINAL · Draft', 2)], ['D2', has('D2', 'FINAL', 2)], ['D3', has('D3', 'FINAL', 2)],
-    ['E1', has('E1', 'BSCRIM', 0)], ['E2', has('E2', 'BSCRIM', 0)], ['F1', has('F1', 'BSCRIM', 0)], ['F2', has('F2', 'BSCRIM', 0)], ['F3', has('F3', 'BSCRIM', 0)], ['G', has('G', 'BSCRIM', 0)],
+    ...roleChecks(report.role, by, has, v),
     ['H guards', g.saveWithoutCsrf === 403 && g.readByPost === 405 && g.saveMismatchedChain === 422 && g.unknownModule === 422 && g.saveGet === 405],
-    ['I signed out and back in, restored, Recent shown', has('I', 'BSCRIM', 0) && has('I', 'ROTC', 2) && by.I && by.I.anonymousRead === 401 && by.I.logoutStatus === 200 && (by.I.recentGroups || []).includes('Recent')],
+    ['I signed out and back in, restored, Recent shown', iRestored(report.role, has) && by.I && by.I.anonymousRead === 401 && by.I.logoutStatus === 200 && (by.I.recentGroups || []).includes('Recent')],
   ];
   for (const c of checks) if (!c[1] && !problems.some(p => p.startsWith(c[0].split(' ')[0] + ' '))) problems.push(c[0] + ' wrong');
   if ((report.failures || []).length) problems.push('run failures: ' + report.failures.join(' | '));

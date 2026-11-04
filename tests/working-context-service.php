@@ -22,7 +22,7 @@ $throws = static function (callable $fn): bool {
 };
 $one = static fn(string $sql) => $db->query($sql)->fetch_assoc();
 
-$user = (int)$one("SELECT id FROM users WHERE username = 'uitest.viewer'")['id'];
+$user = (int)$one("SELECT id FROM users WHERE username = 'uitest.acadfaculty'")['id'];
 $other = (int)$one("SELECT id FROM users WHERE username = 'uitest.staff'")['id'];
 $chainSql = "SELECT v.id AS v, c.id AS c, c.academic_program_id AS p FROM curriculum_versions v JOIN curricula c ON c.id = v.curriculum_id ";
 $first = $one($chainSql . "ORDER BY v.id LIMIT 1");
