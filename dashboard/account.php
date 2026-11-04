@@ -39,6 +39,12 @@ require __DIR__ . '/../shared/sidebar.php';
 <div class="main">
 <?php require __DIR__ . '/../shared/topbar.php'; ?>
 <main class="content account-content">
+<div class="page-title-bar">
+  <div>
+    <h1 class="page-title">Account Settings</h1>
+    <p class="page-subtitle">Manage your profile, password and archived records.</p>
+  </div>
+</div>
 <div class="account-wrap <?= $archiveTab ? 'archives-open' : '' ?>" id="settingsWrap">
   <nav class="settings-tabs" aria-label="Settings sections">
     <a href="account.php" class="<?= !$archiveTab ? 'selected' : '' ?>">Account</a>
@@ -163,7 +169,7 @@ require __DIR__ . '/../shared/sidebar.php';
   </div>
   <?php if ($canViewArchives): ?>
   <section id="archivesPanel" class="archives-panel" data-can-restore="<?= $canRestoreArchives ? '1' : '0' ?>" <?= !$archiveTab ? 'hidden' : '' ?>>
-    <header class="archives-heading"><h1>Archives</h1><p>View and restore archived CSMS records.</p></header>
+    <header class="archives-heading"><h2>Archives</h2><p>View and restore archived CSMS records.</p></header>
     <div class="archive-summary" id="archiveSummary"></div>
     <form id="archiveFilters" class="archive-filters" role="search">
       <input type="search" name="search" placeholder="Search archived records..." aria-label="Search archived records" maxlength="100">

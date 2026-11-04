@@ -144,6 +144,18 @@ Measured with `tools/uitest/run.ps1 -Probe styles` on 25 real pages (admin, 1440
 
 Not changed in this batch: tab strips (a separate component), the floating CIMF button, sign-in controls, and tables built only after a user action (they were not on screen for the probe).
 
+### Batch 5 status (headers, context bar, reports, year filter, messages)
+Measured with `tools/uitest/run.ps1 -Probe headers` / `-CtxFlow` / `-Probe live` on the 25 real pages (admin).
+
+| ID | Status |
+|---|---|
+| P1, B3 | Done. One header on every page: title (h1) in Newsreader 700, about 27 px at 1440, subtitle 14 px muted, actions on the right (right edge at the same x on every page), 86 px high (111 px on the two history pages, which carry an extra line). Before: titles 23-30 px in Segoe UI or Newsreader, bands 84-127 px, title left edge 24 / 44 / 54 / 56 px, three container classes, action edge at 1384 or 1396. After: title left edge **24 px everywhere** (`--csms-page-gutter`, 16 px on tablets and phones); page-level content insets that were 32/44/54/56 px now use the same token. Audit Logs got a real h1 and subtitle; Account Settings got the standard header (its Archives heading became an h2, same look). |
+| P2 | **Redesigned after Batch 5** (see D2-D4 in `UI_Decisions.md`): the 44 px pinned bar and its collapsed summary were replaced by a picker with labels above select-like fields, searchable panels, status on versions, a Recent group and a Reset link, on the five pages that use the three-field cascade. A shared working context now carries the choice to every module page and into the address; resolution rules (a), (b), (e) are built, (c) and (d) wait for the server store (`Working_Context_Proposal.md`). Validate Curriculum (plain selects) is not converted. |
+| P6 | Done. `reports_tab/reports.php` uses `shared/topbar.php`: it now has the clock, the CIMF panel and the 5-minute session timeout with its warning (before, it had none of them), an h1 and a subtitle. The unescaped `$sess_initial` echo is gone with the private topbar. |
+| P7 | Done. Subject Mapping keeps the year pills; the year dropdown is a hidden state holder (`#mappingYearFilter` stays because the page script and its test read it). Toolbar grid adjusted to two filters. |
+| ST2 | Done. Error messages are `role="alert"`, success / empty / loading messages are `role="status"`; table cells get `aria-live` (assertive / polite) instead, so they stay cells; existing roles are never overwritten. `js/csms-live-states.js` covers the many places that build these messages (60 message elements on the 25 pages, all marked; all 35 error elements are alerts); the toast, inline form error and autocomplete state rows set the role themselves (an error toast is an alert, then switches back to status for success or warning). No CSS depends on these attributes, so nothing changes visually. |
+| Fonts | Newsreader moved from `csms-dashboard.css` to `css/csms-fonts.css` so every page can use it. |
+
 ### Placement and layout
 | ID | Page / file | Problem | Rule | Sev | Proposed fix |
 |---|---|---|---|---|---|

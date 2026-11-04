@@ -18,6 +18,7 @@ $topbarTokensVersion = is_file($topbarTokensPath) ? (string)filemtime($topbarTok
 ?>
 <link rel="stylesheet" href="<?= htmlspecialchars($topbarAppRoot . 'css/csms-tokens.css?v=' . $topbarTokensVersion, ENT_QUOTES, 'UTF-8') ?>">
 <link rel="stylesheet" href="<?= htmlspecialchars($topbarAppRoot . 'css/session-warning.css?v=' . (is_file(__DIR__ . '/../css/session-warning.css') ? filemtime(__DIR__ . '/../css/session-warning.css') : '1'), ENT_QUOTES, 'UTF-8') ?>">
+<link rel="stylesheet" href="<?= htmlspecialchars($topbarAppRoot . 'css/csms-fonts.css?v=' . (is_file(__DIR__ . '/../css/csms-fonts.css') ? filemtime(__DIR__ . '/../css/csms-fonts.css') : '1'), ENT_QUOTES, 'UTF-8') ?>">
 <link rel="stylesheet" href="<?= htmlspecialchars($topbarAppRoot . 'css/csms-components.css?v=' . (is_file(__DIR__ . '/../css/csms-components.css') ? filemtime(__DIR__ . '/../css/csms-components.css') : '1'), ENT_QUOTES, 'UTF-8') ?>">
 <?php if (getenv('CSMS_DISPOSABLE_PREVIEW') === '1'): ?><p class="synthetic-preview-notice" role="status">Disposable synthetic preview — not BCP academic data. Institutional adoption/approval not verified.</p><?php endif; ?>
 <header class="topbar">
@@ -46,4 +47,6 @@ $topbarTokensVersion = is_file($topbarTokensPath) ? (string)filemtime($topbarTok
         data-logout-url="<?= htmlspecialchars($topbarAppRoot . 'shared/auth_actions.php', ENT_QUOTES, 'UTF-8') ?>"
         data-signin-url="<?= htmlspecialchars($topbarAppRoot . 'auth/signin.php?reason=session_timeout', ENT_QUOTES, 'UTF-8') ?>"
         data-csrf-token="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>"></script>
+<script src="<?= htmlspecialchars($topbarAppRoot . 'js/csms-live-states.js?v=' . (is_file(__DIR__ . '/../js/csms-live-states.js') ? filemtime(__DIR__ . '/../js/csms-live-states.js') : '1'), ENT_QUOTES, 'UTF-8') ?>"></script>
+<script src="<?= htmlspecialchars($topbarAppRoot . 'js/csms-context-bar.js?v=' . (is_file(__DIR__ . '/../js/csms-context-bar.js') ? filemtime(__DIR__ . '/../js/csms-context-bar.js') : '1'), ENT_QUOTES, 'UTF-8') ?>"></script>
 <script src="<?= htmlspecialchars($topbarAppRoot . 'js/curriculum-context.js?v=' . $topbarCurriculumContextVersion, ENT_QUOTES, 'UTF-8') ?>" data-user-id="<?= $topbarUserId ?>"></script>

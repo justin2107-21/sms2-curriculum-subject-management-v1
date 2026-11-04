@@ -90,6 +90,7 @@ console.log('PASS: cascade dependencies, stale-ID clearing, null-safe program re
         input.parentElement = { querySelector: () => null, contains: target => target === input || target === list };
         return {
             input, list, valueInput: new Element(name + 'SuggestId'), minimumLength: 0,
+            autoSelectSingle: false, // this scenario is about the dropdown opening; auto-pick is tested below
             showSuggestionsOnEnable: index > 0, showSuggestionsOnFocus: true, focusOnEnable: true,
             search: async query => { searches.push([name, query]); return [{ id: index + 1, label: name }]; },
             getId: item => item.id, format: item => ({ label: item.label })
@@ -120,6 +121,46 @@ console.log('PASS: cascade dependencies, stale-ID clearing, null-safe program re
     assert.equal(suggestionLevels[1].input.disabled, true);
     assert.equal(suggestionLevels[1].list.hidden, true, 'a deferred suggestion must not reopen after its parent is cleared');
     console.log('PASS: automatic curriculum/version suggestions survive click bubbling, reopen on focus, and cancel on parent reset');
+    // Auto-pick (UI_Decisions D4): a dependent level with exactly one option, browsed with an empty search, is
+    // selected for the user; two options, typed text, or autoSelectSingle:false are never auto-picked.
+    const makeCascade = (counts, extra = {}) => {
+        const levels = ['program', 'curriculum', 'version'].map((name, index) => {
+            const input = new Element(name + 'AutoInput'), list = new Element(name + 'AutoOptions');
+            input.parentElement = { querySelector: () => null, contains: target => target === input || target === list };
+            return {
+                input, list, valueInput: new Element(name + 'AutoId'), minimumLength: 0,
+                showSuggestionsOnEnable: index > 0, showSuggestionsOnFocus: true, focusOnEnable: true,
+                search: async () => Array.from({ length: counts[index] }, (_, i) => ({ id: index * 10 + i + 1, label: name + i })),
+                getId: item => item.id, format: item => ({ label: item.label })
+            };
+        });
+        return { levels, cascade: ui.createCascadingAutocomplete({ levels, ...extra }) };
+    };
+    const single = makeCascade([2, 1, 1]);
+    single.cascade.selectors[0].setSelected({ id: 1, label: 'program0' });
+    await settle(); await settle(); await settle();
+    assert.equal(single.cascade.selectors[1].getSelectedId(), '11', 'a single curriculum option is picked automatically');
+    assert.equal(single.cascade.selectors[2].getSelectedId(), '21', 'a single version option is picked automatically after it');
+    assert.equal(single.cascade.hasSelection(), true);
+    const two = makeCascade([2, 2, 1]);
+    two.cascade.selectors[0].setSelected({ id: 1, label: 'program0' });
+    await settle(); await settle();
+    assert.equal(two.cascade.selectors[1].getSelectedId(), '', 'two curriculum options are never picked for the user');
+    assert.equal(two.levels[1].list.hidden, false, 'the two options are listed instead');
+    const optOut = makeCascade([2, 1, 1], { autoSelectSingle: false });
+    optOut.cascade.selectors[0].setSelected({ id: 1, label: 'program0' });
+    await settle(); await settle();
+    assert.equal(optOut.cascade.selectors[1].getSelectedId(), '', 'autoSelectSingle:false is honoured');
+    const typedInput = new Element('typedAuto');
+    const typed = ui.createAutocomplete({
+        input: typedInput, valueInput: new Element('typedAutoId'), list: new Element('typedAutoList'), minimumLength: 0,
+        autoSelectSingle: true, search: async () => [{ id: 7, label: 'only' }], getId: item => item.id, format: item => ({ label: item.label })
+    });
+    typedInput.value = 'on'; typed.refresh(); await settle();
+    assert.equal(typed.getSelectedId(), '', 'typed searches are never auto-picked');
+    typedInput.value = ''; typed.refresh(); await settle();
+    assert.equal(typed.getSelectedId(), '7', 'an empty search with one option is auto-picked');
+    console.log('PASS: single dependent options are auto-picked (D4); two options, typed text and autoSelectSingle:false are not');
     const rankedInput = new Element('rankedInput'), rankedList = new Element('rankedList');
     const candidates = [
         {id:1,subject_code:'BPM101',subject_title:'Business Process Management in IT'},

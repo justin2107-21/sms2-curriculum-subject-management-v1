@@ -136,6 +136,8 @@
                 '<span class="toast-title"></span></div><div class="toast-msg"></div>';
             document.body.appendChild(toast);
         }
+        toast.setAttribute('role', safeType === 'error' ? 'alert' : 'status');
+        toast.setAttribute('aria-live', safeType === 'error' ? 'assertive' : 'polite');
         toast.querySelector('.toast-title').textContent = labels[safeType];
         toast.querySelector('.toast-msg').textContent = message;
         toast.className = 'toast ' + safeType;
@@ -148,6 +150,7 @@
     function showFormError(form, message) {
         const errorBox = form?.querySelector('.form-error');
         if (!errorBox) return;
+        errorBox.setAttribute('role', 'alert');
         errorBox.textContent = message;
         errorBox.hidden = false;
         errorBox.setAttribute('tabindex', '-1');
@@ -261,7 +264,7 @@
             list.replaceChildren();
             const row = document.createElement('div');
             row.className = 'record-autocomplete-state' + (kind ? ' ' + kind : '');
-            row.setAttribute('role', 'status');
+            row.setAttribute('role', kind === 'error' ? 'alert' : 'status');
             row.textContent = message;
             list.appendChild(row);
             if (kind === 'error') {
@@ -396,6 +399,7 @@
                     const display = format(item);
                     return display.code || display.title ? [display.code, display.title] : [display.label];
                 }));
+                if (options.autoSelectSingle && !query && ranked.length === 1) { select(ranked[0]); return; }
                 const contextEntity = ranked[0] && !('subject_code' in ranked[0]) && ['program_code','curriculum_code','version_label'].some(key => key in ranked[0]);
                 render(ranked.slice(0, options.maxSuggestions || (contextEntity ? 3 : 5)));
             } catch (error) {
@@ -514,6 +518,10 @@
         if (levels.length < 2 || levels.some(level =>
             !level?.input || !level.valueInput || !level.list || typeof level.search !== 'function')) return null;
         const selectors = [];
+        // When the page has the Program / Curriculum / Version picker (js/csms-context-bar.js), the picker owns
+        // browsing the next list and auto-picking a single option; the engine only keeps selection state.
+        const uiManaged = config.uiManaged ?? Boolean(document.querySelector?.('.mapping-context-bar, .pr-selectors, .grade-weighting-context-card'));
+        let batching = false;
 
         function syncAvailability(index) {
             levels.forEach(function (level, levelIndex) {
@@ -540,7 +548,7 @@
             const nextLevel = levels[nextIndex];
             const currentSelector = selectors[index];
             const nextSelector = selectors[nextIndex];
-            if (nextLevel?.showSuggestionsOnEnable && currentSelector && nextSelector && !nextSelector.hasSelection() && !nextLevel.input.disabled) {
+            if (!uiManaged && nextLevel?.showSuggestionsOnEnable && currentSelector && nextSelector && !nextSelector.hasSelection() && !nextLevel.input.disabled) {
                 const parentId = currentSelector.getSelectedId();
                 // Wait for the selection click to finish bubbling: the outside-click
                 // listener would otherwise immediately dismiss the next dropdown.
@@ -556,6 +564,7 @@
         levels.forEach(function (level, index) {
             const selector = createAutocomplete({
                 ...level,
+                autoSelectSingle: level.autoSelectSingle ?? (!uiManaged && index > 0 && index < 3 && config.autoSelectSingle !== false),
                 maxSuggestions: 3,
                 onSelect: function (item, id) {
                     clearFollowing(index);
@@ -573,6 +582,13 @@
                     document.dispatchEvent(new CustomEvent('csms:curriculum-context-selection', { detail: { index, item: null, action: 'clear' } }));
                 }
             });
+            const setSelectedQuietly = selector.setSelected;
+            selector.setSelected = function (item, notify) {
+                setSelectedQuietly(item, notify);
+                if (notify === false && !batching) {
+                    document.dispatchEvent(new CustomEvent('csms:curriculum-context-selection', { detail: { index, item, action: 'select', silent: true } }));
+                }
+            };
             selectors.push(selector);
         });
 
@@ -582,7 +598,8 @@
             get: function (index) { return selectors[index] || null; },
             setContext: function (items) {
                 if (!Array.isArray(items) || items.length !== selectors.length) throw new Error('Incomplete curriculum context.');
-                selectors.forEach((selector,index) => selector.setSelected(items[index],false));
+                batching = true;
+                try { selectors.forEach((selector,index) => selector.setSelected(items[index],false)); } finally { batching = false; }
                 syncAvailability(-1);
                 items.forEach((item,index) => document.dispatchEvent(new CustomEvent('csms:curriculum-context-selection',{detail:{index,item,action:'select'}})));
             },

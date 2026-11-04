@@ -114,3 +114,218 @@ body :is(.state-cell, .mapping-state, .pr-empty, .equivalency-empty-context, .el
 body :is(.state-cell.error-state, .mapping-state.is-error) {
   color: var(--csms-danger, #8f1d17);
 }
+
+/* ---- Page header (UI_Audit Batch 5): one layout on every page ----
+   Title and subtitle on the left (title in Newsreader, as on the dashboard), actions on the right, the same
+   gutter as the content below. Applies to the legacy header containers; markup and IDs are unchanged. */
+body .main :is(.page-title-bar, .mapping-workspace-header, .subject-landing-header) {
+  align-items: center;
+  background: #fff;
+  border-bottom: 1px solid var(--csms-border, #dfe4ee);
+  border-radius: 0;
+  box-shadow: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding: 16px var(--csms-page-gutter, 24px);
+}
+/* Bar-type headers sit flush with the content area; the subject headers keep their bleed margins. */
+body .main :is(.page-title-bar, .mapping-workspace-header) {
+  margin-left: 0;
+  margin-right: 0;
+  margin-top: 0;
+}
+body .main .csms-dash-header { align-items: flex-end; }
+body .main :is(.page-title-bar, .mapping-workspace-header, .subject-landing-header) > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* Actions: everything after the title block stays on the right, in one row. */
+body .main :is(.page-title-bar, .mapping-workspace-header, .subject-landing-header) > :not(:first-child) {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+body .main :is(.page-title-bar, .mapping-workspace-header, .subject-landing-header, .subject-program-header) .page-title {
+  color: var(--csms-navy, #1a3a8c);
+  display: block;
+  font-family: "Newsreader", Georgia, "Times New Roman", serif;
+  font-size: clamp(1.625rem, 1.9vw, 1.875rem);
+  font-weight: 700;
+  letter-spacing: -.01em;
+  line-height: 1.15;
+  margin: 0;
+}
+body .main :is(.page-title-bar, .mapping-workspace-header, .subject-landing-header, .subject-program-header) :is(.page-subtitle, .system-admin-subtitle, .dashboard-subtitle) {
+  color: var(--csms-text-muted, #4b5563);
+  font-size: var(--csms-text-sm, .875rem);
+  line-height: 1.4;
+  margin: 2px 0 0;
+}
+@media (max-width: 900px) {
+  body .main :is(.page-title-bar, .mapping-workspace-header, .subject-landing-header) { gap: 10px 16px; padding: 14px var(--csms-page-gutter, 16px); }
+  body .main :is(.page-title-bar, .mapping-workspace-header, .subject-landing-header, .subject-program-header) .page-title { font-size: 1.625rem; }
+}
+
+/* A field kept only as a hidden state holder for page scripts (for example the Subject Mapping year filter, which
+   the year pills replace on screen). Not shown, not focusable, not announced. */
+body .csms-hidden-field { display: none !important; }
+
+/* ---- Program / Curriculum / Version picker (UI_Decisions D2) ----
+   js/csms-context-bar.js builds three select-like fields (label above, 40px, 8px radius, chevron) that open a
+   searchable panel; the page's own bar becomes a plain, left-aligned row under the header. */
+body .main .csms-ctx-root {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  display: block;
+  margin: 0 0 16px;
+  min-height: 0;
+  padding: 0;
+}
+body .main .content > .csms-ctx-root {
+  margin-left: var(--csms-page-gutter, 24px);
+  margin-right: var(--csms-page-gutter, 24px);
+}
+body .main .csms-ctx {
+  align-items: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+}
+body .main .csms-ctx-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 100%;
+  position: relative;
+  width: 240px;
+}
+body .main .csms-ctx-label {
+  color: var(--csms-text, #1f2937);
+  font-size: .8125rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+body .main .csms-ctx-trigger {
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--csms-border-strong, #cbd5e1);
+  border-radius: 8px;
+  color: var(--csms-text, #1f2937);
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-size: var(--csms-text-sm, .875rem);
+  gap: 8px;
+  height: 40px;
+  justify-content: space-between;
+  padding: 0 12px;
+  text-align: left;
+  width: 100%;
+}
+body .main .csms-ctx-trigger:hover:not(:disabled) { border-color: var(--csms-navy, #1a3a8c); }
+body .main .csms-ctx-trigger[aria-expanded="true"] { border-color: var(--csms-navy, #1a3a8c); }
+body .main .csms-ctx-trigger:disabled { background: #f1f5f9; color: var(--csms-text-muted, #4b5563); cursor: not-allowed; }
+body .main .csms-ctx-value { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body .main .csms-ctx-field.is-empty .csms-ctx-value { color: var(--csms-text-muted, #4b5563); }
+body .main .csms-ctx-trigger .fa-chevron-down { color: var(--csms-text-muted, #4b5563); flex: 0 0 auto; font-size: var(--csms-icon-sm, 14px); }
+body .main .csms-ctx-sep {
+  align-items: center;
+  color: var(--csms-text-muted, #4b5563);
+  display: inline-flex;
+  font-size: 1.25rem;
+  height: 40px;
+}
+body .main .csms-ctx-reset,
+body .main .csms-ctx-link {
+  background: none;
+  border: 0;
+  border-radius: var(--csms-radius-sm, 6px);
+  color: var(--csms-navy, #1a3a8c);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--csms-text-sm, .875rem);
+  font-weight: 600;
+  padding: 4px 8px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+body .main .csms-ctx-reset { align-self: flex-end; height: 40px; }
+body .main .csms-ctx-reset:hover, body .main .csms-ctx-link:hover { background: var(--csms-navy-50, #e4eafa); }
+body .main .csms-ctx-reset[hidden], body .main .csms-ctx-hint[hidden] { display: none; }
+body .main .csms-ctx-hint {
+  align-self: flex-end;
+  color: var(--csms-text-muted, #4b5563);
+  font-size: .8125rem;
+  line-height: 40px;
+}
+/* Search panel */
+body .main .csms-ctx-panel {
+  background: #fff;
+  border: 1px solid var(--csms-border-strong, #cbd5e1);
+  border-radius: var(--csms-radius-md, 8px);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, .16);
+  left: 0;
+  max-width: calc(100vw - 24px);
+  min-width: 100%;
+  padding: 8px;
+  position: absolute;
+  top: calc(100% + 4px);
+  width: 340px;
+  z-index: 60;
+}
+body .main .csms-ctx-panel[hidden] { display: none; }
+body .main .csms-ctx-search {
+  border: 1px solid var(--csms-border-strong, #cbd5e1);
+  border-radius: var(--csms-radius-sm, 6px);
+  font-size: var(--csms-text-sm, .875rem);
+  height: 36px;
+  padding: 0 10px;
+  width: 100%;
+}
+body .main .csms-ctx-count { color: var(--csms-text-muted, #4b5563); font-size: var(--csms-text-xs, .75rem); margin: 6px 2px 4px; }
+body .main .csms-ctx-options { max-height: 280px; overflow-y: auto; }
+body .main .csms-ctx-group {
+  background: var(--csms-table-head, #eef1f7);
+  color: var(--csms-text-secondary, #374151);
+  font-size: var(--csms-text-xs, .75rem);
+  font-weight: 700;
+  letter-spacing: .03em;
+  padding: 5px 8px;
+  text-transform: uppercase;
+}
+body .main .csms-ctx-option {
+  align-items: baseline;
+  border-radius: var(--csms-radius-sm, 6px);
+  cursor: pointer;
+  display: flex;
+  font-size: var(--csms-text-sm, .875rem);
+  gap: 8px;
+  padding: 8px 10px;
+}
+body .main .csms-ctx-option strong { flex: 0 0 auto; font-weight: 700; }
+body .main .csms-ctx-option span { color: var(--csms-text-muted, #4b5563); flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+body .main .csms-ctx-option:hover, body .main .csms-ctx-option.active { background: var(--csms-navy-50, #e4eafa); }
+body .main .csms-ctx-state { color: var(--csms-text-muted, #4b5563); font-size: var(--csms-text-sm, .875rem); margin: 0; padding: 10px; }
+@media (max-width: 900px) {
+  body .main .csms-ctx-field { width: 100%; }
+  body .main .csms-ctx-sep { display: none; }
+  body .main .csms-ctx-panel { width: 100%; }
+  body .main .csms-ctx-hint { line-height: 1.3; }
+}
+
+/* Phones and tablets: header actions wrap under the title block, aligned with it. */
+@media (max-width: 900px) {
+  body .main :is(.page-title-bar, .mapping-workspace-header, .subject-landing-header) > :not(:first-child) {
+    flex: 0 0 auto;
+    justify-content: flex-start;
+    margin-right: auto;
+  }
+}

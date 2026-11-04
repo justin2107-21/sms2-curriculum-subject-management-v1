@@ -1030,10 +1030,10 @@ body.curriculum-modal-open { overflow: hidden; }
 .subject-landing-header, .subject-program-header { align-items: flex-start; display: flex; gap: 24px; justify-content: space-between; }
 .subject-landing-header .page-title, .subject-program-header .page-title { margin: 0; }
 .subject-landing-header .page-subtitle, .subject-program-header .page-subtitle { margin: 8px 0 0; }
-.subject-landing-header { background: #fff; border-bottom: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(15, 23, 42, .05); margin: 0 -24px 26px; padding: 24px 54px; }
+.subject-landing-header { background: #fff; border-bottom: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(15, 23, 42, .05); margin: 0 -24px 16px; padding: 16px var(--csms-page-gutter, 24px); }
 .subject-landing-controls { align-items: center; display: flex; flex-wrap: wrap; gap: 12px 18px; margin: 26px 0 26px; }
-.subject-program-view > .subject-back-link { background: #fff; display: flex; margin: 0 -24px; padding: 24px 30px 12px; }
-.subject-program-header { background: #fff; border-bottom: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(15, 23, 42, .05); margin: 0 -24px 26px; padding: 0 30px 24px; }
+.subject-program-view > .subject-back-link { background: #fff; display: flex; margin: 0 -24px; padding: 16px var(--csms-page-gutter, 24px) 8px; }
+.subject-program-header { background: #fff; border-bottom: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(15, 23, 42, .05); margin: 0 -24px 16px; padding: 0 var(--csms-page-gutter, 24px) 16px; }
 .subject-card-search { background: #fff; border: 1px solid #dbe3ee; border-radius: 11px; box-shadow: 0 5px 16px rgba(15, 23, 42, .04); flex: 0 1 360px; margin: 0; max-width: 100%; padding: 0 16px; width: 360px; }
 .subject-card-search input { border: 0; box-shadow: none; height: 54px; }
 .subject-category-tabs, .subject-year-tabs { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
@@ -1376,13 +1376,13 @@ body.curriculum-modal-open { overflow: hidden; }
   background: #fff;
   border-bottom: 1px solid #e2e8f0;
   box-shadow: 0 1px 3px rgba(15, 23, 42, .05);
-  margin: 0 0 28px;
-  padding: 24px 44px;
+  margin: 0 0 16px;
+  padding: 16px var(--csms-page-gutter, 24px);
 }
 .curriculum-content .page-title { color: #063469; font-size: 30px; line-height: 1.2; }
 .curriculum-content .page-subtitle { font-size: 15px; line-height: 1.5; margin-top: 7px; }
 .curriculum-content > .workspace-grid {
-  margin: 0 44px 30px;
+  margin: 0 var(--csms-page-gutter, 24px) 30px;
   padding: 0;
 }
 .curriculum-content .domain-card-header { min-height: 46px; padding: 10px 20px 8px; }
@@ -1425,7 +1425,7 @@ body.curriculum-modal-open { overflow: hidden; }
 .curriculum-content .domain-table .remove-action-button,
 .curriculum-content .domain-table .view-button { font-size: 13px; gap: 6px; min-height: var(--csms-control-h-sm, 32px); padding: 4px 10px; }
 .curriculum-content .version-workspace {
-  margin: 0 44px 30px;
+  margin: 0 var(--csms-page-gutter, 24px) 30px;
   padding: 0;
 }
 .curriculum-content .version-title-line h2 { font-size: 30px; }
@@ -1580,15 +1580,15 @@ body.curriculum-modal-open { overflow: hidden; }
 .curriculum-content > .version-workspace { margin: 0 0 30px; padding: 0; }
 .version-workspace > .text-back-button {
   align-items: center; background: #fff; border: 0;
-  display: flex; gap: 8px; margin: 0; padding: 14px 54px 8px; text-decoration: none;
+  display: flex; gap: 8px; margin: 0; padding: 14px var(--csms-page-gutter, 24px) 8px; text-decoration: none;
 }
 .version-workspace-header {
   background: #fff; border-bottom: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(15, 23, 42, .05);
-  margin: 0 0 22px; padding: 10px 54px 22px;
+  margin: 0 0 16px; padding: 10px var(--csms-page-gutter, 24px) 16px;
 }
 .version-heading { display: flex; flex-direction: column; min-width: 0; }
 .version-workspace-header .subject-breadcrumb { margin: 12px 0 0; }
-.year-tabs { gap: 8px; margin: 0 54px 20px; }
+.year-tabs { gap: 8px; margin: 0 var(--csms-page-gutter, 24px) 20px; }
 .year-tab {
   border-color: transparent; border-radius: 999px; color: #52647f; font-size: .78rem;
   min-height: 38px; padding: 8px 15px;
@@ -1599,16 +1599,16 @@ body.curriculum-modal-open { overflow: hidden; }
 .version-workspace > #placementPagination,
 .version-workspace > .reference-baseline-panel,
 .version-workspace > .curriculum-notice,
-.version-workspace > .reference-action-details { margin-left:54px; margin-right:54px; }
+.version-workspace > .reference-action-details { margin-left:var(--csms-page-gutter, 24px); margin-right:var(--csms-page-gutter, 24px); }
 @media (max-width: 1100px) {
-  .version-workspace > .text-back-button { padding-left: 28px; padding-right: 28px; }
-  .version-workspace-header { padding-left: 28px; padding-right: 28px; }
-  .year-tabs { margin-left: 28px; margin-right: 28px; }
+  .version-workspace > .text-back-button { padding-left: var(--csms-page-gutter, 24px); padding-right: var(--csms-page-gutter, 24px); }
+  .version-workspace-header { padding-left: var(--csms-page-gutter, 24px); padding-right: var(--csms-page-gutter, 24px); }
+  .year-tabs { margin-left: var(--csms-page-gutter, 24px); margin-right: var(--csms-page-gutter, 24px); }
   .version-workspace > #placementRows,
   .version-workspace > #placementPagination,
   .version-workspace > .reference-baseline-panel,
   .version-workspace > .curriculum-notice,
-  .version-workspace > .reference-action-details { margin-left:28px; margin-right:28px; }
+  .version-workspace > .reference-action-details { margin-left:var(--csms-page-gutter, 24px); margin-right:var(--csms-page-gutter, 24px); }
 }
 @media (max-width: 700px) {
   .version-workspace > .text-back-button { padding: 14px 16px 8px; }

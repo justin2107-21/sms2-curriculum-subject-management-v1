@@ -5,7 +5,7 @@
 .prerequisite-content [hidden], #editorModal [hidden], #detailsModal [hidden], #removeModal [hidden] { display:none !important; }
 #editorModal, #detailsModal, #removeModal { align-items:center; }
 #editorModal .modal-dialog, #detailsModal .modal-dialog, #removeModal .modal-dialog { max-height:calc(100dvh - 32px); overflow-y:auto; }
-.prerequisite-content { --pr-workspace-gutter:56px; }
+.prerequisite-content { --pr-workspace-gutter:var(--csms-page-gutter, 24px); }
 .prerequisite-content > .pr-selectors {
   align-items:end; display:grid;
   grid-template-columns:minmax(0,1.25fr) 14px minmax(0,1fr) 14px minmax(0,1fr);

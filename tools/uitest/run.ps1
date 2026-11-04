@@ -11,6 +11,11 @@ param(
     [int]$CdpPort = 9340,
     [switch]$NoJs,
     [switch]$Picker,
+    [switch]$CtxFlow,
+    [switch]$CtxNav,
+    [switch]$CtxScenario,
+    [string]$Program = "BSCRIM",
+    [string]$Prefer = "",
     [string]$Probe = "",
     [int]$Height = 0,
     [switch]$WarnPreview,
@@ -67,6 +72,9 @@ try {
         if ($IdleSeconds -gt 0) { $nodeArgs += "--idle=$IdleSeconds" }
         if ($Height -gt 0) { $nodeArgs += "--height=$Height" }
         if ($Probe) { $nodeArgs += "--probe=$Probe" }
+        if ($CtxScenario) { $nodeArgs += "--ctxscenario=1" }
+        if ($CtxNav) { $nodeArgs += "--ctxnav=1"; $nodeArgs += "--program=$Program"; if ($Prefer) { $nodeArgs += "--prefer=$Prefer" } }
+        if ($CtxFlow) { $nodeArgs += "--ctxflow=1"; $nodeArgs += "--program=$Program"; if ($Prefer) { $nodeArgs += "--prefer=$Prefer" } }
         if ($Picker) { $nodeArgs += '--picker=1' }
         if ($WarnPreview) { $nodeArgs += "--warnpreview=1" }
         if ($NoJs) { $nodeArgs += '--nojs=1' }

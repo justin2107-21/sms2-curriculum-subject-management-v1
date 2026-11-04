@@ -98,7 +98,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
         <div class="mapping-year-tabs" id="mappingYearTabs" aria-label="Year / Grade filter"></div>
         <div class="mapping-map-toolbar">
           <label class="search-control"><span class="sr-only">Search subjects</span><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input id="mappingSubjectSearch" type="search" maxlength="100" placeholder="Search subject code or title..."/></label>
-          <label class="form-field"><span class="sr-only">Year / Grade</span><select id="mappingYearFilter"><option value="">All Years</option></select></label>
+          <label class="form-field csms-hidden-field"><span class="sr-only">Year / Grade</span><select id="mappingYearFilter" tabindex="-1" aria-hidden="true"><option value="">All Years</option></select></label>
           <label class="form-field"><span class="sr-only">Semester</span><select id="mappingSemesterFilter"><option value="">All Semesters</option></select></label>
           <label class="form-field"><span class="sr-only">Placement</span><select id="mappingPlacementFilter"><option value="">All Placements</option><option value="1">Required</option><option value="0">Optional</option></select></label>
           <span class="mapping-map-total" id="mappingCount">Select a version</span>

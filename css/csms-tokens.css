@@ -75,7 +75,8 @@
   --csms-icon-md: 16px;
   --csms-icon-lg: 20px;
   --csms-focus: #2563eb;                             /* keyboard focus ring (3:1+ on white and light greys) */
-  --csms-icon-xl: 28px;                              /* empty-state / illustration icons */
+  --csms-icon-xl: 28px;
+  --csms-page-gutter: 24px;                          /* left/right inset of every page header and content block */                              /* empty-state / illustration icons */
 
   /* Layers */
   --csms-z-base: 1; --csms-z-sticky: 100; --csms-z-dropdown: 200; --csms-z-topbar: 300;
@@ -138,4 +139,8 @@
     transition-duration: .01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+@media (max-width: 900px) {
+  :root { --csms-page-gutter: 16px; }
 }

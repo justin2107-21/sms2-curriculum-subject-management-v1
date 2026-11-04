@@ -9,17 +9,25 @@ Stack: plain PHP + Bootstrap 5.3 (custom Sass build, compiled CSS committed), va
 - On pages that need it (Subject Mapping, Pre-requisite Configuration, and any page that depends on a curriculum version), it sits directly under the page title.
 - Dashboard may show a small read-only context line (for example "BSIT · College/CHED"), not a selector.
 
-## D2. Compact single-row bar
-- About 44px high (the current one is about 125px). Small labels beside the fields.
-- Pinned under the header while the page scrolls.
-- One "Reset" link replaces the three × buttons.
+## D2. Program / Curriculum / Version picker (revised 2026-11-03; replaces the compact bar)
+- Three select-like fields in one row under the page header, left-aligned: **label above** each field ("Program", "Curriculum", "Version", 13 px semibold), the field about **40 px** high, white, 1 px border, 8 px radius, value text, chevron on the right, the standard keyboard focus ring. Fields 240 px wide (not full width), a small "›" between them. On phones each field is full width.
+- Clicking a field opens a **searchable panel** (the `csms-program-picker.js` pattern): search box, result count, grouped options, arrow keys / Enter / Escape, ARIA combobox and listbox. Program options are grouped College / Senior High; Version options show the status ("PREORAL-2026 · Draft", "FINAL · Active"), active first.
+- **Recent:** the Program panel starts with a "Recent" group of the user's last 3 complete contexts (`BSIT / BSIT-DEMO-2026 / PREORAL-2026 · Draft`); choosing one applies all three at once. A recent context whose version is gone is refused and forgotten.
+- Choosing a program opens Curriculum, then Version; a list with a single option is picked automatically.
+- One small **Reset** link (clears the context everywhere). When no version is chosen the row shows "Choose a curriculum version to begin".
+- Not pinned: with labels above the fields the row is about 60 px tall, so it scrolls with the page. (The earlier 44 px pinned bar is replaced.)
+- Built by `js/csms-context-bar.js` + `css/csms-components.css` on Subject Mapping, Pre-requisite Configuration, Electives Manager, Curriculum Export and Grade Weighting Setup. The page's own autocomplete cascade stays underneath as the engine and the original inputs stay in the page (hidden), so every page keeps its own permission-checked lookups, handlers and IDs. Curriculum Builder's program and curriculum screens do not use this context (they pick by card), and Validate Curriculum uses plain selects, so they are not converted.
 
-## D3. Collapsed summary after choosing
-- Once all three are chosen, the bar collapses to one line: `BSIT / BSIT-DEMO-2026 / PREORAL-2026` with a "Change" link.
+## D3. Collapsed summary after choosing: removed (2026-11-03)
+- The one-line `BSIT / BSIT-DEMO-2026 / PREORAL-2026` summary with a "Change" link is gone. The picker stays as the same row once all three are chosen; the fields themselves show the choice.
 
-## D4. Keep the cascading selection
-- Each choice narrows the next list to what belongs to it (the current system's best behavior).
-- Add: open the next dropdown automatically; auto-pick when only one option exists; remember the last choice for the session so related pages open on the same context; put the selection in the URL so a page can be linked.
+## D4. Keep the cascading selection, and one working context across modules
+- Each choice narrows the next list to what belongs to it. The next list opens automatically; a single option is picked automatically.
+- **One working context** is shared by every module page. Any change on any page is saved and applies to all of them, and is always written to the address (`?program_id=&curriculum_id=&version_id=`) so links work.
+- **Resolution order on page load:** (a) ids in the address, if valid and permitted for that module; (b) the user's saved working context; (c) the version the user last edited; (d) the newest active version of the first permitted program; (e) otherwise an empty picker with "Choose a curriculum version to begin". Each id is validated through the module's own permission-checked lookup; a deleted or unpermitted item makes that rule fail and the next one is tried. Pages that handle their own link (Subject Mapping, Pre-requisite) get about 4 seconds; if their link handling selected nothing, rule (b) applies.
+- **Implemented:** (a), (b), (e), the address write, Recent, and the fallbacks (`js/curriculum-context.js`, replaced; unit tests in `tests/working-context.cjs`). **Temporary store:** `sessionStorage`, kept across reloads (the old rule that deleted it on reload is gone); it is per browser tab, so a new tab or a new sign-in starts empty until the server store exists.
+- **Waiting for approval:** the per-user server store, and with it rules (c) and (d). See `Working_Context_Proposal.md` (migration for a `user_preferences` table, an authenticated CSRF-protected endpoint, validation on read).
+- Electives' version lookup returns no status, so its field shows the status only when another page already saw that version in the same tab.
 
 ## D5. Manus design (optional reference): what to take and what to leave
 | Take | Leave |
@@ -32,6 +40,8 @@ Stack: plain PHP + Bootstrap 5.3 (custom Sass build, compiled CSS committed), va
 | | Prototype and "synthetic data" banners |
 
 **D5 override (approved by the user, 2026-11-03):** the "one sans font, no serif headings" rule is replaced, starting with the **dashboard only**: **DM Sans** for the interface and **Newsreader** (serif) for page and card titles. Both are self-hosted (variable woff2 or ttf) under `assets/ui/dist/fonts/` with their SIL Open Font Licence files; no Google Fonts or other CDN link. Other pages keep the current system font until the user extends the override.
+
+**D5 extension (approved 2026-11-03, Batch 5):** the **page title (h1) uses Newsreader 700 on every page**, same size and position as the dashboard title, so headers match everywhere. The face is declared once in `css/csms-fonts.css` (loaded by `shared/topbar.php`). The interface font on other pages stays the system font; DM Sans remains dashboard-only.
 
 ## D6. Text size floor
 - Body 16px, tables and menus 14px, nothing below 12px. Contrast at least 4.5:1.

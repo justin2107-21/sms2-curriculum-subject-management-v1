@@ -157,9 +157,170 @@ async function main() {
         const name = `${role}-${url.replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '')}-${width}.png`;
         await shot(path.join(out, name));
         const overflow = await evaluate('document.documentElement.scrollWidth > window.innerWidth');
+        const contentOverflow = await evaluate('(() => { const c = document.querySelector("main.content, .main .content"); return c ? c.scrollWidth - c.clientWidth : 0; })()');
         const sidebar = await sidebarCheck();
         if (sidebar.status === 'fail') report.failures.push(`${role} ${url} @${width}: sidebar burger — ${sidebar.reason}`);
-        report.pages.push({ url, width, finalPath, screenshot: name, horizontalOverflow: overflow, sidebar, issues });
+        report.pages.push({ url, width, finalPath, screenshot: name, horizontalOverflow: overflow, contentOverflow, sidebar, issues });
+      }
+    }
+
+    // ---- Context picker helpers (Program / Curriculum / Version) ----
+    const pickerState = () => evaluate('(() => { const u = document.querySelector(".csms-ctx"); if (!u) return null; const f = [...u.querySelectorAll(".csms-ctx-field")]; const r = u.querySelector(".csms-ctx-reset"); const h = u.querySelector(".csms-ctx-hint"); const rect = u.getBoundingClientRect(); const root = u.closest(".csms-ctx-root"); const rr = root.getBoundingClientRect(); return { values: f.map(x => x.querySelector(".csms-ctx-value").textContent), titles: f.map(x => x.querySelector(".csms-ctx-trigger").title), disabled: f.map(x => x.querySelector(".csms-ctx-trigger").disabled), openPanel: f.findIndex(x => !x.querySelector(".csms-ctx-panel").hidden), resetVisible: !!r && !r.hidden, hintVisible: !!h && !h.hidden, hintText: h ? h.textContent : "", rowH: Math.round(rect.height), left: Math.round(rect.left), fieldW: f.map(x => Math.round(x.getBoundingClientRect().width)), fieldH: f.map(x => Math.round(x.querySelector(".csms-ctx-trigger").getBoundingClientRect().height)), search: location.search, path: location.pathname.split("/").pop() }; })()');
+    const openField = async index => { await evaluate('document.querySelectorAll(".csms-ctx-trigger")[' + index + '].click(); true'); await sleep(700); };
+    const clickOption = prefer => evaluate('((prefer) => { const p = [...document.querySelectorAll(".csms-ctx-panel")].find(x => !x.hidden); if (!p) return null; const opts = [...p.querySelectorAll("[role=option]")]; const o = opts.find(x => prefer && x.textContent.includes(prefer)) || opts.find(x => !x.classList.contains("is-recent")) || opts[0]; if (!o) return null; const t = o.textContent; o.click(); return t; })(' + JSON.stringify(prefer || '') + ')');
+    const panelText = () => evaluate('(() => { const p = [...document.querySelectorAll(".csms-ctx-panel")].find(x => !x.hidden); return p ? { text: p.innerText.slice(0, 600), options: p.querySelectorAll("[role=option]").length, groups: [...p.querySelectorAll(".csms-ctx-group")].map(g => g.textContent) } : null; })()');
+    // Choose a program by typing in the open Program panel, then follow the chain: levels with one option pick themselves,
+    // otherwise the next panel is open and gets the preferred option (comma list: curriculum text, version text).
+    async function choosePath(programText, prefer) {
+      const prefers = (prefer || '').split(',');
+      await openField(0);
+      await evaluate('(() => { const s = document.querySelector(".csms-ctx-panel:not([hidden]) .csms-ctx-search"); s.focus(); return true; })()');
+      await send('Input.insertText', { text: programText });
+      await sleep(900);
+      const picked = [await clickOption('')];
+      for (let step = 0; step < 3; step++) {
+        await sleep(1300);
+        const s = await pickerState();
+        if (!s.hintVisible) break;
+        if (s.openPanel < 0) break;
+        picked.push(await clickOption(prefers[step] || ''));
+      }
+      await sleep(1500);
+      return picked;
+    }
+    async function runChosenFlow(url, programText, prefer, isNav) { return null; }
+
+    if (arg('ctxnav', '') === '1') {
+      // Shared working context across pages: choose on the FIRST url, then open each following url bare (like a sidebar
+      // click) and record whether the context arrived; then reload (F5) on the last page.
+      const program = arg('program', 'BSCRIM');
+      const prefer = arg('prefer', '');
+      const stored = () => evaluate('(() => { const o = {}; for (let i = 0; i < sessionStorage.length; i++) { const k = sessionStorage.key(i); if (/csms/i.test(k)) o[k] = sessionStorage.getItem(k); } return o; })()');
+      report.ctxnav = { steps: [] };
+      await setWidth(widths[0]);
+      await navigate(base + urls[0]);
+      await sleep(1800);
+      report.ctxnav.picked = await choosePath(program, prefer);
+      report.ctxnav.chosenOn = { url: urls[0], state: await pickerState(), storage: await stored() };
+      for (const url of urls.slice(1)) {
+        issues = [];
+        await navigate(base + url);
+        await sleep(3500);
+        report.ctxnav.steps.push({ url, state: await pickerState(), storage: await stored(), issues: issues.length });
+      }
+      await send('Page.reload');
+      await sleep(3500);
+      report.ctxnav.afterReload = { state: await pickerState(), storage: await stored() };
+    }
+
+    if (arg('ctxflow', '') === '1') {
+      // The picker on each page in --urls: look, open a panel, choose a program through the real UI (auto-open and
+      // auto-pick), reload from the address, then Reset. --program=BSCRIM, --prefer="curriculumText,versionText".
+      const program = arg('program', 'BSCRIM');
+      const prefer = arg('prefer', '');
+      report.ctxflow = {};
+      for (const url of urls) {
+        issues = [];
+        const o = {};
+        await setWidth(widths[0]);
+        await navigate(base + url);
+        await sleep(2200);
+        o.initial = await pickerState();
+        if (!o.initial) { report.ctxflow[url] = { noPicker: true }; continue; }
+        await shot(path.join(out, role + '-picker-' + url.split('/').pop().replace('.php', '') + '-initial-' + widths[0] + '.png'));
+        await openField(0);
+        o.programPanel = await panelText();
+        await shot(path.join(out, role + '-picker-' + url.split('/').pop().replace('.php', '') + '-open-' + widths[0] + '.png'));
+        await evaluate('document.querySelector(".csms-ctx-trigger").click(); true');
+        o.picked = await choosePath(program, prefer);
+        o.complete = await pickerState();
+        await shot(path.join(out, role + '-picker-' + url.split('/').pop().replace('.php', '') + '-chosen-' + widths[0] + '.png'));
+        if (/version_id=/.test(o.complete.search)) {
+          await navigate(base + url.split('?')[0] + o.complete.search);
+          await sleep(3000);
+          o.reloadFromUrl = await pickerState();
+        }
+        await evaluate('(() => { const b = document.querySelector(".csms-ctx-reset"); if (b) b.click(); return !!b; })()');
+        await sleep(900);
+        o.afterReset = await pickerState();
+        o.issues = issues;
+        report.ctxflow[url] = o;
+      }
+    }
+
+    if (arg('ctxscenario', '') === '1') {
+      // The shared working context end to end (UI_Decisions D2 / working-context rules). Starts with an empty session.
+      const P = '/modules/curriculum/pages/';
+      const pages = { mapping: P + 'subject_mapping.php', prereq: P + 'prerequisite_configuration.php', electives: P + 'electives_manager.php',
+        export: P + 'curriculum_export.php', weighting: P + 'grade_weighting_setup.php' };
+      const clickOptionExcluding = text => evaluate('((text) => { const p = [...document.querySelectorAll(".csms-ctx-panel")].find(x => !x.hidden); if (!p) return null; const o = [...p.querySelectorAll("[role=option]")].find(x => !x.classList.contains("is-recent") && !x.textContent.includes(text)); if (!o) return null; const t = o.textContent; o.click(); return t; })(' + JSON.stringify(text) + ')');
+      const visit = async (key, query, shotName, settle) => {
+        issues = [];
+        await navigate(base + pages[key] + (query || ''));
+        await sleep(settle || 3500);   // pages with their own link handling wait about 4 s before falling back
+        if (shotName) await shot(path.join(out, role + '-ctx-' + shotName + '-' + widths[0] + '.png'));
+        return { page: key, state: await pickerState(), issues: issues.length };
+      };
+      report.ctxscenario = [];
+      const step = async (name, fn) => report.ctxscenario.push(Object.assign({ name }, await fn()));
+      await setWidth(widths[0]);
+      await navigate(base + '/dashboard/dashboard.php');
+      await sleep(800);
+      await evaluate('sessionStorage.clear(); true');
+      await step('A. Subject Mapping, nothing saved', () => visit('mapping', '', 'A-empty'));
+      await step('B. choose BSIT / BSIT-DEMO / PREORAL on Subject Mapping', async () => { const picked = await choosePath('BSIT', 'DEMO,PREORAL'); await shot(path.join(out, role + '-ctx-B-chosen-' + widths[0] + '.png')); return { picked, state: await pickerState() }; });
+      await step('C1. open Pre-requisite', () => visit('prereq', '', 'C1-prereq'));
+      await step('C2. open Electives', () => visit('electives', '', 'C2-electives'));
+      await step('D1. on Electives choose another version', async () => {
+        await openField(2);
+        const panel = await panelText();
+        const picked = await clickOptionExcluding('PREORAL');
+        await sleep(2200);
+        await shot(path.join(out, role + '-ctx-D1-changed-' + widths[0] + '.png'));
+        return { panel: panel && panel.text.replace(/\s+/g, ' ').slice(0, 160), picked, state: await pickerState() };
+      });
+      await step('D2. open Subject Mapping', () => visit('mapping', '', 'D2-mapping'));
+      await step('D3. open Export', () => visit('export', '', 'D3-export'));
+      await step('E1. link with other ids (BSCRIM) on Export', () => visit('export', '?program_id=109&curriculum_id=47&version_id=43', 'E1-link'));
+      await step('E2. then Grade Weighting follows it', () => visit('weighting', '', 'E2-weighting'));
+      await step('F1. invalid link on Export (missing version) falls back to saved', () => visit('export', '?program_id=108&curriculum_id=46&version_id=99999', 'F1-invalid-export'));
+      await step('F2. invalid link on Pre-requisite falls back to saved', () => visit('prereq', '?program_id=108&curriculum_id=46&version_id=99999', 'F2-invalid-prereq', 8000));
+      await step('F3. invalid link on Subject Mapping falls back to saved', () => visit('mapping', '?program_id=108&curriculum_id=46&version_id=99999', 'F3-invalid-mapping', 8000));
+      await step('G. reload (F5) on Subject Mapping', async () => { await send('Page.reload'); await sleep(8000); return { state: await pickerState() }; });
+    }
+
+    if (arg('probe', '') === 'context') {
+      // Which pages have a Program / Curriculum / Version selector, what kind, and how tall is it?
+      const collector = '(() => {' +
+        'const hit = [...document.querySelectorAll("[class*=context], [class*=selectors], [class*=selector]")].filter(e => { const f = e.querySelectorAll("input:not([type=hidden]), select"); const r = e.getBoundingClientRect(); return f.length >= 2 && f.length <= 6 && r.height > 30 && r.width > 400 && !e.closest("dialog, .modal-dialog, [hidden]"); });' +
+        'const top = hit.filter(e => !hit.some(o => o !== e && o.contains(e)));' +
+        'return top.slice(0, 3).map(e => { const r = e.getBoundingClientRect(); const f = [...e.querySelectorAll("input:not([type=hidden]), select")]; return { tag: e.tagName.toLowerCase(), cls: String(e.className).split(" ").slice(0, 3).join("."), id: e.id, h: Math.round(r.height), w: Math.round(r.width), fields: f.map(x => x.tagName.toLowerCase() + (x.id ? "#" + x.id : "")), clearButtons: e.querySelectorAll("[data-autocomplete-clear], .record-autocomplete-clear").length, kind: e.querySelector(".record-autocomplete") ? "autocomplete" : "native-select" }; }); })()';
+      report.contextProbe = {};
+      for (const url of urls) {
+        await setWidth(widths[0]);
+        await navigate(base + url);
+        await sleep(2000);
+        report.contextProbe[url] = await evaluate(collector);
+      }
+    }
+
+    if (arg('probe', '') === 'headers') {
+      // Page header probe: title element, its header container, subtitle and header actions, per page.
+      const collector = '(() => {' +
+        'const h = document.querySelector(".main .content h1, main h1, .main h1, h1"); if (!h) return { none: true };' +
+        'const cs = e => getComputedStyle(e);' +
+        'let box = h; while (box.parentElement && !/(title-bar|page-header|header|workspace-header|landing-header)/i.test(String(box.className)) && box.parentElement.tagName !== "MAIN" && !box.parentElement.classList.contains("content")) box = box.parentElement;' +
+        'const br = box.getBoundingClientRect(), hr = h.getBoundingClientRect(), hc = cs(h), bc = cs(box);' +
+        'const sub = [...box.querySelectorAll("p, .page-subtitle, .dashboard-subtitle")].find(p => p.getBoundingClientRect().width > 0 && !p.closest("button"));' +
+        'const acts = [...box.querySelectorAll("button, a[class*=button], a[class*=btn]")].filter(b => b.getBoundingClientRect().width > 0).map(b => ({ txt: (b.textContent || "").trim().slice(0, 24), cls: String(b.className).split(" ")[0], right: Math.round(b.getBoundingClientRect().right), top: Math.round(b.getBoundingClientRect().top - br.top) }));' +
+        'const mainL = document.querySelector(".main") ? document.querySelector(".main").getBoundingClientRect().left : 0; const host = box.parentElement || document.body; const kids = [...host.children].filter(k => k !== box && k.getBoundingClientRect().height > 8 && k.getBoundingClientRect().width > 100 && !/^(SCRIPT|STYLE|LINK)$/.test(k.tagName) && cs(k).position !== "fixed").slice(0, 8).map(k => ({ cls: String(k.className).split(" ")[0] || k.tagName.toLowerCase(), left: Math.round(k.getBoundingClientRect().left - mainL), w: Math.round(k.getBoundingClientRect().width) }));return { kids, boxLeft: Math.round(br.left - mainL), boxW: Math.round(br.width), h1cls: String(h.className), h1fs: hc.fontSize, h1fw: hc.fontWeight, h1ff: hc.fontFamily.split(",")[0], h1color: hc.color, boxcls: String(box.className).split(" ").slice(0, 3).join("."), boxtag: box.tagName.toLowerCase(), boxh: Math.round(br.height), boxpad: bc.padding, boxbg: bc.backgroundColor, boxborder: bc.borderBottomWidth + " " + bc.borderBottomColor, h1x: Math.round(hr.left), h1y: Math.round(hr.top), sub: sub ? { cls: String(sub.className).split(" ")[0], fs: cs(sub).fontSize, color: cs(sub).color, txt: sub.textContent.trim().slice(0, 40) } : null, acts, mainw: Math.round(document.querySelector(".main") ? document.querySelector(".main").getBoundingClientRect().width : 0) }; })()';
+      report.headerProbe = {};
+      for (const url of urls) {
+        issues = [];
+        await setWidth(widths[0]);
+        await navigate(base + url);
+        await sleep(2000);
+        report.headerProbe[url] = await evaluate(collector);
       }
     }
 

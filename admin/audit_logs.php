@@ -58,7 +58,10 @@ require_once __DIR__ . '/../shared/sidebar.php';
 
   <div class="content">
     <div class="page-title-bar">
-      <h2 class="page-title"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> Audit Logs</h2>
+      <div>
+        <h1 class="page-title"><i class="fa-solid fa-clipboard-list" aria-hidden="true"></i> Audit Logs</h1>
+        <p class="system-admin-subtitle">Read-only history of sign-ins, account changes and curriculum edits.</p>
+      </div>
     </div>
 
     <div class="audit-card">

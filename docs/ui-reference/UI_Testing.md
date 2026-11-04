@@ -57,3 +57,12 @@ Runs can go in parallel if each gets its own `-ServerPort` and `-CdpPort` (and a
 powershell -ExecutionPolicy Bypass -File tools\uitest\run.ps1 -Role admin -Urls "/dashboard/dashboard.php,/admin/users.php" -Widths 1440 -Probe styles
 ```
 Adds `styleProbe` to `report-<role>.json`: per page, the computed size, font, radius and colours of every button, form control, table header and cell and empty-state block, plus (`focus`) which focusable controls show no outline or shadow when focused after a Tab press. Static state only: modals and panels opened by a click are not included. Compare two runs to measure a change.
+
+## More probes
+- `-Probe headers`: per page, the h1 (font, size, weight), its header container (class, height, padding), subtitle, header actions and the left edge of the title and content blocks.
+- `-Probe context`: which pages have a Program / Curriculum / Version selector, its kind and height.
+- `-CtxFlow -Program BSCRIM` (add `-Prefer "BSIT-DEMO,PREORAL"` to choose by text at the Curriculum and Version steps): on each page in `-Urls`, looks at the picker, opens the Program panel, chooses a program through the real UI (auto-open and auto-pick), reloads from the address, then Reset. Screenshots: initial, open panel, chosen.
+- `-CtxNav -Program BSIT -Prefer "DEMO,PREORAL"`: chooses a context on the first URL, then opens each following URL bare (like a sidebar click), then presses F5, recording the picker and the saved data each time.
+- `-CtxScenario -Urls /dashboard/dashboard.php`: the shared working context end to end on the five picker pages, starting from an empty session: nothing saved, choose, carry to two more pages, change the version on one page and see it on the others, a link with other ids, three invalid links (fall back to the saved context), reload.
+- `-Probe live`: how many error / status message elements each page has and how many are live regions; on the first page it also injects test messages and fires real error and success toasts.
+- Every page check also records `contentOverflow` (pixels the content area is wider than itself); anything above 0 means content is being cut or scrolled sideways.

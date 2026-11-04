@@ -7,7 +7,7 @@
   gap: 14px;
   padding: 16px 18px;
 }
-.mapping-content { --mapping-page-gutter: 56px; }
+.mapping-content { --mapping-page-gutter: var(--csms-page-gutter, 24px); }
 .mapping-content > .mapping-workspace-shell { margin: 0 var(--mapping-page-gutter) 32px; padding: 0; }
 .mapping-content > .mapping-workspace-header {
   align-items: flex-start;
@@ -51,7 +51,7 @@
 .mapping-year-tabs button { background: #fff; border: 1px solid #dbe3ee; border-radius: 8px; padding: 10px 16px; font: inherit; font-size: .8rem; font-weight: 600; color: #52647f; cursor: pointer; }
 .mapping-year-tabs button.is-active, .mapping-review-card.is-active, #mappingHighlightPrerequisites[aria-pressed="true"] { border-color: #9fc3fa; background: #edf4ff; color: #1d5fc7; }
 .mapping-year-tabs button:focus-visible { outline: 2px solid #2563c5; outline-offset: 2px; }
-.mapping-map-toolbar { grid-template-columns: minmax(220px, 1.8fr) repeat(3, minmax(130px, .65fr)) auto; margin-bottom: 28px; }
+.mapping-map-toolbar { grid-template-columns: minmax(220px, 1.8fr) repeat(2, minmax(130px, .65fr)) auto; margin-bottom: 28px; }
 .mapping-map-toolbar .search-control input, .mapping-map-toolbar .form-field select {
   height: 44px;
   border: 1px solid #dbe3ee;

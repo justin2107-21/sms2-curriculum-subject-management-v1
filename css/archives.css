@@ -5,7 +5,7 @@
 #accountPanel[hidden],.archives-panel[hidden],.archive-modal[hidden],.archive-empty[hidden],.archive-filters [hidden]{display:none!important}
 #accountPanel{display:flex;flex-direction:column;gap:24px}
 .archives-panel{display:flex;flex-direction:column;gap:18px}
-.archives-heading h1{font-size:1.5rem;color:#183b73}.archives-heading p{font-size:.88rem;color:#64748b;margin-top:4px}
+.archives-heading :is(h1,h2){font-size:1.5rem;color:#183b73}.archives-heading p{font-size:.88rem;color:#64748b;margin-top:4px}
 .archive-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
 .archive-summary-card{background:#fff;border:1px solid #dce7f6;border-radius:10px;padding:15px;display:flex;flex-direction:column;gap:7px;box-shadow:0 1px 5px #123e7710}
 .archive-summary-card span{font-size:.76rem;color:#64748b}.archive-summary-card strong{font-size:1.45rem;color:#17458c}

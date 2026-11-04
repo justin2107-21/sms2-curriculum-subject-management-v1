@@ -10,7 +10,6 @@ require_once __DIR__ . '/../shared/db.php';
 $sess_first   = htmlspecialchars($_SESSION['first_name'] ?? '');
 $sess_last    = htmlspecialchars($_SESSION['last_name']  ?? '');
 $sess_role    = ucfirst(htmlspecialchars($_SESSION['role'] ?? 'student'));
-$sess_initial = strtoupper(substr($_SESSION['first_name'] ?? 'U', 0, 1));
 
 // Quick stats
 $total = $active = 0;
@@ -30,6 +29,7 @@ $inactive = $total - $active;
   <title>Overview – BCP Student Portal</title>
   <link rel="stylesheet" href="../css/dashboard.css"/>
   <link rel="stylesheet" href="../css/page-loader.css"/>
+  <link rel="stylesheet" href="../css/csms-typography.css?v=<?= (string)@filemtime(__DIR__ . '/../css/csms-typography.css') ?>"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
   <meta name="loader-logo" content="../images/BCP_LOGO.png"/>
   <script src="../js/page-loader.js"></script>
@@ -45,27 +45,16 @@ require_once __DIR__ . '/../shared/sidebar.php';
 
 <div class="main">
 
-  <!-- Topbar -->
-  <div class="topbar">
-    <button class="hamburger" id="hamburgerBtn" aria-label="Toggle sidebar">
-      <i class="fa-solid fa-bars" aria-hidden="true"></i>
-    </button>
-    <span class="topbar-spacer"></span>
-    <div class="topbar-right">
-      <a href="../dashboard/account.php" class="avatar" id="avatarBtn" title="Account Settings">
-        <?= $sess_initial ?>
-      </a>
-    </div>
-  </div>
+  <?php require __DIR__ . '/../shared/topbar.php'; ?>
   <!-- Content -->
   <div class="content">
 
     <!-- Page title -->
     <div class="page-title-bar">
-      <h2 class="page-title">
-        <i class="fa-solid fa-chart-column" aria-hidden="true"></i>
-        Reports
-      </h2>
+      <div>
+        <h1 class="page-title"><i class="fa-solid fa-chart-column" aria-hidden="true"></i> Reports</h1>
+        <p class="page-subtitle">Your account overview and the student totals you can see.</p>
+      </div>
     </div>
 
     <!-- Welcome + stats row -->
