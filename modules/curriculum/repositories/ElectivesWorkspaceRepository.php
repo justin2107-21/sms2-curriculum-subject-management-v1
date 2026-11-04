@@ -30,17 +30,17 @@ class ElectivesWorkspaceRepository
     public function contextOptions(string $level, string $search, ?int $program, ?int $curriculum): array
     {
         if ($level === 'program') {
-            $fields = ['program_code','program_name']; $from = 'academic_programs'; $id = 'id'; $scope = ''; $types = ''; $params = [];
+            $fields = ['program_code','program_name']; $from = 'academic_programs'; $id = 'id'; $scope = ''; $types = ''; $params = []; $extra = '';
         } elseif ($level === 'curriculum') {
-            $fields = ['curriculum_code','curriculum_name']; $from = 'curricula'; $id = 'id'; $scope = 'academic_program_id=? AND '; $types = 'i'; $params = [$program];
+            $fields = ['curriculum_code','curriculum_name']; $from = 'curricula'; $id = 'id'; $scope = 'academic_program_id=? AND '; $types = 'i'; $params = [$program]; $extra = '';
         } else {
-            $fields = ['v.version_label','v.effective_academic_year']; $from = 'curriculum_versions v JOIN curricula c ON c.id=v.curriculum_id'; $id = 'v.id'; $scope = 'c.academic_program_id=? AND c.id=? AND '; $types = 'ii'; $params = [$program,$curriculum];
+            $extra = ', v.status AS status'; $fields = ['v.version_label','v.effective_academic_year']; $from = 'curriculum_versions v JOIN curricula c ON c.id=v.curriculum_id'; $id = 'v.id'; $scope = 'c.academic_program_id=? AND c.id=? AND '; $types = 'ii'; $params = [$program,$curriculum];
         }
         $where = implode(' OR ', array_map(fn($field) => RepositoryQuery::searchColumn($field) . " LIKE ? ESCAPE '='", $fields));
         array_push($params, RepositoryQuery::likePattern($search), RepositoryQuery::likePattern($search)); $types .= 'ss';
         $rankParams = [];
         $order = RepositoryQuery::searchOrder($fields, $search, $rankParams);
-        return $this->rows("SELECT $id AS id, {$fields[0]} AS code, {$fields[1]} AS title FROM $from WHERE $scope ($where) ORDER BY $order {$fields[0]}, $id LIMIT 3", $types . str_repeat('s',count($rankParams)), array_merge($params,$rankParams));
+        return $this->rows("SELECT $id AS id, {$fields[0]} AS code, {$fields[1]} AS title$extra FROM $from WHERE $scope ($where) ORDER BY $order {$fields[0]}, $id LIMIT 50", $types . str_repeat('s',count($rankParams)), array_merge($params,$rankParams));
     }
 
     public function lockGroup(int $id, int $version): ?array

@@ -15,7 +15,7 @@ Stack: plain PHP + Bootstrap 5.3 (custom Sass build, compiled CSS committed), va
 - **Recent:** the Program panel starts with a "Recent" group of the user's last 3 complete contexts (`BSIT / BSIT-DEMO-2026 / PREORAL-2026 · Draft`); choosing one applies all three at once. A recent context whose version is gone is refused and forgotten.
 - Choosing a program opens Curriculum, then Version; a list with a single option is picked automatically.
 - One small **Reset** link (clears the context everywhere). When no version is chosen the row shows "Choose a curriculum version to begin".
-- Not pinned: with labels above the fields the row is about 60 px tall, so it scrolls with the page. (The earlier 44 px pinned bar is replaced.)
+- Not pinned (confirmed 2026-11-04): with labels above the fields the row is about 60 px tall, so it scrolls with the page. (The earlier 44 px pinned bar is replaced.)
 - Built by `js/csms-context-bar.js` + `css/csms-components.css` on Subject Mapping, Pre-requisite Configuration, Electives Manager, Curriculum Export and Grade Weighting Setup. The page's own autocomplete cascade stays underneath as the engine and the original inputs stay in the page (hidden), so every page keeps its own permission-checked lookups, handlers and IDs. Curriculum Builder's program and curriculum screens do not use this context (they pick by card), and Validate Curriculum uses plain selects, so they are not converted.
 
 ## D3. Collapsed summary after choosing: removed (2026-11-03)
@@ -24,10 +24,9 @@ Stack: plain PHP + Bootstrap 5.3 (custom Sass build, compiled CSS committed), va
 ## D4. Keep the cascading selection, and one working context across modules
 - Each choice narrows the next list to what belongs to it. The next list opens automatically; a single option is picked automatically.
 - **One working context** is shared by every module page. Any change on any page is saved and applies to all of them, and is always written to the address (`?program_id=&curriculum_id=&version_id=`) so links work.
-- **Resolution order on page load:** (a) ids in the address, if valid and permitted for that module; (b) the user's saved working context; (c) the version the user last edited; (d) the newest active version of the first permitted program; (e) otherwise an empty picker with "Choose a curriculum version to begin". Each id is validated through the module's own permission-checked lookup; a deleted or unpermitted item makes that rule fail and the next one is tried. Pages that handle their own link (Subject Mapping, Pre-requisite) get about 4 seconds; if their link handling selected nothing, rule (b) applies.
-- **Implemented:** (a), (b), (e), the address write, Recent, and the fallbacks (`js/curriculum-context.js`, replaced; unit tests in `tests/working-context.cjs`). **Temporary store:** `sessionStorage`, kept across reloads (the old rule that deleted it on reload is gone); it is per browser tab, so a new tab or a new sign-in starts empty until the server store exists.
-- **Waiting for approval:** the per-user server store, and with it rules (c) and (d). See `Working_Context_Proposal.md` (migration for a `user_preferences` table, an authenticated CSRF-protected endpoint, validation on read).
-- Electives' version lookup returns no status, so its field shows the status only when another page already saw that version in the same tab.
+- **Resolution order on page load:** (a) ids in the address; (b) the user's saved working context; (c) the version the user last edited: newest audit entry by this user that changed version content (placements, prerequisites/corequisites, electives, grade weighting, version create/clone; viewing and exporting do not count); (d) the newest active version by updated_at among programs the user may access, tie-break by program code; (e) otherwise an empty picker with "Choose a curriculum version to begin".
+- **Permitted** means the user holds that module's view permission and the version exists in a consistent program > curriculum > version chain. The application has no per-program access rules beyond that. An invalid item fails its rule and the next one is tried.
+- **Storage:** per user on the server (`user_preferences`, migration 026; `modules/curriculum/http/working_context_actions.php`): authenticated, CSRF on save, no extra RBAC permission, saves not audit-logged, integers only. `sessionStorage` is the fallback if the request fails.
 
 ## D5. Manus design (optional reference): what to take and what to leave
 | Take | Leave |

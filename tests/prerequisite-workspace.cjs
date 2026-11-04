@@ -41,7 +41,7 @@ async function context(program=programs[0]){[program,curriculum,version].forEach
  el('yearFilter').value='';el('ruleSearch').value='';el('stateFilter').value='without';await el('stateFilter').emit('change');assert.equal((el('ruleCards').innerHTML.match(/<article/g)||[]).length,103);
  el('semesterFilter').value='2nd Semester';await el('semesterFilter').emit('change');assert(el('ruleCards').innerHTML.includes('No subjects match'));el('semesterFilter').value='';
  assert.equal((await autocomplete.focusSearch.search('Subject')).length,105,'All matching candidates reach the shared ranking and suggestion limit');
- await autocomplete.curriculumSearch.search('DEMO');assert.equal(requests.at(-1)[1].academic_program_id,'1');assert.equal(requests.at(-1)[1].per_page,10);
+ await autocomplete.curriculumSearch.search('DEMO');assert.equal(requests.at(-1)[1].academic_program_id,'1');assert.equal(requests.at(-1)[1].per_page,50);
  await autocomplete.versionSearch.search('TEST');assert.equal(requests.at(-1)[1].curriculum_id,'3');
  await click({details:'3'});assert(el('detailsBody').innerHTML.includes('CC1'));assert(el('detailsBody').innerHTML.includes('CC2'));assert(el('detailsBody').innerHTML.includes('CC4'));
  await click({tab:'chain'});assert.equal(el('versionId').value,'4');assert.equal(el('panel-rules').hidden,true);

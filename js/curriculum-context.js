@@ -7,13 +7,12 @@
   // - On page load the context is resolved in this order:
   //     (a) ids in the address, if they are valid and permitted for the page's module;
   //     (b) the user's saved working context;
-  //     (c) the version the user last edited, (d) the newest active version of the first permitted program:
-  //         both need the server and are described in docs/ui-reference/Working_Context_Proposal.md (not built yet);
+  //     (c) the version the user last edited; (d) the newest active version the user may access;
   //     (e) nothing: an empty picker.
   //   "Valid and permitted" is checked by loading each level through the page's own, permission-checked option lookup;
   //   a deleted or unpermitted item makes that rule fail and the next rule is tried.
-  // - Storage: the temporary store is sessionStorage (survives reload; per browser tab). The store is the only part
-  //   that will change when the per-user server store is approved.
+  // - Storage: per user on the server (modules/curriculum/http/working_context_actions.php), which also answers rules
+  //   (a) to (d). sessionStorage is the fallback when that request fails.
   // The page scripts and the picker talk to this through two events from the shared autocomplete cascade
   // (csms:curriculum-context-cascade-ready, csms:curriculum-context-selection) and window.CSMSWorkingContext.
 
@@ -36,6 +35,34 @@
       try { sessionStorage.setItem(storageKey, JSON.stringify(value)); } catch (error) { /* storage may be disabled */ }
     }
   };
+
+  // ---- server store ------------------------------------------------------------------------------------------
+  const apiUrl = (script && script.dataset && script.dataset.contextApi) || '';
+  const csrfToken = (script && script.dataset && script.dataset.csrfToken) || '';
+  const MODULES = { subject_mapping: 'subject_mapping', prerequisite_configuration: 'prerequisite', electives_manager: 'electives', curriculum_export: 'export', grade_weighting_setup: 'grade_weighting' };
+  const moduleName = function () { return MODULES[(location.pathname.split('/').pop() || '').replace(/\.php$/, '')] || ''; };
+
+  async function serverRead(ids) {
+    if (!apiUrl || !moduleName()) return null;
+    try {
+      const params = new URLSearchParams({ action: 'read', module: moduleName() });
+      URL_KEYS.forEach(function (key, index) { if (ids[index]) params.set(key, ids[index]); });
+      const response = await fetch(apiUrl + '?' + params.toString(), { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+      const data = await response.json();
+      return response.ok && data.success ? data : null;
+    } catch (error) { return null; }
+  }
+
+  function serverSave(context) {
+    if (!apiUrl || !moduleName()) return;
+    const body = new URLSearchParams({ action: 'save', module: moduleName(), _csrf_token: csrfToken });
+    if (context) URL_KEYS.forEach(function (key, index) { body.set(key, context[KEYS[index]].id); });
+    else body.set('clear', '1');
+    fetch(apiUrl, { method: 'POST', body: body, credentials: 'same-origin', keepalive: true, headers: { Accept: 'application/json' } })
+      .then(function (response) { return response.json(); })
+      .then(function (data) { if (data && data.success && Array.isArray(data.recent)) { state.recent = data.recent; persist(); } })
+      .catch(function () { /* sessionStorage still holds it for this tab */ });
+  }
 
   const clone = function (value) { return value === undefined ? value : JSON.parse(JSON.stringify(value)); };
   const validId = function (value) { return typeof value === 'string' && /^[1-9][0-9]{0,18}$/.test(value); };
@@ -122,6 +149,11 @@
     }
     persist();
     syncUrl();
+    // Saved when the user (or a page's own link handling) completes or resets the context, not while restoring one.
+    if (!applying) {
+      if (complete(state.current)) serverSave(state.current);
+      else if (index === 0 && !detail.item) serverSave(null);
+    }
   });
 
   // ---- applying a context through the page's own cascade ----------------------------------------------------
@@ -154,20 +186,43 @@
     try { detail.selectors[0].clear(); } finally { applying -= 1; }
   }
 
+  function takeRemote(remote) {
+    if (!remote) return;
+    if (Array.isArray(remote.recent)) state.recent = remote.recent;
+    if (!remote.context) state.current = emptyContext();
+    persist();
+  }
+
   async function resolve(detail) {
     const token = ++generation;
+    const urlIds = readUrlIds();
     // Subject Mapping and Pre-requisite restore a linked context through their own address handling. If that produces
     // nothing (the link is invalid, deleted or not permitted) the next rule applies: the saved working context.
     if (detail.restoreSavedContext === false) {
+      const fallback = await serverRead(['', '', '']);
+      if (token !== generation) return;
+      if (fallback && Array.isArray(fallback.recent)) { state.recent = fallback.recent; persist(); }
       for (let wait = 0; wait < 13; wait += 1) {
         await new Promise(function (done) { setTimeout(done, 300); });
         if (token !== generation || detail.selectors[2].hasSelection()) return;
       }
-      if (complete(state.current) && !(await applyChain(clone(state.current), detail, token)) && token === generation) clearSelection(detail);
+      const next = fallback ? fallback.context : (complete(state.current) ? clone(state.current) : null);
+      if (next && !(await applyChain(next, detail, token)) && token === generation) clearSelection(detail);
       return;
     }
+    const remote = await serverRead(urlIds);
+    if (token !== generation) return;
+    if (remote) {
+      takeRemote(remote);
+      if (!remote.context) return;
+      const ok = await applyChain(remote.context, detail, token);
+      if (token !== generation) return;
+      if (!ok) clearSelection(detail);
+      else if (remote.rule === 'url') serverSave(state.current);     // a followed link becomes the working context
+      return;
+    }
+    // Server not reachable: rules (a) and (b) from this tab.
     const candidates = [];
-    const urlIds = readUrlIds();
     if (urlIds.some(Boolean)) {
       const known = {};
       state.recent.concat([state.current]).forEach(function (entry) {
@@ -178,7 +233,6 @@
       candidates.push(clone(fromUrl));                                   // (a)
     }
     if (complete(state.current)) candidates.push(clone(state.current));  // (b)
-    // (c) and (d): server rules, see the proposal document.
     for (let i = 0; i < candidates.length; i += 1) {
       if (token !== generation) return;
       if (await applyChain(candidates[i], detail, token)) return;
@@ -209,6 +263,7 @@
       const token = ++generation;
       const ok = await applyChain(clone(context), active, token);
       if (!ok && token === generation) clearSelection(active);
+      if (ok) serverSave(state.current);
       return ok;
     },
     forget: function (versionId) {

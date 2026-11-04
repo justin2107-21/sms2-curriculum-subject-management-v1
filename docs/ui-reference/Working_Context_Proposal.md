@@ -1,6 +1,6 @@
 # Working context on the server: proposal (not built, waiting for approval)
 
-Status: **proposal only.** No migration file, no endpoint, no table exists. Nothing here touches `sms_db`. After approval it is built and tested on `sms_db_uitest` only.
+Status: **approved and built 2026-11-04; applied to `sms_db_uitest` only, not yet to `sms_db`.** Final decisions are in D4 of `UI_Decisions.md`; where this proposal differs (rule c actions, rule d order), D4 and `WorkingContextService.php` are correct.
 
 ## What it adds
 Today the shared working context (Program / Curriculum / Version) is kept in `sessionStorage`: it survives a reload and moves between pages in one tab, but it is gone in a new tab, after closing the browser and after signing out. The server store keeps it per user, so it follows the person. It also makes two resolution rules possible that need server data.

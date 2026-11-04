@@ -25,6 +25,10 @@ cmd /c "`"$MysqlBin\mysql.exe`" -uroot $Database < `"$Backup`""
 if ($LASTEXITCODE -ne 0) { throw 'Import failed.' }
 
 $env:DB_NAME = $Database
-try { & $Php (Join-Path $PSScriptRoot 'seed-users.php') } finally { Remove-Item Env:DB_NAME }
+try {
+    & $Php (Join-Path $Root 'database\deploy.php') --apply "--confirm-database=$Database"
+    if ($LASTEXITCODE -ne 0) { throw 'Applying pending migrations to the test database failed.' }
+    & $Php (Join-Path $PSScriptRoot 'seed-users.php')
+} finally { Remove-Item Env:DB_NAME }
 if ($LASTEXITCODE -ne 0) { throw 'Seeding failed.' }
 Write-Host "Ready: $Database (from $Backup)"
