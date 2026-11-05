@@ -11,7 +11,7 @@
   <title>Access Denied – BCP Student Management System</title>
   <style>
     *{box-sizing:border-box}
-    body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f4f7fb;color:#1f2937;font-family:'Segoe UI', sans-serif;padding:24px}
+    body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f4f7fb;color:#1f2937;font-family:"DM Sans", "DM Sans", "Segoe UI", sans-serif;padding:24px}
     .denied-card{width:min(460px,100%);background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:32px;text-align:center;box-shadow:0 12px 35px rgba(15,23,42,.08)}
     .denied-code{font-size:3rem;font-weight:800;color:#dc2626;margin:0}
     h1{font-size:1.35rem;margin:8px 0 10px}

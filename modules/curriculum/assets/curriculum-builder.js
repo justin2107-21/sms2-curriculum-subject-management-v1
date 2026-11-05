@@ -395,6 +395,7 @@
                 else await loadCurriculumWorkspace();
             } else {
                 await loadPrograms(state.programPage);
+                loadProgramTabCounts();
                 programDetailsModal?.close();
             }
         } catch (error) {
@@ -498,15 +499,30 @@
                 const rows = groups[index].map(function (version) {
                     const href = 'curriculum_builder.php?program_id=' + Number(curriculum.academic_program_id) + '&curriculum_id=' + Number(curriculum.id) + '&version_id=' + Number(version.id);
                     return '<li><span class="program-record__version">' + ui.escapeHtml(version.version_label) + '</span>' + ui.statusBadge(version.status) +
-                        '<a href="' + href + '">Open in Builder<span class="sr-only"> (' + ui.escapeHtml(curriculum.curriculum_code + ' ' + version.version_label) + ')</span></a></li>';
+                        '<a class="secondary-action-button program-record__open" href="' + href + '">Open in Builder<span class="sr-only"> (' + ui.escapeHtml(curriculum.curriculum_code + ' ' + version.version_label) + ')</span> <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a></li>';
                 }).join('');
-                return '<section class="program-record__curriculum"><div class="program-record__curriculum-head"><div><h3>' + ui.escapeHtml(curriculum.curriculum_code) + '</h3><p>' + ui.escapeHtml(curriculum.curriculum_name) + '</p></div>' + ui.statusBadge(curriculum.status) + '</div>' +
-                    (rows ? '<ul>' + rows + '</ul>' : '<p class="program-record__none">No versions you can view yet.</p>') + '</section>';
+                const count = groups[index].length;
+                return '<details class="program-record__curriculum"' + (index === 0 ? ' open' : '') + '><summary><i class="fa-solid fa-chevron-right program-record__chevron" aria-hidden="true"></i>' +
+                    '<span class="program-record__curriculum-name"><strong>' + ui.escapeHtml(curriculum.curriculum_code) + '</strong><small>' + ui.escapeHtml(curriculum.curriculum_name) + '</small></span>' +
+                    '<span class="program-record__count">' + count + (count === 1 ? ' version' : ' versions') + '</span>' + ui.statusBadge(curriculum.status) + '</summary>' +
+                    '<p class="program-record__label">Versions</p>' +
+                    (rows ? '<ul>' + rows + '</ul>' : '<p class="program-record__none">No versions you can view yet.</p>') + '</details>';
             }).join('') : '<p class="state-cell">No curricula yet.</p>';
         } catch (error) {
             if (request !== state.programDetailsRequest) return;
             target.innerHTML = '<p class="state-cell">' + ui.escapeHtml(error.message || 'Curricula could not be loaded.') + '</p>';
         }
+    }
+
+    // Total programs per level tab. A count that fails to load just stays hidden.
+    function loadProgramTabCounts() {
+        document.querySelectorAll('[data-program-count]').forEach(async function (badge) {
+            try {
+                const payload = await ui.fetchJson(endpoints.programs, { action: 'list', page: 1, per_page: 10, search: '', status: '', program_category: badge.dataset.programCount });
+                badge.textContent = String(Number(payload.pagination.total_records) || 0);
+                badge.hidden = false;
+            } catch (error) { badge.hidden = true; }
+        });
     }
 
     async function loadPrograms(page) {
@@ -1359,7 +1375,7 @@
                 programModal.close();
                 resetProgramForm();
                 ui.showToast(payload.message, programFormMode === 'create' ? 'success' : 'updated');
-                if (programRows) await loadPrograms(state.programPage);
+                if (programRows) { await loadPrograms(state.programPage); loadProgramTabCounts(); }
                 else if (workspacePage === 'curricula') await loadCurriculaPrograms(state.programPage);
             } catch (error) {
                 ui.showFormError(programForm, error.message || 'The academic program could not be saved.');
@@ -1590,6 +1606,7 @@
             if (document.querySelector('.row-menu__list:not([hidden])')) closeRowMenus(true);
         });
         loadPrograms(1);
+        loadProgramTabCounts();
         return;
     }
 

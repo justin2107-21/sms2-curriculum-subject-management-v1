@@ -27,7 +27,7 @@ class WorkingContextService
     ];
 
     // Actions that change version content. Viewing, exporting and renaming do not count.
-    private const CONTENT_ACTIONS = [
+    public const CONTENT_ACTIONS = [
         'CURRICULUM_VERSION_CREATE', 'CURRICULUM_REVISION_CREATE',
         'CURRICULUM_SUBJECT_ASSIGN', 'CURRICULUM_SUBJECT_UPDATE', 'CURRICULUM_SUBJECT_REMOVE',
         'SUBJECT_REQUIREMENT_CREATE', 'SUBJECT_REQUIREMENT_UPDATE', 'SUBJECT_REQUIREMENT_REMOVE',

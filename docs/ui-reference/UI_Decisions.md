@@ -14,12 +14,14 @@ Stack: plain PHP + Bootstrap 5.3 (custom Sass build, compiled CSS committed), va
 - Clicking a field opens a **searchable panel** (the `csms-program-picker.js` pattern): search box, result count, grouped options, arrow keys / Enter / Escape, ARIA combobox and listbox. Program options are grouped College / Senior High; Version options show the status ("PREORAL-2026 · Draft", "FINAL · Active"), active first.
 - **Recent:** the Program panel starts with a "Recent" group of the user's last 3 complete contexts (`BSIT / BSIT-DEMO-2026 / PREORAL-2026 · Draft`); choosing one applies all three at once. A recent context whose version is gone is refused and forgotten.
 - Choosing a program opens Curriculum, then Version; a list with a single option is picked automatically.
-- One small **Reset** link (clears the context everywhere). When no version is chosen the row shows "Choose a curriculum version to begin".
+- One small **Reset** link (clears the context everywhere; shown in Phase 1 only). When no version is chosen the row shows "Choose a curriculum version to begin".
 - Not pinned (confirmed 2026-11-04): with labels above the fields the row is about 60 px tall, so it scrolls with the page. (The earlier 44 px pinned bar is replaced.)
 - Built by `js/csms-context-bar.js` + `css/csms-components.css` on Subject Mapping, Pre-requisite Configuration, Electives Manager, Curriculum Export and Grade Weighting Setup. The page's own autocomplete cascade stays underneath as the engine and the original inputs stay in the page (hidden), so every page keeps its own permission-checked lookups, handlers and IDs. Curriculum Builder's program and curriculum screens do not use this context (they pick by card), and Validate Curriculum uses plain selects, so they are not converted.
 
-## D3. Collapsed summary after choosing: removed (2026-11-03)
-- The one-line `BSIT / BSIT-DEMO-2026 / PREORAL-2026` summary with a "Change" link is gone. The picker stays as the same row once all three are chosen; the fields themselves show the choice.
+## D3. Collapsed summary after choosing: two phases (revised 2026-11-05; reverses the 2026-11-03 removal)
+- **Phase 1** is the three fields of D2, while choosing. **Phase 2** starts once Program, Curriculum and Version are all chosen: the fields fold into a read-only summary of small uppercase labels PROGRAM / CURRICULUM / VERSION over bold values, with thin "/" dividers.
+- To its right: a **Change** link (reopens Phase 1; a **Done** link there folds it again, and choosing a version folds it automatically) and a **version status chip**: Draft gray, Active green, Archived red. No Reset in Phase 2. Reset stays in Phase 1.
+- Built in `js/csms-context-bar.js` and `css/csms-components.css`, so every page that uses the picker gets both phases. A page's action buttons stay on the right of the same row.
 
 ## D4. Keep the cascading selection, and one working context across modules
 - Each choice narrows the next list to what belongs to it. The next list opens automatically; a single option is picked automatically.
@@ -71,6 +73,11 @@ Stack: plain PHP + Bootstrap 5.3 (custom Sass build, compiled CSS committed), va
 - **Only one card is program-scoped** (Super Admin: Curriculum pipeline by program): no page-level filter. A compact filter sits inside that card's header, right of the title: a small button showing "All programs ▾" that opens the same searchable panel (search, All / College / Senior High, count). It filters only that card. The URL parameter `?program=` is kept.
 - The server enforces it: for Super Admin the program filter narrows the pipeline only; the other cards, including Awaiting review, count all programs. Their "View in module" links carry no program. Test: `tests/dashboard-role-payload.php`.
 - Rule of thumb for a new profile: count its program-scoped cards; several means page-level, one means card-level.
+
+## D11. Heading font and one surface radius (approved 2026-11-05)
+- **Fonts system-wide (replaces the dashboard-only scope in D5):** DM Sans for all body and interface text, Newsreader for titles, both declared once in `css/csms-fonts.css`. No separate code font. Nothing below 12 px.
+- **All headings use Newsreader, the page-title font:** page titles, card and section titles, modal titles and tab-panel headings on every page, through `css/csms-components.css`. This extends D5. Body text is unchanged.
+- **One radius:** cards, table containers, tab bars, panels and modals use `--csms-radius-surface` (12px). Exceptions: the full-width page header band, and the full-screen phone sheet of the program modal.
 
 ## Constraints that still apply
 - Functionality is never sacrificed. No page may load both legacy and Bootstrap CSS. Migrate page by page; pilot page = Pre-requisite Configuration. The legacy UI stays the default until a page is approved.

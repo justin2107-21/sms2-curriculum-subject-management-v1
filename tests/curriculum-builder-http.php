@@ -97,6 +97,18 @@ try {
     $check($sum('staff', 0)[0] === 422, 'an invalid id is 422');
     $check(!str_contains(json_encode($sum('staff', 999999999)[2]), 'mysqli'), 'refusals do not leak internals');
 
+    // Last content edit: real audit data only. UITEST-REV was copied by SQL, so nothing is recorded for it; a placement audit entry then shows up.
+    $check(array_key_exists('last_edit', $r[2]['summary']) && $r[2]['summary']['last_edit'] === null, 'a version with no content audit entry reports no last edit');
+    $staffId = (int)$one("SELECT id FROM users WHERE username='uitest.staff'");
+    $firstPlacement = (int)$one("SELECT id FROM curriculum_version_subjects WHERE curriculum_version_id=$rev LIMIT 1");
+    $db->query("INSERT INTO audit_logs(user_id,action,entity_type,entity_id,description,metadata_json) VALUES($staffId,'CURRICULUM_SUBJECT_UPDATE','curriculum_version_subject',$firstPlacement,'test','{\"curriculum_version_id\":$rev}')");
+    $auditId = (int)$db->insert_id;
+    $edit = $sum('staff', $rev)[2]['summary']['last_edit'] ?? null;
+    $check($edit !== null && str_contains((string)$edit['by'], 'UI') && $edit['at'] !== '', 'the latest content audit entry gives the last edit');
+    $db->query("DELETE FROM audit_logs WHERE id=$auditId");
+    $reviewSummary = $sum('staff', $review)[2]['summary'];
+    $check(array_key_exists('last_edit', $reviewSummary) && $reviewSummary['last_edit'] === null, 'review events are not content edits');
+
     // What the header needs from the existing endpoints.
     $hist = $who['staff']->req("modules/curriculum/http/review_actions.php?action=history&curriculum_version_id=$rev");
     $check($hist[0] === 200 && $hist[2]['can_submit'] === true && $hist[2]['can_decide'] === false, 'a not-started revision can be submitted, not decided');

@@ -9,8 +9,9 @@
 
   const ROOTS = '.mapping-context-bar, .pr-selectors, .grade-weighting-context-card';
   const LEVELS = 3;
-  const NAMES = ['Program', 'Curriculum', 'Version'];
-  const PLACEHOLDERS = ['Choose program', 'Choose curriculum', 'Choose version'];
+  const NAMES = ['Program / Strand', 'Curriculum', 'Version'];
+  const PLACEHOLDERS = ['Choose program or strand', 'Choose curriculum', 'Choose version'];
+  // Same test as the rest of the application: the program's own type, never a code.
   const STATUS_LABEL = { draft: 'Draft', active: 'Active', archived: 'Archived' };
   const STATUS_ORDER = { active: 0, draft: 1 };
   const HINT = 'Choose a curriculum version to begin';
@@ -85,6 +86,7 @@
       ui.appendChild(field);
       fields.push({
         field: field,
+        label: field.querySelector('.csms-ctx-label'),
         trigger: field.querySelector('.csms-ctx-trigger'),
         value: field.querySelector('.csms-ctx-value'),
         panel: field.querySelector('.csms-ctx-panel'),
@@ -107,6 +109,18 @@
     hint.className = 'csms-ctx-hint';
     hint.textContent = HINT;
     ui.appendChild(hint);
+    // Phase 2 (UI_Decisions D2): once all three are chosen the fields fold into a read-only summary.
+    const done = document.createElement('button');
+    done.type = 'button';
+    done.className = 'csms-ctx-link csms-ctx-done';
+    done.textContent = 'Done';
+    done.hidden = true;
+    ui.appendChild(done);
+    const summary = document.createElement('div');
+    summary.className = 'csms-ctx-summary';
+    summary.hidden = true;
+    ui.appendChild(summary);
+    let editing = false;
     root.insertBefore(ui, root.firstChild);
 
     // ---- state shown in the fields ----
@@ -126,7 +140,10 @@
       // Selected silently by a page (no item known): use what the engine shows.
       return selectors[index].hasSelection() ? String(selectors[index].getSelectedLabel() || '') : '';
     }
+    // First label by level: Strand for Senior High, Program for college, Program / Strand while nothing is chosen.
+    function firstLabel() { return items[0] ? (isShs(items[0]) ? 'Strand' : 'Program') : NAMES[0]; }
     function render() {
+      fields[0].label.textContent = firstLabel();
       fields.forEach(function (entry, index) {
         const label = selectedLabel(index);
         entry.value.textContent = label || PLACEHOLDERS[index];
@@ -137,15 +154,35 @@
         entry.field.classList.toggle('is-disabled', blocked);
       });
       const any = selectors.some(function (selector) { return selector.hasSelection(); });
-      reset.hidden = !any;
-      hint.hidden = selectors[2].hasSelection();
-    }
-    function onSelection(change) {
+      const complete = selectors[2].hasSelection();
+      const collapsed = complete && !editing;
+      ui.classList.toggle('is-summary', collapsed);
+      reset.hidden = !any || collapsed;
+      hint.hidden = complete;
+      done.hidden = !(complete && editing);
+      summary.hidden = !collapsed;
+      if (collapsed) {
+        const esc = function (text) { return String(text).replace(/[&<>"]/g, function (ch) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]; }); };
+        // Bold value is the record's code; the full name is the tooltip.
+        const cell = function (name, index) { const full = selectedLabel(index); const code = items[index] ? parts(index, items[index]).code : ''; const value = code || full.split(' · ')[0]; return '<div class="csms-ctx-sum-item"><span class="csms-ctx-sum-label">' + name + '</span><strong class="csms-ctx-sum-value" title="' + esc(full) + '">' + esc(value) + '</strong></div>'; };
+        const p = items[2] ? parts(2, items[2]) : { code: '', status: '' };
+        let status = p.status;
+        if (!status && window.CSMSWorkingContext) {
+          const known = window.CSMSWorkingContext.current().version;
+          if (known && items[2] && known.id === String(items[2].id)) status = known.status || '';
+        }
+        summary.innerHTML = cell(firstLabel().toUpperCase(), 0) + '<span class="csms-ctx-sum-sep" aria-hidden="true">/</span>' + cell('CURRICULUM', 1) +
+          '<span class="csms-ctx-sum-sep" aria-hidden="true">/</span>' + cell('VERSION', 2) +
+          '<button type="button" class="csms-ctx-link csms-ctx-change">Change</button>' +
+          (status && root.dataset.ctxChip !== 'off' ? '<span class="csms-chip csms-chip--' + esc(status) + '">' + esc(STATUS_LABEL[status] || status) + '</span>' : '');
+      }
+    }    function onSelection(change) {
       const index = Number(change.index);
       if (!(index >= 0 && index < LEVELS)) return;
       if (change.action === 'clear' || !change.item) {
         for (let i = index; i < LEVELS; i += 1) items[i] = null;
       } else {
+        if (index === 2) editing = false;
         items[index] = change.item;
         for (let i = index + 1; i < LEVELS; i += 1) items[i] = null;
       }
@@ -353,6 +390,13 @@
         if (option) choose(index, entry.shown[Number(option.dataset.index)]);
       });
     });
+    summary.addEventListener('click', function (event) {
+      if (!event.target.closest('.csms-ctx-change')) return;
+      editing = true;
+      render();
+      fields[0].trigger.focus();
+    });
+    done.addEventListener('click', function () { editing = false; closeAll(false); render(); const change = summary.querySelector('.csms-ctx-change'); if (change) change.focus(); });
     reset.addEventListener('click', function () { advanceToken += 1; closeAll(false); selectors[0].clear(); fields[0].trigger.focus(); });
     document.addEventListener('click', function (event) { if (!ui.contains(event.target)) closeAll(false); });
     render();

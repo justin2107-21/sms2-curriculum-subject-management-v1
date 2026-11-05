@@ -149,7 +149,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
         <span class="sr-only" id="programCount" aria-live="polite"></span>
         <div class="program-tabs" role="group" aria-label="Level">
           <?php foreach (['' => 'All', 'college' => 'College', 'shs' => 'Senior High'] as $tabValue => $tabLabel): ?>
-          <button type="button" class="program-tab" data-program-tab="<?= $tabValue ?>" aria-pressed="<?= $programCategory === $tabValue ? 'true' : 'false' ?>"><?= $tabLabel ?></button>
+          <button type="button" class="program-tab" data-program-tab="<?= $tabValue ?>" aria-pressed="<?= $programCategory === $tabValue ? 'true' : 'false' ?>"><?= $tabLabel ?> <span class="program-tab__count" data-program-count="<?= $tabValue ?>" hidden></span></button>
           <?php endforeach; ?>
         </div>
         <form class="list-toolbar" id="programSearchForm" role="search">
@@ -278,6 +278,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
         <div><dt>Subject placements</dt><dd id="programPlacementsTotal">—</dd></div>
       </dl>
       <p id="programSummaryNotice" class="curriculum-notice" role="status" hidden></p>
+      <p class="program-record__label program-record__label--section">Curricula</p>
       <div id="programRecordCurricula" aria-live="polite"></div>
       <?php else: ?>
       <p class="subject-placement-detail">Curricula are not available with your current permissions.</p>

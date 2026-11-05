@@ -234,7 +234,7 @@
 .academic-modal-body > .subject-description-section:first-child { border-top:0; margin-top:0; padding-top:0; }
 .academic-modal-body .record-detail-grid { padding:8px 0; }
 .academic-modal-body .record-detail-grid dd { font-weight:400; white-space:pre-wrap; }
-.academic-modal-body code { font-family:Consolas,monospace; overflow-wrap:anywhere; }
+.academic-modal-body code { font-family: inherit; overflow-wrap:anywhere; }
 .academic-modal-body p,.academic-modal-body td { overflow-wrap:anywhere; }
 .academic-modal-body .subject-usage-list li { align-items:flex-start; flex-wrap:wrap; }
 .academic-modal-body .subject-usage-context { flex:1 1 220px; }

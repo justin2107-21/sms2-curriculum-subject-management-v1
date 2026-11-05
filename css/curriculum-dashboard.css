@@ -180,7 +180,7 @@
 .snapshot-identity { display: grid; gap: 4px; min-width: 0; }
 .snapshot-program {
   color: #1d4ed8;
-  font-family: Consolas, monospace;
+  font-family: inherit;
   font-size: var(--csms-text-xs, .75rem);
   font-weight: 700;
 }

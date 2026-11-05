@@ -109,7 +109,7 @@
 .mapping-context-stack span {
   color: #64748b;
   display: block;
-  font-family: Consolas, monospace;
+  font-family: inherit;
   font-size: var(--csms-text-xs, .75rem);
   margin-top: 3px;
 }

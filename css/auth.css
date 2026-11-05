@@ -1,8 +1,9 @@
+@import url("csms-fonts.css");
 /* ── Shared auth page styles (register, register2, signin) ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: 'Segoe UI', sans-serif;
+  font-family: "DM Sans", "DM Sans", "Segoe UI", sans-serif;
   background: #cfd8e3;
   min-height: 100vh;
   display: flex;

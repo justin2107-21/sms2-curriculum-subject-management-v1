@@ -79,7 +79,7 @@
 .equivalency-usage-list span { color: #64748b; }
 
 .equivalency-subject-label { display: block; min-width: 190px; white-space: normal; }
-.equivalency-subject-label strong { color: #1e293b; display: block; font-family: Consolas, monospace; font-size: var(--csms-text-xs, .75rem); }
+.equivalency-subject-label strong { color: #1e293b; display: block; font-family: inherit; font-size: var(--csms-text-xs, .75rem); }
 .equivalency-subject-label span { color: #64748b; display: block; font-size: var(--csms-text-xs, .75rem); margin-top: 3px; }
 .equivalency-reviewer { color: #475569; font-size: var(--csms-text-xs, .75rem); }
 .equivalency-action-group { align-items: center; display: flex; flex-wrap: wrap; gap: 12px; white-space: nowrap; }

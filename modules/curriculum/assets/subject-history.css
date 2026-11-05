@@ -13,7 +13,7 @@
 .history-subject-context,.history-curriculum-context{display:block;min-width:130px}
 .history-subject-context strong,.history-curriculum-context strong{color:#1e293b;display:block}
 .history-subject-context span,.history-curriculum-context span{color:#64748b;display:block;margin-top:3px}
-.history-code{font-family:Consolas,monospace}
+.history-code{font-family: inherit}
 .history-link,.subject-history-content .row-action-button{background:none;border:0;color:#155ac4;cursor:pointer;font:inherit;font-weight:700;padding:4px 2px}
 .history-link:hover,.subject-history-content .row-action-button:hover{text-decoration:underline}
 .history-change-badge{border-radius:999px;display:inline-flex;font-weight:750;padding:4px 9px;white-space:nowrap}

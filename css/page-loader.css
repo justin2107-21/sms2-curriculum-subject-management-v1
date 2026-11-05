@@ -34,7 +34,7 @@
 }
 
 #page-loader .pl-text {
-  font-family: 'Segoe UI', sans-serif;
+  font-family: "DM Sans", "DM Sans", "Segoe UI", sans-serif;
   font-size: 1rem;
   font-weight: 600;
   color: #fff;
@@ -43,7 +43,7 @@
 }
 
 #page-loader .pl-sub {
-  font-family: 'Segoe UI', sans-serif;
+  font-family: "DM Sans", "DM Sans", "Segoe UI", sans-serif;
   font-size: 0.85rem;
   color: #c8d8f0;
   display: flex;

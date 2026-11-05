@@ -134,7 +134,7 @@ if (request_method() === 'POST') {
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Development Setup</title>
   <style>
-    body{font-family:'Segoe UI', sans-serif;max-width:560px;margin:60px auto;padding:0 20px;color:#1f2937}
+    body{font-family:"DM Sans", "DM Sans", "Segoe UI", sans-serif;max-width:560px;margin:60px auto;padding:0 20px;color:#1f2937}
     .panel{border:1px solid #d1d5db;border-radius:8px;padding:20px}
     .ok{background:#dcfce7;color:#166534;padding:14px;border-radius:8px;margin-bottom:16px}
     .err{background:#fee2e2;color:#991b1b;padding:14px;border-radius:8px;margin-bottom:16px}

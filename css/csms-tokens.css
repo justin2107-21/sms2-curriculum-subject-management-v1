@@ -39,8 +39,8 @@
   --csms-focus-ring: 0 0 0 3px rgba(26, 58, 140, .45);
 
   /* Type */
-  --csms-font: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
-  --csms-font-mono: Consolas, "Cascadia Mono", monospace;
+  --csms-font: "DM Sans", "Segoe UI", sans-serif;
+  --csms-font-mono: var(--csms-font);
   --csms-text-xs: .75rem;     /* 12px floor */
   --csms-text-sm: .875rem;    /* 14px tables, menus, labels */
   --csms-text-md: 1rem;       /* 16px body (D6) */
@@ -63,6 +63,15 @@
   --csms-radius-md: 8px;
   --csms-radius-lg: 12px;
   --csms-radius-pill: 999px;
+  /* Program / Curriculum / Version picker, Phase 1: one geometry on every page (UI_Decisions D2) */
+  --csms-ctx-field-width: 240px;
+  --csms-ctx-control-height: 40px;
+  --csms-ctx-field-gap: 4px;
+  --csms-ctx-row-gap: 8px 10px;
+  --csms-ctx-label-size: .8125rem;
+  --csms-ctx-label-weight: 600;
+  --csms-ctx-sep-size: 1.25rem;
+  --csms-radius-surface: 12px; /* every card, table container, tab bar, panel and modal */
   --csms-shadow-sm: 0 1px 3px rgba(15, 23, 42, .06);
   --csms-shadow-md: 0 4px 14px rgba(15, 23, 42, .10);
   --csms-shadow-overlay: 0 12px 32px rgba(15, 23, 42, .18);

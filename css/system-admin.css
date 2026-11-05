@@ -72,7 +72,7 @@
 .system-admin-table tbody tr:last-child td { border-bottom: 0; }
 .system-admin-table tbody tr:hover { background: #f8fbff; }
 .system-admin-name { color: #1e293b; font-weight: 700; overflow-wrap: anywhere; }
-.system-admin-code { color: #1a3a8c; font-family: Consolas, monospace; font-weight: 700; }
+.system-admin-code { color: #1a3a8c; font-family: inherit; font-weight: 700; }
 .system-admin-muted { color: var(--csms-text-muted, #4b5563); }
 .system-admin-description { color: #475569; line-height: 1.45; max-width: 340px; overflow-wrap: anywhere; }
 
@@ -96,7 +96,7 @@
 .audit-table th,.audit-table td{padding:12px 14px;text-align:left;border-bottom:1px solid #eef2f7;font-size:.78rem;vertical-align:top}
 .audit-table th{background:#f8fafc;color:#475569;font-size:.75rem;text-transform:uppercase;letter-spacing:.04em}
 .audit-table td{color:#334155}
-.audit-action{font-family:Consolas,monospace;font-size:.75rem;font-weight:700;color:#1d4ed8;background:#eff6ff;border-radius:6px;padding:4px 7px;white-space:nowrap}
+.audit-action{font-family: inherit;font-size:.75rem;font-weight:700;color:#1d4ed8;background:#eff6ff;border-radius:6px;padding:4px 7px;white-space:nowrap}
 .audit-muted{color:#64748b}
 .audit-description{max-width:300px;line-height:1.45}
 .audit-pagination{display:flex;align-items:center;justify-content:center;gap:8px;padding:16px}

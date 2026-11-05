@@ -56,12 +56,16 @@ require __DIR__ . '/../../../shared/sidebar.php';
         data-can-edit-plan="<?= $can('curriculum.update') ? '1' : '0' ?>"
         data-can-view-prerequisites="<?= $can('prerequisite.view') ? '1' : '0' ?>"
         data-can-export="<?= $can('curriculum_export.view') ? '1' : '0' ?>"
+        data-can-export-draft="<?= $can('curriculum_export.draft') ? '1' : '0' ?>"
+        data-can-export-official="<?= $can('curriculum_export.official') ? '1' : '0' ?>"
         data-can-history="<?= $can('subject_history.view') ? '1' : '0' ?>">
     <div class="mapping-workspace-header">
       <div><h1 class="page-title">Curriculum Builder</h1><p class="page-subtitle">Plan, review and approve a curriculum version.</p></div>
+      <span id="builderAccessBadge" hidden></span>
     </div>
     <section class="mapping-workspace-shell">
-      <section class="mapping-context-bar" aria-label="Curriculum context">
+      <div class="builder-context-row">
+      <section class="mapping-context-bar" aria-label="Curriculum context" data-ctx-chip="off">
         <?php foreach (['program' => 'Program / Strand', 'curriculum' => 'Curriculum', 'version' => 'Curriculum Version'] as $key => $label): ?>
         <div class="mapping-context-field"><label for="<?= $key ?>Search"><?= $label ?></label><div class="record-autocomplete">
           <input type="search" id="<?= $key ?>Search" placeholder="<?= $key === 'program' ? 'Search program code or name' : ($key === 'curriculum' ? 'Choose program first' : 'Choose curriculum first') ?>" <?= $key !== 'program' ? 'disabled' : '' ?> autocomplete="off" role="combobox" aria-expanded="false" aria-controls="<?= $key ?>Options"/>
@@ -72,26 +76,30 @@ require __DIR__ . '/../../../shared/sidebar.php';
         <?php if ($key !== 'version'): ?><span class="mapping-context-separator" aria-hidden="true"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span><?php endif; ?>
         <?php endforeach; ?>
       </section>
+      <div class="builder-header__actions"><div class="builder-actions" id="builderActions"></div><div class="builder-actions" id="builderLinks"></div></div>
+      </div>
 
       <div id="builderState" class="builder-state" role="status"><i class="fa-solid fa-table-list" aria-hidden="true"></i><h2>Choose a curriculum version to begin</h2><p>Pick a program, curriculum and version above. Your last choice is remembered.</p></div>
 
       <section id="builderVersion" class="builder-version" hidden aria-labelledby="builderVersionTitle">
         <header class="builder-header">
-          <div class="builder-header__main">
-            <div class="builder-header__title"><h2 id="builderVersionTitle"></h2><span id="builderVersionBadges"></span></div>
-            <ol class="builder-stepper" id="builderStepper" aria-label="Review progress"></ol>
-            <dl class="builder-facts">
-              <div><dt>Units</dt><dd id="builderUnits">—</dd></div>
-              <div><dt>Target</dt><dd id="builderTarget">—</dd></div>
-              <div><dt>Conflicts</dt><dd id="builderConflicts">—</dd></div>
-            </dl>
+          <div class="builder-head__left">
+            <p class="builder-eyebrow">VERSION WORKSPACE</p>
+            <h2 id="builderVersionTitle"></h2>
+            <p class="builder-head__sub" id="builderVersionSub"></p>
           </div>
-          <div class="builder-header__side">
-            <div class="builder-actions" id="builderActions"></div>
-            <p class="builder-next" id="builderNext" hidden></p>
-            <div class="builder-links" id="builderLinks"></div>
+          <div class="builder-head__mid">
+            <div class="builder-chips" id="builderVersionBadges"></div>
+            <p class="builder-head__edit" id="builderLastEdit"></p>
+          </div>
+          <div class="builder-head__right">
+            <p class="builder-head__label">Total curriculum units</p>
+            <p class="builder-head__units" id="builderUnits">—</p>
+            <p class="builder-head__target" id="builderTarget"></p>
+            <p class="builder-head__conflicts" id="builderConflicts"></p>
           </div>
         </header>
+        <p class="builder-next" id="builderNext" hidden></p>
 
         <div class="builder-tabs" role="tablist" aria-label="Version sections">
           <button type="button" id="tabPlan" role="tab" aria-selected="true" aria-controls="panelPlan" data-tab="plan">Plan</button>
@@ -100,24 +108,40 @@ require __DIR__ . '/../../../shared/sidebar.php';
         </div>
 
         <section id="panelPlan" role="tabpanel" aria-labelledby="tabPlan" class="builder-panel">
-          <p class="builder-plan-note" id="builderPlanNote"></p>
+          <div class="builder-plan-bar"><div class="builder-plan-search" id="builderPlanSearchBox"><label for="builderPlanSearch">Find a subject</label><div class="builder-plan-search__row"><input type="search" id="builderPlanSearch" placeholder="Code or title" autocomplete="off" maxlength="100" aria-describedby="builderPlanSearchStatus"/><span class="builder-plan-search__count" id="builderPlanSearchStatus" role="status"></span></div></div>
+            <p class="builder-plan-note" id="builderPlanNote"></p></div>
           <div id="builderPlan" class="builder-plan" aria-live="polite"></div>
         </section>
 
         <section id="panelDetails" role="tabpanel" aria-labelledby="tabDetails" class="builder-panel" hidden>
-          <dl class="record-detail-grid reference-baseline-details" id="builderDetails"></dl>
-          <div class="builder-panel__bar"><h3>Attached sources</h3><?php if ($can('curriculum.reference.attach')): ?><button type="button" class="secondary-action-button" id="builderAttachOpen" hidden><i class="fa-solid fa-paperclip" aria-hidden="true"></i> Attach source</button><?php endif; ?></div>
-          <div class="table-scroll"><table class="domain-table"><thead><tr><th>Attached source</th><th>Purpose</th><th>Origin and assessment</th><th>Attached by</th></tr></thead><tbody id="builderReferences"></tbody></table></div>
+          <section class="builder-card"><h3>Version details</h3><dl class="builder-dl" id="builderDetails"></dl></section>
+          <section class="builder-card">
+            <div class="builder-panel__bar"><h3>Attached sources</h3><?php if ($can('curriculum.reference.attach')): ?><button type="button" class="secondary-action-button" id="builderAttachOpen" hidden><i class="fa-solid fa-paperclip" aria-hidden="true"></i> Attach source</button><?php endif; ?></div>
+            <div class="table-scroll" id="builderReferencesTable"><table class="domain-table"><thead><tr><th>Attached source</th><th>Purpose</th><th>Origin and assessment</th><th>Attached by</th></tr></thead><tbody id="builderReferences"></tbody></table></div>
+            <div class="builder-empty" id="builderReferencesEmpty" hidden><i class="fa-solid fa-paperclip" aria-hidden="true"></i><strong>No sources attached</strong><span>Documentary sources for this version appear here.</span></div>
+          </section>
         </section>
 
         <section id="panelReview" role="tabpanel" aria-labelledby="tabReview" class="builder-panel" hidden>
-          <div class="table-scroll"><table class="domain-table"><thead><tr><th>Date</th><th>By</th><th>Action</th><th>Status</th><th>Reason</th></tr></thead><tbody id="builderHistory"></tbody></table></div>
+          <section class="builder-card"><h3>Review history</h3>
+            <div class="table-scroll" id="builderHistoryTable"><table class="domain-table"><thead><tr><th>Date</th><th>By</th><th>Action</th><th>Status</th><th>Reason</th></tr></thead><tbody id="builderHistory"></tbody></table></div>
+            <div class="builder-empty" id="builderHistoryEmpty" hidden><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><strong>No review activity yet</strong><span>Submissions and decisions appear here.</span></div>
+          </section>
         </section>
       </section>
     </section>
   </main>
 
   <div class="footer">Bestlink College of the Philippines &middot; CSMS-SMS2 &copy; 2026</div>
+</div>
+
+<!-- Prerequisite conflict details -->
+<div class="curriculum-modal" id="builderConflictModal" hidden aria-hidden="true">
+  <div class="modal-backdrop" data-modal-close></div>
+  <section class="modal-dialog modal-dialog-medium" role="dialog" aria-modal="true" aria-labelledby="builderConflictTitle">
+    <div class="modal-header"><div><h2 id="builderConflictTitle">Prerequisite conflict</h2><p class="modal-context" id="builderConflictSubject"></p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
+    <div class="builder-conflict-body" id="builderConflictBody"></div>
+  </section>
 </div>
 
 <!-- Review action: submit, approve or return -->
@@ -160,11 +184,13 @@ require __DIR__ . '/../../../shared/sidebar.php';
       <input type="hidden" name="curriculum_version_id"/>
       <div class="form-error" role="alert" hidden></div>
       <div class="form-grid">
-        <label class="form-field form-field-wide"><span>Primary curriculum source <strong>*</strong></span><select name="compliance_reference_id" required><option value="">Attach a curriculum source first</option></select></label>
+        <label class="form-field form-field-wide" id="builderClassifySource"><span>Primary curriculum source <strong>*</strong></span><select name="compliance_reference_id" required></select></label>
+        <?php if ($can('curriculum.reference.attach')): ?><div class="form-field-wide builder-classify-attach" id="builderClassifyAttach" hidden><button type="button" class="secondary-action-button" id="builderClassifyAttachOpen"><i class="fa-solid fa-paperclip" aria-hidden="true"></i> Attach a source</button></div><?php endif; ?>
         <label class="form-field"><span>Classification basis <strong>*</strong></span><select name="classification_basis" required><option value="ched_sample">CHED sample / demonstration</option><option value="institutional_source">Institution-provided curriculum source</option><option value="other_document">Other documented source</option></select></label>
         <label class="form-field form-field-wide"><span><input type="checkbox" name="confirm_reference_protection" value="1" required/> I confirm that this action makes the version an immutable reference and does not indicate BCP adoption or approval.</span></label>
       </div>
       <p class="curriculum-notice">Identity, origin, and applicability assessments remain separate. Institutional adoption/approval not verified.</p>
+      <p class="builder-disabled-reason" id="builderClassifyReason" hidden></p>
       <div class="modal-actions"><button type="button" class="button-muted" data-modal-close>Cancel</button><button class="button-primary" type="submit">Capture evidence and classify</button></div>
     </form>
   </section>

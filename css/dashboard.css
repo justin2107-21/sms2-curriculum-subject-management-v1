@@ -1,3 +1,4 @@
+@import url("csms-fonts.css");
 /* ── Dashboard styles ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -32,7 +33,7 @@ body *::-webkit-scrollbar-thumb:hover { background: var(--sms2-scrollbar-thumb-h
 body *::-webkit-scrollbar-corner { background: var(--sms2-scrollbar-track); }
 
 body {
-  font-family: 'Segoe UI', sans-serif;
+  font-family: "DM Sans", "DM Sans", "Segoe UI", sans-serif;
   background: #e8edf4;
   display: flex;
   min-height: 100vh;

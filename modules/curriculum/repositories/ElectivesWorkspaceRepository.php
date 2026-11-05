@@ -30,7 +30,7 @@ class ElectivesWorkspaceRepository
     public function contextOptions(string $level, string $search, ?int $program, ?int $curriculum): array
     {
         if ($level === 'program') {
-            $fields = ['program_code','program_name']; $from = 'academic_programs'; $id = 'id'; $scope = ''; $types = ''; $params = []; $extra = '';
+            $fields = ['program_code','program_name']; $from = 'academic_programs'; $id = 'id'; $scope = ''; $types = ''; $params = []; $extra = ', program_type';
         } elseif ($level === 'curriculum') {
             $fields = ['curriculum_code','curriculum_name']; $from = 'curricula'; $id = 'id'; $scope = 'academic_program_id=? AND '; $types = 'i'; $params = [$program]; $extra = '';
         } else {

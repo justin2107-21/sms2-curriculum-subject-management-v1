@@ -20,7 +20,7 @@
     const can = {
         submit: flag('canSubmit'), decide: flag('canDecide'), classify: flag('canClassify'), attach: flag('canAttach'),
         clone: flag('canClone'), editPlan: flag('canEditPlan'), prerequisites: flag('canViewPrerequisites'),
-        exportVersion: flag('canExport'), history: flag('canHistory')
+        exportVersion: flag('canExport'), exportDraft: flag('canExportDraft'), exportOfficial: flag('canExportOfficial'), history: flag('canHistory')
     };
     const me = Number(root.dataset.userId) || 0;
     const state = { ticket: 0, versionId: 0, ws: null, summary: null, review: null, placements: [], graph: null, tab: 'plan' };
@@ -76,6 +76,9 @@
     function clearVersion() {
         state.ticket++;
         state.versionId = 0;
+        $('builderAccessBadge').hidden = true;
+        $('builderActions').innerHTML = '';
+        $('builderLinks').innerHTML = '';
         showState('Choose a curriculum version to begin', 'Pick a program, curriculum and version above. Your last choice is remembered.');
     }
 
@@ -102,55 +105,98 @@
         }
     }
 
-    // ---- Conflicts ----------------------------------------------------------------------------------------------
+    // ---- Conflicts ----
+    // subject id -> the conflicts that involve it: { kind: 'sequence', item } or { kind: 'cycle', chain }.
     function conflictMap() {
         const map = new Map();
         const review = state.graph && state.graph.review;
         if (!review) return null;
-        const add = (id, text) => { const key = String(id); map.set(key, (map.get(key) || []).concat(text)); };
+        const add = (id, entry) => { const key = String(id); map.set(key, (map.get(key) || []).concat([entry])); };
         (review.sequencing || []).forEach(item => {
-            const text = item.message || 'Prerequisite sequence conflict.';
-            add(item.target_subject_id, text);
-            add(item.prerequisite_subject_id, text);
+            const entry = { kind: 'sequence', item: item };
+            add(item.target_subject_id, entry);
+            if (String(item.prerequisite_subject_id) !== String(item.target_subject_id)) add(item.prerequisite_subject_id, entry);
         });
-        (review.cycles || []).forEach(cycle => cycle.slice(0, -1).forEach(subject => add(subject, 'Part of a circular prerequisite chain.')));
+        (review.cycles || []).forEach(cycle => {
+            const chain = cycle.slice(0, -1);
+            const entry = { kind: 'cycle', chain: chain };
+            chain.forEach(subject => add(subject, entry));
+        });
         return map;
     }
 
-    // ---- Rendering ----------------------------------------------------------------------------------------------
-    const STEPS = ['Draft', 'Submit', 'Review', 'Approved'];
+    const CONFLICT_TYPE = {
+        prerequisite_same_period: 'Prerequisite placed in the same period',
+        prerequisite_after_target: 'Prerequisite placed after the subject',
+        self_prerequisite: 'Subject listed as its own prerequisite',
+        missing_placement: 'Placement missing or incomplete',
+        unresolved_sequence: 'Sequence cannot be verified'
+    };
 
-    function stepper() {
-        const status = state.review.review_status;
-        const current = status === 'approved' ? 4 : status === 'under_review' ? 2 : 0;
-        const tag = status === 'returned' ? ' <span class="builder-step__tag">Returned</span>' : '';
-        $('builderStepper').innerHTML = STEPS.map(function (name, index) {
-            const done = status === 'approved' ? true : index < current;
-            const isCurrent = status !== 'approved' && index === current;
-            return '<li class="builder-step' + (done ? ' is-done' : '') + (isCurrent ? ' is-current' : '') + '"' + (isCurrent ? ' aria-current="step"' : '') + '>' +
-                '<span class="builder-step__mark" aria-hidden="true">' + (done ? '<i class="fa-solid fa-check"></i>' : index + 1) + '</span>' +
-                '<span class="builder-step__name">' + esc(name) + (index === 0 ? tag : '') + '<span class="sr-only">' + (done ? ' (done)' : isCurrent ? ' (current)' : '') + '</span></span></li>';
-        }).join('');
+    function placementText(year, semester) {
+        const parts = [year ? view.yearLabel(year) : '', semester || ''].filter(Boolean);
+        return parts.length ? parts.join(' / ') : 'Not placed';
+    }
+
+    function subjectPlacement(subjectId) {
+        const row = state.placements.find(item => String(item.subject_id) === String(subjectId));
+        return row ? { code: row.subject_code, title: row.subject_title, where: placementText(row.year_level, row.semester) } : { code: 'Subject #' + subjectId, title: '', where: 'Not placed' };
+    }
+
+    function openConflict(subjectId) {
+        const map = conflictMap();
+        const entries = (map && map.get(String(subjectId))) || [];
+        const me = subjectPlacement(subjectId);
+        $('builderConflictSubject').textContent = me.code + (me.title ? ' — ' + me.title : '') + ' · ' + me.where;
+        const line = (label, code, title, where, current) => '<tr' + (current ? ' class="is-current"' : '') + '><th scope="row">' + esc(label) + '</th><td><strong>' + esc(code) + '</strong> ' + esc(title || '') + (current ? ' <span class="builder-conflict-this">this subject</span>' : '') + '</td><td>' + esc(where) + '</td></tr>';
+        $('builderConflictBody').innerHTML = entries.map(function (entry, index) {
+            let head, body;
+            if (entry.kind === 'sequence') {
+                const it = entry.item;
+                head = CONFLICT_TYPE[it.type] || 'Prerequisite conflict';
+                body = '<p>' + esc(it.message || '') + '</p><table class="builder-conflict-table"><thead><tr><th scope="col"><span class="sr-only">Role</span></th><th scope="col">Subject</th><th scope="col">Placed in</th></tr></thead><tbody>' +
+                    line('Prerequisite', it.prerequisite_code, it.prerequisite_title, placementText(it.prerequisite_year, it.prerequisite_semester), String(it.prerequisite_subject_id) === String(subjectId)) +
+                    line('Subject', it.target_code, it.target_title, placementText(it.target_year, it.target_semester), String(it.target_subject_id) === String(subjectId)) + '</tbody></table>';
+            } else {
+                head = 'Circular prerequisite chain';
+                body = '<p>These subjects require each other in a loop, so none can be taken first.</p><table class="builder-conflict-table"><thead><tr><th scope="col"><span class="sr-only">Step</span></th><th scope="col">Subject</th><th scope="col">Placed in</th></tr></thead><tbody>' +
+                    entry.chain.map((id, step) => { const p = subjectPlacement(id); return line('Step ' + (step + 1), p.code, p.title, p.where, String(id) === String(subjectId)); }).join('') + '</tbody></table>';
+            }
+            return '<section class="builder-conflict-card"><h3>' + (entries.length > 1 ? (index + 1) + '. ' : '') + esc(head) + '</h3>' + body + '</section>';
+        }).join('') || '<p>No conflict is recorded for this subject any more. Reload the version.</p>';
+        dialogs.conflict.open();
+    }
+    // ---- Rendering ----------------------------------------------------------------------------------------------
+    const ROLE_LABEL = { unclassified: 'Unclassified', proposed: 'Proposed revision', reference: 'Reference' };
+    const REVIEW_LABEL = { not_started: 'Not started', draft: 'Not started', under_review: 'In review', returned: 'Returned', approved: 'Approved' };
+    const STATUS_NAME = { draft: 'Draft', active: 'Active', archived: 'Archived' };
+
+    function chip(kind, label) { return '<span class="csms-chip csms-chip--' + esc(kind) + '">' + esc(label) + '</span>'; }
+
+    function lastEdit() {
+        const edit = state.summary.last_edit;
+        if (!edit) return 'Last edit not recorded';
+        const when = new Date(String(edit.at).replace(' ', 'T'));
+        let text = '';
+        if (!isNaN(when)) {
+            const time = when.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false });
+            const today = new Date().toDateString() === when.toDateString();
+            text = today ? 'Today, ' + time : when.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) + ', ' + time;
+        }
+        return 'Last edited' + (edit.by ? ' by ' + edit.by : '') + (text ? ' · ' + text : '');
     }
 
     function facts() {
         const summary = state.summary;
-        $('builderUnits').textContent = ui.formatUnits(summary.placed_units) + ' units · ' + summary.placements + (summary.placements === 1 ? ' subject' : ' subjects');
-        if (summary.target) {
-            const target = summary.target.value, placed = summary.placed_units;
-            $('builderTarget').textContent = placed >= target
-                ? ui.formatUnits(target) + ' units — met (' + summary.target.rule_name + ')'
-                : ui.formatUnits(target) + ' units — ' + ui.formatUnits(target - placed) + ' to go (' + summary.target.rule_name + ')';
-        } else {
-            $('builderTarget').textContent = 'No target set';
-        }
+        $('builderUnits').textContent = ui.formatUnits(summary.placed_units);
+        $('builderTarget').textContent = summary.target ? 'Target · ' + ui.formatUnits(summary.target.value) + ' units' : 'No target set';
+        $('builderTarget').title = summary.target ? summary.target.rule_name : '';
         const map = conflictMap();
         const conflicts = $('builderConflicts');
-        if (map === null) { conflicts.textContent = '—'; conflicts.title = 'Prerequisite checks need the prerequisite view permission.'; return; }
+        if (map === null) { conflicts.textContent = ''; return; }
         const review = state.graph.review;
         const total = (review.sequencing || []).length + (review.cycles || []).length;
-        conflicts.title = '';
-        conflicts.innerHTML = total ? '<span class="builder-flag"><i class="fa-solid fa-flag" aria-hidden="true"></i> ' + total + (total === 1 ? ' conflict' : ' conflicts') + '</span>' : '0';
+        conflicts.innerHTML = total ? '<span class="builder-flag"><i class="fa-solid fa-flag" aria-hidden="true"></i> ' + total + (total === 1 ? ' conflict' : ' conflicts') + '</span>' : 'No conflicts';
     }
 
     function button(kind, label, primary) {
@@ -194,12 +240,26 @@
         const ws = state.ws;
         const query = new URLSearchParams({ program_id: ws.academic_program_id || '', curriculum_id: ws.curriculum_id, version_id: ws.id });
         const parts = [];
-        if (can.exportVersion) parts.push('<a href="curriculum_export.php?' + esc(query.toString()) + '"><i class="fa-solid fa-download" aria-hidden="true"></i> Export</a>');
-        parts.push('<a href="subject_mapping.php?' + esc(query.toString()) + '&amp;tab=outcomes"><i class="fa-solid fa-graduation-cap" aria-hidden="true"></i> Graduate outcomes</a>');
+        // Same split as the server: approved versions need official export, others draft export.
+        if (can.exportVersion) {
+            const approved = ws.review_status === 'approved';
+            if (approved ? can.exportOfficial : can.exportDraft) {
+                parts.push('<a href="curriculum_export.php?' + esc(query.toString()) + '" class="secondary-action-button"><i class="fa-solid fa-download" aria-hidden="true"></i> Export</a>');
+            } else {
+                const why = approved ? 'Your role exports versions that are not yet approved.' : 'Your role exports approved versions only.';
+                parts.push('<button type="button" class="secondary-action-button" id="builderExportOff" disabled title="' + esc(why) + '" aria-describedby="builderExportWhy"><i class="fa-solid fa-download" aria-hidden="true"></i> Export</button><span class="sr-only" id="builderExportWhy">' + esc(why) + '</span>');
+            }
+        }
+        parts.push('<a href="subject_mapping.php?' + esc(query.toString()) + '&amp;tab=outcomes" class="secondary-action-button"><i class="fa-solid fa-graduation-cap" aria-hidden="true"></i> Graduate outcomes</a>');
         if (can.history && ws.version_role === 'proposed' && ws.baseline_version_id) {
-            parts.push('<a href="curriculum_history_view.php?curriculum_id=' + Number(ws.curriculum_id) + '&amp;version_b_id=' + Number(ws.id) + '"><i class="fa-solid fa-code-compare" aria-hidden="true"></i> Compare with reference</a>');
+            parts.push('<a href="curriculum_history_view.php?curriculum_id=' + Number(ws.curriculum_id) + '&amp;version_b_id=' + Number(ws.id) + '" class="secondary-action-button"><i class="fa-solid fa-code-compare" aria-hidden="true"></i> Compare with reference</a>');
         }
         $('builderLinks').innerHTML = parts.join('');
+    }
+
+    // A code may wrap only after a slash ("CCS1102/" then "CC102"), never inside a segment.
+    function codeHtml(code) {
+        return String(code).split('/').map((part, index, all) => '<span class="builder-code-part">' + esc(part) + (index < all.length - 1 ? '/' : '') + '</span>').join('<wbr>');
     }
 
     function plan() {
@@ -207,32 +267,88 @@
         const conflicts = conflictMap();
         const editable = Boolean(ws.editable) && can.editPlan;
         const query = new URLSearchParams({ program_id: ws.academic_program_id || '', curriculum_id: ws.curriculum_id, version_id: ws.id });
-        $('builderPlanNote').innerHTML = !ws.editable ? '<i class="fa-solid fa-lock" aria-hidden="true"></i> Read-only: this version is protected.'
-            : !can.editPlan ? '<i class="fa-solid fa-eye" aria-hidden="true"></i> Read-only for your role.'
-            : 'Edit placements in <a href="subject_mapping.php?' + esc(query.toString()) + '">Subject Mapping</a>.';
-        if (!state.placements.length) { $('builderPlan').innerHTML = '<p class="state-cell">No subjects are placed in this version yet.</p>'; return; }
+        // Read-only is shown by the badge in the page header; only editors get a line here.
+        $('builderPlanNote').innerHTML = editable ? 'Edit placements in <a href="subject_mapping.php?' + esc(query.toString()) + '">Subject Mapping</a>.' : '';
+        $('builderPlanSearchBox').hidden = !state.placements.length;
+        if (!state.placements.length) { $('builderPlan').innerHTML = '<div class="builder-empty"><i class="fa-solid fa-table-list" aria-hidden="true"></i><strong>No subjects placed yet</strong><span>Placed subjects appear here by year and semester.</span></div>'; return; }
         const rows = state.placements.map(row => Object.assign({}, row, { year_level: view.yearLabel(row.year_level) }));
         const grouped = view.group(rows);
         let html = '';
         grouped.years.forEach(function (semesters, year) {
             let yearCents = 0;
             semesters.forEach(term => { yearCents += term.cents; });
-            html += '<section class="builder-year"><header><h3>' + esc(year || 'Year not specified') + '</h3><span>' + esc(ui.formatUnits(yearCents / 100)) + ' units</span></header><div class="builder-terms">';
+            const yearName = year || 'Year not specified';
+            html += '<section class="builder-year"><header><h3>' + esc(yearName) + '</h3><span>' + esc(ui.formatUnits(yearCents / 100)) + ' units</span></header><div class="builder-terms">';
             semesters.forEach(function (term, name) {
-                html += '<article class="builder-term"><header><strong>' + esc(name || 'Semester not specified') + '</strong><span>' + term.rows.length + (term.rows.length === 1 ? ' subject · ' : ' subjects · ') + esc(ui.formatUnits(term.cents / 100)) + ' units</span></header><ul>';
+                const count = term.rows.length;
+                html += '<article class="builder-term"><header><strong>' + esc(yearName) + ' · ' + esc(name || 'Semester not specified') + ' · <span class="builder-term__count">' + count + (count === 1 ? ' subject' : ' subjects') + '</span></strong><span class="builder-term__units">' + esc(ui.formatUnits(term.cents / 100)) + ' units</span></header>' +
+                    '<table class="builder-subjects"><thead><tr><th scope="col" class="builder-subjects__flag"><span class="sr-only">Conflict</span></th><th scope="col" class="builder-subjects__code">Code</th><th scope="col" class="builder-subjects__title">Subject name</th><th scope="col" class="builder-subjects__units">Units</th><th scope="col" class="builder-subjects__actions"><span class="sr-only">Actions</span></th></tr></thead><tbody>';
                 term.rows.forEach(function (row) {
                     const problems = conflicts && conflicts.get(String(row.subject_id));
                     const required = Number(row.is_required) === 1;
-                    html += '<li' + (problems ? ' class="has-conflict"' : '') + '><span class="builder-subject"><span class="record-code">' + esc(row.subject_code) + '</span><span class="record-name">' + esc(row.subject_title) + '</span>' +
-                        (problems ? '<span class="builder-conflict" role="note"><i class="fa-solid fa-flag" aria-hidden="true"></i> ' + esc(problems.join(' ')) + '</span>' : '') + '</span>' +
-                        '<span class="builder-units">' + esc(ui.formatUnits(row.units)) + '</span>' + (required ? '' : '<span class="placement-indicator placement-optional">Optional</span>') + '</li>';
+                    html += '<tr data-search="' + esc((row.subject_code + ' ' + row.subject_title).toLowerCase()) + '"' + (problems ? ' class="has-conflict"' : '') + '>' +
+                        '<td class="builder-subjects__flag">' + (problems ? '<button type="button" class="builder-conflict-btn" data-conflict="' + Number(row.subject_id) + '" aria-label="View conflict for ' + esc(row.subject_code) + '" title="View conflict"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i></button>' : '') + '</td>' +
+                        '<td class="builder-subjects__code">' + codeHtml(row.subject_code) + '</td>' +
+                        '<td class="builder-subjects__title">' + esc(row.subject_title) + (required ? '' : ' <span class="placement-indicator placement-optional">Optional</span>') + '</td>' +
+                        '<td class="builder-subjects__units">' + esc(ui.formatUnits(row.units)) + '</td><td class="builder-subjects__actions"></td></tr>';
                 });
-                html += '</ul></article>';
+                html += '</tbody></table></article>';
             });
             html += '</div></section>';
         });
         $('builderPlan').innerHTML = html + '<p class="builder-total">Total ' + esc(ui.formatUnits(grouped.cents / 100)) + ' units · ' + grouped.count + ' subjects</p>';
+        clearPlanResults();
     }
+
+    // Typing changes nothing. Enter runs the search; Enter and the arrow keys then move between matches.
+    // Escape, the box's own clear button, or editing the text restores the plan.
+    let planMatches = [];
+    let planMatchIndex = -1;
+    let planSearchActive = false;
+    function clearPlanResults() {
+        planMatches = [];
+        planMatchIndex = -1;
+        planSearchActive = false;
+        $('builderPlan').querySelectorAll('tr[data-search]').forEach(row => row.classList.remove('is-match', 'is-dimmed', 'is-current-match'));
+        $('builderPlanSearchStatus').textContent = '';
+    }
+    function showPlanMatch(index) {
+        if (!planMatches.length) return;
+        planMatchIndex = (index + planMatches.length) % planMatches.length;
+        planMatches.forEach((row, i) => row.classList.toggle('is-current-match', i === planMatchIndex));
+        $('builderPlanSearchStatus').textContent = (planMatchIndex + 1) + ' of ' + planMatches.length;
+        const still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+        planMatches[planMatchIndex].scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' });
+    }
+    function runPlanSearch() {
+        clearPlanResults();
+        const query = $('builderPlanSearch').value.trim().toLowerCase();
+        if (!query) return;
+        planSearchActive = true;
+        $('builderPlan').querySelectorAll('tr[data-search]').forEach(function (row) {
+            const hit = row.dataset.search.includes(query);
+            if (hit) planMatches.push(row);
+            row.classList.toggle('is-match', hit);
+            row.classList.toggle('is-dimmed', !hit);
+        });
+        if (planMatches.length) showPlanMatch(0);
+        else $('builderPlanSearchStatus').textContent = 'No matches';
+    }
+    $('builderPlanSearch').addEventListener('input', clearPlanResults);
+    $('builderPlanSearch').addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            event.currentTarget.value = '';
+            clearPlanResults();
+        } else if (event.key === 'Enter') {
+            event.preventDefault();
+            if (!planSearchActive) runPlanSearch();
+            else showPlanMatch(planMatchIndex + (event.shiftKey ? -1 : 1));
+        } else if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && planSearchActive) {
+            event.preventDefault();
+            showPlanMatch(planMatchIndex + (event.key === 'ArrowDown' ? 1 : -1));
+        }
+    });
 
     function sourceKind(kind) {
         return ({ regulatory_document: 'Regulatory document', ched_sample_curriculum: 'CHED sample curriculum', institutional_curriculum: 'Institution-provided curriculum',
@@ -267,7 +383,9 @@
             return '<tr><td><strong>' + esc(name) + '</strong><span class="compliance-subtext">' + esc(item.reference_title_snapshot || '') + ' · ' + esc(item.issuing_body_snapshot || 'Issuer unavailable') + '</span></td>' +
                 '<td>' + esc(ui.statusLabel(item.reference_purpose)) + '</td><td>' + esc(sourceKind(item.source_kind_snapshot)) + '<span class="compliance-subtext">' + esc(assess + warning) + '</span></td>' +
                 '<td>' + esc(item.linked_by_username || 'Unknown user') + '<span class="compliance-subtext">' + esc(item.linked_at) + '</span></td></tr>';
-        }).join('') : '<tr><td colspan="4" class="empty-cell">No documentary references are attached.</td></tr>';
+        }).join('') : '';
+        $('builderReferencesTable').hidden = !ws.references.length;
+        $('builderReferencesEmpty').hidden = Boolean(ws.references.length);
         const attach = $('builderAttachOpen');
         if (attach) attach.hidden = !(ws.version_role === 'unclassified' && ws.review_status === 'not_started' && !ws.baseline_version_id);
     }
@@ -275,17 +393,24 @@
     function history() {
         const events = state.review.events;
         $('builderHistory').innerHTML = events.length ? events.map(e => '<tr><td>' + esc(e.created_at) + '</td><td>' + esc(e.actor_name) + '</td><td>' + esc(ui.statusLabel(e.action)) +
-            '</td><td>' + esc(ui.statusLabel(e.new_status)) + '</td><td>' + esc(e.comments || '') + '</td></tr>').join('') : '<tr><td colspan="5" class="empty-cell">No review activity yet.</td></tr>';
+            '</td><td>' + esc(ui.statusLabel(e.new_status)) + '</td><td>' + esc(e.comments || '') + '</td></tr>').join('') : '';
+        $('builderHistoryTable').hidden = !events.length;
+        $('builderHistoryEmpty').hidden = Boolean(events.length);
     }
 
     function render() {
         const ws = state.ws;
         $('builderState').hidden = true;
         $('builderVersion').hidden = false;
-        $('builderVersionTitle').textContent = ws.version_label;
-        $('builderVersionBadges').innerHTML = ui.statusBadge(ws.status) + ' ' + ui.statusBadge(ws.version_role) + ' ' + ui.statusBadge(state.review.review_status) +
-            ' ' + (ws.editable ? ui.statusBadge('editable') : ui.statusBadge('protected'));
-        stepper(); facts(); actions(); links(); plan(); details(); history();
+        $('builderVersionTitle').textContent = [ws.program_code, ws.curriculum_code, ws.version_label].join(' · ');
+        $('builderVersionSub').textContent = (ROLE_LABEL[ws.version_role] || ui.statusLabel(ws.version_role)) + ' · ' + (ws.baseline_version_id ? 'based on ' + ws.baseline_version_label : 'no baseline');
+        const reviewKind = state.review.review_status === 'draft' ? 'not_started' : state.review.review_status;
+        $('builderVersionBadges').innerHTML = chip(ws.status, STATUS_NAME[ws.status] || ws.status) + ' ' + chip(reviewKind, REVIEW_LABEL[state.review.review_status] || ui.statusLabel(state.review.review_status));
+        $('builderLastEdit').textContent = lastEdit();
+        const access = $('builderAccessBadge');
+        access.innerHTML = ws.editable && can.editPlan ? ui.statusBadge('editable') : ui.statusBadge('read_only');
+        access.hidden = false;
+        facts(); actions(); links(); plan(); details(); history();
     }
 
     // ---- Tabs ---------------------------------------------------------------------------------------------------
@@ -312,7 +437,7 @@
 
     // ---- Dialogs ------------------------------------------------------------------------------------------------
     const dialogs = {};
-    ['Review', 'Attach', 'Classify', 'Clone'].forEach(function (name) {
+    ['Review', 'Attach', 'Classify', 'Clone', 'Conflict'].forEach(function (name) {
         const element = $('builder' + name + 'Modal');
         if (element) dialogs[name.toLowerCase()] = ui.createModal(element);
     });
@@ -390,12 +515,18 @@
         form.elements.curriculum_version_id.value = state.versionId;
         const choices = state.ws.references.filter(item => item.reference_purpose === 'school_curriculum');
         const select = form.elements.compliance_reference_id;
-        select.innerHTML = choices.length ? choices.map(item => '<option value="' + Number(item.compliance_reference_id) + '">' +
-            esc((item.reference_code_snapshot || item.reference_title_snapshot || 'Source') + ' — ' + sourceKind(item.source_kind_snapshot)) + '</option>').join('')
-            : '<option value="">Attach a curriculum source first</option>';
+        select.innerHTML = choices.map(item => '<option value="' + Number(item.compliance_reference_id) + '">' +
+            esc((item.reference_code_snapshot || item.reference_title_snapshot || 'Source') + ' — ' + sourceKind(item.source_kind_snapshot)) + '</option>').join('');
         select.disabled = !choices.length;
+        $('builderClassifySource').hidden = !choices.length;
         form.querySelector('button[type="submit"]').disabled = !choices.length;
-        if (!choices.length) ui.showFormError(form, 'No curriculum source is attached to this version. Staff attach one first (Details and references).');
+        const attachBox = $('builderClassifyAttach');
+        if (attachBox) attachBox.hidden = Boolean(choices.length);
+        const reason = $('builderClassifyReason');
+        reason.hidden = Boolean(choices.length);
+        reason.textContent = choices.length ? '' : attachBox
+            ? 'Classify is unavailable until a curriculum source is attached.'
+            : 'Classify is unavailable: no curriculum source is attached. Staff attach one first in Details and references.';
         dialogs.classify.open();
     }
     $('builderClassifyForm')?.addEventListener('submit', async function (event) {
@@ -448,6 +579,11 @@
         } catch (error) { ui.showFormError(form, error.message || 'Revision creation failed.'); ui.setFormSubmitting(form, false); }
     });
 
+    $('builderPlan').addEventListener('click', function (event) {
+        const button = event.target.closest('[data-conflict]');
+        if (button) openConflict(button.dataset.conflict);
+    });
+
     // Header buttons.
     $('builderActions').addEventListener('click', function (event) {
         const target = event.target.closest('[data-builder-action]');
@@ -459,4 +595,5 @@
         else if (kind === 'attach') openAttach();
     });
     $('builderAttachOpen')?.addEventListener('click', openAttach);
+    $('builderClassifyAttachOpen')?.addEventListener('click', function () { dialogs.classify.close(); openAttach(); });
 }());

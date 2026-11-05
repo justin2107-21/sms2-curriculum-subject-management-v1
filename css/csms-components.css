@@ -197,20 +197,20 @@ body .main .csms-ctx {
   align-items: flex-end;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 10px;
+  gap: var(--csms-ctx-row-gap, 8px 10px);
 }
 body .main .csms-ctx-field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--csms-ctx-field-gap, 4px);
   max-width: 100%;
   position: relative;
-  width: 240px;
+  width: var(--csms-ctx-field-width, 240px);
 }
 body .main .csms-ctx-label {
   color: var(--csms-text, #1f2937);
-  font-size: .8125rem;
-  font-weight: 600;
+  font-size: var(--csms-ctx-label-size, .8125rem);
+  font-weight: var(--csms-ctx-label-weight, 600);
   line-height: 1.2;
 }
 body .main .csms-ctx-trigger {
@@ -224,7 +224,7 @@ body .main .csms-ctx-trigger {
   font: inherit;
   font-size: var(--csms-text-sm, .875rem);
   gap: 8px;
-  height: 40px;
+  height: var(--csms-ctx-control-height, 40px);
   justify-content: space-between;
   padding: 0 12px;
   text-align: left;
@@ -240,8 +240,8 @@ body .main .csms-ctx-sep {
   align-items: center;
   color: var(--csms-text-muted, #4b5563);
   display: inline-flex;
-  font-size: 1.25rem;
-  height: 40px;
+  font-size: var(--csms-ctx-sep-size, 1.25rem);
+  height: var(--csms-ctx-control-height, 40px);
 }
 body .main .csms-ctx-reset,
 body .main .csms-ctx-link {
@@ -362,3 +362,120 @@ body .sidebar .sidebar-submenu-item.active { font-weight: 600; }
   body .sidebar { height: calc(100dvh - var(--sms2-topbar-height, 56px)); top: var(--sms2-topbar-height, 56px); }
   body .sidebar-overlay { top: var(--sms2-topbar-height, 56px); }
 }
+
+/* ---- Polish pass (UI_Decisions D11) ---- */
+/* Every heading uses the page-title font. The sidebar has no headings; its section labels are not h-elements. */
+body :is(h1, h2, h3, h4, h5, h6, .page-title, .modal-section-title, .csms-card__title) {
+  font-family: "Newsreader", Georgia, "Times New Roman", serif;
+  font-weight: 600;
+  letter-spacing: -.005em;
+}
+
+/* One radius on every surface. */
+body :is(.domain-card, .csms-card, .csms-stat, .info-card, .dashboard-card, .settings-card, .system-admin-card, .table-card, .form-card, .summary-card,
+  .subject-master-card, .subject-results-card, .subject-filter-panel, .subject-context-panel, .subject-program-card, .subject-semester-card, .subject-form-section,
+  .mapping-results-card, .mapping-filter-card, .mapping-review-card, .mapping-subject-card, .mapping-usage-card, .mapping-semester-panel, .mapping-workspace-panel, .mapping-context-bar:not(.has-context-picker),
+  .curriculum-record-card, .semester-panel, .version-card, .nested-section, .elective-card, .export-format-card, .export-scope-card, .export-preview-shell, .export-report-section,
+  .grade-weighting-context-card, .grade-weighting-subject-card, .grade-weighting-component-card, .assignment-review-card, .assignment-selector-card, .equivalency-selector-card, .equivalency-summary-card,
+  .history-summary-card, .archive-summary-card, .pr-panel, .notif-panel, .csms-picker__panel,
+  .system-admin-table-wrap, .audit-table-wrap, .activity-table-wrap, .archive-table-wrap,
+  .elective-tabs, .pr-tabs, .export-tabs, .settings-tabs, .mapping-workspace-tabs, .mapping-year-tabs, .subject-year-tabs, .subject-category-tabs, .year-tabs,
+  .modal-dialog, .archive-dialog) {
+  border-radius: var(--csms-radius-surface, 12px);
+}
+body .table-scroll { border-radius: var(--csms-radius-surface, 12px); }
+body .modal-header { border-radius: var(--csms-radius-surface, 12px) var(--csms-radius-surface, 12px) 0 0; }
+body :is(.modal-footer, .modal-dialog > form > .modal-actions:last-child) { border-radius: 0 0 var(--csms-radius-surface, 12px) var(--csms-radius-surface, 12px); }
+
+/* Checkboxes and radios inside form fields keep their standard size and sit left of their label. */
+body .form-field input:is([type="checkbox"], [type="radio"]) {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  margin: 2px 0 0;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  accent-color: var(--csms-navy, #1a3a8c);
+}
+body .form-field > span:has(> input:is([type="checkbox"], [type="radio"])) {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+/* Segmented control: soft track, active pill. Used for level filters and section tabs. */
+body :is(.csms-segmented, .program-tabs) {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 100%;
+  padding: 4px;
+  overflow: visible;
+  background: var(--csms-navy-50, #e4eafa);
+  border: 0;
+  border-radius: var(--csms-radius-surface, 12px);
+}
+body .program-tabs .program-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 6px 16px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--csms-text-secondary, #374151);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--csms-duration, 200ms), color var(--csms-duration, 200ms), box-shadow var(--csms-duration, 200ms);
+}
+body .program-tabs .program-tab + .program-tab { border-left: 0; }
+body .program-tabs .program-tab:hover { color: var(--csms-navy, #1a3a8c); }
+body .program-tabs .program-tab[aria-pressed="true"] {
+  background: #fff;
+  border-bottom: 0;
+  box-shadow: var(--csms-shadow-sm, 0 1px 3px rgba(15, 23, 42, .06)), 0 0 0 1px rgba(26, 58, 140, .08);
+  color: var(--csms-navy, #1a3a8c);
+}
+body .program-tab__count {
+  min-width: 24px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(26, 58, 140, .1);
+  color: var(--csms-navy, #1a3a8c);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+@media (prefers-reduced-motion: reduce) {
+  body .program-tabs .program-tab { transition: none; }
+}
+
+/* One table header and one tab text size (found by the consistency probe). */
+body .main table thead th { font-size: 13px; font-weight: 600; }
+body .main :is(.export-tab, .elective-tabs button, .pr-tabs button, .mapping-workspace-tabs button, .mapping-year-tabs button, .subject-year-tabs button, .subject-category-tabs button) { font-size: 14px; }
+
+/* ---- Context picker, phase 2: read-only summary (UI_Decisions D2) and status chips ---- */
+body .main .csms-ctx.is-summary > :is(.csms-ctx-field, .csms-ctx-sep, .csms-ctx-reset, .csms-ctx-hint) { display: none; }
+body .main .csms-ctx-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; min-height: 40px; padding: 4px 0; }
+body .main .csms-ctx-summary[hidden], body .main .csms-ctx-done[hidden] { display: none; }
+body .main .csms-ctx-sum-item { display: flex; flex-direction: column; gap: 2px; min-width: 0; max-width: 22rem; }
+body .main .csms-ctx-sum-label { font-size: 12px; font-weight: 600; letter-spacing: .06em; color: var(--csms-text-secondary, #374151); }
+body .main .csms-ctx-sum-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 700; color: var(--csms-text, #1f2937); }
+body .main .csms-ctx-sum-sep { align-self: flex-end; padding-bottom: 2px; font-size: 20px; font-weight: 300; color: var(--csms-border-strong, #cbd5e1); }
+body .main .csms-ctx-change { align-self: flex-end; }
+body .main .csms-ctx-done { align-self: flex-end; height: 40px; }
+.csms-chip { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1.6; white-space: nowrap; }
+.csms-chip--draft, .csms-chip--not_started { background: #e5e7eb; color: #374151; }
+.csms-chip--active, .csms-chip--approved { background: #d9f2e6; color: #14532d; }
+.csms-chip--archived { background: #fde0e0; color: #8a1c1c; }
+.csms-chip--under_review { background: #fdf0c8; color: #7a4a00; }
+.csms-chip--returned { background: #f7e1ec; color: #7a1f4d; }
+@media (max-width: 600px) { body .main .csms-ctx-sum-item { max-width: 100%; } body .main .csms-ctx-sum-sep { display: none; } }

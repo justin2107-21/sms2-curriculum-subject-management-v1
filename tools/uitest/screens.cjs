@@ -581,6 +581,8 @@ async function main() {
         await navigate(`${base}/modules/curriculum/pages/academic_programs.php`);
         await sleep(1200);
         const result = {};
+        await shotView(path.join(out, `${role}-programs-list-${width}.png`));
+        result.counts = await evaluate(`[...document.querySelectorAll('[data-program-tab]')].map(b => b.innerText.replace(/[\\r\\n]+/g, ' ').trim())`);
         for (const code of ['ASD', 'BSIT']) {
           result['menu' + code] = await evaluate(`(() => { const row = ${rowOf(code)}; const t = row.querySelector('[data-row-menu]'); if (!t) return null; t.click(); const l = t.parentElement.querySelector('.row-menu__list'); const r = l.getBoundingClientRect(); return { status: row.querySelector('.status-badge')?.textContent, inView: r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight, items: [...l.querySelectorAll('button')].map(b => b.textContent) }; })()`);
           if (result['menu' + code]) { await shotView(path.join(out, `${role}-programs-menu-${code}-${width}.png`)); await evaluate(`document.body.click(); true`); }
@@ -595,6 +597,7 @@ async function main() {
         await sleep(1400);
         const modalState = `(() => { const m = document.getElementById('programDetailsModal'); const d = m.querySelector('.modal-dialog').getBoundingClientRect(); const a = document.activeElement; return { open: !m.hidden, w: Math.round(d.width), h: Math.round(d.height), focusInside: m.contains(a), focusRow: a.dataset ? a.dataset.recordView || null : null, summary: [...m.querySelectorAll('.program-record__summary dd')].map(x => x.textContent), blocks: m.querySelectorAll('.program-record__curriculum').length, links: m.querySelectorAll('.program-record__curriculum a').length, footer: [...m.querySelectorAll('.modal-footer button')].filter(b => !b.hidden).map(b => b.textContent.trim()), bodyScrolls: getComputedStyle(m.querySelector('.modal-body')).overflowY }; })()`;
         result.modal = await evaluate(modalState);
+        result.collapse = await evaluate(`[...document.querySelectorAll('#programDetailsModal details.program-record__curriculum')].map(d => d.open)`);
         await shotView(path.join(out, `${role}-programs-modal-${width}.png`));
         for (let i = 0; i < 30; i++) await key('Tab');
         result.afterTabs = (await evaluate(modalState)).focusInside;
@@ -648,9 +651,37 @@ async function main() {
       }
     }
 
+    if (arg('probe', '') === 'ctxlayout') {
+      // Phase 1 geometry of the context picker on each page: field boxes, label and separator styles, gaps.
+      report.ctxLayout = {};
+      for (const url of urls) {
+        for (const width of widths) {
+          await setWidth(width);
+          await navigate(base + url);
+          await sleep(2500);
+          await evaluate(`(() => { const c = document.querySelector('.csms-ctx-change'); if (c) c.click(); return true; })()`);
+          await sleep(300);
+          report.ctxLayout[url + '@' + width] = await evaluate(`(() => { const r = e => { const b = e.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.top), Math.round(b.width), Math.round(b.height)]; }; const root = document.querySelector('.csms-ctx-root'); if (!root) return null; const fields = [...root.querySelectorAll('.csms-ctx-field')]; const l = root.querySelector('.csms-ctx-label'); const s = root.querySelector('.csms-ctx-sep'); const t = root.querySelector('.csms-ctx-trigger'); const cs = e => getComputedStyle(e); return { root: r(root), bg: cs(root).backgroundColor, pad: cs(root).padding, fields: fields.map(r), label: [cs(l).fontSize, cs(l).fontWeight, cs(l).color, l.textContent], sep: s ? [cs(s).fontSize, s.textContent] : null, trigger: [cs(t).height, cs(t).fontSize, cs(t).borderRadius] }; })()`);
+          await shotView(path.join(out, `${role}-ctx-` + url.replace(/[^a-z0-9]+/gi, '_').slice(-40) + `-${width}.png`));
+        }
+      }
+    }
+
+    if (arg('probe', '') === 'fonts') {
+      // Every visible text node: first font family and size. Lists anything not DM Sans / Newsreader, or below 12 px.
+      report.fontProbe = {};
+      for (const url of urls) {
+        await setWidth(widths[0]);
+        await navigate(base + url);
+        await sleep(1800);
+        report.fontProbe[url] = await evaluate(`(() => { const out = { families: {}, small: {}, ready: document.fonts.check('14px "DM Sans"') && document.fonts.check('14px "Newsreader"') }; const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT); let n; while ((n = w.nextNode())) { if (!n.textContent.trim()) continue; const e = n.parentElement; if (!e || ['SCRIPT','STYLE','NOSCRIPT','OPTION'].includes(e.tagName) || !e.getClientRects().length) continue; const c = getComputedStyle(e); if (c.visibility === 'hidden' || e.closest('.sr-only, .visually-hidden')) continue; const f = c.fontFamily.split(',')[0].replace(/"/g, '').trim(); out.families[f] = (out.families[f] || 0) + 1; const s = parseFloat(c.fontSize); if (s < 12) { const k = (e.className && String(e.className).split(' ')[0] || e.tagName) + ' ' + c.fontSize; out.small[k] = (out.small[k] || 0) + 1; } } return out; })()`);
+      }
+    }
+
     if (arg('probe', '') === 'builder') {
       // Curriculum Builder: header, tabs and the first action's dialog, for each URL (one version each) and width.
       report.builderProbe = {};
+      const key = async (k, code) => { for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: k, code: code || k }); };
       for (const url of urls) {
         for (const width of widths) {
           issues = [];
@@ -658,29 +689,68 @@ async function main() {
           await navigate(base + url);
           await sleep(3200);
           const collect = `(() => { const t = id => (document.getElementById(id) || {}).textContent || ''; const v = document.getElementById('builderVersion');
-            return { shown: v && !v.hidden, state: t('builderState').slice(0, 120), title: t('builderVersionTitle'), badges: [...document.querySelectorAll('#builderVersionBadges .status-badge')].map(b => b.textContent.trim()).join(' | '),
+            return { shown: v && !v.hidden, state: t('builderState').slice(0, 120), title: t('builderVersionTitle'), sub: t('builderVersionSub'), lastEdit: t('builderLastEdit'), summary: (() => { const s = document.querySelector('.csms-ctx-summary'); return s && !s.hidden ? s.innerText.replace(/[\\r\\n]+/g, ' | ') : ''; })(), chips: [...document.querySelectorAll('.csms-ctx-summary .csms-chip')].map(x => x.className.split('--')[1] + ':' + x.textContent), badges: [...document.querySelectorAll('#builderVersionBadges .status-badge')].map(b => b.textContent.trim()).join(' | '),
               steps: [...document.querySelectorAll('.builder-step')].map(s => (s.classList.contains('is-done') ? 'done:' : s.classList.contains('is-current') ? 'now:' : 'todo:') + s.querySelector('.builder-step__name').firstChild.textContent.trim()),
               units: t('builderUnits'), target: t('builderTarget'), conflicts: t('builderConflicts').trim(),
               actions: [...document.querySelectorAll('#builderActions button')].map(b => b.textContent.trim()), next: document.getElementById('builderNext').hidden ? '' : t('builderNext'),
               links: [...document.querySelectorAll('#builderLinks a')].map(a => a.textContent.trim()), note: t('builderPlanNote').trim(),
-              terms: document.querySelectorAll('.builder-term').length, subjects: document.querySelectorAll('.builder-term li').length, flags: document.querySelectorAll('.builder-term li.has-conflict').length,
+              terms: document.querySelectorAll('.builder-term').length, subjects: document.querySelectorAll('.builder-subjects tbody tr').length, flags: document.querySelectorAll('.builder-subjects tbody tr.has-conflict').length,
               overflow: document.documentElement.scrollWidth > innerWidth, tabs: [...document.querySelectorAll('.builder-tabs [role=tab]')].map(b => b.textContent) }; })()`;
           const result = { page: await evaluate(collect) };
           await shotView(path.join(out, `${role}-builder-${url.match(/version_id=(\d+)/)[1]}-${width}.png`));
+          await evaluate(`window.scrollTo(0, 0); true`);
+          await shotView(path.join(out, `${role}-builder-selector-summary-${width}.png`));
+          await evaluate(`document.querySelector('.csms-ctx-change').click(); true`);
+          await sleep(300);
+          result.phase1 = await evaluate(`({ fields: document.querySelectorAll('.csms-ctx-field').length && getComputedStyle(document.querySelector('.csms-ctx-field')).display !== 'none', summaryHidden: document.querySelector('.csms-ctx-summary').hidden, done: !document.querySelector('.csms-ctx-done').hidden, reset: !document.querySelector('.csms-ctx-reset').hidden })`);
+          await shotView(path.join(out, `${role}-builder-selector-edit-${width}.png`));
+          await evaluate(`document.querySelector('.csms-ctx-done').click(); true`);
+          await sleep(300);
+          result.phase2again = await evaluate(`!document.querySelector('.csms-ctx-summary').hidden`);
           if (arg('builderflow', '') === '1' && result.page.actions.length) {
             await evaluate(`document.querySelector('#builderActions button').click(); true`);
             await sleep(1500);
             result.dialog = await evaluate(`(() => { const m = document.querySelector('.curriculum-modal:not([hidden])'); return m ? { id: m.id, title: m.querySelector('h2').textContent, text: m.querySelector('form') ? m.querySelector('form').innerText.slice(0, 260) : '' } : null; })()`);
             await shotView(path.join(out, `${role}-builder-dialog-${url.match(/version_id=(\d+)/)[1]}-${width}.png`));
+            result.dialogAttach = await evaluate(`(() => { const b = document.getElementById('builderClassifyAttachOpen'); if (!b || b.offsetParent === null) return null; b.click(); return true; })()`);
+            if (result.dialogAttach) { await sleep(900); result.dialogAttach = await evaluate(`document.querySelector('.curriculum-modal:not([hidden])').id`); }
             await evaluate(`document.querySelector('.curriculum-modal:not([hidden]) [data-modal-close]').click(); true`);
             await sleep(300);
           }
-          await evaluate(`document.getElementById('tabDetails').click(); true`);
+          const tag = url.match(/version_id=(\d+)/)[1];
+          await evaluate(`document.querySelector('.builder-tabs').scrollIntoView(); window.scrollBy(0, -70); true`);
+          await sleep(200);
+          await shotView(path.join(out, `${role}-builder-plan-${tag}-${width}.png`));
+          result.search = await evaluate(`(() => { const box = document.getElementById('builderPlanSearch'); const st = () => document.getElementById('builderPlanSearchStatus').textContent; const marked = () => document.querySelectorAll('tr.is-match, tr.is-dimmed').length; const key = (k, s) => box.dispatchEvent(new KeyboardEvent('keydown', { key: k, shiftKey: !!s, bubbles: true })); box.value = 'GE1'; box.dispatchEvent(new Event('input')); const typing = marked(); key('Enter'); const one = st() + '/' + document.querySelectorAll('tr.is-dimmed').length; key('Escape'); const esc = marked() + ':' + box.value; box.value = 'GE'; box.dispatchEvent(new Event('input')); key('Enter'); const a = st(); key('Enter'); const b = st(); key('ArrowDown'); const c = st(); key('ArrowUp'); const d = st(); key('Enter', true); const e = st(); return { typing, one, esc, steps: [a, b, c, d, e], access: document.getElementById('builderAccessBadge').textContent.trim() }; })()`);
+          await sleep(700);
+          result.searchCentred = await evaluate(`(() => { const r = document.querySelector('tr.is-current-match'); if (!r) return null; const b = r.getBoundingClientRect(); return Math.round(Math.abs((b.top + b.bottom) / 2 - innerHeight / 2)); })()`);
+          await shotView(path.join(out, `${role}-builder-search-${tag}-${width}.png`));
+          await evaluate(`document.getElementById('tabDetails').click(); document.querySelector('.builder-tabs').scrollIntoView(); window.scrollBy(0, -70); true`);
           await sleep(300);
+          await shotView(path.join(out, `${role}-builder-details-${tag}-${width}.png`));
           result.details = await evaluate(`({ facts: document.querySelectorAll('#builderDetails > div').length, refs: document.querySelectorAll('#builderReferences tr').length, attach: !!document.getElementById('builderAttachOpen') && !document.getElementById('builderAttachOpen').hidden })`);
           await evaluate(`document.getElementById('tabReview').click(); true`);
           await sleep(300);
+          await shotView(path.join(out, `${role}-builder-review-${tag}-${width}.png`));
+          result.conflictLabel = await evaluate(`(() => { document.getElementById('tabPlan').click(); const b = document.querySelector('.builder-conflict-btn'); if (!b) return null; const l = b.getAttribute('aria-label'); b.focus(); b.click(); return l; })()`);
+          await sleep(500);
+          result.conflictModal = result.conflictLabel ? await evaluate(`(() => { const m = document.getElementById('builderConflictModal'); try { return { open: !m.hidden, title: m.querySelector('h2').textContent, subject: document.getElementById('builderConflictSubject').textContent, cards: m.querySelectorAll('.builder-conflict-card').length, text: m.querySelector('.builder-conflict-body').innerText.replace(/\\s+/g, ' | ').slice(0, 420), titleFont: getComputedStyle(m.querySelector('h2')).fontFamily.split(',')[0] }; } catch (e) { return { error: String(e) }; } })()`) : null;
+          if (result.conflictModal) {
+            await shotView(path.join(out, `${role}-builder-conflict-modal-${tag}-${width}.png`));
+            await key('Escape');
+            await sleep(300);
+            result.conflictClosed = await evaluate(`({ closed: document.getElementById('builderConflictModal').hidden, focusBack: document.activeElement && document.activeElement.className })`);
+          }
+          result.tabKeys = await evaluate(`(() => { const t = document.getElementById('tabReview'); t.focus(); t.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })); const a = document.activeElement.id; document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })); return [a, document.activeElement.id]; })()`);
+          result.exportHref = await evaluate(`[...document.querySelectorAll('#builderLinks a')].filter(a => a.href.includes('curriculum_export')).map(a => a.getAttribute('href'))[0] || ''`);
+          result.classifyAttach = await evaluate(`(() => { const b = document.getElementById('builderClassifyAttachOpen'); return b ? true : false; })()`);
           result.history = await evaluate(`document.querySelectorAll('#builderHistory tr').length + ':' + document.querySelector('#builderHistory').textContent.slice(0, 80)`);
+          if (result.exportHref) {
+            await navigate(base + '/modules/curriculum/pages/' + result.exportHref.replace(/&amp;/g, '&'));
+            await sleep(3000);
+            result.exportContext = await evaluate(`[...document.querySelectorAll('.csms-ctx-trigger')].map(t => t.textContent.trim())`);
+            await shotView(path.join(out, `${role}-export-${tag}-${width}.png`));
+          }
           result.issues = issues.slice();
           (report.builderProbe[url] = report.builderProbe[url] || {})[width] = result;
         }

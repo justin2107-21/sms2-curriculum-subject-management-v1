@@ -1,6 +1,6 @@
 /* Shared CSMS typography and navigation scale. Loaded after page/module styles. */
 :root {
-  --sms2-font-family: 'Segoe UI', sans-serif;
+  --sms2-font-family: "DM Sans", "DM Sans", "Segoe UI", sans-serif;
   --sms2-text-xs: .8125rem;
   --sms2-text-sm: .875rem;
   --sms2-text-base: .9375rem;
