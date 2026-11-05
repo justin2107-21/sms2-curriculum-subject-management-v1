@@ -39,6 +39,12 @@ Written 2026-11-05 for whoever (or whichever session) continues this work. Read 
 8. Defender: the exclusion for `C:\xampp\mysql\data` is in place (added by the owner on 2026-11-04). Do not change Defender settings.
 9. **The 15:32 incident on 2026-11-04 is still unexplained.** `sms_db/grade_weighting_components.ibd` was emptied to 0 bytes at 15:32:27 and MySQL crashed at 15:33:05 while a backup read it; a second crash followed at 16:23:32 with no file empty. The table was rebuilt from the 15:31 backup, all 38 tables passed `CHECK TABLE` and matched row counts, the disk is healthy, and MySQL has been stable since the exclusion. The cause was not found. If it repeats, stop and report; the next suspect is the XAMPP MariaDB install itself.
 
+## Blocker found on 2026-11-05: deploy.php refuses sms_db after migration 027
+`php database\deploy.php --status` on the real `sms_db` now stops with **"Legacy baseline adoption record is invalid; manual review required."** The adoption record stores a fingerprint of the legacy `roles`, `permissions` and `role_permissions` tables (`csms_legacy_baseline_fingerprint()` in `database/legacy_baseline.php`), and 027 changed all three (new columns, the legacy admin role renamed, new roles, permissions and grants). Earlier migrations were kept out of the fingerprint by listing mutated tables and future permissions; 027 was not. Consequences:
+- **No new migration (028 or later) can be applied to `sms_db` until this is resolved.** Nothing is broken at runtime; the site works.
+- `tools/uitest/setup-db.ps1` fails for the same reason, because it runs `deploy.php` on a copy of `sms_db`. Workaround used on 2026-11-05: after the failed rebuild, run `DB_NAME=sms_db_uitest php tools/uitest/seed-users.php` (it also seeds the scenario fixtures); the copy is already imported by then.
+- The guard was deliberately **not** changed. It needs the owner's decision: either make the fingerprint cover only the pre-027 legacy rows and columns (excluding what 027 added or renamed), or re-adopt the baseline with a reviewed new fingerprint. Either way: backup first, test on a `sms_db_uitest` copy, and do not weaken the check.
+
 ## Open decisions
 | Item | Owner of the decision | Notes |
 |---|---|---|
@@ -52,6 +58,7 @@ Written 2026-11-05 for whoever (or whichever session) continues this work. Read 
 Split `curriculum.update` so Admin cannot edit placements; drop `users.role`; faculty-subject link; switch the Faculty read scope to `approved`.
 
 ## Next tasks, in order
+0. **Resolve the baseline blocker above.** It gates tasks 3 to 5, which need migrations.
 1. **Password reset for Admin and Super Admin:** `KENNETH123` still needs the reset the owner planned from the Users page as `csms_admin`. Review the reset flow and its audit entry before relying on it.
 2. **Module page redesigns, starting with Pre-requisite Configuration.** Follow `UI_Audit.md`, `UI_Decisions.md` and the shared header, picker and state components. Then the other module pages in the sidebar order.
 3. **Subject category field:** a migration adding a category to `subjects` (list to be agreed), the Subject Master form field and import support, then enable the "Units by subject category" card (currently a pending card).
@@ -59,7 +66,7 @@ Split `curriculum.update` so Admin cannot edit placements; drop `users.role`; fa
 5. **Faculty-subject link:** a table linking faculty users to subjects, an admin screen, and the permission it needs (needs the owner's approval). Then give Acad Faculty CLO management of their own subjects, and fill "My subjects" on their dashboard.
 
 ## How to run things
-- Rebuild the test database and users: `powershell -ExecutionPolicy Bypass -File tools\uitest\setup-db.ps1`
+- Rebuild the test database and users: `powershell -ExecutionPolicy Bypass -File tools\uitest\setup-db.ps1` (currently fails at the migration step, see the blocker above)
 - One role, both widths: `powershell -ExecutionPolicy Bypass -File tools\uitest\run.ps1 -Role staff -Widths 1440,390 -Urls /dashboard/dashboard.php`
 - Scenario then checker: `-CtxScenario`, then `node tools\uitest\check-scenario.cjs <folder>`
 - Authorization tests: `DB_NAME=sms_db_uitest php tests/rbac-final-roles.php`, `tests/rbac-safety-http.php`, `tests/dashboard-role-payload.php`; node tests: `tests/*.cjs`
