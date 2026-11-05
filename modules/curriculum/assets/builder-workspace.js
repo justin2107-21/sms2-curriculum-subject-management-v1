@@ -19,7 +19,7 @@
     const flag = key => root.dataset[key] === '1';
     const can = {
         submit: flag('canSubmit'), decide: flag('canDecide'), classify: flag('canClassify'), attach: flag('canAttach'),
-        clone: flag('canClone'), editPlan: flag('canEditPlan'), prerequisites: flag('canViewPrerequisites'),
+        clone: flag('canClone'), editPlan: flag('canEditPlan'), pickSubject: flag('canPickSubject'), prerequisites: flag('canViewPrerequisites'),
         exportVersion: flag('canExport'), exportDraft: flag('canExportDraft'), exportOfficial: flag('canExportOfficial'), history: flag('canHistory')
     };
     const me = Number(root.dataset.userId) || 0;
@@ -83,11 +83,12 @@
     }
 
     // ---- Loading ------------------------------------------------------------------------------------------------
-    async function loadVersion(id) {
+    // quiet: refresh in place after a plan edit, keeping the page and tab where they are.
+    async function loadVersion(id, quiet) {
         if (!id) return;
         const ticket = ++state.ticket;
         state.versionId = id;
-        showState('Loading version…', '', 'fa-spinner fa-spin');
+        if (!quiet) showState('Loading version…', '', 'fa-spinner fa-spin');
         try {
             const [ws, summary, review, placements, graph] = await Promise.all([
                 ui.fetchJson(api.references, { action: 'workspace', curriculum_version_id: id }),
@@ -147,7 +148,11 @@
         const map = conflictMap();
         const entries = (map && map.get(String(subjectId))) || [];
         const me = subjectPlacement(subjectId);
-        $('builderConflictSubject').textContent = me.code + (me.title ? ' — ' + me.title : '') + ' · ' + me.where;
+        showConflicts(entries, subjectId, me.code + (me.title ? ' — ' + me.title : '') + ' · ' + me.where);
+    }
+
+    function showConflicts(entries, subjectId, context) {
+        $('builderConflictSubject').textContent = context;
         const line = (label, code, title, where, current) => '<tr' + (current ? ' class="is-current"' : '') + '><th scope="row">' + esc(label) + '</th><td><strong>' + esc(code) + '</strong> ' + esc(title || '') + (current ? ' <span class="builder-conflict-this">this subject</span>' : '') + '</td><td>' + esc(where) + '</td></tr>';
         $('builderConflictBody').innerHTML = entries.map(function (entry, index) {
             let head, body;
@@ -268,10 +273,13 @@
         const editable = Boolean(ws.editable) && can.editPlan;
         const query = new URLSearchParams({ program_id: ws.academic_program_id || '', curriculum_id: ws.curriculum_id, version_id: ws.id });
         // Read-only is shown by the badge in the page header; only editors get a line here.
-        $('builderPlanNote').innerHTML = editable ? 'Edit placements in <a href="subject_mapping.php?' + esc(query.toString()) + '">Subject Mapping</a>.' : '';
+        $('builderPlanNote').innerHTML = editable ? 'More placement details in <a href="subject_mapping.php?' + esc(query.toString()) + '">Subject Mapping</a>.' : '';
+        const canAdd = editable && can.pickSubject && Boolean(dialogs.add);
+        $('builderAddOpen').hidden = !canAdd;
         $('builderPlanSearchBox').hidden = !state.placements.length;
         if (!state.placements.length) { $('builderPlan').innerHTML = '<div class="builder-empty"><i class="fa-solid fa-table-list" aria-hidden="true"></i><strong>No subjects placed yet</strong><span>Placed subjects appear here by year and semester.</span></div>'; return; }
         const rows = state.placements.map(row => Object.assign({}, row, { year_level: view.yearLabel(row.year_level) }));
+        const addTerm = (year, name, label) => canAdd ? '<button type="button" class="builder-term__add" data-add-year="' + esc(year) + '" data-add-semester="' + esc(name) + '" aria-label="Add subject to ' + esc(label) + '" title="Add subject"><i class="fa-solid fa-plus" aria-hidden="true"></i></button>' : '';
         const grouped = view.group(rows);
         let html = '';
         grouped.years.forEach(function (semesters, year) {
@@ -281,16 +289,16 @@
             html += '<section class="builder-year"><header><h3>' + esc(yearName) + '</h3><span>' + esc(ui.formatUnits(yearCents / 100)) + ' units</span></header><div class="builder-terms">';
             semesters.forEach(function (term, name) {
                 const count = term.rows.length;
-                html += '<article class="builder-term"><header><strong>' + esc(yearName) + ' · ' + esc(name || 'Semester not specified') + ' · <span class="builder-term__count">' + count + (count === 1 ? ' subject' : ' subjects') + '</span></strong><span class="builder-term__units">' + esc(ui.formatUnits(term.cents / 100)) + ' units</span></header>' +
-                    '<table class="builder-subjects"><thead><tr><th scope="col" class="builder-subjects__flag"><span class="sr-only">Conflict</span></th><th scope="col" class="builder-subjects__code">Code</th><th scope="col" class="builder-subjects__title">Subject name</th><th scope="col" class="builder-subjects__units">Units</th><th scope="col" class="builder-subjects__actions"><span class="sr-only">Actions</span></th></tr></thead><tbody>';
+                html += '<article class="builder-term"><header><strong>' + esc(yearName) + ' · ' + esc(name || 'Semester not specified') + ' · <span class="builder-term__count">' + count + (count === 1 ? ' subject' : ' subjects') + '</span></strong><span class="builder-term__units">' + esc(ui.formatUnits(term.cents / 100)) + ' units' + addTerm(year, name, yearName + ' · ' + (name || 'Semester not specified')) + '</span></header>' +
+                    '<table class="builder-subjects' + (editable ? ' is-editing' : '') + '"><thead><tr><th scope="col" class="builder-subjects__code">Code</th><th scope="col" class="builder-subjects__title">Subject name</th><th scope="col" class="builder-subjects__units">Units</th>' + (editable ? '<th scope="col" class="builder-subjects__actions"><span class="sr-only">Actions</span></th>' : '') + '</tr></thead><tbody>';
                 term.rows.forEach(function (row) {
                     const problems = conflicts && conflicts.get(String(row.subject_id));
                     const required = Number(row.is_required) === 1;
                     html += '<tr data-search="' + esc((row.subject_code + ' ' + row.subject_title).toLowerCase()) + '"' + (problems ? ' class="has-conflict"' : '') + '>' +
-                        '<td class="builder-subjects__flag">' + (problems ? '<button type="button" class="builder-conflict-btn" data-conflict="' + Number(row.subject_id) + '" aria-label="View conflict for ' + esc(row.subject_code) + '" title="View conflict"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i></button>' : '') + '</td>' +
                         '<td class="builder-subjects__code">' + codeHtml(row.subject_code) + '</td>' +
-                        '<td class="builder-subjects__title">' + esc(row.subject_title) + (required ? '' : ' <span class="placement-indicator placement-optional">Optional</span>') + '</td>' +
-                        '<td class="builder-subjects__units">' + esc(ui.formatUnits(row.units)) + '</td><td class="builder-subjects__actions"></td></tr>';
+                        '<td class="builder-subjects__title"><div class="builder-title-wrap"><span class="builder-title-text">' + esc(row.subject_title) + (required ? '' : ' <span class="placement-indicator placement-optional">Optional</span>') + '</span>' +
+                        (problems ? '<button type="button" class="builder-conflict-btn" data-conflict="' + Number(row.subject_id) + '" aria-label="View conflict for ' + esc(row.subject_code) + '" title="View conflict"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i></button>' : '') + '</div></td>' +
+                        '<td class="builder-subjects__units">' + esc(ui.formatUnits(row.units)) + '</td>' + (editable ? '<td class="builder-subjects__actions"><button type="button" class="builder-row-btn" data-move="' + Number(row.id) + '" aria-haspopup="menu" aria-expanded="false" aria-label="Move ' + esc(row.subject_code) + ' to another term" title="Move"><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></button><button type="button" class="builder-row-btn builder-row-btn--remove" data-remove="' + Number(row.id) + '" aria-label="Remove ' + esc(row.subject_code) + '" title="Remove"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></td>' : '') + '</tr>';
                 });
                 html += '</tbody></table></article>';
             });
@@ -437,7 +445,7 @@
 
     // ---- Dialogs ------------------------------------------------------------------------------------------------
     const dialogs = {};
-    ['Review', 'Attach', 'Classify', 'Clone', 'Conflict'].forEach(function (name) {
+    ['Review', 'Attach', 'Classify', 'Clone', 'Conflict', 'Add', 'Remove'].forEach(function (name) {
         const element = $('builder' + name + 'Modal');
         if (element) dialogs[name.toLowerCase()] = ui.createModal(element);
     });
@@ -579,9 +587,183 @@
         } catch (error) { ui.showFormError(form, error.message || 'Revision creation failed.'); ui.setFormSubmitting(form, false); }
     });
 
+    // ---- Plan editing -------------------------------------------------------------------------------------------
+    // The server decides every edit. A refusal is shown as it was sent; the plan is then refreshed from the server.
+    function isShs() { return /senior|shs|strand/i.test(String(state.ws.program_type || '')); }
+    function termChoices() {
+        const stored = key => state.placements.map(row => key === 'year_level' ? view.yearLabel(row.year_level) : row[key]).filter(Boolean);
+        return {
+            years: [...new Set([...(isShs() ? ['Grade 11', 'Grade 12'] : ['1st Year', '2nd Year', '3rd Year', '4th Year']), ...stored('year_level')])],
+            semesters: [...new Set(['1st Semester', '2nd Semester', ...stored('semester')])]
+        };
+    }
+    function placementById(id) { return state.placements.find(row => String(row.id) === String(id)); }
+    async function refreshPlan(focusSelector) {
+        await loadVersion(state.versionId, true);
+        const target = (focusSelector && document.querySelector(focusSelector)) || (!$('builderAddOpen').hidden && $('builderAddOpen')) || $('tabPlan');
+        target.focus();
+    }
+
+    const addSubject = dialogs.add ? ui.createAutocomplete({
+        input: $('builderAddSubject'), valueInput: $('builderAddSubjectId'), list: $('builderAddOptions'), status: $('builderAddHint'),
+        helpText: 'Subjects already in this version are not listed.', selectedText: 'Subject selected.', noResultsText: 'No available subject matches.',
+        search: async query => (await ui.fetchJson(api.assignments, { action: 'placement_subject_options', curriculum_version_id: state.ws.id, academic_program_id: state.ws.academic_program_id, curriculum_id: state.ws.curriculum_id, page: 1, per_page: 50, search: query, status: '' })).subjects,
+        getId: subject => subject.id,
+        format: subject => ({ label: subject.subject_code + ' — ' + subject.subject_title, code: subject.subject_code, title: subject.subject_title })
+    }) : null;
+    function fillSelect(select, values, label, chosen) {
+        select.innerHTML = '<option value="">' + esc(label) + '</option>' + values.map(value => '<option value="' + esc(value) + '"' + (value === chosen ? ' selected' : '') + '>' + esc(value) + '</option>').join('');
+    }
+    function openAdd(year, semester) {
+        const form = $('builderAddForm');
+        form.reset(); ui.clearFormError(form);
+        addSubject.clear();
+        form.elements.curriculum_version_id.value = state.ws.id;
+        form.elements.academic_program_id.value = state.ws.academic_program_id;
+        form.elements.curriculum_id.value = state.ws.curriculum_id;
+        const choices = termChoices();
+        fillSelect($('builderAddYear'), choices.years, 'Select year / grade level', year);
+        fillSelect($('builderAddSemester'), choices.semesters, 'Select semester', semester);
+        $('builderAddContext').textContent = state.ws.curriculum_code + ' / ' + state.ws.version_label;
+        dialogs.add.open();
+        $('builderAddSubject').focus();
+    }
+    $('builderAddOpen').addEventListener('click', () => openAdd('', ''));
+    $('builderAddForm')?.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        const form = event.currentTarget;
+        if (!form.elements.subject_id.value) { ui.showFormError(form, 'Choose a subject from the list.'); return; }
+        if (!form.reportValidity()) return;
+        const data = new FormData(form);
+        data.set('action', 'map_subject');
+        const subjectId = form.elements.subject_id.value;
+        ui.setFormSubmitting(form, true, 'Adding…');
+        try {
+            const result = await ui.postForm(api.assignments, data);
+            dialogs.add.close();
+            ui.showToast(result.message || 'Subject added.', 'success');
+            await loadVersion(state.versionId, true);
+            const added = state.placements.find(row => String(row.subject_id) === String(subjectId));
+            (added && document.querySelector('[data-move="' + Number(added.id) + '"]') || $('builderAddOpen')).focus();
+        } catch (error) { ui.showFormError(form, error.message || 'The subject could not be added.'); }
+        finally { ui.setFormSubmitting(form, false); }
+    });
+
+    // Move menu: every term except the current one.
+    const moveMenu = $('builderMoveMenu');
+    let moveTrigger = null;
+    function closeMoveMenu(refocus) {
+        if (!moveMenu || moveMenu.hidden) return;
+        moveMenu.hidden = true;
+        if (moveTrigger) { moveTrigger.setAttribute('aria-expanded', 'false'); if (refocus) moveTrigger.focus(); }
+        moveTrigger = null;
+    }
+    function openMoveMenu(trigger) {
+        const row = placementById(trigger.dataset.move);
+        if (!row) return;
+        const choices = termChoices();
+        const currentYear = view.yearLabel(row.year_level);
+        let html = '';
+        choices.years.forEach(year => {
+            const items = choices.semesters.filter(semester => !(year === currentYear && semester === row.semester));
+            if (!items.length) return;
+            html += '<div class="builder-move-menu__group" role="presentation">' + esc(year) + '</div>' + items.map(semester => '<button type="button" role="menuitem" tabindex="-1" data-year="' + esc(year) + '" data-semester="' + esc(semester) + '">' + esc(semester) + '</button>').join('');
+        });
+        moveMenu.innerHTML = html;
+        moveMenu.dataset.placement = row.id;
+        moveMenu.hidden = false;
+        moveTrigger = trigger;
+        trigger.setAttribute('aria-expanded', 'true');
+        const box = trigger.getBoundingClientRect();
+        const menu = moveMenu.getBoundingClientRect();
+        moveMenu.style.left = Math.max(8, Math.min(box.right - menu.width, innerWidth - menu.width - 8)) + 'px';
+        const below = box.bottom + 4;
+        moveMenu.style.top = (below + menu.height > innerHeight - 8 ? Math.max(8, box.top - menu.height - 4) : below) + 'px';
+        moveMenu.querySelector('button').focus();
+    }
+    async function moveTo(id, year, semester) {
+        const row = placementById(id);
+        if (!row) return;
+        const data = new FormData();
+        data.set('action', 'update_mapping');
+        data.set('id', id);
+        data.set('year_level', year);
+        data.set('semester', semester);
+        data.set('is_required', Number(row.is_required) === 1 ? '1' : '0');
+        const focus = '[data-move="' + Number(id) + '"]';
+        try {
+            const result = await ui.postForm(api.assignments, data);
+            ui.showToast(result.message || 'Subject moved.', 'success');
+            await refreshPlan(focus);
+        } catch (error) {
+            const conflicts = error.payload && error.payload.validation && error.payload.validation.conflicts;
+            if (conflicts && conflicts.length) {
+                showConflicts(conflicts.map(item => ({ kind: 'sequence', item: item })), row.subject_id, row.subject_code + ' was not moved to ' + year + ' / ' + semester);
+            } else {
+                ui.showToast(error.message || 'The subject could not be moved.', 'error');
+                await refreshPlan(focus);
+            }
+        }
+    }
+    if (moveMenu) {
+        moveMenu.addEventListener('click', function (event) {
+            const item = event.target.closest('[role="menuitem"]');
+            if (!item) return;
+            const id = moveMenu.dataset.placement;
+            closeMoveMenu(true);
+            moveTo(id, item.dataset.year, item.dataset.semester);
+        });
+        moveMenu.addEventListener('keydown', function (event) {
+            const items = Array.from(moveMenu.querySelectorAll('[role="menuitem"]'));
+            const index = items.indexOf(document.activeElement);
+            const step = { ArrowDown: 1, ArrowUp: -1 }[event.key];
+            if (step) { event.preventDefault(); items[(index + step + items.length) % items.length].focus(); }
+            else if (event.key === 'Home') { event.preventDefault(); items[0].focus(); }
+            else if (event.key === 'End') { event.preventDefault(); items[items.length - 1].focus(); }
+            else if (event.key === 'Escape' || event.key === 'Tab') { event.preventDefault(); closeMoveMenu(true); }
+        });
+        document.addEventListener('click', event => { if (!moveMenu.hidden && !moveMenu.contains(event.target) && !event.target.closest('[data-move]')) closeMoveMenu(false); });
+        window.addEventListener('resize', () => closeMoveMenu(false));
+        window.addEventListener('scroll', () => closeMoveMenu(false), true);
+    }
+
+    // Remove.
+    let removeId = 0;
+    function openRemove(id) {
+        const row = placementById(id);
+        if (!row) return;
+        removeId = Number(id);
+        const form = $('builderRemoveForm');
+        ui.clearFormError(form);
+        $('builderRemoveContext').textContent = state.ws.curriculum_code + ' / ' + state.ws.version_label;
+        $('builderRemoveText').innerHTML = 'Remove <strong>' + esc(row.subject_code) + ' — ' + esc(row.subject_title) + '</strong> from ' + esc(placementText(row.year_level, row.semester)) + '?';
+        dialogs.remove.open();
+    }
+    $('builderRemoveForm')?.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const data = new FormData();
+        data.set('action', 'remove');
+        data.set('id', removeId);
+        ui.setFormSubmitting(form, true, 'Removing…');
+        try {
+            const result = await ui.postForm(api.assignments, data);
+            dialogs.remove.close();
+            ui.showToast(result.message || 'Subject removed.', 'success');
+            await refreshPlan('');
+        } catch (error) { ui.showFormError(form, error.message || 'The subject could not be removed.'); }
+        finally { ui.setFormSubmitting(form, false); }
+    });
+
     $('builderPlan').addEventListener('click', function (event) {
-        const button = event.target.closest('[data-conflict]');
-        if (button) openConflict(button.dataset.conflict);
+        const conflict = event.target.closest('[data-conflict]');
+        if (conflict) { openConflict(conflict.dataset.conflict); return; }
+        const add = event.target.closest('[data-add-year]');
+        if (add) { openAdd(add.dataset.addYear, add.dataset.addSemester); return; }
+        const move = event.target.closest('[data-move]');
+        if (move) { const again = moveTrigger === move; closeMoveMenu(false); if (!again) openMoveMenu(move); return; }
+        const remove = event.target.closest('[data-remove]');
+        if (remove) openRemove(remove.dataset.remove);
     });
 
     // Header buttons.

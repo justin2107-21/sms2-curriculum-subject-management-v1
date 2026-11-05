@@ -98,11 +98,11 @@ try {
     $check($invalid[0] === 422, 'an invalid id is 422');
     $check(!str_contains(json_encode($again[2] ?? []), 'mysqli') && !str_contains(json_encode($missing[2] ?? []), 'Exception'), 'refusals do not leak internals');
     // Other modules keep the active-only rule: an inactive curriculum cannot be archived.
-    $curriculumId = (int)$db->query("SELECT id FROM curricula WHERE status='active' LIMIT 1")->fetch_row()[0];
+    $curriculumId = (int)$db->query("SELECT c.id FROM curricula c WHERE c.status='active' AND NOT EXISTS (SELECT 1 FROM curriculum_versions v WHERE v.curriculum_id=c.id AND (v.version_role='reference' OR v.review_status<>'not_started')) ORDER BY c.id LIMIT 1")->fetch_row()[0];
     $db->query("UPDATE curricula SET status='inactive' WHERE id=$curriculumId");
     $keep = $who['admin']->post('modules/curriculum/http/curriculum_actions.php', ['action' => 'archive', 'id' => $curriculumId]);
     $db->query("UPDATE curricula SET status='active' WHERE id=$curriculumId");
-    $check($keep[0] === 409 && str_contains((string)($keep[2]['message'] ?? ''), 'Only active'), 'curriculum archive keeps the active-only rule, as 409: ' . $keep[0]);
+    $check($keep[0] === 409 && str_contains((string)($keep[2]['message'] ?? ''), 'Only active'), 'curriculum archive keeps the active-only rule, as 409: ' . $keep[0] . ' ' . ($keep[2]['message'] ?? ''));
     // Leave the inactive program archived-free but inactive for the page checks below.
     // Summary follows the read scope.
     $bsit = (int)$db->query("SELECT c.academic_program_id FROM curriculum_versions v JOIN curricula c ON c.id=v.curriculum_id WHERE v.status='draft' AND v.review_status<>'approved' LIMIT 1")->fetch_row()[0];

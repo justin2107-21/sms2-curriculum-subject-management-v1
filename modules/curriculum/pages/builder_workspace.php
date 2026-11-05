@@ -54,6 +54,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
         data-can-attach="<?= $can('curriculum.reference.attach') ? '1' : '0' ?>"
         data-can-clone="<?= $can('curriculum.version.clone') ? '1' : '0' ?>"
         data-can-edit-plan="<?= $can('curriculum.update') ? '1' : '0' ?>"
+        data-can-pick-subject="<?= $can('subject.view') ? '1' : '0' ?>"
         data-can-view-prerequisites="<?= $can('prerequisite.view') ? '1' : '0' ?>"
         data-can-export="<?= $can('curriculum_export.view') ? '1' : '0' ?>"
         data-can-export-draft="<?= $can('curriculum_export.draft') ? '1' : '0' ?>"
@@ -109,7 +110,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 
         <section id="panelPlan" role="tabpanel" aria-labelledby="tabPlan" class="builder-panel">
           <div class="builder-plan-bar"><div class="builder-plan-search" id="builderPlanSearchBox"><label for="builderPlanSearch">Find a subject</label><div class="builder-plan-search__row"><input type="search" id="builderPlanSearch" placeholder="Code or title" autocomplete="off" maxlength="100" aria-describedby="builderPlanSearchStatus"/><span class="builder-plan-search__count" id="builderPlanSearchStatus" role="status"></span></div></div>
-            <p class="builder-plan-note" id="builderPlanNote"></p></div>
+            <p class="builder-plan-note" id="builderPlanNote"></p><button type="button" class="primary-action-button" id="builderAddOpen" hidden><i class="fa-solid fa-plus" aria-hidden="true"></i> Add subject</button></div>
           <div id="builderPlan" class="builder-plan" aria-live="polite"></div>
         </section>
 
@@ -143,6 +144,46 @@ require __DIR__ . '/../../../shared/sidebar.php';
     <div class="builder-conflict-body" id="builderConflictBody"></div>
   </section>
 </div>
+
+<?php if ($can('curriculum.update')): ?>
+<!-- Plan editing: move menu, add and remove dialogs -->
+<div class="builder-move-menu" id="builderMoveMenu" role="menu" aria-label="Move to term" hidden></div>
+<?php if ($can('subject.view')): ?>
+<div class="curriculum-modal" id="builderAddModal" hidden aria-hidden="true">
+  <div class="modal-backdrop" data-modal-close></div>
+  <section class="modal-dialog modal-dialog-medium" role="dialog" aria-modal="true" aria-labelledby="builderAddTitle">
+    <div class="modal-header"><div><h2 id="builderAddTitle">Add subject</h2><p class="modal-context" id="builderAddContext"></p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
+    <form id="builderAddForm" class="domain-form" novalidate>
+      <input type="hidden" name="curriculum_version_id"/><input type="hidden" name="academic_program_id"/><input type="hidden" name="curriculum_id"/>
+      <div class="form-error" role="alert" hidden></div>
+      <div class="form-grid">
+        <div class="form-field form-field-wide"><label for="builderAddSubject">Subject <strong>*</strong></label><div class="record-autocomplete">
+          <input type="search" id="builderAddSubject" placeholder="Search subject code or title" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="builderAddOptions" aria-describedby="builderAddHint"/>
+          <input type="hidden" name="subject_id" id="builderAddSubjectId"/>
+          <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear subject" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+          <div class="record-autocomplete-options" id="builderAddOptions" role="listbox" aria-label="Subject suggestions" hidden></div>
+        </div><small id="builderAddHint"></small></div>
+        <label class="form-field"><span>Year / Grade level <strong>*</strong></span><select name="year_level" id="builderAddYear" required></select></label>
+        <label class="form-field"><span>Semester <strong>*</strong></span><select name="semester" id="builderAddSemester" required></select></label>
+        <label class="form-field"><span>Placement <strong>*</strong></span><select name="is_required" required><option value="1">Required</option><option value="0">Optional</option></select></label>
+      </div>
+      <div class="modal-actions"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="submit" class="button-primary">Add subject</button></div>
+    </form>
+  </section>
+</div>
+<?php endif; ?>
+<div class="curriculum-modal" id="builderRemoveModal" hidden aria-hidden="true">
+  <div class="modal-backdrop" data-modal-close></div>
+  <section class="modal-dialog modal-dialog-medium" role="dialog" aria-modal="true" aria-labelledby="builderRemoveTitle">
+    <div class="modal-header"><div><h2 id="builderRemoveTitle">Remove subject</h2><p class="modal-context" id="builderRemoveContext"></p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
+    <form id="builderRemoveForm" class="domain-form" novalidate>
+      <div class="form-error" role="alert" hidden></div>
+      <p id="builderRemoveText"></p>
+      <div class="modal-actions"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="submit" class="button-danger">Remove</button></div>
+    </form>
+  </section>
+</div>
+<?php endif; ?>
 
 <!-- Review action: submit, approve or return -->
 <div class="curriculum-modal" id="builderReviewModal" hidden aria-hidden="true">

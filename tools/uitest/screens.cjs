@@ -651,6 +651,72 @@ async function main() {
       }
     }
 
+    if (arg('probe', '') === 'planedit') {
+      // Plan controls for this role; with --builderflow=1 also add, move, a refused move and remove, in the browser.
+      report.planEdit = {};
+      for (const width of widths) {
+        const result = {};
+        await setWidth(width);
+        await navigate(base + urls[0]);
+        await sleep(3000);
+        const counts = `({ add: !document.getElementById('builderAddOpen').hidden, termAdd: document.querySelectorAll('.builder-term__add').length, move: document.querySelectorAll('[data-move]').length, remove: document.querySelectorAll('[data-remove]').length, rows: document.querySelectorAll('.builder-subjects tbody tr').length, overflow: document.documentElement.scrollWidth > innerWidth })`;
+        result.controls = await evaluate(counts);
+        await evaluate(`document.querySelector('.builder-tabs').scrollIntoView(); window.scrollBy(0, -70); true`);
+        await sleep(300);
+        await shotView(path.join(out, `${role}-plan-controls-${width}.png`));
+        if (arg('builderflow', '') === '1' && result.controls.move) {
+          await evaluate(`document.querySelector('.builder-term__add').click(); true`);
+          await sleep(400);
+          const box = `document.getElementById('builderAddSubject')`;
+          await evaluate(`(() => { const i = ${box}; i.focus(); i.value = 'a'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+          await sleep(1400);
+          result.addTerm = await evaluate(`[document.getElementById('builderAddYear').value, document.getElementById('builderAddSemester').value]`);
+          await shotView(path.join(out, `${role}-plan-add-${width}.png`));
+          result.picked = await evaluate(`(() => { const o = document.querySelector('#builderAddOptions [role=option]'); if (!o) return null; const text = o.textContent; o.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); o.click(); return text; })()`);
+          await sleep(300);
+          await evaluate(`document.getElementById('builderAddForm').requestSubmit(); true`);
+          await sleep(2500);
+          result.afterAdd = await evaluate(counts);
+          result.focusAfterAdd = await evaluate(`document.activeElement.getAttribute('aria-label')`);
+          // Open the move menu on the new row; the focused move button belongs to it.
+          await evaluate(`document.activeElement.click(); true`);
+          await sleep(300);
+          result.menu = await evaluate(`[...document.querySelectorAll('#builderMoveMenu [role=menuitem]')].length`);
+          await shotView(path.join(out, `${role}-plan-menu-${width}.png`));
+          await evaluate(`[...document.querySelectorAll('#builderMoveMenu [role=menuitem]')].find(b => b.dataset.year === '4th Year' && b.dataset.semester === '2nd Semester').click(); true`);
+          await sleep(2500);
+          result.afterMove = await evaluate(`[...document.querySelectorAll('.builder-term')].map(t => t.querySelector('header strong').textContent)`);
+          await shotView(path.join(out, `${role}-plan-moved-${width}.png`));
+          // Refused move: GE4 is a prerequisite of GE1 and cannot go later.
+          await evaluate(`[...document.querySelectorAll('[data-move]')].find(b => b.getAttribute('aria-label').includes('GE4')).click(); true`);
+          await sleep(300);
+          await evaluate(`[...document.querySelectorAll('#builderMoveMenu [role=menuitem]')].find(b => b.dataset.year === '2nd Year').click(); true`);
+          await sleep(1500);
+          result.refused = await evaluate(`(() => { const m = document.getElementById('builderConflictModal'); return { open: !m.hidden, context: document.getElementById('builderConflictSubject').textContent, body: document.getElementById('builderConflictBody').textContent.slice(0, 160) }; })()`);
+          await shotView(path.join(out, `${role}-plan-refused-${width}.png`));
+          await evaluate(`document.querySelector('#builderConflictModal [data-modal-close]').click(); true`);
+          await sleep(300);
+          // Refused remove: GE4 has prerequisite links.
+          await evaluate(`[...document.querySelectorAll('[data-remove]')].find(b => b.getAttribute('aria-label').includes('GE4')).click(); true`);
+          await sleep(300);
+          await evaluate(`document.getElementById('builderRemoveForm').requestSubmit(); true`);
+          await sleep(1200);
+          result.removeRefused = await evaluate(`document.querySelector('#builderRemoveForm .form-error').textContent`);
+          await shotView(path.join(out, `${role}-plan-remove-refused-${width}.png`));
+          await evaluate(`document.querySelector('#builderRemoveModal [data-modal-close]').click(); true`);
+          await sleep(300);
+          // Remove the row added above: the one in 4th Year.
+          await evaluate(`document.querySelector('.builder-term:last-of-type, .builder-terms .builder-term'); [...document.querySelectorAll('.builder-term')].find(t => t.querySelector('header strong').textContent.includes('4th Year')).querySelector('[data-remove]').click(); true`);
+          await sleep(300);
+          await evaluate(`document.getElementById('builderRemoveForm').requestSubmit(); true`);
+          await sleep(2500);
+          result.afterRemove = await evaluate(counts);
+          result.focusAfterRemove = await evaluate(`document.activeElement.id`);
+        }
+        report.planEdit[width] = result;
+      }
+    }
+
     if (arg('probe', '') === 'ctxlayout') {
       // Phase 1 geometry of the context picker on each page: field boxes, label and separator styles, gaps.
       report.ctxLayout = {};

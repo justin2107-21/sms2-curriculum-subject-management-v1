@@ -237,3 +237,10 @@ Each ends with tests and your review; commits only when you approve.
 - **Header actions (decision 1):** Submit for review (Staff, Super Admin); Approve and Return (Acad Office, Super Admin, never on their own submission); Classify as reference (users with `curriculum.reference.classify`); Create revision from this reference (`curriculum.version.clone`); otherwise one line saying what happens next. Rules are the server's.
 - **Not in this slice:** versions drawer, new-curriculum dialog, rename (slice 4); sidebar, redirects, retiring the Curricula list (slice 5). The classic Curricula page still works and still serves its own links.
 - **Known limits:** a Faculty address pointing at a draft opens the saved context instead (D4). The three `*-http.php` revision, reference and comparison suites need the isolated Task 2 Docker database and were not run here.
+
+### Slice 3: Plan editing
+
+- **Add:** "Add subject" above the plan and + on each term header (term preselected). Searchable picker; subjects already placed are left out by the server.
+- **Move and remove:** actions column on the right, shown only when the server says the version is editable and the user holds `curriculum.update`. Move opens a menu of terms; remove asks for confirmation.
+- **Refusals:** a refused move opens the Prerequisite conflict dialog with the server's conflicts; add and remove show the server's message in their dialog; lifecycle refusals on a stale page show as a toast and the plan refreshes. No rule lives in the page.
+- **Endpoints:** existing `assignment_actions.php` actions only (`placement_subject_options`, `map_subject`, `update_mapping`, `remove`). The workspace payload gained `program_type` for the term choices.

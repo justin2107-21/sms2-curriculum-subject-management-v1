@@ -97,8 +97,9 @@ try {
     $check($sum('staff', 0)[0] === 422, 'an invalid id is 422');
     $check(!str_contains(json_encode($sum('staff', 999999999)[2]), 'mysqli'), 'refusals do not leak internals');
 
-    // Last content edit: real audit data only. UITEST-REV was copied by SQL, so nothing is recorded for it; a placement audit entry then shows up.
-    $check(array_key_exists('last_edit', $r[2]['summary']) && $r[2]['summary']['last_edit'] === null, 'a version with no content audit entry reports no last edit');
+    // Last content edit: real audit data only. UITEST-REVIEW has no content edits; a placement audit entry on UITEST-REV shows up.
+    $noEdit = $sum('staff', $review)[2]['summary'] ?? [];
+    $check(array_key_exists('last_edit', $noEdit) && $noEdit['last_edit'] === null, 'a version with no content audit entry reports no last edit');
     $staffId = (int)$one("SELECT id FROM users WHERE username='uitest.staff'");
     $firstPlacement = (int)$one("SELECT id FROM curriculum_version_subjects WHERE curriculum_version_id=$rev LIMIT 1");
     $db->query("INSERT INTO audit_logs(user_id,action,entity_type,entity_id,description,metadata_json) VALUES($staffId,'CURRICULUM_SUBJECT_UPDATE','curriculum_version_subject',$firstPlacement,'test','{\"curriculum_version_id\":$rev}')");
@@ -126,6 +127,43 @@ try {
     $check($who['staff']->post('modules/curriculum/http/review_actions.php', ['action' => 'submit', 'curriculum_version_id' => $ref])[0] === 409, 'a reference cannot be submitted');
     $check($who['acadoffice']->post('modules/curriculum/http/review_actions.php', ['action' => 'decide', 'decision' => 'approve', 'reason' => '', 'curriculum_version_id' => $review])[0] === 422, 'approving needs a reason');
     $check($who['acadfaculty']->post('modules/curriculum/http/review_actions.php', ['action' => 'submit', 'curriculum_version_id' => $rev])[0] === 403, 'Faculty cannot submit');
+
+    // Slice 3: plan editing goes through the same endpoints and rules as Subject Mapping.
+    $aapi = 'modules/curriculum/http/assignment_actions.php';
+    $placementOf = static fn(int $version, string $code): int => (int)$one("SELECT p.id FROM curriculum_version_subjects p JOIN subjects s ON s.id=p.subject_id WHERE p.curriculum_version_id=$version AND s.subject_code='$code'");
+    $termOf = static fn(int $placement): string => (string)$one("SELECT CONCAT(year_level,'|',semester) FROM curriculum_version_subjects WHERE id=$placement");
+    $free = (int)$one("SELECT s.id FROM subjects s WHERE s.status='active' AND s.id NOT IN (SELECT subject_id FROM curriculum_version_subjects WHERE curriculum_version_id=$rev) ORDER BY s.id LIMIT 1");
+    $addBody = ['action' => 'map_subject', 'curriculum_version_id' => $rev, 'academic_program_id' => $program, 'curriculum_id' => $curriculum, 'subject_id' => $free, 'year_level' => '2nd Year', 'semester' => '1st Semester', 'is_required' => '1'];
+    $options = $who['staff']->req("$aapi?action=placement_subject_options&curriculum_version_id=$rev&academic_program_id=$program&curriculum_id=$curriculum&page=1&per_page=50&search=&status=");
+    $check($options[0] === 200 && !in_array($placementOf($rev, 'GE1'), array_column($options[2]['subjects'], 'id'), true) && !in_array('GE1', array_column($options[2]['subjects'], 'subject_code'), true), 'the subject picker leaves out subjects already placed');
+    foreach (['acadoffice', 'acadfaculty'] as $role) {
+        $check($who[$role]->post($aapi, $addBody)[0] === 403, "$role cannot add a placement");
+        $check($who[$role]->post($aapi, ['action' => 'update_mapping', 'id' => $placementOf($rev, 'GE1'), 'year_level' => '2nd Year', 'semester' => '1st Semester', 'is_required' => '1'])[0] === 403, "$role cannot move a placement");
+        $check($who[$role]->post($aapi, ['action' => 'remove', 'id' => $placementOf($rev, 'GE2')])[0] === 403, "$role cannot remove a placement");
+    }
+    $added = $who['staff']->post($aapi, $addBody);
+    $check($added[0] === 201 && (int)($added[2]['assignment']['subject_id'] ?? 0) === $free, 'Staff adds a subject to a term');
+    $newId = (int)($added[2]['assignment']['id'] ?? 0);
+    $check($who['staff']->post($aapi, $addBody)[0] === 409, 'adding the same subject twice is refused');
+    $moved = $who['staff']->post($aapi, ['action' => 'update_mapping', 'id' => $newId, 'year_level' => '3rd Year', 'semester' => '2nd Semester', 'is_required' => '1']);
+    $check($moved[0] === 200 && $termOf($newId) === '3rd Year|2nd Semester', 'Staff moves it to another term');
+    $check($who['staff']->post($aapi, ['action' => 'remove', 'id' => $newId])[0] === 200 && (int)$one("SELECT COUNT(*) FROM curriculum_version_subjects WHERE id=$newId") === 0, 'Staff removes it');
+    // GE4 is the prerequisite of GE1 in the scenario: moving it later is a sequence conflict, with details for the dialog.
+    $ge4 = $placementOf($rev, 'GE4');
+    $before = $termOf($ge4);
+    $refused = $who['staff']->post($aapi, ['action' => 'update_mapping', 'id' => $ge4, 'year_level' => '2nd Year', 'semester' => '1st Semester', 'is_required' => '1']);
+    $check($refused[0] === 422 && !empty($refused[2]['validation']['conflicts'][0]['message']) && isset($refused[2]['validation']['conflicts'][0]['prerequisite_code']), 'a move that breaks the sequence is refused with the conflict details');
+    $check($termOf($ge4) === $before, 'the refused move changed nothing');
+    $linked = $who['staff']->post($aapi, ['action' => 'remove', 'id' => $ge4]);
+    $check($linked[0] === 409 && str_contains($linked[2]['message'], 'prerequisite'), 'a subject with prerequisite links cannot be removed, and the reason is given');
+    foreach ([$ref => 'a reference', $review => 'a version under review'] as $locked => $label) {
+        $code = $one("SELECT s.subject_code FROM curriculum_version_subjects p JOIN subjects s ON s.id=p.subject_id WHERE p.curriculum_version_id=$locked ORDER BY p.id LIMIT 1");
+        $lockedId = $placementOf($locked, $code);
+        $check($who['staff']->post($aapi, ['action' => 'update_mapping', 'id' => $lockedId, 'year_level' => '4th Year', 'semester' => '2nd Semester', 'is_required' => '1'])[0] === 409, "moving in $label is refused");
+        $check($who['staff']->post($aapi, ['action' => 'remove', 'id' => $lockedId])[0] === 409, "removing from $label is refused");
+    }
+    $wsProgram = $who['staff']->req("modules/curriculum/http/version_reference_actions.php?action=workspace&curriculum_version_id=$rev");
+    $check(array_key_exists('program_type', $wsProgram[2]['workspace'] ?? []), 'the workspace carries the program type for the term choices');
 
     // Working context for the new module.
     $ctx = 'modules/curriculum/http/working_context_actions.php';

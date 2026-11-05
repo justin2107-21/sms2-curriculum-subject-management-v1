@@ -60,8 +60,9 @@
     }
 
     class CurriculumRequestError extends Error {
-        constructor(message, status, code) {
+        constructor(message, status, code, payload) {
             super(message);
+            this.payload = payload || {};
             this.name = 'CurriculumRequestError';
             this.status = status;
             this.code = code || '';
@@ -112,7 +113,7 @@
         if (!response.ok || !payload.success) {
             throw new CurriculumRequestError(
                 payload.message || 'The request could not be completed.',
-                response.status, payload.error_code
+                response.status, payload.error_code, payload
             );
         }
         return payload;
