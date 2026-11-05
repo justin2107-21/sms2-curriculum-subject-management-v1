@@ -61,10 +61,20 @@ Adds `styleProbe` to `report-<role>.json`: per page, the computed size, font, ra
 ## More probes
 - `-Probe headers`: per page, the h1 (font, size, weight), its header container (class, height, padding), subtitle, header actions and the left edge of the title and content blocks.
 - `-Probe context`: which pages have a Program / Curriculum / Version selector, its kind and height.
-- `-CtxFlow -Program BSCRIM` (add `-Prefer "BSIT-DEMO,PREORAL"` to choose by text at the Curriculum and Version steps): on each page in `-Urls`, looks at the picker, opens the Program panel, chooses a program through the real UI (auto-open and auto-pick), reloads from the address, then Reset. Screenshots: initial, open panel, chosen.
-- `-CtxNav -Program BSIT -Prefer "DEMO,PREORAL"`: chooses a context on the first URL, then opens each following URL bare (like a sidebar click), then presses F5, recording the picker and the saved data each time.
+- `-CtxFlow -Program UITEST-PA` (add `-Prefer "UITEST-CA,UITEST-A"` to choose by text at the Curriculum and Version steps): on each page in `-Urls`, looks at the picker, opens the Program panel, chooses a program through the real UI (auto-open and auto-pick), reloads from the address, then Reset. Screenshots: initial, open panel, chosen.
+- `-CtxNav -Program UITEST-PA -Prefer "UITEST-CA,UITEST-A"`: chooses a context on the first URL, then opens each following URL bare (like a sidebar click), then presses F5, recording the picker and the saved data each time.
 - `-CtxScenario -Urls /dashboard/dashboard.php`: the shared working context end to end on the five picker pages, starting from an empty session: nothing saved, choose, carry to two more pages, change the version on one page and see it on the others, a link with other ids, three invalid links (fall back to the saved context), reload.
 - `-Probe live`: how many error / status message elements each page has and how many are live regions; on the first page it also injects test messages and fires real error and success toasts.
 - Every page check also records `contentOverflow` (pixels the content area is wider than itself); anything above 0 means content is being cut or scrolled sideways.
 - `-Probe sidebar [-Height 1600]`: every sidebar label (lines, mid-word breaks, text start, icon width, active fill, radius and contrast over the real composited background), the section headings and, at 390 px, whether the burger is reachable with the drawer open.
 - `node tools/uitest/check-scenario.cjs <folder>`: checks a `-CtxScenario` run. **Every expected step (A to I) must be present and error-free**, then each outcome is checked. A step that throws is recorded with its error and fails the run (it used to vanish, ending the scenario with the message only on stderr). `-FailStep I` injects a failure to prove this.
+
+## Scenario fixtures
+The working-context scenario no longer uses any real program, curriculum or version name, so real records can be renamed freely. `tools/uitest/seed-fixtures.php` (run by `seed-users.php` during `setup-db.ps1`) creates, in `sms_db_uitest` only:
+
+| Fixture | Contents |
+|---|---|
+| Program `UITEST-PA` | Curriculum `UITEST-CA` with drafts `UITEST-A` and `UITEST-B`; curriculum `UITEST-CC` with active `UITEST-C` |
+| Program `UITEST-PB` | Curriculum `UITEST-CB` with active `UITEST-D` |
+
+Each version has four placements. The ids are written to `.env.uitest` as `UITEST_FX_*` (git-ignored, not secrets) and read by `screens.cjs`. `check-scenario.cjs` asserts per role what must be allowed and what must be denied: Super Admin and Staff follow the draft versions and export them; Admin and Acad Office read drafts but their export stays blank (official export only); Acad Faculty never sees a draft and gets 403 on Export and Grade Weighting.

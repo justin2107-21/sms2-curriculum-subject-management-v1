@@ -395,7 +395,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
       <div class="form-error" role="alert" hidden></div>
       <div class="curriculum-fixed-program" id="curriculumProgramFixedContext" hidden><span>Current Program</span><strong id="curriculumProgramFixedLabel"></strong></div>
       <div class="form-grid">
-        <label class="form-field"><span>Curriculum Code <strong>*</strong></span><input name="curriculum_code" id="curriculumCode" maxlength="80" placeholder="e.g. BSIT-DEMO-2026" required/></label>
+        <label class="form-field"><span>Curriculum Code <strong>*</strong></span><input name="curriculum_code" id="curriculumCode" maxlength="80" placeholder="e.g. BSIT-2026" required/></label>
         <div class="form-field program-combobox-field" id="curriculumProgramPicker">
           <label for="curriculumProgramInput">Academic Program <strong>*</strong></label>
           <div class="record-autocomplete" id="curriculumProgramCombobox">

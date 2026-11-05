@@ -1098,13 +1098,7 @@
     }
 
     function renderWorkspaceYear() {
-        const isPreoral2026 = state.selectedCurriculum?.curriculum_code === 'BSIT-DEMO-2026' &&
-            state.selectedVersionLabel === 'PREORAL-2026';
-        const displayPlacements = isPreoral2026
-            ? state.placements.map(row => /^3rd\s*yr$/i.test(String(row.year_level || '').trim())
-                ? { ...row, year_level: '3rd Year' }
-                : row)
-            : state.placements;
+        const displayPlacements = state.placements.map(row => ({ ...row, year_level: window.CurriculumPlacementView.yearLabel(row.year_level) }));
         const grouped = window.CurriculumPlacementView.group(displayPlacements);
         const tabs = document.getElementById('yearTabs');
         const years = Array.from(grouped.years.keys());

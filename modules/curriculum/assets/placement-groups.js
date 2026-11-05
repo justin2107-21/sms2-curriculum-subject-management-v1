@@ -1,6 +1,15 @@
 (function () {
     'use strict';
     const compare = new Intl.Collator('en', { numeric: true, sensitivity: 'base' }).compare;
+    // Display label only: "3rd Yr", "3rd", "Year 3" and "3" read as "3rd Year". Anything else (Grade 11, Summer Bridge) is kept as stored.
+    function yearLabel(raw) {
+        const text = String(raw ?? '').trim();
+        const match = /^(?:(\d+)(?:st|nd|rd|th)?(?:\s*(?:yr|year))?|(?:year|yr)\s*(\d+))$/i.exec(text);
+        const n = match ? Number(match[1] || match[2]) : 0;
+        if (!n || n > 9) return text;
+        const suffix = n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th');
+        return n + suffix + ' Year';
+    }
     function group(rows) {
         const years = new Map();
         let cents = 0;
@@ -75,5 +84,5 @@
         });
         return { html, summary: data.count + ' Subjects / ' + ui.formatUnits(data.cents / 100) + ' Units' };
     }
-    window.CurriculumPlacementView = { group, load, render };
+    window.CurriculumPlacementView = { group, load, render, yearLabel };
 }());

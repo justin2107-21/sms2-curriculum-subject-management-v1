@@ -195,7 +195,7 @@ async function main() {
     if (arg('ctxnav', '') === '1') {
       // Shared working context across pages: choose on the FIRST url, then open each following url bare (like a sidebar
       // click) and record whether the context arrived; then reload (F5) on the last page.
-      const program = arg('program', 'BSCRIM');
+      const program = arg('program', 'UITEST-PA');
       const prefer = arg('prefer', '');
       const stored = () => evaluate('(() => { const o = {}; for (let i = 0; i < sessionStorage.length; i++) { const k = sessionStorage.key(i); if (/csms/i.test(k)) o[k] = sessionStorage.getItem(k); } return o; })()');
       report.ctxnav = { steps: [] };
@@ -217,8 +217,8 @@ async function main() {
 
     if (arg('ctxflow', '') === '1') {
       // The picker on each page in --urls: look, open a panel, choose a program through the real UI (auto-open and
-      // auto-pick), reload from the address, then Reset. --program=BSCRIM, --prefer="curriculumText,versionText".
-      const program = arg('program', 'BSCRIM');
+      // auto-pick), reload from the address, then Reset. --program=UITEST-PA, --prefer="curriculumText,versionText".
+      const program = arg('program', 'UITEST-PA');
       const prefer = arg('prefer', '');
       report.ctxflow = {};
       for (const url of urls) {
@@ -250,7 +250,16 @@ async function main() {
       }
     }
 
+    // Scenario fixture ids (created by tools/uitest/seed-fixtures.php); not secrets. Never reads passwords.
+    const fx = {};
+    try {
+      for (const line of fs.readFileSync(path.join(__dirname, '..', '..', '.env.uitest'), 'utf8').split(/\r?\n/)) {
+        const m = /^UITEST_FX_([A-Z]+)=(\d+)$/.exec(line);
+        if (m) fx[m[1]] = m[2];
+      }
+    } catch (_) { /* no env file */ }
     if (arg('ctxscenario', '') === '1') {
+      if (!fx.PA) throw new Error('Scenario fixtures missing: run tools/uitest/setup-db.ps1.');
       // The shared working context end to end (UI_Decisions D2 / working-context rules). Starts with an empty session.
       const P = '/modules/curriculum/pages/';
       const pages = { mapping: P + 'subject_mapping.php', prereq: P + 'prerequisite_configuration.php', electives: P + 'electives_manager.php',
@@ -293,29 +302,29 @@ async function main() {
         r.rule = (await get('?action=read&module=' + scenarioModule)).body.rule;
         return r;
       });
-      await step('B. choose BSIT / BSIT-DEMO / PREORAL on Subject Mapping', async () => { const picked = await choosePath('BSIT', 'DEMO,PREORAL'); await shot(path.join(out, role + '-ctx-B-chosen-' + widths[0] + '.png')); return { picked, state: await pickerState() }; });
+      await step('B. choose UITEST-PA / UITEST-CA / UITEST-A on Subject Mapping', async () => { const picked = await choosePath('UITEST-PA', 'UITEST-CA,UITEST-A'); await shot(path.join(out, role + '-ctx-B-chosen-' + widths[0] + '.png')); return { picked, state: await pickerState() }; });
       await step('C1. open Pre-requisite', () => visit('prereq', '', 'C1-prereq'));
       await step('C2. open Electives', () => visit('electives', '', 'C2-electives'));
       await step('D1. on Electives choose another version', async () => {
         await openField(2);
         const panel = await panelText();
-        const picked = await clickOptionExcluding('PREORAL');
+        const picked = await clickOption('UITEST-B');
         await sleep(2200);
         await shot(path.join(out, role + '-ctx-D1-changed-' + widths[0] + '.png'));
         return { panel: panel && panel.text.replace(/\s+/g, ' ').slice(0, 160), picked, state: await pickerState() };
       });
       await step('D2. open Subject Mapping', () => visit('mapping', '', 'D2-mapping'));
       await step('D3. open Export', () => visit('export', '', 'D3-export'));
-      await step('E1. link with other ids (BSCRIM) on Export', () => visit('export', '?program_id=109&curriculum_id=47&version_id=43', 'E1-link'));
+      await step('E1. link with other ids (UITEST-PB) on Export', () => visit('export', `?program_id=${fx.PB}&curriculum_id=${fx.CB}&version_id=${fx.VD}`, 'E1-link'));
       await step('E2. then Grade Weighting follows it', () => visit('weighting', '', 'E2-weighting'));
-      await step('F1. invalid link on Export (missing version) falls back to saved', () => visit('export', '?program_id=108&curriculum_id=46&version_id=99999', 'F1-invalid-export'));
-      await step('F2. invalid link on Pre-requisite falls back to saved', () => visit('prereq', '?program_id=108&curriculum_id=46&version_id=99999', 'F2-invalid-prereq', 8000));
-      await step('F3. invalid link on Subject Mapping falls back to saved', () => visit('mapping', '?program_id=108&curriculum_id=46&version_id=99999', 'F3-invalid-mapping', 8000));
+      await step('F1. invalid link on Export (missing version) falls back to saved', () => visit('export', `?program_id=${fx.PA}&curriculum_id=${fx.CA}&version_id=99999`, 'F1-invalid-export'));
+      await step('F2. invalid link on Pre-requisite falls back to saved', () => visit('prereq', `?program_id=${fx.PA}&curriculum_id=${fx.CA}&version_id=99999`, 'F2-invalid-prereq', 8000));
+      await step('F3. invalid link on Subject Mapping falls back to saved', () => visit('mapping', `?program_id=${fx.PA}&curriculum_id=${fx.CA}&version_id=99999`, 'F3-invalid-mapping', 8000));
       await step('G. reload (F5) on Subject Mapping', async () => { await send('Page.reload'); await sleep(8000); return { state: await pickerState() }; });
       await step('H. endpoint guards', async () => ({ guards: {
-        saveWithoutCsrf: (await post({ action: 'save', module: scenarioModule, program_id: '109', curriculum_id: '47', version_id: '43' }, false)).status,
+        saveWithoutCsrf: (await post({ action: 'save', module: scenarioModule, program_id: fx.PB, curriculum_id: fx.CB, version_id: fx.VD }, false)).status,
         readByPost: (await post({ action: 'read', module: scenarioModule }, true)).status,
-        saveMismatchedChain: (await post({ action: 'save', module: scenarioModule, program_id: '108', curriculum_id: '47', version_id: '43' }, true)).status,
+        saveMismatchedChain: (await post({ action: 'save', module: scenarioModule, program_id: fx.PA, curriculum_id: fx.CB, version_id: fx.VD }, true)).status,
         unknownModule: (await get('?action=read&module=nope')).status,
         saveGet: (await get('?action=save&module=' + scenarioModule)).status,
       } }));

@@ -71,3 +71,4 @@ foreach ($users as $key => [$username, $role, $label]) {
 $db->commit();
 file_put_contents(__DIR__ . '/../../.env.uitest', implode("\n", $env) . "\n");
 echo "credentials written to .env.uitest\n";
+require __DIR__ . '/seed-fixtures.php';

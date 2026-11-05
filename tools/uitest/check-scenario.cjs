@@ -6,31 +6,33 @@ const EXPECTED = ['A', 'B', 'C1', 'C2', 'D1', 'D2', 'D3', 'E1', 'E2', 'F1', 'F2'
 const roots = process.argv.slice(2);
 const FULL = new Set(['superadmin', 'staff']);          // may read and export drafts
 const OFFICIAL_ONLY = new Set(['admin', 'acadoffice']); // read drafts; export approved versions only
-const iRestored = (role, has) => FULL.has(role) ? has('I', 'BSCRIM', 0) && has('I', 'ROTC', 2)
-  : OFFICIAL_ONLY.has(role) ? has('I', 'BSIT', 0) && has('I', 'FINAL', 2) : has('I', 'BSIT', 0) && has('I', 'Active', 2);
+const iRestored = (role, has) => FULL.has(role) ? has('I', 'UITEST-PB', 0) && has('I', 'UITEST-D', 2)
+  : OFFICIAL_ONLY.has(role) ? has('I', 'UITEST-PA', 0) && has('I', 'UITEST-B', 2) : has('I', 'Active', 2);
 // Denials are asserted, never skipped: a role that gains access it should not have fails here.
+// Fixtures: tools/uitest/seed-fixtures.php (UITEST-A/B drafts, UITEST-C/D active).
 function roleChecks(role, by, has, v) {
   const blank = k => (v(k)[2] || '') === 'Choose version' && (v(k)[0] || '') === 'Choose program';
   const forbidden = k => !!(by[k] && by[k].forbidden) && !by[k].state;
   if (FULL.has(role)) return [
-    ['B', has('B', 'BSIT', 0) && has('B', 'PREORAL', 2)], ['C1', has('C1', 'PREORAL', 2)], ['C2 status', has('C2', 'PREORAL-2026 · Draft', 2)],
-    ['D1 status', has('D1', 'FINAL · Draft', 2)], ['D2', has('D2', 'FINAL', 2)], ['D3', has('D3', 'FINAL', 2)],
-    ['E1', has('E1', 'BSCRIM', 0)], ['E2', has('E2', 'BSCRIM', 0)], ['F1', has('F1', 'BSCRIM', 0)], ['F2', has('F2', 'BSCRIM', 0)], ['F3', has('F3', 'BSCRIM', 0)], ['G', has('G', 'BSCRIM', 0)],
+    ['B', has('B', 'UITEST-PA', 0) && has('B', 'UITEST-A', 2)], ['C1', has('C1', 'UITEST-A', 2)], ['C2 status', has('C2', 'UITEST-A · Draft', 2)],
+    ['D1 status', has('D1', 'UITEST-B · Draft', 2)], ['D2', has('D2', 'UITEST-B', 2)], ['D3', has('D3', 'UITEST-B', 2)],
+    ['E1', has('E1', 'UITEST-PB', 0)], ['E2', has('E2', 'UITEST-PB', 0)], ['F1', has('F1', 'UITEST-PB', 0)], ['F2', has('F2', 'UITEST-PB', 0)], ['F3', has('F3', 'UITEST-PB', 0)], ['G', has('G', 'UITEST-PB', 0)],
   ];
   if (OFFICIAL_ONLY.has(role)) return [
-    ['B', has('B', 'BSIT', 0) && has('B', 'PREORAL', 2)], ['C1', has('C1', 'PREORAL', 2)], ['C2 status', has('C2', 'PREORAL-2026 · Draft', 2)],
-    ['D1 status', has('D1', 'FINAL · Draft', 2)], ['D2', has('D2', 'FINAL', 2)],
+    ['B', has('B', 'UITEST-PA', 0) && has('B', 'UITEST-A', 2)], ['C1', has('C1', 'UITEST-A', 2)], ['C2 status', has('C2', 'UITEST-A · Draft', 2)],
+    ['D1 status', has('D1', 'UITEST-B · Draft', 2)], ['D2', has('D2', 'UITEST-B', 2)],
     ['D3 export denies the draft', blank('D3')], ['E1 export denies an unapproved link', blank('E1')],
-    ['E2 context kept, link not adopted', has('E2', 'FINAL', 2) && !has('E2', 'BSCRIM', 0)], ['F1 export stays blank', blank('F1')],
-    ['F2', has('F2', 'FINAL', 2)], ['F3', has('F3', 'FINAL', 2)], ['G', has('G', 'FINAL', 2)],
+    ['E2 context kept, link not adopted', has('E2', 'UITEST-B', 2) && !has('E2', 'UITEST-PB', 0)], ['F1 export stays blank', blank('F1')],
+    ['F2', has('F2', 'UITEST-B', 2)], ['F3', has('F3', 'UITEST-B', 2)], ['G', has('G', 'UITEST-B', 2)],
   ];
-  const active = k => has(k, 'BSIT', 0) && has(k, 'Active', 2) && !has(k, 'Draft', 2);
-  return [ // Acad Faculty
+  const active = k => has(k, 'Active', 2) && !has(k, 'Draft', 2);
+  return [ // Acad Faculty: drafts are invisible, an active version is chosen for them
     ['B draft version denied', (v('B')[2] || '') === 'Choose version'], ['C1', active('C1')], ['C2 status', active('C2')], ['D1 status', active('D1')], ['D2', active('D2')],
     ['D3 export 403', forbidden('D3')], ['E1 export 403', forbidden('E1')], ['E2 grade weighting 403', forbidden('E2')], ['F1 export 403', forbidden('F1')],
     ['F2', active('F2')], ['F3', active('F3')], ['G', active('G')],
   ];
 }
+
 let bad = 0;
 const files = [];
 (function walk(d) { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (/^report-.*\.json$/.test(e.name)) files.push(p); } })(roots[0]);

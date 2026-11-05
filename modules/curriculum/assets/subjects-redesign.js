@@ -292,15 +292,8 @@
         }
         return contexts.map(context => ({
             ...context,
-            year_level: isPreoral2026Version() && /^3rd\s*yr$/i.test(String(context.year_level || '').trim())
-                ? '3rd Year'
-                : context.year_level
+            year_level: window.CurriculumPlacementView.yearLabel(context.year_level)
         }));
-    }
-
-    function isPreoral2026Version() {
-        const select = document.getElementById('subjectVersionSelect');
-        return select?.selectedOptions[0]?.textContent.trim().toUpperCase() === 'PREORAL-2026';
     }
 
     function renderGroupedSubjects() {

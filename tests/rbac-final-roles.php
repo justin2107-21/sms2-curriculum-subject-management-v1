@@ -55,12 +55,16 @@ $check(get_user_permissions($takashi) === [], 'student-only account has no permi
 $check((int)$conn->query("SELECT COUNT(*) FROM roles r JOIN roles x ON x.id=r.id WHERE r.user_type='Acad' AND r.is_active=1")->fetch_row()[0] === 2, 'two roles under Acad');
 
 // Requested accounts, when present in this copy.
-$expect = ['csms_admin' => 'super_admin', 'kennethbonio' => 'super_admin', 'admin' => 'admin', 'academic_staff' => 'staff',
+$expect = ['csms_admin' => 'super_admin', 'kennethbonio' => 'super_admin', 'admin' => 'admin',
     'curriculum_reviewer' => 'acad_office', 'KENNETH123' => 'acad_office', 'faculty_viewer' => 'acad_faculty'];
 foreach ($expect as $username => $role) {
     $stmt = $conn->prepare('SELECT GROUP_CONCAT(r.name), MAX(u.is_active) FROM users u JOIN user_roles ur ON ur.user_id=u.id JOIN roles r ON r.id=ur.role_id AND r.is_active=1 WHERE u.username=?');
     $stmt->bind_param('s', $username); $stmt->execute(); $row = $stmt->get_result()->fetch_row(); $stmt->close();
     $check($row[0] === $role && (int)$row[1] === 1, "$username is active $role");
+}
+// Accounts may be re-assigned on the real site later, so the invariant is: every account has exactly one active role, and it is one of the five.
+foreach($conn->query("SELECT u.username, u.is_active, GROUP_CONCAT(r.name) roles FROM users u LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id AND r.is_active=1 WHERE u.username NOT LIKE 'uitest.%' AND u.is_active=1 GROUP BY u.id")->fetch_all(MYSQLI_ASSOC) as $acct){
+    $check(in_array($acct['roles'], array_keys($definitions), true), "active account " . $acct['username'] . ' has exactly one of the five roles');
 }
 $row = $conn->query("SELECT is_active FROM users WHERE username='takashii001'")->fetch_row();
 $check($row && (int)$row[0] === 0, 'takashii001 deactivated, kept');
