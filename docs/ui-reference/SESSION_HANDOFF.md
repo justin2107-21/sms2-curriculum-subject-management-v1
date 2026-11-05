@@ -61,6 +61,9 @@ Written 2026-11-05 for whoever (or whichever session) continues this work. Read 
 | Drop `sms_db_reconcile_test_20261102_retry01` | The owner | A 2 Nov baseline-reconciliation test copy with 7 user rows; nothing references it. `sms_db_archive_test` is required by `tests/archives.php` and is kept |
 | `students` table | Decided | Kept for SMS2 integration, synthetic data, not used by CSMS; only Super Admin holds `student.*` |
 
+## Curriculum Builder redesign (in progress)
+Plan: `Curriculum_Builder_Plan.md` (section 11 is the build log). Slice 1 is committed; slice 2 is built and awaiting review; slices 3 to 5 are next. Test scenario for the Builder: `DB_NAME=sms_db_uitest php tools/uitest/builder-fixtures.php` on a freshly rebuilt test database (adds UITEST-REF, UITEST-REV, UITEST-REVIEW and a unit-target rule), then `tests/curriculum-builder-http.php` and `tools/uitest/run.ps1 -Probe builder -BuilderFlow`.
+
 ## Later tasks recorded in the docs
 **First task after the Curriculum Builder module:** split `curriculum.update` so Admin can't edit placements.
 

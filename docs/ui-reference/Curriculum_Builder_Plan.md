@@ -226,3 +226,14 @@ Each ends with tests and your review; commits only when you approve.
 3. Plan tab: full grid, add, move, remove, conflict flags, 390 px layout.
 4. Versions drawer and new-curriculum dialog.
 5. Sidebar, redirects, retire the Curricula list, link and doc updates.
+
+## 11. Build log
+**Slice 1 (committed `5de99cf`):** Academic Programs tabs, row menu, record modal; programs may be archived from inactive; archive/restore refusals return 409/404 with their reason.
+
+**Slice 2 (built, awaiting review):** `curriculum_builder.php` is now the Builder workspace (`pages/builder_workspace.php`, `assets/builder-workspace.js` and `.css`). It has the shared context bar and working context (new `builder` module), the version header (status badges, review stepper, units against the target, conflict count, next step per role), and three tabs. Two read-only server additions: `version_actions.php?action=builder_summary` (placed units and the `MIN_TOTAL_UNITS` target) and `academic_program_id` in the version workspace payload.
+- **Plan tab:** all years and semesters at once, unit totals, conflict flags with the validator's message, read-only note. Editing placements still happens in Subject Mapping; slice 3 adds add, move and remove here.
+- **Details and references tab:** facts, attached sources, Attach source dialog.
+- **Review history tab:** events with actor, status and reason.
+- **Header actions (decision 1):** Submit for review (Staff, Super Admin); Approve and Return (Acad Office, Super Admin, never on their own submission); Classify as reference (users with `curriculum.reference.classify`); Create revision from this reference (`curriculum.version.clone`); otherwise one line saying what happens next. Rules are the server's.
+- **Not in this slice:** versions drawer, new-curriculum dialog, rename (slice 4); sidebar, redirects, retiring the Curricula list (slice 5). The classic Curricula page still works and still serves its own links.
+- **Known limits:** a Faculty address pointing at a draft opens the saved context instead (D4). The three `*-http.php` revision, reference and comparison suites need the isolated Task 2 Docker database and were not run here.

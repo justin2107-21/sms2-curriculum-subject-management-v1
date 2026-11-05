@@ -27,6 +27,33 @@ class CurriculumVersionService
         return $version;
     }
 
+    /** Read-only header figures for the Builder: placed units and the unit target, if a rule sets one. */
+    public function builderSummary(int $versionId): array
+    {
+        $stmt = $this->db->prepare('SELECT v.id, v.curriculum_id, c.academic_program_id FROM curriculum_versions v JOIN curricula c ON c.id = v.curriculum_id WHERE v.id = ?');
+        $stmt->bind_param('i', $versionId);
+        $stmt->execute();
+        $version = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        if (!$version) throw new DomainNotFoundException('Curriculum version not found.');
+        $stmt = $this->db->prepare('SELECT COUNT(*) AS placements, COALESCE(SUM(s.units), 0) AS units FROM curriculum_version_subjects m JOIN subjects s ON s.id = m.subject_id WHERE m.curriculum_version_id = ?');
+        $stmt->bind_param('i', $versionId);
+        $stmt->execute();
+        $placed = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        // The curriculum's own MIN_TOTAL_UNITS rule beats its program's; no active rule means no target.
+        $curriculumId = (int)$version['curriculum_id'];
+        $programId = (int)$version['academic_program_id'];
+        $stmt = $this->db->prepare("SELECT rule_name, numeric_value FROM compliance_rules WHERE rule_type = 'MIN_TOTAL_UNITS' AND technical_status = 'active'
+            AND (curriculum_id = ? OR (academic_program_id = ? AND curriculum_id IS NULL)) ORDER BY (curriculum_id = ?) DESC, id LIMIT 1");
+        $stmt->bind_param('iii', $curriculumId, $programId, $curriculumId);
+        $stmt->execute();
+        $rule = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        return ['version_id' => $versionId, 'placements' => (int)$placed['placements'], 'placed_units' => round((float)$placed['units'], 2),
+            'target' => $rule ? ['value' => (float)$rule['numeric_value'], 'rule_name' => (string)$rule['rule_name']] : null];
+    }
+
     public function list(int $curriculumId, array $input): array
     {
         $curriculum=$this->curricula->findById($curriculumId);

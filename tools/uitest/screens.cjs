@@ -648,6 +648,45 @@ async function main() {
       }
     }
 
+    if (arg('probe', '') === 'builder') {
+      // Curriculum Builder: header, tabs and the first action's dialog, for each URL (one version each) and width.
+      report.builderProbe = {};
+      for (const url of urls) {
+        for (const width of widths) {
+          issues = [];
+          await setWidth(width);
+          await navigate(base + url);
+          await sleep(3200);
+          const collect = `(() => { const t = id => (document.getElementById(id) || {}).textContent || ''; const v = document.getElementById('builderVersion');
+            return { shown: v && !v.hidden, state: t('builderState').slice(0, 120), title: t('builderVersionTitle'), badges: [...document.querySelectorAll('#builderVersionBadges .status-badge')].map(b => b.textContent.trim()).join(' | '),
+              steps: [...document.querySelectorAll('.builder-step')].map(s => (s.classList.contains('is-done') ? 'done:' : s.classList.contains('is-current') ? 'now:' : 'todo:') + s.querySelector('.builder-step__name').firstChild.textContent.trim()),
+              units: t('builderUnits'), target: t('builderTarget'), conflicts: t('builderConflicts').trim(),
+              actions: [...document.querySelectorAll('#builderActions button')].map(b => b.textContent.trim()), next: document.getElementById('builderNext').hidden ? '' : t('builderNext'),
+              links: [...document.querySelectorAll('#builderLinks a')].map(a => a.textContent.trim()), note: t('builderPlanNote').trim(),
+              terms: document.querySelectorAll('.builder-term').length, subjects: document.querySelectorAll('.builder-term li').length, flags: document.querySelectorAll('.builder-term li.has-conflict').length,
+              overflow: document.documentElement.scrollWidth > innerWidth, tabs: [...document.querySelectorAll('.builder-tabs [role=tab]')].map(b => b.textContent) }; })()`;
+          const result = { page: await evaluate(collect) };
+          await shotView(path.join(out, `${role}-builder-${url.match(/version_id=(\d+)/)[1]}-${width}.png`));
+          if (arg('builderflow', '') === '1' && result.page.actions.length) {
+            await evaluate(`document.querySelector('#builderActions button').click(); true`);
+            await sleep(1500);
+            result.dialog = await evaluate(`(() => { const m = document.querySelector('.curriculum-modal:not([hidden])'); return m ? { id: m.id, title: m.querySelector('h2').textContent, text: m.querySelector('form') ? m.querySelector('form').innerText.slice(0, 260) : '' } : null; })()`);
+            await shotView(path.join(out, `${role}-builder-dialog-${url.match(/version_id=(\d+)/)[1]}-${width}.png`));
+            await evaluate(`document.querySelector('.curriculum-modal:not([hidden]) [data-modal-close]').click(); true`);
+            await sleep(300);
+          }
+          await evaluate(`document.getElementById('tabDetails').click(); true`);
+          await sleep(300);
+          result.details = await evaluate(`({ facts: document.querySelectorAll('#builderDetails > div').length, refs: document.querySelectorAll('#builderReferences tr').length, attach: !!document.getElementById('builderAttachOpen') && !document.getElementById('builderAttachOpen').hidden })`);
+          await evaluate(`document.getElementById('tabReview').click(); true`);
+          await sleep(300);
+          result.history = await evaluate(`document.querySelectorAll('#builderHistory tr').length + ':' + document.querySelector('#builderHistory').textContent.slice(0, 80)`);
+          result.issues = issues.slice();
+          (report.builderProbe[url] = report.builderProbe[url] || {})[width] = result;
+        }
+      }
+    }
+
     if (arg('picker', '') === '1') {
       // Dashboard Program / Strand picker: open, search, keyboard-select, then back/forward.
       const results = {};

@@ -31,6 +31,12 @@ try {
             CurriculumReadScope::enforceVersion($conn, $id);
             json_response(true, 'Curriculum version loaded.', ['version' => $service->get($id)]);
 
+        case 'builder_summary':
+            curriculum_require_read('curriculum.view');
+            $id = DomainValidator::positiveId($_GET['curriculum_version_id'] ?? null, 'Curriculum version');
+            CurriculumReadScope::enforceVersion($conn, $id);
+            json_response(true, 'Builder summary loaded.', ['summary' => $service->builderSummary($id)]);
+
         case 'create':
             curriculum_require_mutation('curriculum.version.create');
             $version = $service->create($_POST, curriculum_actor_id());

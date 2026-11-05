@@ -19,6 +19,7 @@ class WorkingContextService
 
     private const MODULE_PERMISSIONS = [
         'subject_mapping' => 'curriculum.view',
+        'builder' => 'curriculum.view',
         'prerequisite' => 'prerequisite.view',
         'electives' => 'elective.view',
         'export' => 'curriculum_export.view',

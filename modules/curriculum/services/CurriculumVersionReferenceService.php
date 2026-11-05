@@ -23,7 +23,7 @@ final class CurriculumVersionReferenceService
         $stmt = RepositoryQuery::execute($this->db,
             'SELECT v.id, v.curriculum_id, v.version_label, v.status, v.version_role,
                     v.review_status, v.baseline_version_id, v.effective_academic_year,
-                    c.curriculum_code, c.curriculum_name, p.program_code, p.program_name,
+                    c.curriculum_code, c.curriculum_name, c.academic_program_id, p.program_code, p.program_name,
                     bv.version_label AS baseline_version_label,
                     bv.version_role AS baseline_version_role
              FROM curriculum_versions v

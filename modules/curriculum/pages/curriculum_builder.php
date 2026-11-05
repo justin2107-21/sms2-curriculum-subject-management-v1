@@ -6,29 +6,11 @@ if (!is_authenticated()) {
     exit;
 }
 
-// Shared renderer for the two Curriculum Builder child pages. Direct requests
-// to the historical combined route redirect instead of exposing a duplicate UI.
+// Shared renderer for the Academic Programs page and the classic Curricula workspace (retired in the last build step).
+// A direct request to this file is the Curriculum Builder workspace.
 $curriculumWorkspacePage = $curriculumWorkspacePage ?? null;
 if ($curriculumWorkspacePage === null) {
-    $legacyUserId = current_user_id();
-    $hasCurriculumContext = isset($_GET['curriculum_id'])
-        || isset($_GET['id'])
-        || (($_GET['view'] ?? '') === 'curricula');
-
-    if ($hasCurriculumContext && $legacyUserId !== null
-        && user_can($legacyUserId, 'curriculum.view')) {
-        $legacyTarget = 'curricula.php';
-    } elseif ($legacyUserId !== null && user_can($legacyUserId, 'program.view')) {
-        $legacyTarget = 'academic_programs.php';
-    } elseif ($legacyUserId !== null && user_can($legacyUserId, 'curriculum.view')) {
-        $legacyTarget = 'curricula.php';
-    } else {
-        require_permission('curriculum.view');
-        exit;
-    }
-
-    $legacyQuery = http_build_query($_GET);
-    header('Location: ' . $legacyTarget . ($legacyQuery === '' ? '' : '?' . $legacyQuery));
+    require __DIR__ . '/builder_workspace.php';
     exit;
 }
 

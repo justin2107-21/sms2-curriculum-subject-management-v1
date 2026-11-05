@@ -39,7 +39,7 @@
   // ---- server store ------------------------------------------------------------------------------------------
   const apiUrl = (script && script.dataset && script.dataset.contextApi) || '';
   const csrfToken = (script && script.dataset && script.dataset.csrfToken) || '';
-  const MODULES = { subject_mapping: 'subject_mapping', prerequisite_configuration: 'prerequisite', electives_manager: 'electives', curriculum_export: 'export', grade_weighting_setup: 'grade_weighting' };
+  const MODULES = { curriculum_builder: 'builder', subject_mapping: 'subject_mapping', prerequisite_configuration: 'prerequisite', electives_manager: 'electives', curriculum_export: 'export', grade_weighting_setup: 'grade_weighting' };
   const moduleName = function () { return MODULES[(location.pathname.split('/').pop() || '').replace(/\.php$/, '')] || ''; };
 
   async function serverRead(ids) {
