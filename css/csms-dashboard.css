@@ -204,3 +204,9 @@ a.csms-stat:hover { border-color: var(--csms-navy, #1a3a8c); }
   .csms-picker__panel { left: 0; right: auto; width: 100%; max-width: none; }
   .csms-dash-version, .csms-dash-version select { width: 100%; max-width: 100%; }
 }
+
+/* Role dashboards: an empty card is one short line, not a full-height card. */
+.csms-card--compact .csms-card__body { min-height: 0; padding-top: 0; }
+.csms-state-compact { margin: 0; padding: 2px 0 4px; color: var(--csms-text-secondary, #374151); font-size: var(--csms-text-sm, 14px); }
+.csms-card .csms-data-table { width: 100%; }
+.csms-card--compact { align-self: start; }

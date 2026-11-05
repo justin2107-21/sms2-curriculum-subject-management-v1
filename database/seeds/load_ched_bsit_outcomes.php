@@ -3,6 +3,19 @@ declare(strict_types=1);
 
 if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 $databaseName = (string)getenv('DB_NAME');
+// Operator mode: --confirm-database=<name> for exactly sms_db_uitest or sms_db on this machine. DB_NAME must match when set.
+$operatorTarget = null;
+foreach ($argv as $argument) if (str_starts_with($argument, '--confirm-database=')) $operatorTarget = substr($argument, 19);
+if ($operatorTarget !== null) {
+    if (!in_array($operatorTarget, ['sms_db_uitest', 'sms_db'], true) || ($databaseName !== '' && $databaseName !== $operatorTarget)
+        || !in_array((string)(getenv('DB_HOST') ?: 'localhost'), ['localhost', '127.0.0.1'], true)) {
+        fwrite(STDERR, "BLOCKED: --confirm-database must be sms_db_uitest or sms_db on localhost, matching DB_NAME.\n"); exit(2);
+    }
+    putenv('DB_NAME=' . $operatorTarget);
+    require_once __DIR__ . '/../../shared/db.php';
+    mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+    if ($conn->query('SELECT DATABASE()')->fetch_row()[0] !== $operatorTarget) { fwrite(STDERR, "BLOCKED: connected database did not match.\n"); exit(2); }
+} else {
 $confirmed = (string)getenv('SMS_TEST_CONFIRM_DATABASE');
 $tempRoot = (string)(getenv('CSMS_TASK7_TEMP_ROOT') ?: getenv('CSMS_TASK2_TEMP_ROOT'));
 if ($databaseName === '' || $confirmed !== $databaseName
@@ -21,6 +34,7 @@ if ($identity['db'] !== $databaseName || (int)$identity['port'] !== (int)getenv(
     || (int)$identity['fk'] !== 1 || !$expectedData || !$actualData
     || strcasecmp($expectedData,$actualData)!==0) {
     fwrite(STDERR, "BLOCKED: database server identity did not match the isolated Task 7 data directory.\n"); exit(2);
+}
 }
 
 $data = json_decode((string)file_get_contents(__DIR__ . '/../../docs/source-data/ched-cmo25-2015-bsit.json'),true,512,JSON_THROW_ON_ERROR);

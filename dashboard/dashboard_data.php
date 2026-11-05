@@ -22,8 +22,7 @@ try {
         throw new DomainValidationException('Choose a program or strand before choosing a version.');
     }
 
-    $permissions = ['program.view', 'curriculum.view', 'subject.view', 'prerequisite.view', 'compliance.view',
-        'grade_weighting.view', 'curriculum.update', 'curriculum.version.create', 'audit.view'];
+    $permissions = DashboardAnalyticsService::PERMISSIONS;
     $can = [];
     foreach ($permissions as $permission) $can[$permission] = user_can($userId, $permission);
 

@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/../modules/curriculum/services/AcademicSequenceValidator.php';
+require_once __DIR__ . '/../modules/curriculum/services/PrerequisiteGraph.php';
 
 require_once __DIR__ . '/../modules/curriculum/services/AcademicSequenceValidator.php';
 
@@ -30,36 +32,144 @@ final class DashboardShaper
         return ['status' => self::UNAVAILABLE, 'reason' => $reason, 'data' => []];
     }
 
-    /**
-     * Representative version per curriculum (approved rule): the most recently
-     * updated 'active' version; otherwise the most recently updated non-archived
-     * version; curricula with only archived versions are skipped.
-     * @param array<int,array<string,mixed>> $versions rows with id, curriculum_id, status, updated_at
-     * @return array<int,array<string,mixed>> keyed by curriculum_id
-     */
-    public static function representativeVersions(array $versions): array
+    /** Counted version per curriculum: approved, then active, then draft with placements, then other draft; newest wins. */
+    public static function countedVersions(array $versions): array
     {
         $picked = [];
         foreach ($versions as $version) {
-            $status = (string)($version['status'] ?? '');
-            if ($status === 'archived') continue;
+            if (($version['status'] ?? '') === 'archived') continue;
             $curriculumId = (int)$version['curriculum_id'];
             $current = $picked[$curriculumId] ?? null;
-            if ($current === null || self::preferVersion($version, $current)) {
-                $picked[$curriculumId] = $version;
-            }
+            if ($current === null || self::versionRank($version) > self::versionRank($current)) $picked[$curriculumId] = $version;
         }
         ksort($picked);
         return $picked;
     }
 
-    private static function preferVersion(array $candidate, array $current): bool
+    /** The strongest of several counted versions. */
+    public static function bestVersion(array $versions): ?array
     {
-        $candidateActive = ($candidate['status'] ?? '') === 'active';
-        $currentActive = ($current['status'] ?? '') === 'active';
-        if ($candidateActive !== $currentActive) return $candidateActive;
-        $byTime = strcmp((string)($candidate['updated_at'] ?? ''), (string)($current['updated_at'] ?? ''));
-        return $byTime !== 0 ? $byTime > 0 : (int)$candidate['id'] > (int)$current['id'];
+        $best = null;
+        foreach ($versions as $version) {
+            if ($best === null || self::versionRank($version) > self::versionRank($best)) $best = $version;
+        }
+        return $best;
+    }
+
+    private static function versionRank(array $v): array
+    {
+        $state = match (true) {
+            ($v['review_status'] ?? '') === 'approved' => 3,
+            ($v['status'] ?? '') === 'active' => 2,
+            (int)($v['placements'] ?? 0) > 0 => 1,
+            default => 0,
+        };
+        return [$state, (string)($v['updated_at'] ?? ''), (int)$v['id']];
+    }
+
+    public static function isShs(?string $programType): bool
+    {
+        $type = strtolower(trim((string)$programType));
+        return str_contains($type, 'senior high') || $type === 'shs' || str_contains($type, 'strand');
+    }
+
+    public const PIPELINE = ['draft' => 'Draft', 'active' => 'Active (not reviewed)', 'in_review' => 'In review', 'returned' => 'Returned', 'approved' => 'Approved', 'archived' => 'Archived'];
+
+    public static function pipelineBucket(array $v): string
+    {
+        if (($v['status'] ?? '') === 'archived') return 'archived';
+        return match ($v['review_status'] ?? '') {
+            'approved' => 'approved',
+            'under_review' => 'in_review',
+            'returned' => 'returned',
+            default => ($v['status'] ?? '') === 'active' ? 'active' : 'draft',
+        };
+    }
+
+    public static function pipeline(array $programs, array $versions): array
+    {
+        $rows = []; $none = [];
+        $byProgram = [];
+        foreach ($versions as $v) $byProgram[(int)$v['program_id']][] = $v;
+        foreach ($programs as $p) {
+            $list = $byProgram[(int)$p['id']] ?? [];
+            if ($list === []) { $none[] = (string)$p['program_code']; continue; }
+            $counts = array_fill_keys(array_keys(self::PIPELINE), 0);
+            foreach ($list as $v) $counts[self::pipelineBucket($v)]++;
+            $rows[] = ['label' => (string)$p['program_code'], 'counts' => $counts];
+        }
+        if ($rows === [] && $none === []) return self::empty();
+        return self::ok(['buckets' => self::PIPELINE, 'rows' => $rows, 'no_curriculum' => $none]);
+    }
+
+    /** A curriculum's own rule beats its program's. */
+    public static function targetFor(array $rules, int $curriculumId, int $programId): ?array
+    {
+        $found = null;
+        foreach ($rules as $rule) {
+            if ((int)($rule['curriculum_id'] ?? 0) === $curriculumId) return ['value' => (float)$rule['numeric_value'], 'name' => (string)$rule['rule_name']];
+            if ($found === null && (int)($rule['academic_program_id'] ?? 0) === $programId) $found = ['value' => (float)$rule['numeric_value'], 'name' => (string)$rule['rule_name']];
+        }
+        return $found;
+    }
+
+    public static function prerequisiteHealthRow(string $label, array $placements, array $edges): array
+    {
+        $review = PrerequisiteGraph::review($placements, $edges);
+        $withPrerequisite = [];
+        foreach ($edges as $e) $withPrerequisite[(int)$e['subject_id']] = true;
+        $upper = 0; $covered = 0;
+        foreach ($placements as $p) {
+            $position = AcademicSequenceValidator::position($p);
+            if ($position === null || $position <= 2) continue;
+            $upper++;
+            if (isset($withPrerequisite[(int)$p['subject_id']])) $covered++;
+        }
+        return ['label' => $label, 'placements' => count($placements), 'later_term' => count($review['sequencing']), 'circular' => count($review['cycles']),
+            'upper_subjects' => $upper, 'upper_with_prerequisite' => $covered, 'percent' => $upper > 0 ? (int)round($covered / $upper * 100) : null];
+    }
+
+    /** Average days from each submit to its decision, or null when there are no decisions. */
+    public static function averageDaysInReview(array $events): ?float
+    {
+        $open = []; $durations = [];
+        foreach ($events as $e) {
+            $id = (int)$e['version_id'];
+            if ($e['action'] === 'submit') { $open[$id] = strtotime((string)$e['created_at']); continue; }
+            if (isset($open[$id])) { $durations[] = (strtotime((string)$e['created_at']) - $open[$id]) / 86400; unset($open[$id]); }
+        }
+        return $durations === [] ? null : round(array_sum($durations) / count($durations), 1);
+    }
+
+    /**
+     * Discrete counts per week or month. Series rows are {day, total}. Without a forced size, history under
+     * 3 months uses weeks. Empty periods stay as real zeros between the first event and now.
+     * @param array<string,array> $seriesRows label => rows
+     */
+    public static function buckets(array $seriesRows, ?string $force = null, ?DateTimeImmutable $now = null): array
+    {
+        $now ??= new DateTimeImmutable('today');
+        $days = [];
+        foreach ($seriesRows as $rows) foreach ($rows as $r) $days[] = (string)$r['day'];
+        if ($days === []) return self::empty();
+        $first = new DateTimeImmutable(min($days));
+        $size = $force ?? ($first > $now->modify('-3 months') ? 'week' : 'month');
+        $key = static fn(DateTimeImmutable $d): string => $size === 'week' ? $d->modify('monday this week')->format('Y-m-d') : $d->format('Y-m');
+        $keys = [];
+        $cursor = $size === 'week' ? $first->modify('monday this week') : $first->modify('first day of this month');
+        while ($cursor <= $now) { $keys[] = $key($cursor); $cursor = $cursor->modify($size === 'week' ? '+7 days' : '+1 month'); }
+        $keys = array_slice($keys, -12);
+        $index = array_flip($keys);
+        $series = [];
+        foreach ($seriesRows as $label => $rows) {
+            $values = array_fill(0, count($keys), 0);
+            foreach ($rows as $r) {
+                $k = $key(new DateTimeImmutable((string)$r['day']));
+                if (isset($index[$k])) $values[$index[$k]] += (int)$r['total'];
+            }
+            $series[] = ['label' => $label, 'values' => $values];
+        }
+        return self::ok(['size' => $size, 'periods' => $keys, 'series' => $series]);
     }
 
     /** Canonical year label; raw value kept when it cannot be parsed. */

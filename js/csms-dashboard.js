@@ -16,28 +16,7 @@
     success: '#17653a', danger: '#b3261e', neutral: '#94a3b8', grid: '#e5e9f0', text: '#374151'
   };
   const series = [color.navy, color.teal, color.amber, color.violet, color.rose, color.slate];
-  const statusColor = { draft: color.amber, active: color.success, archived: color.slate };
-
-  // Charts that only make sense for one version; in "All programs" their "select a
-  // program" prompts are combined into a single hint instead of four empty cards.
-  const versionScoped = ['term_load', 'outcome_coverage', 'required_optional', 'grade_weighting'];
-  const chartOrder = ['version_status', 'units_per_program', 'compliance', 'activity', 'prerequisites',
-    'term_load', 'outcome_coverage', 'required_optional', 'grade_weighting', 'units_by_category', 'outcome_ipd', 'review_trend'];
-  const listOrder = ['my_drafts', 'review_queue', 'compliance_failures', 'active_curricula', 'my_subjects', 'recent_activity'];
-  const descriptions = {
-    version_status: 'Draft, active and archived curriculum versions.',
-    units_per_program: 'Required and optional units of placed subjects.',
-    compliance: 'Pass, fail and not-evaluated rules from the latest validation run.',
-    activity: 'Versions created, subject placements added and compliance runs per month.',
-    prerequisites: 'How many stored prerequisites each placed subject has.',
-    term_load: 'Subjects or units per year level and semester.',
-    outcome_coverage: 'Subjects mapped to each graduate outcome, with the recorded coverage state.',
-    required_optional: 'Required and optional subject placements in this version.',
-    grade_weighting: 'Placements whose grade weighting adds up to 100%.',
-    units_by_category: 'Units per subject category (GE, core, professional, elective, PE, NSTP).',
-    outcome_ipd: 'Introduced, practised and demonstrated levels per graduate outcome.',
-    review_trend: 'Versions submitted, approved and returned per month.'
-  };
+  const bucketColor = { draft: color.amber, active: color.teal, in_review: color.violet, returned: color.rose, approved: color.success, archived: color.neutral };
 
   if (window.Chart) {
     Chart.defaults.font.family = getComputedStyle(root).fontFamily;
@@ -98,7 +77,7 @@
     const link = item.module ? `<a class="csms-card__link" href="${esc(moduleHref(item.module, filter))}">View in module <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i><span class="visually-hidden"> (${esc(item.title)})</span></a>` : '';
     const pending = item.status === 'unavailable' ? ' <span class="csms-badge-pending"><i class="fa-solid fa-hourglass-half" aria-hidden="true"></i>Pending backend</span>' : '';
     el.innerHTML = `<div class="csms-card__head"><div><h2 class="csms-card__title" id="${titleId}">${esc(item.title)}${pending}</h2>` +
-      (descriptions[key] ? `<p class="csms-card__desc">${esc(descriptions[key])}</p>` : '') + `</div>${link}</div><div class="csms-card__body"></div>`;
+      (item.description ? `<p class="csms-card__desc">${esc(item.description)}</p>` : '') + `</div>${link}</div><div class="csms-card__body"></div>`;
     return el;
   }
 
@@ -106,7 +85,7 @@
     if (item.status === 'unavailable') {
       body.innerHTML = `<div class="csms-state">${ghost(item.type)}<p class="csms-state__title">Not available yet</p><p class="csms-state__reason">${esc(item.reason)}</p></div>`;
     } else {
-      body.innerHTML = `<div class="csms-state"><p class="csms-state__title">No data yet for this selection.</p>${item.reason && item.reason !== 'No data yet for this selection.' ? `<p class="csms-state__reason">${esc(item.reason)}</p>` : ''}</div>`;
+      body.innerHTML = `<p class="csms-state-compact">${esc(item.reason || 'No data yet for this selection.')}</p>`;
     }
   }
 
@@ -132,37 +111,88 @@
   function shortTick(value) { const label = this.getLabelForValue(value); return label.length > 24 ? label.slice(0, 23) + '…' : label; }
   function aside(body, html) { body.insertAdjacentHTML('beforeend', `<div class="csms-card__aside">${html}</div>`); }
 
+  function periodLabel(d, key) {
+    if (d.size === 'month') return monthLabel(key);
+    const parts = key.split('-').map(Number);
+    return 'Wk ' + new Date(parts[0], parts[1] - 1, parts[2]).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+  function discreteBars(body, d, label, stacked) {
+    const labels = d.periods.map(p => periodLabel(d, p));
+    chart(canvas(body, label + ': ' + d.series.map(x => x.label + ' total ' + x.values.reduce((m, n) => m + n, 0)).join('; '), 230), {
+      type: 'bar',
+      data: { labels, datasets: d.series.map((x, i) => ({ label: x.label, data: x.values, backgroundColor: series[i % series.length] })) },
+      options: { scales: { x: { stacked, grid: { display: false } }, y: { stacked, beginAtZero: true, ticks: { precision: 0 }, title: { display: true, text: 'Count' } } }, plugins: { legend: { display: d.series.length > 1 } } }
+    });
+    aside(body, dataTable([d.size === 'week' ? 'Week' : 'Month', ...d.series.map(x => x.label)], d.periods.map((p, i) => [labels[i], ...d.series.map(x => x.values[i])])));
+  }
+  function simpleBars(body, d, label, axis) {
+    chart(canvas(body, label + ': ' + d.bars.map(x => x.label + ' ' + x.value).join('; '), Math.max(150, 30 * d.bars.length + 60)), {
+      type: 'bar',
+      data: { labels: d.bars.map(x => x.label), datasets: [{ label: axis, data: d.bars.map(x => x.value), backgroundColor: color.navy }] },
+      options: { indexAxis: 'y', scales: { x: { beginAtZero: true, ticks: { precision: 0 }, title: { display: true, text: axis } }, y: { grid: { display: false }, ticks: { callback: shortTick } } }, plugins: { legend: { display: false } } }
+    });
+    aside(body, dataTable(['Item', axis], d.bars.map(x => [x.label, x.value])));
+  }
+  function noCurriculum(list) {
+    return list && list.length ? '<p><strong>No curriculum yet:</strong> ' + list.map(esc).join(', ') + '</p>' : '';
+  }
+
   const renderers = {
-    version_status(body, d) {
-      const segments = d.segments.filter(s => s.value > 0);
-      const summary = d.segments.map(s => `${s.label}: ${s.value}`).join(', ');
-      chart(canvas(body, `Curriculum versions by status. ${summary}. Total ${d.total}.`, 200), {
-        type: 'doughnut',
-        data: { labels: segments.map(s => `${s.label} (${s.value})`), datasets: [{ data: segments.map(s => s.value), backgroundColor: segments.map(s => statusColor[s.key] || color.slate), borderColor: '#fff', borderWidth: 2 }] },
-        options: { cutout: '58%', plugins: { legend: { position: 'right' } } }
-      });
-      let extra = '';
-      if (d.review) extra = '<p><strong>Review status:</strong> ' + d.review.map(r => `${esc(r.label)} ${r.value}`).join(' · ') + '</p>';
-      aside(body, extra + dataTable(['Status', 'Versions'], d.segments.map(s => [s.label, s.value])));
+    accounts_by_role(body, d) { simpleBars(body, d, 'Active accounts by role', 'Accounts'); },
+    programs_by_level(body, d) { simpleBars(body, d, 'Active programs by level', 'Programs'); },
+    audit_weekly(body, d) { discreteBars(body, d, 'Audit events', false); },
+    review_outcomes(body, d) { discreteBars(body, d, 'Review outcomes', true); },
+    pipeline(body, d) {
+      const keys = Object.keys(d.buckets);
+      if (d.rows.length) {
+        chart(canvas(body, 'Curriculum pipeline: ' + d.rows.map(r => r.label + ' ' + keys.filter(k => r.counts[k]).map(k => d.buckets[k] + ' ' + r.counts[k]).join(', ')).join('; '), Math.max(170, 34 * d.rows.length + 80)), {
+          type: 'bar',
+          data: { labels: d.rows.map(r => r.label), datasets: keys.map(k => ({ label: d.buckets[k], data: d.rows.map(r => r.counts[k]), backgroundColor: bucketColor[k] })) },
+          options: { indexAxis: 'y', scales: { x: { stacked: true, beginAtZero: true, ticks: { precision: 0 }, title: { display: true, text: 'Versions' } }, y: { stacked: true, grid: { display: false } } } }
+        });
+      }
+      aside(body, noCurriculum(d.no_curriculum) + (d.rows.length ? dataTable(['Program', ...keys.map(k => d.buckets[k])], d.rows.map(r => [r.label, ...keys.map(k => r.counts[k])])) : ''));
     },
-    units_per_program(body, d) {
-      const labels = d.bars.map(b => b.label);
-      chart(canvas(body, 'Required and optional units per ' + (labels.length ? 'item' : '') + ': ' + d.bars.map(b => `${b.label} ${num(b.required_units)} required, ${num(b.optional_units)} optional`).join('; '), Math.max(160, 30 * labels.length + 70)), {
-        type: 'bar',
-        data: { labels, datasets: [
-          { label: 'Required units', data: d.bars.map(b => b.required_units), backgroundColor: color.navy },
-          { label: 'Optional units', data: d.bars.map(b => b.optional_units), backgroundColor: color.amber }
-        ] },
-        options: { indexAxis: 'y', scales: { x: { stacked: true, beginAtZero: true, title: { display: true, text: 'Units' } }, y: { stacked: true, grid: { display: false }, ticks: { callback: shortTick } } },
-          plugins: { tooltip: { callbacks: { footer: items => { const b = d.bars[items[0].dataIndex]; return `${b.subjects} subjects · ${num(b.required_units + b.optional_units)} units`; } } } } }
-      });
-      aside(body, dataTable(['Item', 'Required units', 'Optional units', 'Subjects'], d.bars.map(b => [b.label, num(b.required_units), num(b.optional_units), b.subjects])));
+    completeness(body, d) {
+      if (d.rows.length) {
+        const labels = d.rows.map(r => r.label);
+        const hasTarget = d.rows.some(r => r.target !== null);
+        // The required-units marker is drawn on top of each bar; rows without a rule have none.
+        const targetMarker = { id: 'targetMarker', afterDatasetsDraw(c) {
+          const ctx = c.ctx, meta = c.getDatasetMeta(0);
+          d.rows.forEach((r, i) => {
+            if (r.target === null || !meta.data[i]) return;
+            const x = c.scales.x.getPixelForValue(r.target), y = meta.data[i].y;
+            ctx.save(); ctx.strokeStyle = color.rose; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.moveTo(x, y - 14); ctx.lineTo(x, y + 14); ctx.stroke(); ctx.restore();
+          });
+        } };
+        const most = Math.max(...d.rows.map(r => Math.max(r.units, r.target || 0)));
+        chart(canvas(body, 'Curriculum completeness: ' + d.rows.map(r => r.label + ' ' + num(r.units) + ' units, ' + (r.target === null ? 'no target set' : 'target ' + num(r.target))).join('; '), Math.max(170, 40 * d.rows.length + 70)), {
+          type: 'bar', plugins: [targetMarker],
+          data: { labels, datasets: [{ label: 'Placed units', data: d.rows.map(r => r.units), backgroundColor: color.navy }] },
+          options: { indexAxis: 'y', scales: { x: { beginAtZero: true, suggestedMax: most * 1.05, title: { display: true, text: hasTarget ? 'Units (red mark: required units)' : 'Units' } }, y: { grid: { display: false }, ticks: { callback: shortTick } } },
+            plugins: { legend: { display: false }, tooltip: { callbacks: { footer: items => { const r = d.rows[items[0].dataIndex]; return r.target === null ? 'No target set' : 'Required ' + num(r.target) + ': ' + r.target_name; } } } } }
+        });
+      }
+      aside(body, noCurriculum(d.no_curriculum) + (d.rows.length ? dataTable(['Curriculum · counted version', 'Placed units', 'Required units'], d.rows.map(r => [r.label, num(r.units), r.target === null ? 'No target set' : num(r.target)])) : ''));
     },
-    compliance(body, d) {
+    prerequisite_health(body, d) {
+      body.insertAdjacentHTML('beforeend', table(['Curriculum · counted version', 'Later-term conflicts', 'Circular chains', 'Year 2–4 with a prerequisite'],
+        d.rows.map(r => [r.label, r.later_term, r.circular, r.percent === null ? 'Not applicable' : r.percent + '% (' + r.upper_with_prerequisite + ' of ' + r.upper_subjects + ')'])));
+      if (d.histogram) {
+        chart(canvas(body, 'Prerequisites per subject: ' + d.histogram.bins.map(b => b.label + ' prerequisites, ' + b.subjects + ' subjects').join('; '), 170), {
+          type: 'bar',
+          data: { labels: d.histogram.bins.map(b => b.label), datasets: [{ label: 'Subjects', data: d.histogram.bins.map(b => b.subjects), backgroundColor: color.navy, barPercentage: 1, categoryPercentage: .9 }] },
+          options: { scales: { x: { grid: { display: false }, title: { display: true, text: 'Stored prerequisites per subject' } }, y: { beginAtZero: true, ticks: { precision: 0 } } }, plugins: { legend: { display: false } } }
+        });
+      }
+    },
+    compliance_under_review(body, d) {
       const validated = d.bars.filter(b => b.validated);
       const pending = d.bars.filter(b => !b.validated);
       if (validated.length) {
-        chart(canvas(body, 'Latest compliance results: ' + validated.map(b => `${b.label} pass ${b.pass}, fail ${b.fail}, not evaluated ${b.not_evaluated}`).join('; '), Math.max(160, 30 * validated.length + 70)), {
+        chart(canvas(body, 'Compliance results: ' + validated.map(b => b.label + ' pass ' + b.pass + ', fail ' + b.fail + ', not evaluated ' + b.not_evaluated).join('; '), Math.max(160, 30 * validated.length + 70)), {
           type: 'bar',
           data: { labels: validated.map(b => b.label), datasets: [
             { label: 'Pass', data: validated.map(b => b.pass), backgroundColor: color.success },
@@ -172,20 +202,7 @@
           options: { indexAxis: 'y', scales: { x: { stacked: true, beginAtZero: true, ticks: { precision: 0 }, title: { display: true, text: 'Rules' } }, y: { stacked: true, grid: { display: false }, ticks: { callback: shortTick } } } }
         });
       }
-      aside(body, (pending.length ? `<p><strong>Not yet validated:</strong> ${pending.map(b => esc(b.label)).join(', ')}</p>` : '') +
-        dataTable(['Curriculum', 'Pass', 'Fail', 'Not evaluated'], d.bars.map(b => b.validated ? [b.label, b.pass, b.fail, b.not_evaluated] : [b.label, '—', '—', 'Not yet validated'])));
-    },
-    activity(body, d) { lineChart(body, d, 'Curriculum activity per month'); },
-    review_trend(body, d) { lineChart(body, d, 'Review events per month'); },
-    prerequisites(body, d) {
-      chart(canvas(body, `Prerequisites per subject: ${d.bins.map(b => `${b.label} prerequisites, ${b.subjects} subjects`).join('; ')}.`, 220), {
-        type: 'bar',
-        data: { labels: d.bins.map(b => b.label), datasets: [{ label: 'Subjects', data: d.bins.map(b => b.subjects), backgroundColor: color.navy, barPercentage: 1, categoryPercentage: .9 }] },
-        options: { scales: { x: { grid: { display: false }, title: { display: true, text: 'Stored prerequisites per subject' } }, y: { beginAtZero: true, ticks: { precision: 0 }, title: { display: true, text: 'Subjects' } } }, plugins: { legend: { display: false } } }
-      });
-      const top = d.top.length ? '<p><strong>Most prerequisites:</strong></p><ol>' + d.top.map(t => `<li>${esc(t.subject_code)} — ${esc(t.subject_title)} (${t.prerequisites})</li>`).join('') + '</ol>' : '';
-      aside(body, `<p>${d.with_prerequisites} of ${d.subjects} placed subjects have stored prerequisites. Subjects without prerequisites are not automatically incomplete.</p>` + top +
-        dataTable(['Prerequisites', 'Subjects'], d.bins.map(b => [b.label, b.subjects])));
+      aside(body, pending.length ? '<p><strong>Not yet validated:</strong> ' + pending.map(b => esc(b.label)).join(', ') + '</p>' : '');
     },
     term_load(body, d) {
       const toggle = document.createElement('div');
@@ -194,8 +211,8 @@
       toggle.setAttribute('aria-label', 'Measure');
       toggle.innerHTML = '<button type="button" data-measure="units" aria-pressed="true">Units</button><button type="button" data-measure="subjects" aria-pressed="false">Subjects</button>';
       body.appendChild(toggle);
-      const datasets = measure => d.series.map((s, i) => ({ label: s.label, data: s.points.map(p => p[measure]), backgroundColor: series[i % series.length] }));
-      const instance = chart(canvas(body, `Load by year and semester for this version: ${d.totals.subjects} subjects, ${num(d.totals.units)} units.`, 220), {
+      const datasets = measure => d.series.map((x, i) => ({ label: x.label, data: x.points.map(p => p[measure]), backgroundColor: series[i % series.length] }));
+      const instance = chart(canvas(body, 'Load by year and semester: ' + d.totals.subjects + ' subjects, ' + num(d.totals.units) + ' units.', 220), {
         type: 'bar', data: { labels: d.years, datasets: datasets('units') },
         options: { scales: { x: { grid: { display: false }, title: { display: true, text: 'Year level' } }, y: { beginAtZero: true, title: { display: true, text: 'Units' } } } }
       });
@@ -208,108 +225,57 @@
         instance.options.scales.y.ticks = btn.dataset.measure === 'units' ? {} : { precision: 0 };
         instance.update();
       });
-      const merged = d.merged_labels.length ? '<p><strong>Labels combined:</strong> ' + d.merged_labels.map(m => `${esc(m.label)} (stored as ${m.stored_values.map(v => '“' + esc(v || 'blank') + '”').join(', ')})`).join('; ') + '</p>' : '';
+      const merged = d.merged_labels.length ? '<p><strong>Labels combined:</strong> ' + d.merged_labels.map(m => esc(m.label) + ' (stored as ' + m.stored_values.map(v => '“' + esc(v || 'blank') + '”').join(', ') + ')').join('; ') + '</p>' : '';
       const rows = [];
-      d.years.forEach((y, yi) => d.series.forEach(s => rows.push([`${y} · ${s.label}`, s.points[yi].subjects, num(s.points[yi].units)])));
+      d.years.forEach((y, yi) => d.series.forEach(x => rows.push([y + ' · ' + x.label, x.points[yi].subjects, num(x.points[yi].units)])));
       aside(body, merged + dataTable(['Year · semester', 'Subjects', 'Units'], rows));
     },
     outcome_coverage(body, d) {
-      chart(canvas(body, 'Subjects mapped per graduate outcome: ' + d.outcomes.map(o => `${o.code} ${o.mapped_subjects}`).join(', '), Math.max(220, 24 * d.outcomes.length + 60)), {
-        type: 'bar',
-        data: { labels: d.outcomes.map(o => o.code), datasets: [{ label: 'Mapped subjects', data: d.outcomes.map(o => o.mapped_subjects), backgroundColor: d.outcomes.map(o => o.assessment_state === 'complete' ? color.success : color.navy) }] },
-        options: { indexAxis: 'y', scales: { x: { beginAtZero: true, ticks: { precision: 0 }, title: { display: true, text: 'Mapped subjects' } } },
-          plugins: { legend: { display: false }, tooltip: { callbacks: { afterLabel: i => { const o = d.outcomes[i.dataIndex]; return [o.text.slice(0, 90) + (o.text.length > 90 ? '…' : ''), 'Coverage: ' + (o.assessment_state || 'not assessed')]; } } } } }
+      chart(canvas(body, 'Subjects mapped per graduate outcome: ' + d.outcomes.map(o => o.code + ' ' + o.mapped_subjects).join(', '), 300), {
+        type: 'radar',
+        data: { labels: d.outcomes.map(o => o.code), datasets: [{ label: 'Mapped subjects', data: d.outcomes.map(o => o.mapped_subjects), borderColor: color.navy, backgroundColor: 'rgba(26,58,140,.15)', pointBackgroundColor: color.navy }] },
+        options: { scales: { r: { beginAtZero: true, ticks: { precision: 0 } } }, plugins: { legend: { display: false } } }
       });
       aside(body, dataTable(['Outcome', 'Mapped subjects', 'Coverage'], d.outcomes.map(o => [o.code, o.mapped_subjects, o.assessment_state || 'not assessed'])));
-    },
-    required_optional(body, d) {
-      chart(canvas(body, `Required ${d.required}, optional ${d.optional}, total ${d.total} placements.`, 200), {
-        type: 'doughnut',
-        data: { labels: [`Required (${d.required})`, `Optional (${d.optional})`], datasets: [{ data: [d.required, d.optional], backgroundColor: [color.navy, color.amber], borderColor: '#fff', borderWidth: 2 }] },
-        options: { cutout: '58%', plugins: { legend: { position: 'right' } } }
-      });
-      aside(body, '<p>Optional placement is not automatically elective membership.</p>' + dataTable(['Placement', 'Subjects'], [['Required', d.required], ['Optional', d.optional]]));
-    },
-    grade_weighting(body, d) {
-      const pct = d.placements ? Math.round(d.complete / d.placements * 100) : 0;
-      body.innerHTML = `<p class="csms-stat__value">${d.complete} <span class="csms-stat__label" style="display:inline">of ${d.placements} placements complete</span></p>` +
-        `<div class="csms-progress" role="progressbar" aria-valuemin="0" aria-valuemax="${d.placements}" aria-valuenow="${d.complete}" aria-label="Placements with complete grade weighting"><span style="width:${pct}%"></span></div>` +
-        `<p class="csms-card__desc">${d.configured} configured · ${d.placements - d.complete} not fully configured</p>`;
-      body.style.minHeight = '0';
     }
   };
-  function lineChart(body, d, label) {
-    const labels = d.months.map(monthLabel);
-    chart(canvas(body, label + ': ' + d.series.map(s => `${s.label} total ${s.values.reduce((a, b) => a + b, 0)}`).join('; '), 240), {
-      type: 'line',
-      data: { labels, datasets: d.series.map((s, i) => ({ label: s.label, data: s.values, borderColor: series[i % series.length], backgroundColor: series[i % series.length], pointStyle: ['circle', 'rect', 'triangle'][i % 3], pointRadius: 2.5, tension: 0.2 })) },
-      options: { interaction: { mode: 'index', intersect: false }, scales: { y: { beginAtZero: true, min: 0, ticks: { precision: 0 }, title: { display: true, text: 'Count' } }, x: { grid: { display: false }, title: { display: true, text: 'Month' } } } }
-    });
-    aside(body, dataTable(['Month', ...d.series.map(s => s.label)], d.months.map((m, mi) => [monthLabel(m), ...d.series.map(s => s.values[mi])])));
-  }
-
-  const listRenderers = {
-    my_drafts: (i, f) => `<strong>${esc(i.label)}</strong><small>${esc(i.context)} · ${i.placements} placements · Next: ${esc(i.next_step)}</small>`,
-    review_queue: i => `<strong>${esc(i.label)}</strong><small>${esc(i.context)} · ${esc(i.responsibility)}</small>`,
-    compliance_failures: i => `<strong>${esc(i.program_code)} · ${esc(i.curriculum_code)} · ${esc(i.version_label)}</strong><small>${i.failed_count} failed · ${i.passed_count} passed · ${i.not_evaluated_count} not evaluated</small>`,
-    active_curricula: i => `<strong>${esc(i.program_code)} · ${esc(i.curriculum_code)}</strong><small>${esc(i.curriculum_name)} · ${esc(i.version_label)}${i.effective_academic_year ? ' · ' + esc(i.effective_academic_year) : ''}</small>`,
-    recent_activity: i => `<strong>${i.link ? `<a href="${esc(appRoot + i.link)}">${esc(i.label)}</a>` : esc(i.label)}</strong><small>${esc(i.description)} · ${esc(i.user)}</small>`
-  };
-  function listMeta(key, i) {
-    if (key === 'recent_activity') return dateTime(i.created_at);
-    if (key === 'compliance_failures') return dateTime(i.created_at);
-    return i.updated_at ? 'Updated ' + dateTime(i.updated_at) : '';
-  }
 
   function render(payload) {
     charts.splice(0).forEach(c => c.destroy());
     const filter = payload.filter || {};
-    const overall = !filter.program_id;
 
-    // Stat row (max 4)
-    $('metricGrid').innerHTML = (payload.stats || []).map(s => {
-      const inner = `<span class="csms-stat__label">${esc(s.label)}</span><strong class="csms-stat__value">${esc(num(s.value))}</strong>${s.detail ? `<span class="csms-stat__detail">${esc(s.detail)}</span>` : ''}`;
-      return s.module ? `<a class="csms-stat" href="${esc(moduleHref(s.module, filter))}">${inner}</a>` : `<div class="csms-stat">${inner}</div>`;
+    $('metricGrid').innerHTML = (payload.stats || []).map(x => {
+      const value = x.value === null ? '—' : num(x.value);
+      const inner = '<span class="csms-stat__label">' + esc(x.label) + '</span><strong class="csms-stat__value">' + esc(value) + '</strong>' + (x.detail ? '<span class="csms-stat__detail">' + esc(x.detail) + '</span>' : '');
+      return x.module ? '<a class="csms-stat" href="' + esc(moduleHref(x.module, filter)) + '">' + inner + '</a>' : '<div class="csms-stat">' + inner + '</div>';
     }).join('');
     $('metricGrid').hidden = !(payload.stats || []).length;
 
-    // Charts
     const grid = $('analyticsGrid');
     grid.innerHTML = '';
-    const items = payload.charts || {};
-    const prompts = [];
-    chartOrder.forEach(key => {
-      const item = items[key];
-      if (!item) return;
-      if (overall && versionScoped.includes(key) && item.status === 'empty') { prompts.push(item.title); return; }
-      const el = card(key, item, filter, key === 'activity' || key === 'review_trend' ? 'csms-card--wide' : '');
+    Object.entries(payload.charts || {}).forEach(([key, item]) => {
+      const el = card(key, item, filter, key === 'pipeline' || key === 'prerequisite_health' ? 'csms-card--wide' : '');
+      el.classList.toggle('csms-card--compact', item.status === 'empty');
       grid.appendChild(el);
       const body = el.querySelector('.csms-card__body');
       if (item.status === 'ok' && renderers[key]) renderers[key](body, item.data);
       else renderState(body, item);
     });
-    if (prompts.length) {
-      grid.insertAdjacentHTML('beforeend', `<p class="csms-hint-card"><i class="fa-solid fa-filter" aria-hidden="true"></i><span>Select a program or strand in the filter above to see: ${prompts.map(esc).join(', ')}.</span></p>`);
-    }
     grid.hidden = !grid.children.length;
     const rule = $('dashboardVersionRule');
-    rule.textContent = overall && payload.version_rule ? payload.version_rule : '';
-    rule.hidden = !(overall && payload.version_rule);
+    rule.textContent = payload.version_rule || '';
+    rule.hidden = !payload.version_rule;
 
-    // Lists
     const lists = $('dashboardLists');
     lists.innerHTML = '';
-    listOrder.forEach(key => {
-      const item = (payload.lists || {})[key];
-      if (!item) return;
-      const el = card(key, Object.assign({}, item, { type: 'list' }), key === 'recent_activity' ? null : filter, 'csms-card--list');
-      if (key === 'recent_activity') el.querySelector('.csms-card__link').firstChild.textContent = 'View audit logs ';
+    Object.entries(payload.lists || {}).forEach(([key, item]) => {
+      const el = card(key, Object.assign({}, item, { type: 'list' }), filter, 'csms-card--list');
+      el.classList.toggle('csms-card--compact', item.status === 'empty');
       const body = el.querySelector('.csms-card__body');
       if (item.status === 'ok') {
-        body.innerHTML = '<ul class="csms-list">' + item.data.items.map(i => `<li><span>${listRenderers[key](i)}</span><span class="csms-list__meta">${esc(listMeta(key, i))}</span></li>`).join('') + '</ul>';
+        body.innerHTML = '<ul class="csms-list">' + item.data.items.map(i => '<li><span><strong>' + esc(i.primary) + '</strong><small>' + esc(i.secondary) + '</small></span><span class="csms-list__meta">' + (i.meta ? esc(dateTime(i.meta)) : '') + '</span></li>').join('') + '</ul>';
       } else {
         renderState(body, Object.assign({}, item, { type: 'list' }));
-        body.querySelector('.csms-state').style.minHeight = '120px';
       }
       lists.appendChild(el);
     });
@@ -317,7 +283,7 @@
 
     const nothing = !grid.children.length && !lists.children.length && !(payload.stats || []).length;
     $('dashboardEmpty').hidden = !nothing;
-    if (nothing) $('dashboardEmpty').textContent = 'Your account does not have access to curriculum analytics. Ask an administrator if you need it.';
+    if (nothing) $('dashboardEmpty').textContent = 'No dashboard items for your account. Ask an administrator if you need access.';
   }
 
   function syncVersionSelect(payload) {

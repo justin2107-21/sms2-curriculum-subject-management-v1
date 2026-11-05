@@ -34,19 +34,50 @@ shapeCheck($load['data']['totals'] === ['subjects' => 4, 'units' => 11.5, 'requi
 shapeCheck(count($load['data']['merged_labels']) === 2, 'Merged spellings reported for year and semester');
 shapeCheck(DashboardShaper::termLoad([])['status'] === 'empty', 'No placements is empty, not zeros');
 
-// Representative version rule.
+// Counted-version rule.
 $versions = [
-    ['id' => 1, 'curriculum_id' => 10, 'status' => 'draft', 'updated_at' => '2026-05-01 00:00:00'],
-    ['id' => 2, 'curriculum_id' => 10, 'status' => 'active', 'updated_at' => '2026-01-01 00:00:00'],
-    ['id' => 3, 'curriculum_id' => 10, 'status' => 'active', 'updated_at' => '2026-03-01 00:00:00'],
-    ['id' => 4, 'curriculum_id' => 20, 'status' => 'draft', 'updated_at' => '2026-02-01 00:00:00'],
-    ['id' => 5, 'curriculum_id' => 20, 'status' => 'archived', 'updated_at' => '2026-09-01 00:00:00'],
-    ['id' => 6, 'curriculum_id' => 30, 'status' => 'archived', 'updated_at' => '2026-09-01 00:00:00'],
+    ['id' => 1, 'curriculum_id' => 10, 'status' => 'draft', 'review_status' => 'not_started', 'placements' => 5, 'updated_at' => '2026-05-01 00:00:00'],
+    ['id' => 2, 'curriculum_id' => 10, 'status' => 'active', 'review_status' => 'not_started', 'placements' => 1, 'updated_at' => '2026-01-01 00:00:00'],
+    ['id' => 3, 'curriculum_id' => 10, 'status' => 'active', 'review_status' => 'not_started', 'placements' => 1, 'updated_at' => '2026-03-01 00:00:00'],
+    ['id' => 4, 'curriculum_id' => 20, 'status' => 'draft', 'review_status' => 'not_started', 'placements' => 52, 'updated_at' => '2026-02-01 00:00:00'],
+    ['id' => 7, 'curriculum_id' => 20, 'status' => 'draft', 'review_status' => 'not_started', 'placements' => 0, 'updated_at' => '2026-04-01 00:00:00'],
+    ['id' => 5, 'curriculum_id' => 20, 'status' => 'archived', 'review_status' => 'approved', 'placements' => 9, 'updated_at' => '2026-09-01 00:00:00'],
+    ['id' => 6, 'curriculum_id' => 30, 'status' => 'archived', 'review_status' => 'not_started', 'placements' => 9, 'updated_at' => '2026-09-01 00:00:00'],
+    ['id' => 8, 'curriculum_id' => 40, 'status' => 'active', 'review_status' => 'not_started', 'placements' => 9, 'updated_at' => '2026-09-01 00:00:00'],
+    ['id' => 9, 'curriculum_id' => 40, 'status' => 'draft', 'review_status' => 'approved', 'placements' => 2, 'updated_at' => '2026-01-01 00:00:00'],
 ];
-$picked = DashboardShaper::representativeVersions($versions);
-shapeCheck(array_keys($picked) === [10, 20], 'Archived-only curriculum skipped');
+$picked = DashboardShaper::countedVersions($versions);
+shapeCheck(array_keys($picked) === [10, 20, 40], 'Archived-only curriculum skipped');
 shapeCheck($picked[10]['id'] === 3, 'Latest active beats newer draft');
-shapeCheck($picked[20]['id'] === 4, 'Non-archived fallback');
+shapeCheck($picked[20]['id'] === 4, 'Draft with placements beats newer empty draft, archived approved ignored');
+shapeCheck($picked[40]['id'] === 9, 'Approved beats active');
+
+// Pipeline: six buckets, every version once.
+$pipeline = DashboardShaper::pipeline([['id' => 1, 'program_code' => 'A'], ['id' => 2, 'program_code' => 'B']], [
+    ['program_id' => 1, 'status' => 'active', 'review_status' => 'not_started'], ['program_id' => 1, 'status' => 'draft', 'review_status' => 'not_started'],
+    ['program_id' => 1, 'status' => 'draft', 'review_status' => 'under_review'], ['program_id' => 1, 'status' => 'draft', 'review_status' => 'returned'],
+    ['program_id' => 1, 'status' => 'draft', 'review_status' => 'approved'], ['program_id' => 1, 'status' => 'archived', 'review_status' => 'approved'],
+]);
+shapeCheck(array_values($pipeline['data']['rows'][0]['counts']) === [1, 1, 1, 1, 1, 1] && $pipeline['data']['no_curriculum'] === ['B'], 'Pipeline buckets and programs without a curriculum');
+
+// Targets come only from rules.
+$rules = [['rule_name' => 'P', 'numeric_value' => 100, 'academic_program_id' => 1, 'curriculum_id' => null], ['rule_name' => 'C', 'numeric_value' => 120, 'academic_program_id' => null, 'curriculum_id' => 5]];
+shapeCheck(DashboardShaper::targetFor($rules, 5, 1)['value'] === 120.0 && DashboardShaper::targetFor($rules, 6, 1)['value'] === 100.0 && DashboardShaper::targetFor($rules, 6, 2) === null, 'Curriculum rule beats program rule; no rule means no target');
+
+// Prerequisite health.
+$health = DashboardShaper::prerequisiteHealthRow('X', [
+    ['subject_id' => 1, 'year_level' => '1st Year', 'semester' => '1st Semester'], ['subject_id' => 2, 'year_level' => '2nd Year', 'semester' => '1st Semester'],
+    ['subject_id' => 3, 'year_level' => '2nd Year', 'semester' => '2nd Semester'], ['subject_id' => 4, 'year_level' => '3rd Year', 'semester' => '1st Semester'],
+], [['subject_id' => 2, 'required_subject_id' => 3], ['subject_id' => 4, 'required_subject_id' => 1]]);
+shapeCheck($health['later_term'] === 1 && $health['circular'] === 0 && $health['upper_subjects'] === 3 && $health['upper_with_prerequisite'] === 2 && $health['percent'] === 67, 'Prerequisite health counts');
+
+// Average days and discrete buckets.
+shapeCheck(DashboardShaper::averageDaysInReview([['version_id' => 1, 'action' => 'submit', 'created_at' => '2026-01-01 00:00:00'], ['version_id' => 1, 'action' => 'return', 'created_at' => '2026-01-03 00:00:00']]) === 2.0, 'Average days');
+shapeCheck(DashboardShaper::averageDaysInReview([['version_id' => 1, 'action' => 'submit', 'created_at' => '2026-01-01 00:00:00']]) === null, 'No decision means no average');
+$now = new DateTimeImmutable('2026-11-05');
+$weekly = DashboardShaper::buckets(['E' => [['day' => '2026-10-20', 'total' => 2], ['day' => '2026-11-04', 'total' => 1]]], null, $now);
+shapeCheck($weekly['data']['size'] === 'week' && array_sum($weekly['data']['series'][0]['values']) === 3 && in_array(0, $weekly['data']['series'][0]['values'], true), 'Under 3 months uses weeks, empty week is a real zero');
+shapeCheck(DashboardShaper::buckets(['E' => [['day' => '2026-01-20', 'total' => 2]]], null, $now)['data']['size'] === 'month', 'Longer history uses months');
 
 // Prerequisite histogram.
 $hist = DashboardShaper::prerequisiteHistogram([

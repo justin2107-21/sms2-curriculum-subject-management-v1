@@ -72,6 +72,8 @@ async function main() {
       await send('Page.navigate', { url });
       await Promise.race([loaded, sleep(15000)]);
     };
+    // Charts animate; screenshots must show final bars, not a frame of the animation.
+    await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
     const setWidth = w => send('Emulation.setDeviceMetricsOverride', { width: w, height: viewportHeight || (w < 600 ? 844 : 900), deviceScaleFactor: 1, mobile: w < 600 });
     const shot = async file => {
       const metrics = await send('Page.getLayoutMetrics');

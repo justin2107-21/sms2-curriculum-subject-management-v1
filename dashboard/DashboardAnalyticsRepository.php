@@ -58,7 +58,8 @@ final class DashboardAnalyticsRepository
             "SELECT v.id, v.curriculum_id, v.version_label, v.effective_academic_year, v.status,
                     v.review_status, v.version_role, v.created_by, v.created_at, v.updated_at,
                     c.curriculum_code, c.curriculum_name, c.academic_program_id AS program_id,
-                    p.program_code, p.program_name
+                    p.program_code, p.program_name,
+                    (SELECT COUNT(*) FROM curriculum_version_subjects AS pc WHERE pc.curriculum_version_id = v.id) AS placements
              FROM curriculum_versions AS v
              JOIN curricula AS c ON c.id = v.curriculum_id
              JOIN academic_programs AS p ON p.id = c.academic_program_id
@@ -369,5 +370,172 @@ final class DashboardAnalyticsRepository
             'i',
             [$safeLimit]
         );
+    }
+
+    public function accountCounts(): array
+    {
+        return array_map('intval', $this->rows("SELECT COALESCE(SUM(is_active = 1), 0) AS active, COALESCE(SUM(is_active = 1 AND must_change_password = 1), 0) AS must_change FROM users")[0]);
+    }
+
+    public function accountsByRole(): array
+    {
+        return $this->rows(
+            "SELECT r.display_name, COUNT(*) AS accounts
+             FROM user_roles AS ur
+             JOIN roles AS r ON r.id = ur.role_id AND r.is_active = 1
+             JOIN users AS u ON u.id = ur.user_id AND u.is_active = 1
+             GROUP BY r.id, r.display_name ORDER BY accounts DESC, r.display_name"
+        );
+    }
+
+    public function accountsNeedingPassword(int $limit): array
+    {
+        return $this->rows('SELECT username, first_name, last_name FROM users WHERE is_active = 1 AND must_change_password = 1 ORDER BY username LIMIT ?', 'i', [$limit]);
+    }
+
+    public function auditCountSince(string $since): int
+    {
+        return (int)($this->rows('SELECT COUNT(*) AS total FROM audit_logs WHERE created_at >= ?', 's', [$since])[0]['total'] ?? 0);
+    }
+
+    public function auditPerDay(string $since): array
+    {
+        return $this->rows('SELECT DATE(created_at) AS day, COUNT(*) AS total FROM audit_logs WHERE created_at >= ? GROUP BY DATE(created_at)', 's', [$since]);
+    }
+
+    public function rbacChanges(int $limit): array
+    {
+        return $this->rows(
+            "SELECT a.action, a.entity_type, a.description, a.created_at, u.username, u.first_name, u.last_name
+             FROM audit_logs AS a LEFT JOIN users AS u ON u.id = a.user_id
+             WHERE a.action IN ('RBAC_ROLE_ASSIGNMENT', 'RBAC_PERMISSION_CHANGE')
+             ORDER BY a.id DESC LIMIT ?", 'i', [$limit]);
+    }
+
+    /** All review events in scope, oldest first. */
+    public function reviewEvents(?int $programId, string $since): array
+    {
+        [$where, $types, $params] = self::programClause($programId, 'c.academic_program_id');
+        return $this->rows(
+            "SELECT e.curriculum_version_id AS version_id, e.action, e.created_at
+             FROM curriculum_version_review_events AS e
+             JOIN curriculum_versions AS v ON v.id = e.curriculum_version_id
+             JOIN curricula AS c ON c.id = v.curriculum_id
+             WHERE $where AND e.created_at >= ? AND e.action IN ('submit', 'approve', 'return')
+             ORDER BY e.id", $types . 's', [...$params, $since]);
+    }
+
+    /** Versions under review that this user did not submit. */
+    public function awaitingReview(int $userId, ?int $programId): array
+    {
+        [$where, $types, $params] = self::programClause($programId, 'c.academic_program_id');
+        return $this->rows(
+            "SELECT v.id, v.version_label, c.curriculum_code, p.program_code, e.created_at AS submitted_at, u.username, u.first_name, u.last_name
+             FROM curriculum_versions AS v
+             JOIN curricula AS c ON c.id = v.curriculum_id
+             JOIN academic_programs AS p ON p.id = c.academic_program_id
+             JOIN curriculum_version_review_events AS e ON e.id = (SELECT MAX(s.id) FROM curriculum_version_review_events AS s WHERE s.curriculum_version_id = v.id AND s.action = 'submit')
+             LEFT JOIN users AS u ON u.id = e.actor_user_id
+             WHERE v.review_status = 'under_review' AND e.actor_user_id <> ? AND $where
+             ORDER BY e.id", 'i' . $types, [$userId, ...$params]);
+    }
+
+    public function myDecisions(int $userId, ?int $programId, int $limit): array
+    {
+        [$where, $types, $params] = self::programClause($programId, 'c.academic_program_id');
+        return $this->rows(
+            "SELECT e.action, e.comments, e.created_at, v.version_label, c.curriculum_code, p.program_code
+             FROM curriculum_version_review_events AS e
+             JOIN curriculum_versions AS v ON v.id = e.curriculum_version_id
+             JOIN curricula AS c ON c.id = v.curriculum_id
+             JOIN academic_programs AS p ON p.id = c.academic_program_id
+             WHERE e.actor_user_id = ? AND e.action IN ('approve', 'return') AND $where
+             ORDER BY e.id DESC LIMIT ?", 'i' . $types . 'i', [$userId, ...$params, $limit]);
+    }
+
+    public function recentlyApproved(?int $programId, int $limit): array
+    {
+        [$where, $types, $params] = self::programClause($programId, 'c.academic_program_id');
+        return $this->rows(
+            "SELECT v.id, v.version_label, v.effective_academic_year, c.curriculum_code, p.program_code, e.created_at, u.username, u.first_name, u.last_name
+             FROM curriculum_version_review_events AS e
+             JOIN curriculum_versions AS v ON v.id = e.curriculum_version_id AND v.review_status = 'approved'
+             JOIN curricula AS c ON c.id = v.curriculum_id
+             JOIN academic_programs AS p ON p.id = c.academic_program_id
+             LEFT JOIN users AS u ON u.id = e.actor_user_id
+             WHERE e.action = 'approve' AND $where
+             ORDER BY e.id DESC LIMIT ?", $types . 'i', [...$params, $limit]);
+    }
+
+    public function officialExports(?int $programId, int $limit): array
+    {
+        [$where, $types, $params] = self::programClause($programId, 'c.academic_program_id');
+        return $this->rows(
+            "SELECT a.created_at, v.version_label, c.curriculum_code, p.program_code, u.username, u.first_name, u.last_name
+             FROM audit_logs AS a
+             JOIN curriculum_versions AS v ON v.id = a.entity_id AND v.review_status = 'approved'
+             JOIN curricula AS c ON c.id = v.curriculum_id
+             JOIN academic_programs AS p ON p.id = c.academic_program_id
+             LEFT JOIN users AS u ON u.id = a.user_id
+             WHERE a.action = 'CURRICULUM_EXPORT_GENERATE' AND a.entity_type = 'curriculum_version' AND $where
+             ORDER BY a.id DESC LIMIT ?", $types . 'i', [...$params, $limit]);
+    }
+
+    public function pendingEquivalencies(int $limit): array
+    {
+        return $this->rows(
+            "SELECT e.created_at, a.subject_code, b.subject_code AS equivalent_code
+             FROM subject_equivalencies AS e
+             JOIN subjects AS a ON a.id = e.subject_id
+             JOIN subjects AS b ON b.id = e.equivalent_subject_id
+             WHERE e.decision_status = 'pending' AND e.archived_at IS NULL
+             ORDER BY e.id LIMIT ?", 'i', [$limit]);
+    }
+
+    /** Versions this user owns: last submitter, otherwise creator. */
+    public function myVersions(int $userId, ?int $programId): array
+    {
+        [$where, $types, $params] = self::programClause($programId, 'c.academic_program_id');
+        return $this->rows(
+            "SELECT v.id, v.version_label, v.status, v.review_status, v.updated_at, c.curriculum_code, p.program_code,
+                    (SELECT COUNT(*) FROM curriculum_version_subjects AS m WHERE m.curriculum_version_id = v.id) AS placements,
+                    (SELECT COUNT(*) FROM compliance_validation_runs AS r WHERE r.curriculum_version_id = v.id) AS runs,
+                    COALESCE((SELECT r.failed_count FROM compliance_validation_runs AS r WHERE r.curriculum_version_id = v.id ORDER BY r.id DESC LIMIT 1), 0) AS failed_count,
+                    (SELECT e.comments FROM curriculum_version_review_events AS e WHERE e.curriculum_version_id = v.id AND e.action = 'return' ORDER BY e.id DESC LIMIT 1) AS last_reason
+             FROM curriculum_versions AS v
+             JOIN curricula AS c ON c.id = v.curriculum_id
+             JOIN academic_programs AS p ON p.id = c.academic_program_id
+             WHERE COALESCE((SELECT e.actor_user_id FROM curriculum_version_review_events AS e WHERE e.curriculum_version_id = v.id AND e.action = 'submit' ORDER BY e.id DESC LIMIT 1), v.created_by) = ?
+               AND $where
+             ORDER BY v.updated_at DESC, v.id DESC", 'i' . $types, [$userId, ...$params]);
+    }
+
+    /** @param int[] $versionIds */
+    public function placementsForVersions(array $versionIds): array
+    {
+        if ($versionIds === []) return [];
+        [$in, $types, $ids] = self::idList($versionIds);
+        return $this->rows("SELECT curriculum_version_id AS version_id, subject_id, year_level, semester FROM curriculum_version_subjects WHERE curriculum_version_id IN ($in)", $types, $ids);
+    }
+
+    /** @param int[] $versionIds */
+    public function prerequisiteEdges(array $versionIds): array
+    {
+        if ($versionIds === []) return [];
+        [$in, $types, $ids] = self::idList($versionIds);
+        return $this->rows("SELECT curriculum_version_id AS version_id, subject_id, required_subject_id FROM curriculum_subject_requirements WHERE requirement_type = 'prerequisite' AND curriculum_version_id IN ($in)", $types, $ids);
+    }
+
+    public function minTotalUnitRules(): array
+    {
+        return $this->rows("SELECT rule_name, numeric_value, academic_program_id, curriculum_id FROM compliance_rules WHERE rule_type = 'MIN_TOTAL_UNITS' AND technical_status = 'active' ORDER BY id");
+    }
+
+    public function workingVersionId(int $userId): ?int
+    {
+        $row = $this->rows("SELECT pref_value FROM user_preferences WHERE user_id = ? AND pref_key = 'working_context'", 'i', [$userId])[0] ?? null;
+        $value = $row ? json_decode((string)$row['pref_value'], true) : null;
+        $id = is_array($value) ? (int)($value['version_id'] ?? 0) : 0;
+        return $id > 0 ? $id : null;
     }
 }

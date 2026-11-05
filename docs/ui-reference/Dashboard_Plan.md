@@ -1,8 +1,198 @@
-# CSMS-SMS2 Dashboard Redesign — Plan (Phase 1, analysis only)
+# CSMS-SMS2 Dashboard Redesign — Plan (V2 section awaiting approval)
 
 Date: 2026-11-03 · Branch `ui-redesign-pilot` · Status: **awaiting approval**. Nothing in the application was changed for this plan.
 Inputs: `UI_Decisions.md` (D1–D8), `UI_Audit.md`, `design-system/csms-sms2/MASTER.md`, `css/csms-tokens.css`, `ui-ux-pro-max` (`data/charts.csv`, `references/quick-reference.md`, read directly because Python is not installed).
 Method: code and migration reading only. **No connection to `sms_db` and no queries were run.** Where real values matter (e.g. the label bug), a read-only diagnostic query is supplied for you to run yourself.
+
+---
+
+## V2: role dashboards and chart corrections (plan, awaiting approval, 2026-11-05)
+This section replaces the card lists, chart plan, role variants and representative-version rule in sections 4 and 8 below. Everything below it is kept as history. Data facts come from read-only queries on `sms_db`, whose test copy `sms_db_uitest` holds the same curriculum data.
+
+### V2.1 What the data shows today
+| Program | Curriculum | Version | Status / review | Subjects | Units |
+|---|---|---|---|---|---:|
+| BSIT | 123 | 1 | active / not started | 1 | 3 |
+| BSIT | 123 | 2 | draft / not started | 1 | 2 |
+| BSIT | BSIT-DEMO-2026 | PREORAL-2026 | draft / not started | 52 | 157 |
+| BSIT | BSIT-DEMO-2026 | FINAL | draft / not started | 0 | 0 |
+| BSCRIM | CRIMINALISM | ROTC | active / not started | 2 | 8 |
+| ICT | COMP11 | COMSHOP | active / not started | 0 | 0 |
+| BSBA, BSHM, ASD (inactive) | none | | | | |
+
+Also: 0 review events, 0 compliance rules and runs, 0 outcome catalog rows, 8 prerequisite rules, audit history from 2026-08-19.
+
+Consequences:
+1. **BSIT has two curricula, so "one version per curriculum" gives BSIT two counted versions.** The old chart added them under one label. V2 shows one row per curriculum and never adds them.
+2. **The rule as written counts FINAL (0 subjects), not PREORAL-2026 (52 subjects),** because FINAL is the newer draft. See decision 1.
+3. **PREORAL-2026 is 157 units,** not about 158.
+4. **146 is not in the repository.** `docs/source-data/ched-cmo25-2015-bsit.json` holds a partial 81 units and says `known_units_are_not_a_program_total`. It must be confirmed against the CMO before it is stored.
+5. **Three versions are active but never reviewed.** The five pipeline buckets have no place for them; calling them Draft would be false. See decision 2.
+6. **`curriculum_version_personnel` is empty and nothing fills it,** so today's "Awaiting my review" query always returns nothing, even with versions under review.
+7. **Faculty charts have no data on the real site:** with no outcome catalog, Outcome coverage and "Outcomes covered" stay unavailable until `database/seeds/load_ched_bsit_outcomes.php` is run on `sms_db`.
+
+### V2.2 Counted-version rule
+Per curriculum, ignoring archived versions and anything outside the user's read scope:
+1. Approved (`review_status='approved'`), latest `updated_at`.
+2. Otherwise active (`status='active'`), latest `updated_at`.
+3. Otherwise draft: those with at least one placement first (proposed, decision 1), then latest `updated_at`.
+
+Ties go to the higher id. It replaces `DashboardShaper::representativeVersions()` and `VERSION_RULE_NOTE`. Every chart that uses it shows the version in its label or tooltip, plus the note: "Each curriculum counts one version: approved, otherwise active, otherwise the latest draft with subjects."
+
+Result today: curriculum 123 counts version 1 (active, 3 units), and BSIT-DEMO-2026 counts PREORAL-2026 (157 units) until FINAL gets subjects or a version is approved.
+
+### V2.3 Required-units target
+There is no dedicated target field, but none needs adding. `compliance_rules` already has `rule_type='MIN_TOTAL_UNITS'` with `numeric_value`, scoped by program or curriculum, tied to a reference document, and used by the validator.
+
+**Proposal: no migration.** The target is the active `MIN_TOTAL_UNITS` rule for that curriculum, otherwise for its program. A Super Admin creates it on the Compliance Rules page once the figure is confirmed. No active rule shows "No target set". If you prefer a field that doesn't affect validation, the alternative is a new `curriculum_unit_targets` table (migration 028).
+
+### V2.4 Replacement charts
+All queries are read-only and prepared, and use the existing snapshot transaction. `P` means the Program filter applies.
+
+| Key | Type | Source and query | Empty or unavailable |
+|---|---|---|---|
+| `completeness` | Horizontal bar with target marker | Counted versions (V2.2) × `curriculum_version_subjects` × `subjects.units` (reuses `placementTotals`); target from `compliance_rules`; one row per curriculum, label "BSIT · BSIT-DEMO-2026 · PREORAL-2026". P | Row "No target set"; programs with no curricula listed under the chart as "No curriculum yet" |
+| `pipeline` | Stacked horizontal bar | All versions per program, each in one bucket, checked in order: Archived (`status`), Approved, In review, Returned, Active (not reviewed, decision 2), Draft. P | Program with no versions gets "No curriculum yet" |
+| `prerequisite_health` | Overall: table-style bars. Single program: histogram | Counted versions; `curriculum_subject_requirements` and placements through `PrerequisiteGraph::review()` for later-term and circular conflicts; % = Year 2–4 placements with at least one prerequisite, by `AcademicSequenceValidator::position()`. P | SHS versions use "Grade 12" for the later years if `position()` allows, otherwise "Not applicable"; no rules gives a compact empty state |
+| `audit_weekly` | Bars | `audit_logs` per week, 12 weeks | Compact empty state |
+| `review_outcomes` | Stacked bars | `curriculum_version_review_events` per month, or per week when the first event is under 3 months old; submit, approve, return. P | "No reviews yet" |
+| `accounts_by_role` | Bars | `users` (active) × `user_roles` × active `roles` | Never empty |
+| `programs_by_level` | Bars | `academic_programs`, College or SHS using the existing `program_type` test | Compact empty state |
+| `term_load` | Grouped bars (existing) | Staff: working-context version. Faculty: counted version in read scope | "Choose a version" |
+| `outcome_coverage` | Radar, per your table (BSIT has 13 axes) | Existing query | Unavailable until the catalog is loaded |
+| `compliance_under_review` | Stacked bars | Latest run for `review_status='under_review'` versions | "No validation results for versions under review" |
+| `units_by_category` | Pending card | None | Unavailable; respects `dashboard.show_pending_charts` |
+
+Empty cards use one line and a link, at compact height. The "Active curricula" list becomes labelled rows: "Curriculum 123 · Version 1 · Effective 2100", or "Effective date not set".
+
+### V2.5 Role and server rule
+The server picks one profile from permissions, first match wins:
+`rbac.manage` Super Admin → `user.manage` Admin → `curriculum.review.decide` Acad Office → `curriculum.review.submit` Staff → `curriculum.view` Acad Faculty → none (a short "No dashboard items" message).
+
+Only that profile's queries run, and only its cards go in the JSON. Every card also keeps its own permission check, so a query can't run for a role without the permission. No permission changes. The filter list still needs `program.view`. Account and audit cards aren't program data, so they ignore the filter and say "All programs".
+
+"Awaiting my review" means all versions `under_review` that this user did not submit, not `curriculum_version_personnel`. "Returned to me" and "my versions" use the last `submit` event's actor, otherwise `created_by`.
+
+### V2.6 Cards per role
+**Super Admin**
+| Card | Source | Permission | Empty |
+|---|---|---|---|
+| Active accounts | `users.is_active` | `user.manage` | Never |
+| Need password change | `users.must_change_password`, active | `user.manage` | 0 |
+| Audit events, 7 days | `audit_logs` | `audit.view` | 0 |
+| Awaiting review | `review_status='under_review'` | `curriculum.view` | 0 |
+| Accounts by role, Audit events per week, Pipeline | V2.4 | `user.manage`, `audit.view`, `curriculum.view` | V2.4 |
+| Recent role/permission changes | `audit_logs` `RBAC_ROLE_ASSIGNMENT`, `RBAC_PERMISSION_CHANGE` | `rbac.manage` | "No recent changes" |
+| Accounts needing password change | `users` | `user.manage` | "None" |
+
+```
+┌ Dashboard ─────────────────────────── [Program: All ▾] ┐
+│ Active accts │ Need password │ Audit 7d │ Awaiting rev. │
+│ ┌ Accounts by role ──┐ ┌ Audit events per week ───────┐ │
+│ ┌ Curriculum pipeline by program ─────────────────────┐ │
+│ ┌ Role/permission changes ┐ ┌ Password change needed ┐ │
+```
+
+**Admin**
+| Card | Source | Permission | Empty |
+|---|---|---|---|
+| Active programs | `academic_programs` | `program.view` | 0 |
+| Curricula | `curricula` | `curriculum.view` | 0 |
+| Approved versions | `review_status='approved'` | `curriculum.view` | 0 |
+| Awaiting review (count only) | `under_review` | `curriculum.view` | 0 |
+| Pipeline, Completeness, Programs by level | V2.4 | `curriculum.view`, `program.view` | V2.4 |
+| Recently approved | `approve` events | `curriculum.view` | "None yet" |
+| Official export log | `CURRICULUM_EXPORT_GENERATE`, approved versions only | `audit.view` and `curriculum_export.official` | "No official exports yet" (see V2.8) |
+| Programs with no curriculum | `academic_programs` | `program.view` | "All have one" |
+
+```
+┌ Dashboard ─────────────────────────── [Program: All ▾] ┐
+│ Programs │ Curricula │ Approved │ Awaiting review       │
+│ ┌ Pipeline ──────────┐ ┌ Completeness ────────────────┐ │
+│ ┌ Programs by level ─┐ ┌ Recently approved ───────────┐ │
+│ ┌ Official exports ──┐ ┌ Programs with no curriculum ─┐ │
+```
+
+**Staff**
+| Card | Source | Permission | Empty |
+|---|---|---|---|
+| My drafts | `created_by`, draft | `curriculum.update` | 0 |
+| Returned to me | `returned`, last submitter | `curriculum.review.submit` | 0 |
+| Awaiting decision | `under_review`, last submitter | `curriculum.review.submit` | 0 |
+| Failing checks | Latest runs of my versions, `failed_count>0` | `compliance.view` | 0 |
+| Term load, Prerequisite health, Units by category | V2.4 | `curriculum.view`, `prerequisite.view` | "Choose a version"; pending |
+| Returned for revision, with reason | Latest `return` event | `curriculum.review.submit` | "Nothing returned" |
+| My drafts, next step | Existing | `curriculum.update` | "No drafts" |
+| Validator failures | Existing | `compliance.view` | "No failures" |
+
+```
+┌ Dashboard ─────────────────────────── [Program: All ▾] ┐
+│ My drafts │ Returned to me │ Awaiting decision │ Failing │
+│ ┌ Returned for revision: version · reason · Open ─────┐ │
+│ ┌ Term load (working version) ┐ ┌ Prerequisite health ┐ │
+│ ┌ Units by category (pending) ┐ ┌ My drafts ──────────┐ │
+│ ┌ Validator failures ─────────────────────────────────┐ │
+```
+
+**Acad Office**
+| Card | Source | Permission | Empty |
+|---|---|---|---|
+| Awaiting my review | V2.5 | `curriculum.review.decide` | 0 |
+| Average days in review | Each `approve` or `return` minus its preceding `submit`, last 90 days | `curriculum.review.decide` | "No decisions yet" |
+| Approved this month | Events | `curriculum.review.decide` | 0 |
+| Returned this month | Events | `curriculum.review.decide` | 0 |
+| Review outcomes, Pipeline, Compliance under review | V2.4 | `curriculum.view`, `compliance.view` | V2.4 |
+| Awaiting my review, submitter and date | Events × `users` | `curriculum.review.decide` | "Nothing waiting" |
+| Pending equivalency decisions | `decision_status='pending'` | `equivalency.manage` | "None pending" |
+| My recent decisions | Events, this actor | `curriculum.review.decide` | "None yet" |
+
+```
+┌ Dashboard ─────────────────────────── [Program: All ▾] ┐
+│ Awaiting me │ Avg days │ Approved mo. │ Returned mo.    │
+│ ┌ Awaiting my review: version · submitter · date ─────┐ │
+│ ┌ Review outcomes ───┐ ┌ Pipeline ────────────────────┐ │
+│ ┌ Compliance under review ┐ ┌ Pending equivalencies ──┐ │
+│ ┌ My recent decisions ────────────────────────────────┐ │
+```
+
+**Acad Faculty**
+| Card | Source | Permission | Empty |
+|---|---|---|---|
+| Approved curricula | `approved` versions | `curriculum.view` | 0 |
+| Outcomes covered | Outcomes with a mapped subject in the counted version | `curriculum.view` | Unavailable without a catalog |
+| My subjects (pending) | None | `curriculum.view` | Unavailable; respects the flag |
+| Outcome coverage, Term load | V2.4, in read scope | `curriculum.view` | V2.4 |
+| Approved curricula list | Approved | `curriculum.view` | "None approved yet" |
+| Recently approved | `approve` events, approved versions only | `curriculum.view` | "None yet" |
+
+```
+┌ Dashboard ─────────────────────────── [Program: All ▾] ┐
+│ Approved │ Outcomes covered │ My subjects (pending)     │
+│ ┌ Outcome coverage (radar) ┐ ┌ Term load ─────────────┐ │
+│ ┌ Approved curricula ──────┐ ┌ Recently approved ─────┐ │
+```
+
+### V2.7 Build notes
+- `DashboardAnalyticsService::build()` becomes a profile-to-cards map. `js/csms-dashboard.js` renders the payload's card order, and existing IDs stay.
+- The "Curriculum activity" chart isn't on any role in the approved table. Its fix (discrete bars, no smoothing, weekly under 3 months) applies to `audit_weekly` and `review_outcomes`.
+- `analytics.php` is unchanged.
+
+### V2.8 What the data can't fully support
+| Item | Limit | Plan |
+|---|---|---|
+| BSIT target of 146 | Not in the repository | Needs your confirmation, then a rule |
+| Official export log | The audit entry stores no review state at export time, so "approved" means approved now | Label it "exports of versions now approved"; storing the state at export is a later task |
+| Average days in review | No real events yet | "No decisions yet" until there are |
+| Outcome coverage | No catalog on `sms_db` and no faculty link | Loading the catalog is a data step for you to approve; "My subjects" stays pending |
+| Units by category | No category field | Pending card |
+| Compliance cards | 0 rules and runs on `sms_db` | Compact empty state |
+
+### V2.9 Decisions needed
+1. **Prefer drafts with subjects in the counted-version rule?** Recommended: yes. Otherwise BSIT-DEMO-2026 counts the empty FINAL and shows 0 units.
+2. **Add a sixth pipeline bucket, "Active (not reviewed)"?** Recommended: yes. Otherwise the three active versions must be mislabelled.
+3. **Use `MIN_TOTAL_UNITS` rules for targets?** Recommended: yes, no migration.
+4. **Confirm 146 and load it?** You or I would check it against the CMO in `C:\xampp\csms-reference-documents`. Until a rule exists, BSIT shows "No target set".
+5. **Which charts stay removed?** Your table drops Required vs optional, Grade weighting and the I/P/D chart from every dashboard. Recommended: drop them; the data remains in their modules.
 
 ---
 
@@ -244,3 +434,8 @@ None for step 1. Optional later: the backend tasks in §9.
 3. Card titles: keep sans-serif per D5, or serif as in the brief?
 4. Representative-version rule (§4) acceptable?
 5. Optional, later: add a subject category column (needs a migration) so the "units by category" chart becomes possible.
+
+## V2 decisions recorded (2026-11-05)
+Approved: drafts with placements count first; sixth pipeline bucket "Active (not reviewed)"; targets only from `MIN_TOTAL_UNITS` rules (none loaded, so "No target set"); Required vs optional, Grade weighting and I/P/D charts removed. Staff "Needs attention" lists validator failures and placements with incomplete grade weighting in their versions.
+
+CMO 25 s.2015 figures for the adviser: Section 8.1, p.10, minimum total 146 units (GE 54, Common 18, Professional 48, Electives 12, Math 0, PE 8, NSTP 6); COE minimum 134. Section 23, p.48: from AY 2018-2019 GE falls from 54 to a minimum of 36 under CMO 20 s.2013; the balance of 18 "may be replaced by professional/domain courses... as long as the minimum total number of units is satisfied as articulated in Section 8.1".

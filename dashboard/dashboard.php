@@ -5,8 +5,7 @@ require_once __DIR__ . '/DashboardAnalyticsService.php';
 require_once __DIR__ . '/../modules/curriculum/validators/DomainValidator.php';
 
 $userId = current_user_id();
-$dashboardPermissions = ['program.view', 'curriculum.view', 'subject.view', 'prerequisite.view', 'compliance.view',
-    'grade_weighting.view', 'curriculum.update', 'curriculum.version.create', 'audit.view'];
+$dashboardPermissions = DashboardAnalyticsService::PERMISSIONS;
 $can = [];
 foreach ($dashboardPermissions as $permission) {
     $can[$permission] = $userId !== null && user_can($userId, $permission);
