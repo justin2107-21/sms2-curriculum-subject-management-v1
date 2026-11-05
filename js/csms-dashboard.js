@@ -418,25 +418,44 @@
     }
   };
 
-function render(payload) {
+  // Card-level filter (Super Admin): the program filter lives in the pipeline card's header and reaches only that card.
+  const cardScope = root.dataset.filterScope === 'card';
+  function attachCardFilter(el) {
+    const box = $('dashboardCardFilter');
+    if (!box) return;
+    const head = el.querySelector('.csms-card__head');
+    const link = head.querySelector('.csms-card__link');
+    const tools = document.createElement('div');
+    tools.className = 'csms-card__tools';
+    head.classList.add('csms-card__head--tools');
+    tools.appendChild(box);
+    if (link) tools.appendChild(link);
+    head.appendChild(tools);
+  }
+
+  function render(payload) {
     charts.splice(0).forEach(c => c.destroy());
     const filter = payload.filter || {};
+    // Park the card filter before the grid is rebuilt, so re-rendering never destroys it.
+    if (cardScope && $('dashboardCardFilter') && $('dashboardFilterHome')) $('dashboardFilterHome').appendChild($('dashboardCardFilter'));
+    const filterFor = key => (cardScope && key !== 'pipeline' ? {} : filter);
 
     $('metricGrid').innerHTML = (payload.stats || []).map(x => {
       const value = x.value === null ? '—' : num(x.value);
       const inner = '<span class="csms-stat__label">' + esc(x.label) + '</span><strong class="csms-stat__value">' + esc(value) + '</strong>' + (x.detail ? '<span class="csms-stat__detail">' + esc(x.detail) + '</span>' : '');
-      return x.module ? '<a class="csms-stat" href="' + esc(moduleHref(x.module, filter)) + '">' + inner + '</a>' : '<div class="csms-stat">' + inner + '</div>';
+      return x.module ? '<a class="csms-stat" href="' + esc(moduleHref(x.module, filterFor('stat'))) + '">' + inner + '</a>' : '<div class="csms-stat">' + inner + '</div>';
     }).join('');
     $('metricGrid').hidden = !(payload.stats || []).length;
 
     const grid = $('analyticsGrid');
     grid.innerHTML = '';
     Object.entries(payload.charts || {}).forEach(([key, item]) => {
-      const el = card(key, item, filter, key === 'pipeline' ? 'csms-card--wide' : '');
+      const el = card(key, item, filterFor(key), key === 'pipeline' ? 'csms-card--wide' : '');
+      if (cardScope && key === 'pipeline') attachCardFilter(el);
       el.classList.toggle('csms-card--compact', item.status === 'empty');
       grid.appendChild(el);
       const body = el.querySelector('.csms-card__body');
-      if (item.status === 'ok' && renderers[key]) renderers[key](body, item.data, { item, filter });
+      if (item.status === 'ok' && renderers[key]) renderers[key](body, item.data, { item, filter: filterFor(key) });
       else renderState(body, item);
     });
     grid.hidden = !grid.children.length;
@@ -447,7 +466,7 @@ function render(payload) {
     const lists = $('dashboardLists');
     lists.innerHTML = '';
     Object.entries(payload.lists || {}).forEach(([key, item]) => {
-      const el = card(key, Object.assign({}, item, { type: 'list' }), filter, 'csms-card--list');
+      const el = card(key, Object.assign({}, item, { type: 'list' }), filterFor(key), 'csms-card--list');
       el.classList.toggle('csms-card--compact', item.status === 'empty');
       const body = el.querySelector('.csms-card__body');
       if (item.status === 'ok') {
@@ -488,13 +507,13 @@ function render(payload) {
       render(data);
       syncVersionSelect(data);
       const program = (data.programs || []).find(p => p.id === data.filter.program_id);
-      $('dashboardSubtitle').textContent = program ? `Curriculum overview for ${program.code} — ${program.name}.` : 'Curriculum overview across all programs and strands.';
+      if (!cardScope) $('dashboardSubtitle').textContent = program ? `Curriculum overview for ${program.code} — ${program.name}.` : 'Curriculum overview across all programs and strands.';
       const url = new URL(location.href);
       url.searchParams.delete('program'); url.searchParams.delete('version');
       if (data.filter.program_id) url.searchParams.set('program', data.filter.program_id);
       if (data.filter.program_id && versionId) url.searchParams.set('version', data.filter.version_id);
       history[push ? 'pushState' : 'replaceState']({ program: data.filter.program_id, version: versionId || null }, '', url);
-      $('dashboardStatus').textContent = 'Dashboard updated' + (program ? ' for ' + program.code : ' for all programs') + '.';
+      $('dashboardStatus').textContent = (cardScope ? 'Pipeline updated' : 'Dashboard updated') + (program ? ' for ' + program.code : ' for all programs') + '.';
     } catch (error) {
       if (id !== request) return;
       $('dashboardError').textContent = error.message;

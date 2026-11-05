@@ -54,6 +54,7 @@ Stack: plain PHP + Bootstrap 5.3 (custom Sass build, compiled CSS committed), va
 - Remove the duplicate year filter (keep the pills or the dropdown, not both).
 - Show "52 placements" next to the heading and unit totals.
 - Reserve space for the floating CIMF button so it does not cover content.
+- **Update 2026-11-05:** CIMF launcher overlap accepted temporarily; CIMF button will be redesigned later. (A reserved strip beside the dashboard was tried and reverted; page margins stay equal on both sides. The bottom padding that clears the launcher at the end of the page stays.)
 
 ## D9. Session idle timeout: 5 minutes, with a 60-second warning (approved 2026-11-03)
 - Replaces the open "3 vs 5 minutes" question. Idle timeout is **300 seconds**.
@@ -64,6 +65,12 @@ Stack: plain PHP + Bootstrap 5.3 (custom Sass build, compiled CSS committed), va
 - While the warning is open, ordinary mouse/keyboard activity is ignored; only the buttons, or activity in another tab of the same user, dismiss it.
 - The keep-alive heartbeat now has a trailing call, so the server's clock is never more than a moment behind the browser's. Without it the "60 seconds" could be up to 30 s too long.
 - Tests: `tests/session-timeout-config.php` (DB-free) and the logged-in idle checks (`tools/uitest/run.ps1 -IdleSeconds 300 [-Stay]`).
+
+## D10. Program filter placement on dashboards (approved 2026-11-05)
+- **Most cards are program-scoped** (Admin, Staff, Acad Office, Acad Faculty): keep the page-level Program / Strand filter in the page header.
+- **Only one card is program-scoped** (Super Admin: Curriculum pipeline by program): no page-level filter. A compact filter sits inside that card's header, right of the title: a small button showing "All programs ▾" that opens the same searchable panel (search, All / College / Senior High, count). It filters only that card. The URL parameter `?program=` is kept.
+- The server enforces it: for Super Admin the program filter narrows the pipeline only; the other cards, including Awaiting review, count all programs. Their "View in module" links carry no program. Test: `tests/dashboard-role-payload.php`.
+- Rule of thumb for a new profile: count its program-scoped cards; several means page-level, one means card-level.
 
 ## Constraints that still apply
 - Functionality is never sacrificed. No page may load both legacy and Bootstrap CSS. Migrate page by page; pilot page = Pre-requisite Configuration. The legacy UI stays the default until a page is approved.

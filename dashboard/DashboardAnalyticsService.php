@@ -56,7 +56,10 @@ final class DashboardAnalyticsService
             throw new DomainNotFoundException('Program or strand not found.');
         }
         $profile = self::profile($can);
-        $this->versions = $this->allow('curriculum.view') ? array_values(array_filter($this->repo->versions($programId),
+        // Super Admin has one program-scoped card (the pipeline), so the filter reaches only that card: every other
+        // figure, including Awaiting review, counts all programs. Other profiles apply the filter to their whole page.
+        $scopeProgram = $profile === 'super_admin' ? null : $programId;
+        $this->versions = $this->allow('curriculum.view') ? array_values(array_filter($this->repo->versions($scopeProgram),
             static fn(array $v): bool => CurriculumReadScope::allows($v, $userId))) : [];
         $this->counted = array_values(DashboardShaper::countedVersions($this->versions));
 
@@ -296,8 +299,9 @@ final class DashboardAnalyticsService
     private function pipeline(bool $listNone): array
     {
         $programs = $this->programId === null ? $this->repo->programs() : array_values(array_filter($this->repo->programs(), fn($p) => (int)$p['id'] === $this->programId));
+        $versions = $this->programId === null ? $this->versions : array_values(array_filter($this->versions, fn($v) => (int)$v['program_id'] === $this->programId));
         return $this->meta('Curriculum pipeline by program', 'bar', self::CURRICULA, 'Every version of each program, by lifecycle stage.',
-            $this->allow('curriculum.view') ? DashboardShaper::pipeline($programs, $this->versions, self::TOP, $listNone) : DashboardShaper::empty());
+            $this->allow('curriculum.view') ? DashboardShaper::pipeline($programs, $versions, self::TOP, $listNone) : DashboardShaper::empty());
     }
 
     private function completeness(): array

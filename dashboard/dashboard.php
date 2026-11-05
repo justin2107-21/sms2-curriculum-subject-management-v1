@@ -57,6 +57,27 @@ function dashboard_escape(string $value): string
 {
     return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
 }
+// Filter placement (UI_Decisions D10): Super Admin has a single program-scoped card (the pipeline), so its filter lives in that
+// card's header. Every other profile keeps the page-level filter.
+$isCardScope = ($dashboardPayload['profile'] ?? '') === 'super_admin' && $can['program.view'] && $can['curriculum.view'];
+ob_start();
+?>
+<label for="dashboardProgram" id="dashboardProgramLabel"<?= $isCardScope ? ' class="visually-hidden"' : '' ?>><?= $isCardScope ? 'Program or strand for the curriculum pipeline' : 'Program / Strand' ?></label>
+<!-- Native select is the value holder and the no-JavaScript fallback; js/csms-program-picker.js
+     replaces it on screen with the searchable picker. -->
+<select id="dashboardProgram" name="program" data-program-picker>
+  <option value="all"<?= $programId === null ? ' selected' : '' ?>>All programs</option>
+  <?php foreach ($programGroups as $group => $programs): ?>
+  <optgroup label="<?= dashboard_escape($group) ?>">
+    <?php foreach ($programs as $program): ?>
+    <option value="<?= (int)$program['id'] ?>" data-code="<?= dashboard_escape($program['code']) ?>" data-name="<?= dashboard_escape($program['name']) ?>"
+            data-level="<?= dashboard_escape($program['level']) ?>"<?= $program['inactive'] ? ' data-inactive="1"' : '' ?><?= $program['id'] === $programId ? ' selected' : '' ?>><?= dashboard_escape($program['code'] . ' — ' . $program['name'] . ($program['inactive'] ? ' (Inactive)' : '')) ?></option>
+    <?php endforeach; ?>
+  </optgroup>
+  <?php endforeach; ?>
+</select>
+<?php
+$programFilterMarkup = ob_get_clean();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -83,7 +104,7 @@ require __DIR__ . '/../shared/sidebar.php';
   <?php require __DIR__ . '/../shared/topbar.php'; ?>
 
   <main class="content curriculum-dashboard csms-dash" id="curriculumDashboard"
-        data-dashboard-api="dashboard_data.php" data-app-root="../"
+        data-dashboard-api="dashboard_data.php" data-app-root="../" data-filter-scope="<?= $isCardScope ? 'card' : 'page' ?>"
         data-user-id="<?= (int)$userId ?>"
         data-can-view-programs="<?= $can['program.view'] ? '1' : '0' ?>"
         data-can-view-curriculum="<?= $can['curriculum.view'] ? '1' : '0' ?>">
@@ -96,22 +117,9 @@ require __DIR__ . '/../shared/sidebar.php';
               : dashboard_escape('Curriculum overview for ' . $selectedProgram['code'] . ' — ' . $selectedProgram['name'] . '.') ?>
         </p>
       </div>
-      <?php if ($can['program.view'] && $can['curriculum.view']): ?>
+      <?php if ($can['program.view'] && $can['curriculum.view'] && !$isCardScope): ?>
       <form class="csms-dash-filter" id="dashboardFilter" method="get" action="dashboard.php" role="search" aria-label="Dashboard filter">
-        <label for="dashboardProgram" id="dashboardProgramLabel">Program / Strand</label>
-        <!-- Native select is the value holder and the no-JavaScript fallback; js/csms-program-picker.js
-             replaces it on screen with the searchable picker. -->
-        <select id="dashboardProgram" name="program" data-program-picker>
-          <option value="all"<?= $programId === null ? ' selected' : '' ?>>All programs</option>
-          <?php foreach ($programGroups as $group => $programs): ?>
-          <optgroup label="<?= dashboard_escape($group) ?>">
-            <?php foreach ($programs as $program): ?>
-            <option value="<?= (int)$program['id'] ?>" data-code="<?= dashboard_escape($program['code']) ?>" data-name="<?= dashboard_escape($program['name']) ?>"
-                    data-level="<?= dashboard_escape($program['level']) ?>"<?= $program['inactive'] ? ' data-inactive="1"' : '' ?><?= $program['id'] === $programId ? ' selected' : '' ?>><?= dashboard_escape($program['code'] . ' — ' . $program['name'] . ($program['inactive'] ? ' (Inactive)' : '')) ?></option>
-            <?php endforeach; ?>
-          </optgroup>
-          <?php endforeach; ?>
-        </select>
+        <?= $programFilterMarkup ?>
         <span class="csms-dash-version" id="dashboardVersionWrap"<?= $programId === null ? ' hidden' : '' ?>>
           <label for="dashboardVersion">Version</label>
           <select id="dashboardVersion" name="version">
@@ -137,6 +145,10 @@ require __DIR__ . '/../shared/sidebar.php';
       <div class="csms-list-grid" id="dashboardLists"></div>
     </section>
     <section id="dashboardEmpty" class="dashboard-empty" hidden></section>
+    <?php if ($isCardScope): ?>
+    <!-- Home of the pipeline card's filter; js/csms-dashboard.js moves it into that card's header. -->
+    <div id="dashboardFilterHome" hidden><div class="csms-card__filter" id="dashboardCardFilter"><?= $programFilterMarkup ?></div></div>
+    <?php endif; ?>
   </main>
 
   <footer class="footer">Bestlink College of the Philippines &middot; CSMS-SMS2 &copy; 2026</footer>

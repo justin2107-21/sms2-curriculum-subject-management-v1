@@ -222,5 +222,15 @@ a.csms-stat:hover { border-color: var(--csms-navy, #1a3a8c); }
 .csms-legend__value { flex: 0 0 auto; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--csms-text, #1f2937); }
 .csms-legend__value small { font-weight: 500; color: var(--dash-muted); }
 
-/* D8: the fixed CIMF launcher (right 24px, 60px wide) must never cover content, so wide screens keep a clear strip beside it. */
-@media (min-width: 601px) { .csms-dash #dashboardResults, .csms-dash #dashboardEmpty { margin-right: 72px; } }
+/* Compact filter inside one card's header (used when only that card is program-scoped, UI_Decisions D10) */
+.csms-card__head--tools { flex-wrap: wrap; }
+.csms-card__tools { display: flex; flex: 0 1 auto; align-items: center; gap: 8px 12px; margin-left: auto; }
+.csms-card__filter { flex: 0 1 auto; }
+.csms-card__filter .csms-picker__trigger { width: auto; min-width: 9.5rem; max-width: 15rem; height: 32px; padding: 0 10px; }
+.csms-card__filter .csms-picker__panel { right: 0; left: auto; width: min(26rem, calc(100vw - 48px)); }
+@media (max-width: 600px) {
+  .csms-card__tools { width: 100%; justify-content: space-between; margin-left: 0; }
+  .csms-card__filter { flex: 1 1 auto; min-width: 0; }
+  .csms-card__filter .csms-picker, .csms-card__filter .csms-picker__trigger { width: 100%; max-width: none; }
+  .csms-card__filter .csms-picker__panel { left: 0; right: auto; width: 100%; }
+}

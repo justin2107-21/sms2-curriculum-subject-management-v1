@@ -54,5 +54,13 @@ $check($rows !== [], 'Completeness has rows');
 if ($rules === 0) foreach ($rows as $r) $check($r['target'] === null, 'No rule, no target: ' . $r['label']);
 $labels = array_column($rows, 'label');
 $check(count($labels) === count(array_unique($labels)), 'One row per curriculum');
+// Filter placement rule: for Super Admin the program filter reaches only the pipeline card.
+$sa = (int)$db->query("SELECT id FROM users WHERE username='uitest.superadmin'")->fetch_row()[0];
+$can = []; foreach (DashboardAnalyticsService::PERMISSIONS as $p) $can[$p] = user_can($sa, $p);
+$program = (int)$db->query("SELECT c.academic_program_id FROM curriculum_versions v JOIN curricula c ON c.id=v.curriculum_id GROUP BY c.academic_program_id ORDER BY COUNT(*) DESC LIMIT 1")->fetch_row()[0];
+$all = $service->build($sa, $can, null, null); $one = $service->build($sa, $can, $program, null);
+$check(count($all['charts']['pipeline']['data']['rows']) > 1 && count($one['charts']['pipeline']['data']['rows']) === 1, 'Super Admin filter narrows the pipeline to one program');
+$check($all['stats'] === $one['stats'], 'Super Admin stats ignore the program filter');
+$check($all['charts']['accounts_by_role'] === $one['charts']['accounts_by_role'] && $all['charts']['audit_weekly'] === $one['charts']['audit_weekly'] && $all['lists'] === $one['lists'], 'Super Admin account and audit cards ignore the program filter');
 echo $failures ? "FAILED $failures of $checks\n" : "PASS $checks checks\n";
 exit($failures ? 1 : 0);
