@@ -165,6 +165,45 @@ try {
     $wsProgram = $who['staff']->req("modules/curriculum/http/version_reference_actions.php?action=workspace&curriculum_version_id=$rev");
     $check(array_key_exists('program_type', $wsProgram[2]['workspace'] ?? []), 'the workspace carries the program type for the term choices');
 
+    // Slice 4: versions list, new curriculum, new version, renames. Same endpoints and rules as before.
+    $capi = 'modules/curriculum/http/curriculum_actions.php';
+    $list = $who['staff']->req("$vapi?action=list&curriculum_id=$curriculum&page=1&per_page=50&search=");
+    $rows = $list[2]['versions'] ?? [];
+    $check($list[0] === 200 && count($rows) >= 4 && isset($rows[0]['version_role'], $rows[0]['review_status'], $rows[0]['status']), 'the version list carries role, review state and status for the drawer');
+    $facultyList = $who['acadfaculty']->req("$vapi?action=list&curriculum_id=$curriculum&page=1&per_page=50&search=");
+    $check($facultyList[0] === 200 && !in_array('UITEST-REV', array_column($facultyList[2]['versions'], 'version_label'), true), 'Faculty never sees draft versions in the list');
+    $code = 'S4' . substr((string)time(), -6);
+    $newCurr = ['action' => 'create', 'curriculum_code' => $code, 'curriculum_name' => 'Slice four test', 'academic_program_id' => $program];
+    foreach (['staff', 'acadoffice', 'acadfaculty'] as $role) {
+        $check($who[$role]->post($capi, $newCurr)[0] === 403, "$role cannot create a curriculum");
+    }
+    $made = $who['admin']->post($capi, $newCurr);
+    $newCurrId = (int)($made[2]['curriculum']['id'] ?? 0);
+    $check($made[0] === 201 && $newCurrId > 0, 'Admin creates a curriculum under a program');
+    try {
+        $check($who['admin']->post($capi, $newCurr)[0] === 409, 'a duplicate curriculum code is refused');
+        $check($who['admin']->post($capi, ['action' => 'create', 'curriculum_code' => '', 'curriculum_name' => 'x', 'academic_program_id' => $program])[0] === 422, 'an empty curriculum code is refused');
+        $renamed = $who['admin']->post($capi, ['action' => 'update', 'id' => $newCurrId, 'curriculum_code' => $code, 'curriculum_name' => 'Slice four renamed', 'academic_program_id' => $program, 'status' => 'active']);
+        $check($renamed[0] === 200 && $one("SELECT curriculum_name FROM curricula WHERE id=$newCurrId") === 'Slice four renamed', 'Admin renames the curriculum');
+        $check($who['acadoffice']->post($capi, ['action' => 'update', 'id' => $newCurrId, 'curriculum_code' => $code, 'curriculum_name' => 'No', 'academic_program_id' => $program, 'status' => 'active'])[0] === 403, 'Acad Office cannot rename a curriculum');
+        foreach (['acadoffice', 'acadfaculty'] as $role) {
+            $check($who[$role]->post($vapi, ['action' => 'create', 'curriculum_id' => $newCurrId, 'version_label' => 'V-NO'])[0] === 403, "$role cannot create a version");
+        }
+        $ver = $who['staff']->post($vapi, ['action' => 'create', 'curriculum_id' => $newCurrId, 'version_label' => 'V1', 'effective_academic_year' => '2027-2028']);
+        $verId = (int)($ver[2]['version']['id'] ?? 0);
+        $check($ver[0] === 201 && $verId > 0 && ($ver[2]['version']['version_role'] ?? '') === 'unclassified', 'Staff creates a version, unclassified and editable');
+        $check($who['staff']->post($vapi, ['action' => 'create', 'curriculum_id' => $newCurrId, 'version_label' => 'V1'])[0] === 409, 'a duplicate version label is refused');
+        $check($who['staff']->post($vapi, ['action' => 'rename', 'id' => $verId, 'version_label' => 'V1-renamed'])[0] === 200 && $one("SELECT version_label FROM curriculum_versions WHERE id=$verId") === 'V1-renamed', 'Staff renames an editable version');
+        $check($who['staff']->post($vapi, ['action' => 'rename', 'id' => $verId, 'version_label' => ''])[0] === 422, 'renaming to an empty label is refused');
+        $check($who['acadoffice']->post($vapi, ['action' => 'rename', 'id' => $verId, 'version_label' => 'No'])[0] === 403, 'Acad Office cannot rename a version');
+        $check($who['staff']->post($vapi, ['action' => 'rename', 'id' => $ref, 'version_label' => 'Renamed reference'])[0] === 409, 'a protected reference cannot be renamed');
+        $check($who['staff']->post($vapi, ['action' => 'rename', 'id' => $review, 'version_label' => 'Renamed in review'])[0] === 409, 'a version under review cannot be renamed');
+        $check($who['staff']->post($vapi, ['action' => 'archive', 'id' => $verId])[0] === 400, 'there is still no version archive');
+    } finally {
+        $db->query("DELETE FROM curriculum_versions WHERE curriculum_id=$newCurrId");
+        $db->query("DELETE FROM curricula WHERE id=$newCurrId");
+    }
+
     // Working context for the new module.
     $ctx = 'modules/curriculum/http/working_context_actions.php';
     $saved = $who['staff']->post($ctx, ['action' => 'save', 'module' => 'builder', 'program_id' => $program, 'curriculum_id' => $curriculum, 'version_id' => $rev]);

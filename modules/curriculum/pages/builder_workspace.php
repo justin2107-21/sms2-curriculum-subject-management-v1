@@ -54,6 +54,8 @@ require __DIR__ . '/../../../shared/sidebar.php';
         data-can-attach="<?= $can('curriculum.reference.attach') ? '1' : '0' ?>"
         data-can-clone="<?= $can('curriculum.version.clone') ? '1' : '0' ?>"
         data-can-edit-plan="<?= $can('curriculum.update') ? '1' : '0' ?>"
+        data-can-create-curriculum="<?= $can('curriculum.create') ? '1' : '0' ?>"
+        data-can-create-version="<?= $can('curriculum.version.create') ? '1' : '0' ?>"
         data-can-pick-subject="<?= $can('subject.view') ? '1' : '0' ?>"
         data-can-view-prerequisites="<?= $can('prerequisite.view') ? '1' : '0' ?>"
         data-can-export="<?= $can('curriculum_export.view') ? '1' : '0' ?>"
@@ -86,7 +88,9 @@ require __DIR__ . '/../../../shared/sidebar.php';
         <header class="builder-header">
           <div class="builder-head__left">
             <p class="builder-eyebrow">VERSION WORKSPACE</p>
-            <h2 id="builderVersionTitle"></h2>
+            <div class="builder-title-row"><h2 id="builderVersionTitle"></h2>
+              <div class="builder-more" id="builderMore" hidden><button type="button" class="builder-more__btn" id="builderMoreBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="builderMoreMenu" aria-label="More actions" title="More actions"><i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i></button>
+                <div class="builder-more__menu" id="builderMoreMenu" role="menu" aria-label="More actions" hidden></div></div></div>
             <p class="builder-head__sub" id="builderVersionSub"></p>
           </div>
           <div class="builder-head__mid">
@@ -135,6 +139,47 @@ require __DIR__ . '/../../../shared/sidebar.php';
 
   <div class="footer">Bestlink College of the Philippines &middot; CSMS-SMS2 &copy; 2026</div>
 </div>
+
+<?php if ($can('curriculum.create') || $can('curriculum.update')): ?>
+<!-- New or renamed curriculum -->
+<div class="curriculum-modal" id="builderCurriculumModal" hidden aria-hidden="true">
+  <div class="modal-backdrop" data-modal-close></div>
+  <section class="modal-dialog modal-dialog-medium" role="dialog" aria-modal="true" aria-labelledby="builderCurriculumTitle">
+    <div class="modal-header"><div><h2 id="builderCurriculumTitle">New curriculum</h2><p class="modal-context" id="builderCurriculumContext"></p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
+    <form id="builderCurriculumForm" class="domain-form" novalidate>
+      <input type="hidden" name="id"/>
+      <div class="form-error" role="alert" hidden></div>
+      <div class="form-grid">
+        <label class="form-field form-field-wide" id="builderCurriculumProgramField"><span>Program / Strand <strong>*</strong></span><select name="academic_program_id" required></select></label>
+        <label class="form-field"><span>Curriculum code <strong>*</strong></span><input name="curriculum_code" maxlength="80" required/></label>
+        <label class="form-field"><span>Curriculum name <strong>*</strong></span><input name="curriculum_name" maxlength="255" required/></label>
+        <label class="form-field form-field-wide" id="builderFirstVersionField"><span>First version label <strong>*</strong></span><input name="first_version_label" maxlength="100" value="v1"/><small>A curriculum is opened through a version, so it starts with an editable one.</small></label>
+      </div>
+      <div class="modal-actions"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="submit" class="button-primary" id="builderCurriculumSubmit">Create curriculum</button></div>
+    </form>
+  </section>
+</div>
+<?php endif; ?>
+
+<?php if ($can('curriculum.version.create') || $can('curriculum.update')): ?>
+<!-- New or renamed version -->
+<div class="curriculum-modal" id="builderVersionModal" hidden aria-hidden="true">
+  <div class="modal-backdrop" data-modal-close></div>
+  <section class="modal-dialog modal-dialog-medium" role="dialog" aria-modal="true" aria-labelledby="builderVersionFormTitle">
+    <div class="modal-header"><div><h2 id="builderVersionFormTitle">New version</h2><p class="modal-context" id="builderVersionFormContext"></p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
+    <form id="builderVersionForm" class="domain-form" novalidate>
+      <input type="hidden" name="id"/><input type="hidden" name="curriculum_id"/>
+      <div class="form-error" role="alert" hidden></div>
+      <div class="form-grid">
+        <label class="form-field"><span>Version label <strong>*</strong></span><input name="version_label" maxlength="100" required/></label>
+        <label class="form-field" id="builderVersionYearField"><span>Effective academic year (optional)</span><input name="effective_academic_year" maxlength="50"/></label>
+        <label class="form-field form-field-wide" id="builderVersionDescField"><span>Description (optional)</span><textarea name="description" maxlength="60000" rows="3"></textarea></label>
+      </div>
+      <div class="modal-actions"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="submit" class="button-primary" id="builderVersionSubmit">Create version</button></div>
+    </form>
+  </section>
+</div>
+<?php endif; ?>
 
 <!-- Prerequisite conflict details -->
 <div class="curriculum-modal" id="builderConflictModal" hidden aria-hidden="true">

@@ -717,6 +717,87 @@ async function main() {
       }
     }
 
+    if (arg('probe', '') === 'versions') {
+      // Selector footers (+ New curriculum / + New version) and the More menu in the version header, for this role.
+      // With --builderflow=1 also the create and rename flows in the browser.
+      report.versionsProbe = {};
+      const key = async (k, code) => { for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: k, code: code || k, windowsVirtualKeyCode: { Escape: 27 }[k] || 0 }); };
+      const openLevel = async index => {
+        await evaluate(`(() => { const c = document.querySelector('.csms-ctx-change'); if (c) c.click(); return true; })()`);
+        await sleep(300);
+        await evaluate(`document.querySelectorAll('.csms-ctx-trigger')[${index}].click(); true`);
+        await sleep(1500);
+      };
+      const levelState = index => evaluate(`(() => { const f = document.querySelectorAll('.csms-ctx-field')[${index}]; const b = f.querySelector('.csms-ctx-footer-btn'); const foot = f.querySelector('.csms-ctx-footer'); return { footer: foot.hidden ? '' : b.textContent, options: [...f.querySelectorAll('[role=option]')].map(o => o.textContent.trim().replace(/\\s+/g, ' ')).slice(0, 8) }; })()`);
+      const openMore = async () => {
+        await evaluate(`(() => { const b = document.getElementById('builderMoreBtn'); b.focus(); b.click(); return true; })()`);
+        await sleep(300);
+      };
+      const moreItems = () => evaluate(`[...document.querySelectorAll('#builderMoreMenu [role=menuitem]')].map(x => x.textContent.trim())`);
+      for (const width of widths) {
+        const result = {};
+        await setWidth(width);
+        await navigate(base + urls[0]);
+        await sleep(3000);
+        result.page = await evaluate(`({ oldButtons: !!document.getElementById('builderVersionsOpen') || !!document.getElementById('builderVersionsModal') || !!document.getElementById('builderNewCurriculum'), more: !document.getElementById('builderMore').hidden, overflow: document.documentElement.scrollWidth > innerWidth, title: document.getElementById('builderVersionTitle').textContent })`);
+        await shotView(path.join(out, `${role}-header-more-${width}.png`));
+        if (result.page.more) {
+          await openMore();
+          result.more = await moreItems();
+          await shotView(path.join(out, `${role}-more-menu-${width}.png`));
+          await key('Escape');
+          await sleep(300);
+          result.moreClosed = await evaluate(`({ hidden: document.getElementById('builderMoreMenu').hidden, focus: document.activeElement.id })`);
+        }
+        await openLevel(2);
+        result.versionLevel = await levelState(2);
+        await shotView(path.join(out, `${role}-version-dropdown-${width}.png`));
+        await key('Escape');
+        await sleep(300);
+        await openLevel(1);
+        result.curriculumLevel = await levelState(1);
+        await shotView(path.join(out, `${role}-curriculum-dropdown-${width}.png`));
+        await key('Escape');
+        await sleep(300);
+        if (arg('builderflow', '') === '1' && width === widths[0]) {
+          const stamp = String(Date.now()).slice(-5);
+          const clickFooter = async index => { await openLevel(index); await evaluate(`document.querySelectorAll('.csms-ctx-footer-btn')[${index}].click(); true`); await sleep(1200); };
+          const submit = async (form, fields) => { await evaluate(`(() => { const f = document.getElementById('${form}'); ${Object.entries(fields).map(([n, v]) => `f.elements.${n}.value = '${v}';`).join(' ')} f.requestSubmit(); return true; })()`); await sleep(3500); };
+          const where = () => evaluate(`({ url: location.search, title: document.getElementById('builderVersionTitle').textContent, selector: [...document.querySelectorAll('.csms-ctx-sum-value')].map(v => v.textContent).join(' / ') })`);
+          if (result.curriculumLevel.footer) {
+            await clickFooter(1);
+            result.newCurriculumDialog = await evaluate(`({ title: document.getElementById('builderCurriculumTitle').textContent, program: document.querySelector('#builderCurriculumForm [name=academic_program_id]').selectedOptions[0]?.textContent })`);
+            await shotView(path.join(out, `${role}-new-curriculum-${width}.png`));
+            await submit('builderCurriculumForm', { curriculum_code: 'P5-' + stamp, curriculum_name: 'Probe curriculum ' + stamp, first_version_label: 'P5V1-' + stamp });
+            result.afterCurriculum = await where();
+          }
+          // New version from the Version dropdown.
+          await clickFooter(2);
+          await shotView(path.join(out, `${role}-new-version-${width}.png`));
+          await submit('builderVersionForm', { version_label: 'P5V-' + stamp });
+          result.afterVersion = await where();
+          // Rename version from More.
+          await openMore();
+          result.moreOnNew = await moreItems();
+          await evaluate(`[...document.querySelectorAll('#builderMoreMenu [role=menuitem]')].find(x => x.textContent === 'Rename version').click(); true`);
+          await sleep(600);
+          result.renameDialog = await evaluate(`({ title: document.getElementById('builderVersionFormTitle').textContent, label: document.querySelector('#builderVersionForm [name=version_label]').value, yearHidden: document.getElementById('builderVersionYearField').hidden })`);
+          await shotView(path.join(out, `${role}-rename-version-${width}.png`));
+          await submit('builderVersionForm', { version_label: 'P5R-' + stamp });
+          result.afterRename = await where();
+          // Rename curriculum from More (the server may refuse it, e.g. when a protected version exists).
+          await openMore();
+          await evaluate(`[...document.querySelectorAll('#builderMoreMenu [role=menuitem]')].find(x => x.textContent === 'Rename curriculum').click(); true`);
+          await sleep(1500);
+          await shotView(path.join(out, `${role}-rename-curriculum-${width}.png`));
+          await submit('builderCurriculumForm', { curriculum_name: 'Probe renamed ' + stamp });
+          result.afterCurriculumRename = await evaluate(`({ url: location.search, error: (document.querySelector('#builderCurriculumForm .form-error') || {}).textContent || '', dialogOpen: !document.getElementById('builderCurriculumModal').hidden, selector: document.getElementById('curriculumSearch').value })`);
+          await shotView(path.join(out, `${role}-rename-curriculum-result-${width}.png`));
+        }
+        report.versionsProbe[width] = result;
+      }
+    }
+
     if (arg('probe', '') === 'ctxlayout') {
       // Phase 1 geometry of the context picker on each page: field boxes, label and separator styles, gaps.
       report.ctxLayout = {};

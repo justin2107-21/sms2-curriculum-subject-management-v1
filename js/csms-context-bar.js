@@ -82,6 +82,7 @@
           '<input type="search" class="csms-ctx-search" role="combobox" aria-autocomplete="list" aria-expanded="true" aria-controls="' + id + 'O' + index + '" autocomplete="off" placeholder="Search ' + name.toLowerCase() + '" aria-label="Search ' + name.toLowerCase() + '">' +
           '<p class="csms-ctx-count" aria-live="polite"></p>' +
           '<div class="csms-ctx-options" id="' + id + 'O' + index + '" role="listbox" aria-labelledby="' + id + 'L' + index + '"></div>' +
+          '<div class="csms-ctx-footer" hidden><button type="button" class="csms-ctx-footer-btn"></button></div>' +
         '</div>';
       ui.appendChild(field);
       fields.push({
@@ -93,6 +94,8 @@
         search: field.querySelector('.csms-ctx-search'),
         count: field.querySelector('.csms-ctx-count'),
         list: field.querySelector('.csms-ctx-options'),
+        footer: field.querySelector('.csms-ctx-footer'),
+        footerButton: field.querySelector('.csms-ctx-footer-btn'),
         shown: [],
         active: -1,
         seq: 0,
@@ -330,6 +333,10 @@
       entry.panel.hidden = false;
       entry.trigger.setAttribute('aria-expanded', 'true');
       entry.search.value = '';
+      // A page may attach one action to the foot of a list (levels[i].footer = { label, onClick }), e.g. "+ New version".
+      const footer = levels[index].footer;
+      entry.footer.hidden = !(footer && footer.label);
+      if (footer && footer.label) entry.footerButton.textContent = footer.label;
       load(index, '', preloaded).then(function () { if (entry.shown.length) setActive(index, 0); });
       entry.search.focus();
     }
@@ -382,7 +389,17 @@
         else if (event.key === 'End') { event.preventDefault(); setActive(index, entry.shown.length - 1); }
         else if (event.key === 'Enter') { event.preventDefault(); if (entry.active >= 0) choose(index, entry.shown[entry.active]); }
         else if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeAll(true); }
-        else if (event.key === 'Tab') { closeAll(false); }
+        else if (event.key === 'Tab') { if (event.shiftKey || entry.footer.hidden) closeAll(false); }
+      });
+      entry.footerButton.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeAll(true); }
+        else if (event.key === 'Tab' && !event.shiftKey) closeAll(false);
+        else if (event.key === 'Tab' && event.shiftKey) { event.preventDefault(); entry.search.focus(); }
+      });
+      entry.footerButton.addEventListener('click', function () {
+        const footer = levels[index].footer;
+        closeAll(false);
+        if (footer && typeof footer.onClick === 'function') footer.onClick();
       });
       entry.list.addEventListener('mousedown', function (event) { if (event.target.closest('[role="option"]')) event.preventDefault(); });
       entry.list.addEventListener('click', function (event) {

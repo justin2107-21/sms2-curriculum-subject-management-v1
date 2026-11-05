@@ -244,3 +244,11 @@ Each ends with tests and your review; commits only when you approve.
 - **Move and remove:** actions column on the right, shown only when the server says the version is editable and the user holds `curriculum.update`. Move opens a menu of terms; remove asks for confirmation.
 - **Refusals:** a refused move opens the Prerequisite conflict dialog with the server's conflicts; add and remove show the server's message in their dialog; lifecycle refusals on a stale page show as a toast and the plan refreshes. No rule lives in the page.
 - **Endpoints:** existing `assignment_actions.php` actions only (`placement_subject_options`, `map_subject`, `update_mapping`, `remove`). The workspace payload gained `program_type` for the term choices.
+
+### Slice 4: New version, new curriculum, renames (no versions drawer)
+
+- **No Versions button or drawer:** the selector already lists versions (each option shows its status, e.g. "PREORAL-2026 · Draft").
+- **Footer actions in the picker:** "+ New version" at the foot of the Version list (`curriculum.version.create`) and "+ New curriculum" at the foot of the Curriculum list (`curriculum.create`: Super Admin, Admin). Shared picker feature: a level may carry `footer: { label, onClick }`; reachable by keyboard (Tab from the search box). Both open the existing dialogs.
+- **New curriculum** also asks for the first version label, because the shared working context opens a curriculum through a version. The two creates are separate server calls; if the version step fails the dialog says so and retries only that step.
+- **More ⋮ menu** in the version header, right of the title: Rename version (editable versions, `curriculum.update`), Rename curriculum (`curriculum.update`), Compare versions (`subject_history.view`), Create revision (references, `curriculum.version.clone`; the header's primary button for references stays). Items appear only when role and state allow; the server still decides, and its refusal shows in the dialog (e.g. renaming a curriculum with a protected version: "This curriculum version is protected or has an invalid lifecycle state.").
+- Pages reload after a create or rename so the selector shows the new names; a toast is carried across the reload. No version archive. No new endpoints.

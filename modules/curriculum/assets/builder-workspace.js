@@ -19,7 +19,7 @@
     const flag = key => root.dataset[key] === '1';
     const can = {
         submit: flag('canSubmit'), decide: flag('canDecide'), classify: flag('canClassify'), attach: flag('canAttach'),
-        clone: flag('canClone'), editPlan: flag('canEditPlan'), pickSubject: flag('canPickSubject'), prerequisites: flag('canViewPrerequisites'),
+        clone: flag('canClone'), editPlan: flag('canEditPlan'), pickSubject: flag('canPickSubject'), createCurriculum: flag('canCreateCurriculum'), createVersion: flag('canCreateVersion'), prerequisites: flag('canViewPrerequisites'),
         exportVersion: flag('canExport'), exportDraft: flag('canExportDraft'), exportOfficial: flag('canExportOfficial'), history: flag('canHistory')
     };
     const me = Number(root.dataset.userId) || 0;
@@ -46,7 +46,8 @@
                     action: 'list', page: 1, per_page: 50, search: query, status: '', academic_program_id: $('programId').value
                 })).curricula : [],
                 getId: item => item.id,
-                format: item => ({ label: item.curriculum_code + ' — ' + item.curriculum_name, code: item.curriculum_code, title: item.curriculum_name })
+                format: item => ({ label: item.curriculum_code + ' — ' + item.curriculum_name, code: item.curriculum_code, title: item.curriculum_name }),
+                footer: can.createCurriculum ? { label: '+ New curriculum', onClick: () => openCurriculumForm('create') } : null
             },
             {
                 input: $('versionSearch'), valueInput: $('versionId'), list: $('versionOptions'),
@@ -57,7 +58,8 @@
                     action: 'list', curriculum_id: $('curriculumId').value, page: 1, per_page: 50, search: query
                 })).versions : [],
                 getId: item => item.id,
-                format: item => ({ label: item.version_label, code: item.version_label, title: item.effective_academic_year || '' })
+                format: item => ({ label: item.version_label, code: item.version_label, title: item.effective_academic_year || '' }),
+                footer: can.createVersion ? { label: '+ New version', onClick: () => openVersionForm('create', null) } : null
             }
         ],
         onChange: function (index, item, id, action) {
@@ -79,6 +81,7 @@
         $('builderAccessBadge').hidden = true;
         $('builderActions').innerHTML = '';
         $('builderLinks').innerHTML = '';
+        $('builderMore').hidden = true;
         showState('Choose a curriculum version to begin', 'Pick a program, curriculum and version above. Your last choice is remembered.');
     }
 
@@ -256,9 +259,6 @@
             }
         }
         parts.push('<a href="subject_mapping.php?' + esc(query.toString()) + '&amp;tab=outcomes" class="secondary-action-button"><i class="fa-solid fa-graduation-cap" aria-hidden="true"></i> Graduate outcomes</a>');
-        if (can.history && ws.version_role === 'proposed' && ws.baseline_version_id) {
-            parts.push('<a href="curriculum_history_view.php?curriculum_id=' + Number(ws.curriculum_id) + '&amp;version_b_id=' + Number(ws.id) + '" class="secondary-action-button"><i class="fa-solid fa-code-compare" aria-hidden="true"></i> Compare with reference</a>');
-        }
         $('builderLinks').innerHTML = parts.join('');
     }
 
@@ -418,7 +418,7 @@
         const access = $('builderAccessBadge');
         access.innerHTML = ws.editable && can.editPlan ? ui.statusBadge('editable') : ui.statusBadge('read_only');
         access.hidden = false;
-        facts(); actions(); links(); plan(); details(); history();
+        facts(); actions(); links(); plan(); details(); history(); more();
     }
 
     // ---- Tabs ---------------------------------------------------------------------------------------------------
@@ -445,7 +445,7 @@
 
     // ---- Dialogs ------------------------------------------------------------------------------------------------
     const dialogs = {};
-    ['Review', 'Attach', 'Classify', 'Clone', 'Conflict', 'Add', 'Remove'].forEach(function (name) {
+    ['Review', 'Attach', 'Classify', 'Clone', 'Conflict', 'Add', 'Remove', 'Curriculum', 'Version'].forEach(function (name) {
         const element = $('builder' + name + 'Modal');
         if (element) dialogs[name.toLowerCase()] = ui.createModal(element);
     });
@@ -553,21 +553,22 @@
     });
 
     // Create a revision from a reference.
-    async function openClone() {
+    async function openClone(source) {
         if (!dialogs.clone) return;
+        const src = source || { id: state.ws.id, curriculum_id: state.ws.curriculum_id, label: state.ws.version_label };
         const form = $('builderCloneForm');
         form.reset(); ui.clearFormError(form);
-        form.elements.source_version_id.value = state.ws.id;
-        form.elements.curriculum_id.value = state.ws.curriculum_id;
+        form.elements.source_version_id.value = src.id;
+        form.elements.curriculum_id.value = src.curriculum_id;
         form.querySelector('button[type="submit"]').disabled = true;
         const scope = $('builderCloneScope');
         scope.textContent = 'Checking the protected reference and copy scope…';
         dialogs.clone.open();
         const ticket = state.ticket;
         try {
-            const result = await ui.fetchJson(api.versions, { action: 'clone_preview', source_version_id: state.ws.id, curriculum_id: state.ws.curriculum_id });
+            const result = await ui.fetchJson(api.versions, { action: 'clone_preview', source_version_id: src.id, curriculum_id: src.curriculum_id });
             if (ticket !== state.ticket) return;
-            scope.textContent = state.ws.program_code + ' / ' + state.ws.version_label + '. Copy: ' +
+            scope.textContent = (state.ws ? state.ws.program_code + ' / ' : '') + src.label + '. Copy: ' +
                 Object.entries(result.preview.counts).map(([key, value]) => value + ' ' + key).join(', ') + '. ' + result.preview.notice;
             form.querySelector('button[type="submit"]').disabled = false;
         } catch (error) { scope.textContent = 'Cannot create a revision: ' + error.message; }
@@ -581,9 +582,9 @@
         try {
             const result = await ui.postForm(api.versions, data);
             ui.showToast(result.message, 'success');
-            const ws = state.ws;
             // Open the new revision: the address carries the context.
-            window.location.search = new URLSearchParams({ program_id: ws.academic_program_id || '', curriculum_id: ws.curriculum_id, version_id: result.version.id }).toString();
+            flash(result.message);
+            window.location.search = new URLSearchParams({ program_id: programId(), curriculum_id: $('builderCloneForm').elements.curriculum_id.value, version_id: result.version.id }).toString();
         } catch (error) { ui.showFormError(form, error.message || 'Revision creation failed.'); ui.setFormSubmitting(form, false); }
     });
 
@@ -753,6 +754,176 @@
             await refreshPlan('');
         } catch (error) { ui.showFormError(form, error.message || 'The subject could not be removed.'); }
         finally { ui.setFormSubmitting(form, false); }
+    });
+
+    // ---- Versions drawer, new and renamed curricula and versions (slice 4) -------------------------------------
+    // Every refusal is the server's. Pages reload after a create or rename so the selector shows the new names.
+    const FLASH = 'csms.builder.flash';
+    function flash(message) { try { sessionStorage.setItem(FLASH, message || ''); } catch (error) { /* storage may be disabled */ } }
+    try { const pending = sessionStorage.getItem(FLASH); if (pending) { sessionStorage.removeItem(FLASH); setTimeout(() => ui.showToast(pending, 'success'), 600); } } catch (error) { /* ignore */ }
+    const programId = () => $('programId').value || (state.ws && state.ws.academic_program_id) || '';
+    const go = (program, curriculum, version) => { window.location.search = new URLSearchParams(Object.assign({ program_id: program, curriculum_id: curriculum }, version ? { version_id: version } : {})).toString(); };
+    const versionEditable = v => v.version_role === 'unclassified' ? v.review_status === 'not_started' && !v.baseline_version_id
+        : v.version_role === 'proposed' && Boolean(v.baseline_version_id) && ['not_started', 'draft', 'returned'].includes(v.review_status);
+    // ---- More menu (version header): rename version, rename curriculum, compare, create revision ----
+    // Items appear only when the role and the version state allow them; the server still decides every action.
+    const moreMenu = $('builderMoreMenu');
+    function moreItems() {
+        const ws = state.ws, items = [];
+        if (can.editPlan && ws.editable) items.push({ label: 'Rename version', run: () => openVersionForm('rename', { id: ws.id, version_label: ws.version_label }) });
+        if (can.editPlan) items.push({ label: 'Rename curriculum', run: () => openCurriculumForm('rename') });
+        if (can.history) items.push({ label: 'Compare versions', href: 'curriculum_history_view.php?' + new URLSearchParams({ curriculum_id: ws.curriculum_id, version_b_id: ws.id }).toString() });
+        if (can.clone && ws.version_role === 'reference') items.push({ label: 'Create revision', run: () => openClone() });
+        return items;
+    }
+    let moreCurrent = [];
+    function more() {
+        moreCurrent = moreItems();
+        $('builderMore').hidden = !moreCurrent.length;
+        closeMore(false);
+        moreMenu.innerHTML = moreCurrent.map((item, index) => item.href
+            ? '<a role="menuitem" tabindex="-1" href="' + esc(item.href) + '">' + esc(item.label) + '</a>'
+            : '<button type="button" role="menuitem" tabindex="-1" data-more="' + index + '">' + esc(item.label) + '</button>').join('');
+    }
+    function closeMore(refocus) {
+        if (moreMenu.hidden) return;
+        moreMenu.hidden = true;
+        $('builderMoreBtn').setAttribute('aria-expanded', 'false');
+        if (refocus) $('builderMoreBtn').focus();
+    }
+    function openMore() {
+        moreMenu.hidden = false;
+        $('builderMoreBtn').setAttribute('aria-expanded', 'true');
+        moreMenu.querySelector('[role="menuitem"]').focus();
+    }
+    $('builderMoreBtn').addEventListener('click', () => moreMenu.hidden ? openMore() : closeMore(true));
+    $('builderMoreBtn').addEventListener('keydown', function (event) { if (event.key === 'ArrowDown') { event.preventDefault(); if (moreMenu.hidden) openMore(); } });
+    moreMenu.addEventListener('click', function (event) {
+        const item = event.target.closest('[data-more]');
+        if (!item) return;
+        closeMore(false);
+        moreCurrent[Number(item.dataset.more)].run();
+    });
+    moreMenu.addEventListener('keydown', function (event) {
+        const items = Array.from(moreMenu.querySelectorAll('[role="menuitem"]'));
+        const at = items.indexOf(document.activeElement);
+        const step = { ArrowDown: 1, ArrowUp: -1 }[event.key];
+        if (step) { event.preventDefault(); items[(at + step + items.length) % items.length].focus(); }
+        else if (event.key === 'Home') { event.preventDefault(); items[0].focus(); }
+        else if (event.key === 'End') { event.preventDefault(); items[items.length - 1].focus(); }
+        else if (event.key === 'Escape') { event.preventDefault(); closeMore(true); }
+        else if (event.key === 'Tab') closeMore(false);
+    });
+    document.addEventListener('click', event => { if (!moreMenu.hidden && !event.target.closest('#builderMore')) closeMore(false); });
+
+    // Version form: create or rename.
+    let versionMode = 'create';
+    function openVersionForm(mode, version) {
+        if (!dialogs.version) return;
+        versionMode = mode;
+        const form = $('builderVersionForm');
+        form.reset(); ui.clearFormError(form);
+        form.elements.curriculum_id.value = $('curriculumId').value;
+        form.elements.id.value = version ? version.id : '';
+        form.elements.version_label.value = version ? version.version_label : '';
+        $('builderVersionYearField').hidden = mode === 'rename';
+        $('builderVersionDescField').hidden = mode === 'rename';
+        $('builderVersionFormTitle').textContent = mode === 'rename' ? 'Rename version' : 'New version';
+        $('builderVersionFormContext').textContent = $('curriculumSearch').value || (state.ws ? state.ws.curriculum_code : '');
+        $('builderVersionSubmit').textContent = mode === 'rename' ? 'Save name' : 'Create version';
+        dialogs.version.open();
+    }
+    $('builderVersionForm')?.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        const form = event.currentTarget;
+        if (!form.elements.version_label.value.trim()) { ui.showFormError(form, 'Enter a version label.'); return; }
+        const data = new FormData(form);
+        data.set('action', versionMode === 'rename' ? 'rename' : 'create');
+        if (versionMode === 'create') data.delete('id');
+        ui.setFormSubmitting(form, true, 'Saving…');
+        try {
+            const result = await ui.postForm(api.versions, data);
+            flash(result.message);
+            const curriculum = form.elements.curriculum_id.value;
+            go(programId(), curriculum, versionMode === 'create' ? result.version.id : (state.versionId || form.elements.id.value));
+        } catch (error) { ui.showFormError(form, error.message || 'The version could not be saved.'); ui.setFormSubmitting(form, false); }
+    });
+
+    // Curriculum form: create (needs a program) or rename (code and name; program and status are kept).
+    let curriculumMode = 'create';
+    let curriculumRecord = null;
+    let createdCurriculum = null;   // set when the curriculum exists but its first version still has to be created
+    async function openCurriculumForm(mode) {
+        if (!dialogs.curriculum) return;
+        curriculumMode = mode;
+        curriculumRecord = null;
+        const form = $('builderCurriculumForm');
+        form.reset(); ui.clearFormError(form);
+        $('builderCurriculumTitle').textContent = mode === 'rename' ? 'Rename curriculum' : 'New curriculum';
+        $('builderCurriculumSubmit').textContent = mode === 'rename' ? 'Save' : 'Create curriculum';
+        $('builderCurriculumProgramField').hidden = mode === 'rename';
+        $('builderFirstVersionField').hidden = mode === 'rename';
+        form.elements.academic_program_id.required = mode !== 'rename';
+        createdCurriculum = null;
+        dialogs.curriculum.open();
+        try {
+            if (mode === 'rename') {
+                const id = $('curriculumId').value;
+                const data = await ui.fetchJson(api.curricula, { action: 'get', id: id });
+                curriculumRecord = data.curriculum;
+                form.elements.id.value = curriculumRecord.id;
+                form.elements.curriculum_code.value = curriculumRecord.curriculum_code;
+                form.elements.curriculum_name.value = curriculumRecord.curriculum_name;
+                $('builderCurriculumContext').textContent = $('programSearch').value || '';
+            } else {
+                $('builderCurriculumContext').textContent = 'Added under the program you choose.';
+                const select = form.elements.academic_program_id;
+                select.innerHTML = '<option value="">Loading programs…</option>';
+                const data = await ui.fetchJson(api.programs, { action: 'list', page: 1, per_page: 50, search: '', status: 'active' });
+                select.innerHTML = '<option value="">Select program or strand</option>' + data.programs.map(p => '<option value="' + Number(p.id) + '"' + (String(p.id) === String($('programId').value) ? ' selected' : '') + '>' + esc(p.program_code + ' — ' + p.program_name) + '</option>').join('');
+            }
+        } catch (error) { ui.showFormError(form, error.message || 'Could not load the form.'); }
+    }
+    $('builderCurriculumForm')?.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        const form = event.currentTarget;
+        if (!form.reportValidity()) return;
+        const data = new FormData(form);
+        if (curriculumMode === 'rename') {
+            if (!curriculumRecord) { ui.showFormError(form, 'The curriculum is still loading.'); return; }
+            data.set('action', 'update');
+            data.set('academic_program_id', curriculumRecord.academic_program_id);
+            data.set('status', curriculumRecord.status);
+        } else {
+            if (!form.elements.first_version_label.value.trim()) { ui.showFormError(form, 'Enter a label for the first version.'); return; }
+            data.set('action', 'create'); data.delete('id');
+        }
+        ui.setFormSubmitting(form, true, 'Saving…');
+        let step = 'curriculum';
+        try {
+            let record;
+            if (curriculumMode === 'rename') {
+                const result = await ui.postForm(api.curricula, data);
+                flash(result.message);
+                go(programId(), result.curriculum.id, state.versionId || '');
+                return;
+            }
+            if (createdCurriculum) record = createdCurriculum;
+            else { record = (await ui.postForm(api.curricula, data)).curriculum; createdCurriculum = record; }
+            step = 'version';
+            const versionData = new FormData();
+            versionData.set('action', 'create');
+            versionData.set('curriculum_id', record.id);
+            versionData.set('version_label', form.elements.first_version_label.value.trim());
+            const version = (await ui.postForm(api.versions, versionData)).version;
+            flash('Curriculum and first version created.');
+            go(record.academic_program_id, record.id, version.id);
+        } catch (error) {
+            ui.showFormError(form, step === 'version'
+                ? 'The curriculum was created, but its first version was not: ' + (error.message || 'unknown error') + ' Fix the label and save again to retry only the version.'
+                : (error.message || 'The curriculum could not be saved.'));
+            ui.setFormSubmitting(form, false);
+        }
     });
 
     $('builderPlan').addEventListener('click', function (event) {
