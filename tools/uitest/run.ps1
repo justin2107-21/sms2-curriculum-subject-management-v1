@@ -19,6 +19,7 @@ param(
     [string]$Program = "BSCRIM",
     [string]$Prefer = "",
     [string]$Probe = "",
+    [switch]$ProgramWrite,
     [int]$Height = 0,
     [switch]$WarnPreview,
     [string]$Out = ''
@@ -74,6 +75,7 @@ try {
         if ($IdleSeconds -gt 0) { $nodeArgs += "--idle=$IdleSeconds" }
         if ($Height -gt 0) { $nodeArgs += "--height=$Height" }
         if ($Probe) { $nodeArgs += "--probe=$Probe" }
+        if ($ProgramWrite) { $nodeArgs += '--programwrite=1' }
         if ($ReviewFlow) { $nodeArgs += "--reviewflow=$ReviewFlow" }
         if ($CtxScenario) { $nodeArgs += "--ctxscenario=1"; if ($FailStep) { $nodeArgs += "--fail-step=$FailStep" } }
         if ($CtxNav) { $nodeArgs += "--ctxnav=1"; $nodeArgs += "--program=$Program"; if ($Prefer) { $nodeArgs += "--prefer=$Prefer" } }

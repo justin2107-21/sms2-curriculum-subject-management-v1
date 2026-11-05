@@ -46,7 +46,6 @@ if ($isProgramPage && !in_array($programCategory, ['', 'college', 'shs'], true))
     http_response_code(400);
     exit('Invalid academic program category.');
 }
-$isProgramLanding = $isProgramPage && $programCategory === '';
 
 $userId = current_user_id();
 $canViewPrograms = $userId !== null && user_can($userId, 'program.view');
@@ -64,7 +63,7 @@ $canClassifyReference = $userId !== null && user_can($userId, 'curriculum.refere
 $canCloneReference = $userId !== null && user_can($userId, 'curriculum.version.clone');
 $canSubmitReview = $userId !== null && user_can($userId, 'curriculum.review.submit');
 $canDecideReview = $userId !== null && user_can($userId, 'curriculum.review.decide');
-$programColumnCount = ($programCategory === 'shs' ? 4 : 5) + ($canUpdatePrograms ? 1 : 0);
+$programColumnCount = 5 + ($canUpdatePrograms ? 1 : 0);
 $curriculumColumnCount = $canUpdateCurricula ? 7 : 6;
 $initialCurriculumId = $isCurriculaPage
     ? filter_var($_GET['curriculum_id'] ?? $_GET['id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]])
@@ -79,13 +78,13 @@ $isCurriculaProgramView = $isCurriculaPage && $initialProgramId !== false && $in
 $isCurriculumWorkspaceView = $isCurriculaPage && $initialCurriculumId !== false;
 $curriculaView = $isCurriculaProgramView ? 'program-curricula' : ($isCurriculumWorkspaceView ? 'curriculum-workspace' : 'program-list');
 $pageTitle = $isProgramPage
-    ? ($programCategory === 'shs' ? 'Senior High School Strands' : ($programCategory === 'college' ? 'College Programs' : 'Academic Programs'))
+    ? 'Academic Programs'
     : 'Curricula';
 $pageIcon = $isProgramPage
-    ? ($programCategory === 'shs' ? 'fa-book-open' : 'fa-graduation-cap')
+    ? 'fa-graduation-cap'
     : 'fa-table-list';
 $pageSubtitle = $isProgramPage
-    ? ($isProgramLanding ? 'Browse academic offerings by level.' : ($programCategory === 'shs' ? 'Grade 11–12 strands.' : 'Higher-education academic programs.'))
+    ? 'College programs and Senior High School strands.'
     : 'Browse curricula by academic program or strand.';
 $avatarInitial = strtoupper(substr((string)($_SESSION['first_name'] ?? 'U'), 0, 1));
 $curriculumCssVersion = substr(hash_file('sha256', __DIR__ . '/../assets/curriculum.css'), 0, 16);
@@ -142,14 +141,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
         data-can-create-versions="<?= $canCreateVersions ? '1' : '0' ?>"
         data-can-assign-subjects="<?= $canAssignSubjects ? '1' : '0' ?>"
         data-can-remove-assignments="<?= $canUpdateCurricula ? '1' : '0' ?>">
-    <?php if ($isProgramLanding): ?>
-    <div class="page-title-bar curriculum-title-bar">
-      <div>
-        <h1 class="page-title">Academic Programs</h1>
-        <p class="page-subtitle">Browse academic offerings by level.</p>
-      </div>
-    </div>
-    <?php elseif ($isCurriculaProgramView): ?>
+    <?php if ($isCurriculaProgramView): ?>
     <div class="page-title-bar curriculum-title-bar">
       <div><a class="program-back-link" href="curricula.php"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Back to Curricula</a><h1 class="page-title"><span id="selectedProgramCode">Loading...</span></h1><p class="page-subtitle" id="selectedProgramName"></p><p class="page-subtitle" id="selectedProgramCurriculumCount">Loading curricula...</p></div>
       <?php if ($canCreateCurricula): ?><button type="button" class="primary-action-button manuscript-primary" id="newCurriculumButton" disabled><i class="fa-solid fa-plus" aria-hidden="true"></i> New Curriculum</button><?php endif; ?>
@@ -162,41 +154,29 @@ require __DIR__ . '/../../../shared/sidebar.php';
     <?php else: ?>
     <div class="page-title-bar curriculum-title-bar">
       <div>
-        <?php if ($isProgramPage && !$isProgramLanding): ?><a class="program-back-link" href="academic_programs.php"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Back to Academic Programs</a><?php endif; ?>
         <h1 class="page-title"><i class="fa-solid <?= $pageIcon ?>" aria-hidden="true"></i> <?= htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8') ?></h1>
         <p class="page-subtitle"><?= htmlspecialchars($pageSubtitle, ENT_QUOTES, 'UTF-8') ?></p>
       </div>
-      <?php if ($isProgramPage && !$isProgramLanding && $canCreatePrograms): ?><button type="button" class="primary-action-button manuscript-primary" id="newProgramButton"><i class="fa-solid fa-plus" aria-hidden="true"></i> New Program</button><?php endif; ?>
+      <?php if ($isProgramPage && $canCreatePrograms): ?><button type="button" class="primary-action-button manuscript-primary" id="newProgramButton"><i class="fa-solid fa-plus" aria-hidden="true"></i> New Program</button><?php endif; ?>
     </div>
     <?php endif; ?>
 
-    <?php if ($isProgramLanding): ?>
-    <section class="program-category-grid" aria-label="Academic program categories">
-      <a class="program-category-card" href="academic_programs.php?category=college">
-        <span class="program-category-icon" aria-hidden="true"><i class="fa-solid fa-graduation-cap" aria-hidden="true"></i></span>
-        <span class="program-category-kicker">Higher Education</span>
-        <span class="program-category-copy"><strong>College Programs</strong><span>Bachelor's and other higher-education programs</span></span>
-        <span class="program-category-footer"><small id="collegeProgramCount" hidden></small><span class="program-category-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></span></span>
-      </a>
-      <a class="program-category-card program-category-card-shs" href="academic_programs.php?category=shs">
-        <span class="program-category-icon" aria-hidden="true"><i class="fa-solid fa-book-open" aria-hidden="true"></i></span>
-        <span class="program-category-kicker">Grades 11–12</span>
-        <span class="program-category-copy"><strong>Senior High School Strands</strong><span>Academic and applied pathways for senior high learners</span></span>
-        <span class="program-category-footer"><small id="shsProgramCount" hidden></small><span class="program-category-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></span></span>
-      </a>
-    </section>
-    <?php else: ?>
     <section class="workspace-grid workspace-grid-single" aria-label="<?= $isProgramPage ? 'Academic program records' : 'Curriculum records' ?>">
       <?php if ($isProgramPage): ?>
       <article class="domain-card" id="programPanel">
         <span class="sr-only" id="programCount" aria-live="polite"></span>
+        <div class="program-tabs" role="group" aria-label="Level">
+          <?php foreach (['' => 'All', 'college' => 'College', 'shs' => 'Senior High'] as $tabValue => $tabLabel): ?>
+          <button type="button" class="program-tab" data-program-tab="<?= $tabValue ?>" aria-pressed="<?= $programCategory === $tabValue ? 'true' : 'false' ?>"><?= $tabLabel ?></button>
+          <?php endforeach; ?>
+        </div>
         <form class="list-toolbar" id="programSearchForm" role="search">
           <label class="search-control">
             <span class="sr-only">Search academic programs</span>
             <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
             <input type="search" id="programSearch" placeholder="Search programs..." maxlength="100"/>
           </label>
-          <?php if ($programCategory === 'college'): ?><label class="select-control"><span class="sr-only">Degree level</span><select id="programDegreeLevelFilter"><option value="">All degree levels</option><option value="Bachelor&#39;s Degree">Bachelor's Degree</option><option value="Associate Degree">Associate Degree</option><option value="Diploma / Certificate">Diploma / Certificate</option><option value="Other">Other</option></select></label><?php endif; ?>
+          <label class="select-control" id="programDegreeLevelControl"<?= $programCategory === 'shs' ? ' hidden' : '' ?>><span class="sr-only">Degree level</span><select id="programDegreeLevelFilter"><option value="">All degree levels</option><option value="Bachelor&#39;s Degree">Bachelor's Degree</option><option value="Associate Degree">Associate Degree</option><option value="Diploma / Certificate">Diploma / Certificate</option><option value="Other">Other</option></select></label>
           <label class="select-control">
             <span class="sr-only">Program status</span>
             <select id="programStatus">
@@ -208,7 +188,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
         </form>
         <div class="table-scroll">
           <table class="domain-table">
-            <thead><tr><th>Code</th><th><?= $programCategory === 'shs' ? 'Strand' : 'Program' ?></th><?php if ($programCategory !== 'shs'): ?><th>Degree Level</th><?php endif; ?><th class="num">Curricula</th><th>Status</th><?php if ($canUpdatePrograms): ?><th>Actions</th><?php endif; ?></tr></thead>
+            <thead><tr><th>Code</th><th>Program / Strand</th><th>Degree Level</th><th class="num">Curricula</th><th>Status</th><?php if ($canUpdatePrograms): ?><th><span class="th-long">Actions</span><span class="th-short">More</span></th><?php endif; ?></tr></thead>
             <tbody id="programRows"><tr><td colspan="<?= $programColumnCount ?>" class="state-cell">Loading academic programs…</td></tr></tbody>
           </table>
         </div>
@@ -243,7 +223,6 @@ require __DIR__ . '/../../../shared/sidebar.php';
       <?php endif; ?>
       <?php endif; ?>
     </section>
-    <?php endif; ?>
 
     <?php if ($isCurriculaPage): ?>
     <section class="version-workspace" id="versionWorkspace" hidden aria-labelledby="workspaceVersionTitle">
@@ -297,34 +276,35 @@ require __DIR__ . '/../../../shared/sidebar.php';
   <div class="footer">Bestlink College of the Philippines &middot; CSMS-SMS2 &copy; 2026</div>
 </div>
 
-<?php if (($isProgramPage && !$isProgramLanding) || ($isCurriculaPage && $canUpdatePrograms)): ?>
-<div class="curriculum-modal record-details-modal" id="programDetailsModal" hidden aria-hidden="true">
+<?php if ($isProgramPage || ($isCurriculaPage && $canUpdatePrograms)): ?>
+<div class="curriculum-modal record-details-modal program-record-modal" id="programDetailsModal" hidden aria-hidden="true">
   <div class="modal-backdrop" data-modal-close></div>
   <section class="modal-dialog modal-dialog-large modal-dialog-scroll" role="dialog" aria-modal="true" aria-labelledby="programDetailsName">
     <div class="modal-header">
-      <div><p class="modal-kicker">Academic Program</p><h2 id="programDetailsName">Program Details</h2><p class="modal-context" id="programDetailsCode"></p></div>
-      <span id="programDetailsStatusBadge"></span>
+      <div class="program-record__identity">
+        <p class="program-record__code" id="programDetailsCode"></p>
+        <h2 id="programDetailsName">Program Details</h2>
+        <p class="program-record__meta"><span id="programDetailsType"></span> <span id="programDetailsStatusBadge"></span></p>
+      </div>
       <button type="button" class="modal-close-button" data-modal-close aria-label="Close academic program details"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
     </div>
-    <div class="modal-body">
-      <dl class="record-detail-grid program-detail-grid">
-        <div class="program-degree-level"><div><dt>Degree Level</dt><dd id="programDetailsType"></dd></div><?php if ($canViewCurricula): ?><a class="secondary-action-button program-see-curricula" id="programSeeCurricula" href="curricula.php"><i class="fa-solid fa-list" aria-hidden="true"></i> See Curriculas</a><?php endif; ?></div>
-      </dl>
+    <div class="modal-body program-record__body">
       <?php if ($canViewCurricula): ?>
+      <dl class="program-record__summary">
+        <div><dt>Curricula</dt><dd id="programCurriculaTotal">—</dd></div>
+        <div><dt>Versions</dt><dd id="programVersionsTotal">—</dd></div>
+        <div><dt>Subject placements</dt><dd id="programPlacementsTotal">—</dd></div>
+      </dl>
       <p id="programSummaryNotice" class="curriculum-notice" role="status" hidden></p>
-      <section class="nested-section program-related-section" aria-label="Related curricula">
-        <div class="section-heading"><p class="eyebrow">Curricula for this program</p></div>
-        <div class="program-summary-grid">
-          <div><span>Curricula</span><strong id="programCurriculaTotal">—</strong></div>
-          <div><span>Versions</span><strong id="programVersionsTotal">—</strong></div>
-          <div><span>Subject Placements</span><strong id="programPlacementsTotal">—</strong></div>
-        </div>
-      </section>
+      <div id="programRecordCurricula" aria-live="polite"></div>
       <?php else: ?>
-      <p class="subject-placement-detail">Curriculum summary is not available with your current permissions.</p>
+      <p class="subject-placement-detail">Curricula are not available with your current permissions.</p>
       <?php endif; ?>
     </div>
-    <?php if ($canUpdatePrograms): ?><div class="modal-footer program-details-footer"><button type="button" class="button-muted" data-modal-close>Close</button><button type="button" class="button-primary" id="programDetailsEdit"><i class="fa-solid fa-pen" aria-hidden="true"></i> Edit</button><button type="button" class="button-danger" id="programDetailsArchive"><i class="fa-solid fa-box-archive" aria-hidden="true"></i> Archive</button></div><?php endif; ?>
+    <div class="modal-footer program-details-footer">
+      <?php if ($canUpdatePrograms): ?><button type="button" class="button-primary" id="programDetailsEdit"><i class="fa-solid fa-pen" aria-hidden="true"></i> Edit</button><button type="button" class="button-danger" id="programDetailsArchive"><i class="fa-solid fa-box-archive" aria-hidden="true"></i> Archive</button><?php endif; ?>
+      <button type="button" class="button-muted" data-modal-close>Close</button>
+    </div>
   </section>
 </div>
 <?php if ($canUpdatePrograms): ?>
@@ -339,12 +319,12 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <?php endif; ?>
 <?php endif; ?>
 
-<?php if (($isProgramPage && !$isProgramLanding && ($canCreatePrograms || $canUpdatePrograms)) || ($isCurriculaPage && $canUpdatePrograms)): ?>
+<?php if (($isProgramPage && ($canCreatePrograms || $canUpdatePrograms)) || ($isCurriculaPage && $canUpdatePrograms)): ?>
 <div class="curriculum-modal" id="programModal" hidden>
   <div class="modal-backdrop" data-modal-close></div>
   <section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="programModalTitle">
     <div class="modal-header">
-      <div><h2 id="programModalTitle">New Program</h2><p class="modal-context">Create an academic program.</p></div>
+      <div><h2 id="programModalTitle">New Program</h2><p class="modal-context" id="programModalContext">Create an academic program.</p></div>
       <button type="button" class="modal-close-button" data-modal-close aria-label="Close academic program form"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
     </div>
     <form id="programForm" class="domain-form">

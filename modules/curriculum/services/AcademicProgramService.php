@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/CurriculumReadScope.php';
 
 require_once __DIR__ . '/CurriculumVersionEditPolicy.php';
 
@@ -27,7 +28,7 @@ class AcademicProgramService
     public function summary(int $id): array
     {
         $this->get($id);
-        return $this->programs->curriculumSummary($id);
+        return $this->programs->curriculumSummary($id, CurriculumReadScope::sql('v'));
     }
 
     public function list(array $input): array

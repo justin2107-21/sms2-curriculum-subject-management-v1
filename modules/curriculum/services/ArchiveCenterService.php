@@ -223,7 +223,8 @@ final class ArchiveCenterService
             $row = $this->one("SELECT * FROM $table WHERE id=? FOR UPDATE", 'i', [$id]);
             if (!$row) throw new OutOfBoundsException('Record not found.');
             if ($module === 'elective_group' ? $row['status'] === 'archived' : $row['archived_at'] !== null) throw new DomainException('This record is already archived.');
-            if ($row['status'] !== 'active') throw new DomainException('Only active records can be archived.');
+            // A program may be archived from either of its two states; restore returns it to the stored one. Other modules stay active-only.
+            if ($module !== 'program' && $row['status'] !== 'active') throw new DomainException('Only active records can be archived.');
             $newStatus = $module === 'elective_group' ? 'archived' : 'inactive';
             $this->execute("UPDATE $table SET status=?, archived_at=UTC_TIMESTAMP(), archived_by=?, archive_previous_status=? WHERE id=?", 'sisi', [$newStatus, $actor, $row['status'], $id]);
             audit_log_required(strtoupper($module) . '_ARCHIVE', $entity, $id, 'Record archived.',

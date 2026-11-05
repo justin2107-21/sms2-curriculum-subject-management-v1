@@ -62,7 +62,11 @@ Written 2026-11-05 for whoever (or whichever session) continues this work. Read 
 | `students` table | Decided | Kept for SMS2 integration, synthetic data, not used by CSMS; only Super Admin holds `student.*` |
 
 ## Later tasks recorded in the docs
-Split `curriculum.update` so Admin cannot edit placements; drop `users.role`; faculty-subject link; switch the Faculty read scope to `approved`; update `tests/original_post_migration_readonly.php`, which is out of date: it still expects 5 migration history rows and 37 tables, and has not been changed since before migrations 026 and 027.
+**First task after the Curriculum Builder module:** split `curriculum.update` so Admin can't edit placements.
+
+Also later: version archive (own design); summer term support (pending BCP answer).
+
+Drop `users.role`; faculty-subject link; switch the Faculty read scope to `approved`; update `tests/original_post_migration_readonly.php`, which is out of date: it still expects 5 migration history rows and 37 tables, and has not been changed since before migrations 026 and 027.
 
 ## Next tasks, in order
 0. **Curriculum Builder (next task).** The baseline blocker is fixed. Task 3 changes `subjects`, so its migration needs a declared entry (`database/README.md`).

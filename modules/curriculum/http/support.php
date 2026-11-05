@@ -49,8 +49,12 @@ function curriculum_handle_error(Throwable $error): void
     if ($error instanceof DomainConflictException) {
         json_response(false, $error->getMessage(), [], 409);
     }
-    if ($error instanceof DomainNotFoundException) {
+    if ($error instanceof DomainNotFoundException || $error instanceof OutOfBoundsException) {
         json_response(false, $error->getMessage(), [], 404);
+    }
+    // The archive and restore service refuses state conflicts (already archived, parent archived) with SPL exceptions.
+    if ($error instanceof DomainException) {
+        json_response(false, $error->getMessage(), [], 409);
     }
 
     if ($error instanceof mysqli_sql_exception && in_array((int)$error->getCode(), [1054,1146], true)) {

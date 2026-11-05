@@ -7,7 +7,7 @@
     const ui = window.CurriculumUI;
     const workspacePage = workspace.dataset.workspacePage;
     const curriculaView = workspace.dataset.curriculaView || 'program-list';
-    const programCategory = workspace.dataset.programCategory || '';
+    let programCategory = workspace.dataset.programCategory || '';
     const initialProgramId = Number(workspace.dataset.initialProgramId) || 0;
     const initialCurriculumId = Number(workspace.dataset.initialCurriculumId) || 0;
     const initialVersionId = Number(workspace.dataset.initialVersionId) || 0;
@@ -78,7 +78,9 @@
     const versionRenameForm = document.getElementById('versionRenameForm');
     const assignmentForm = document.getElementById('assignmentForm');
     const programModal = ui.createModal(document.getElementById('programModal'));
-    const programDetailsModal = ui.createModal(document.getElementById('programDetailsModal'));
+    const programDetailsModal = ui.createModal(document.getElementById('programDetailsModal'), {
+        restoreFocus: () => document.querySelector('tr[data-record-view="' + Number(state.viewingProgramId) + '"]')
+    });
     const programArchiveModal = ui.createModal(document.getElementById('programArchiveModal'));
     const curriculumModal = ui.createModal(document.getElementById('curriculumModal'));
     const curriculumDetailModal = ui.createModal(document.getElementById('curriculumDetail'));
@@ -325,8 +327,10 @@
             document.getElementById('programDetailsStatusBadge').innerHTML = ui.statusBadge(program.status);
             const curriculaLink = document.getElementById('programSeeCurricula');
             if (curriculaLink) curriculaLink.href = 'curricula.php?program_id=' + Number(program.id);
-            if (permissions.updatePrograms) setButtonEnabled('programDetailsArchive', String(program.status).toLowerCase() !== 'inactive');
+            const archiveAction = document.getElementById('programDetailsArchive');
+            if (archiveAction) { archiveAction.hidden = Boolean(program.archived_at); archiveAction.disabled = false; }
             if (permissions.viewCurricula) {
+                loadProgramRecordCurricula(program.id, sequence);
                 try {
                     await loadProgramCurriculumSummary(program, sequence);
                 } catch (summaryError) {
@@ -351,8 +355,6 @@
         document.getElementById('programCurriculaTotal').textContent=String(summary.curricula);
         document.getElementById('programVersionsTotal').textContent=String(summary.versions);
         document.getElementById('programPlacementsTotal').textContent=String(summary.placements);
-        const note=document.getElementById('programSummaryNotice');
-        if(note){note.textContent=summary.scope;note.hidden=false;}
     }
 
     function openProgramArchiveConfirmation() {
@@ -393,7 +395,7 @@
                 else await loadCurriculumWorkspace();
             } else {
                 await loadPrograms(state.programPage);
-                await openProgramDetails(payload.program.id);
+                programDetailsModal?.close();
             }
         } catch (error) {
             ui.showToast(error.message || 'The academic program could not be archived.', 'error');
@@ -433,48 +435,83 @@
         syncProgramDegreeLevel();
     }
 
-    async function loadProgramCategoryCounts() {
-        const collegeCount = document.getElementById('collegeProgramCount');
-        const shsCount = document.getElementById('shsProgramCount');
-        if (!collegeCount || !shsCount) return;
-        const categories = [
-            { category: 'college', element: collegeCount, noun: total => total === 1 ? 'program' : 'programs' },
-            { category: 'shs', element: shsCount, noun: total => total === 1 ? 'strand' : 'strands' }
-        ];
-        await Promise.all(categories.map(async item => {
-            try {
-                const payload = await ui.fetchJson(endpoints.programs, {
-                    action: 'list', page: 1, per_page: 10, search: '', status: '', program_category: item.category
-                });
-                const total = Number(payload.pagination.total_records) || 0;
-                item.element.textContent = total + ' ' + item.noun(total);
-                item.element.hidden = false;
-            } catch (error) {
-                item.element.hidden = true;
-            }
-        }));
-    }
-
-    function programRow(program, category) {
+    function programRow(program) {
+        const code = ui.escapeHtml(program.program_code);
+        // Inactive is not archived: only an archive timestamp ends the Archive action.
+        const isArchived = Boolean(program.archived_at);
         const actions = permissions.updatePrograms
-            ? '<td class="row-actions"><div class="table-actions program-row-actions"><button type="button" class="row-action-button" data-edit-program="' +
-                Number(program.id) + '"><i class="fa-solid fa-pen" aria-hidden="true"></i> Edit</button> ' +
-                '<button type="button" class="remove-action-button" data-archive-program="' + Number(program.id) + '"><i class="fa-solid fa-box-archive" aria-hidden="true"></i> Archive</button></div></td>'
+            ? '<td class="row-actions"><div class="row-menu"><button type="button" class="row-menu__toggle" data-row-menu aria-haspopup="menu" aria-expanded="false" aria-label="Actions for ' + code + '"><i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i></button>' +
+                '<div class="row-menu__list" role="menu" hidden><button type="button" role="menuitem" data-edit-program="' + Number(program.id) + '">Edit</button>' +
+                (isArchived ? '' : '<button type="button" role="menuitem" data-archive-program="' + Number(program.id) + '">Archive</button>') + '</div></div></td>'
             : '';
-        const degreeLevelCell = category === 'shs' ? '' : '<td>' + ui.escapeHtml(programDegreeLevel(program)) + '</td>';
-        return '<tr data-record-view="' + Number(program.id) + '" tabindex="0" aria-label="View academic program ' +
-            ui.escapeHtml(program.program_code) + '">' +
-            '<td><span class="record-code">' + ui.escapeHtml(program.program_code) + '</span></td>' +
+        return '<tr data-record-view="' + Number(program.id) + '" tabindex="0" aria-label="Show curricula and versions of ' + code + '">' +
+            '<td><span class="record-code">' + code + '</span></td>' +
             '<td><span class="record-name">' + ui.escapeHtml(program.program_name) + '</span></td>' +
-            degreeLevelCell +
+            '<td>' + ui.escapeHtml(programDegreeLevel(program)) + '</td>' +
             '<td class="num">' + (permissions.viewCurricula ? (Number(program.curriculum_count) || 0) : '—') + '</td>' +
             '<td>' + ui.statusBadge(program.status) + '</td>' + actions +
             '</tr>';
     }
 
+    // Row actions: a compact menu. Fixed position, because the table scroller would clip it.
+    function closeRowMenus(focusToggle) {
+        document.querySelectorAll('.row-menu__list:not([hidden])').forEach(function (list) {
+            list.hidden = true;
+            const toggle = list.parentElement.querySelector('[data-row-menu]');
+            toggle.setAttribute('aria-expanded', 'false');
+            if (focusToggle) toggle.focus();
+        });
+    }
+
+    function openRowMenu(toggle) {
+        const list = toggle.parentElement.querySelector('.row-menu__list');
+        const wasOpen = !list.hidden;
+        closeRowMenus(false);
+        if (wasOpen) return;
+        list.hidden = false;
+        toggle.setAttribute('aria-expanded', 'true');
+        const box = toggle.getBoundingClientRect();
+        list.style.top = Math.min(box.bottom + 4, window.innerHeight - list.offsetHeight - 8) + 'px';
+        list.style.left = Math.max(8, Math.min(box.right, window.innerWidth - 8) - list.offsetWidth) + 'px';
+        list.querySelector('button')?.focus();
+    }
+
+    async function allPages(endpoint, params, key) {
+        const records = [];
+        for (let page = 1; ; page++) {
+            const payload = await ui.fetchJson(endpoint, Object.assign({ action: 'list', page: page, per_page: 50 }, params));
+            records.push(...payload[key]);
+            if (page >= Number(payload.pagination.total_pages)) return records;
+        }
+    }
+
+    // Each curriculum with its versions, as far as this user's read scope allows.
+    async function loadProgramRecordCurricula(id, request) {
+        const target = document.getElementById('programRecordCurricula');
+        if (!target) return;
+        target.innerHTML = '<p class="state-cell">Loading curricula…</p>';
+        try {
+            const curricula = await allPages(endpoints.curricula, { search: '', status: '', academic_program_id: id }, 'curricula');
+            const groups = await Promise.all(curricula.map(curriculum => allPages(endpoints.versions, { curriculum_id: curriculum.id }, 'versions')));
+            if (request !== state.programDetailsRequest) return;
+            target.innerHTML = curricula.length ? curricula.map(function (curriculum, index) {
+                const rows = groups[index].map(function (version) {
+                    const href = 'curriculum_builder.php?program_id=' + Number(curriculum.academic_program_id) + '&curriculum_id=' + Number(curriculum.id) + '&version_id=' + Number(version.id);
+                    return '<li><span class="program-record__version">' + ui.escapeHtml(version.version_label) + '</span>' + ui.statusBadge(version.status) +
+                        '<a href="' + href + '">Open in Builder<span class="sr-only"> (' + ui.escapeHtml(curriculum.curriculum_code + ' ' + version.version_label) + ')</span></a></li>';
+                }).join('');
+                return '<section class="program-record__curriculum"><div class="program-record__curriculum-head"><div><h3>' + ui.escapeHtml(curriculum.curriculum_code) + '</h3><p>' + ui.escapeHtml(curriculum.curriculum_name) + '</p></div>' + ui.statusBadge(curriculum.status) + '</div>' +
+                    (rows ? '<ul>' + rows + '</ul>' : '<p class="program-record__none">No versions you can view yet.</p>') + '</section>';
+            }).join('') : '<p class="state-cell">No curricula yet.</p>';
+        } catch (error) {
+            if (request !== state.programDetailsRequest) return;
+            target.innerHTML = '<p class="state-cell">' + ui.escapeHtml(error.message || 'Curricula could not be loaded.') + '</p>';
+        }
+    }
+
     async function loadPrograms(page) {
         if (!permissions.viewPrograms || !programRows) return;
-        const programColumns = (programCategory === 'shs' ? 4 : 5) + (permissions.updatePrograms ? 1 : 0);
+        const programColumns = 5 + (permissions.updatePrograms ? 1 : 0);
         const sequence = ++state.programRequest;
         state.programPage = Number(page) || 1;
         tableState(programRows, programColumns, 'Loading academic programs…', false);
@@ -503,7 +540,7 @@
                     tableState(programRows, programColumns, message, false);
                 }
             } else {
-                programRows.innerHTML = payload.programs.map(program => programRow(program, programCategory)).join('');
+                programRows.innerHTML = payload.programs.map(program => programRow(program)).join('');
             }
             renderCompactPagination(document.getElementById('programPagination'), payload.pagination, loadPrograms, 'programs');
         } catch (error) {
@@ -1170,6 +1207,7 @@
             syncProgramDegreeLevel();
         }
         document.getElementById('programModalTitle').textContent = 'New Program';
+        document.getElementById('programModalContext').textContent = 'Create an academic program.';
         document.getElementById('programSubmitButton').textContent = 'Save Program';
         programModal.open();
         document.getElementById('programCode').focus();
@@ -1180,6 +1218,7 @@
         programFormMode = 'update';
         resetProgramForm();
         document.getElementById('programModalTitle').textContent = 'Edit Academic Program';
+        document.getElementById('programModalContext').textContent = 'Update this academic program.';
         document.getElementById('programSubmitButton').textContent = 'Save Changes';
         programModal.open();
         ui.setFormSubmitting(programForm, true, 'Loading…');
@@ -1322,7 +1361,6 @@
                 ui.showToast(payload.message, programFormMode === 'create' ? 'success' : 'updated');
                 if (programRows) await loadPrograms(state.programPage);
                 else if (workspacePage === 'curricula') await loadCurriculaPrograms(state.programPage);
-                else await loadProgramCategoryCounts();
             } catch (error) {
                 ui.showFormError(programForm, error.message || 'The academic program could not be saved.');
             } finally {
@@ -1497,20 +1535,32 @@
     assignmentSubjectInput?.addEventListener('input', function () { ui.clearFormError(assignmentForm); });
 
     if (workspacePage === 'programs') {
-        if (!programRows) {
-            loadProgramCategoryCounts();
-            return;
-        }
+        if (!programRows) return;
         document.getElementById('programSearchForm').addEventListener('submit', function (event) {
             event.preventDefault(); loadPrograms(1);
         });
         document.getElementById('programSearch').addEventListener('input', ui.debounce(function () { loadPrograms(1); }, 300));
         document.getElementById('programStatus').addEventListener('change', function () { loadPrograms(1); });
         document.getElementById('programDegreeLevelFilter')?.addEventListener('change', function () { loadPrograms(1); });
+        document.querySelectorAll('[data-program-tab]').forEach(function (tab) {
+            tab.addEventListener('click', function () {
+                programCategory = tab.dataset.programTab;
+                document.querySelectorAll('[data-program-tab]').forEach(function (other) { other.setAttribute('aria-pressed', String(other === tab)); });
+                const degree = document.getElementById('programDegreeLevelControl');
+                degree.hidden = programCategory === 'shs';
+                if (degree.hidden) document.getElementById('programDegreeLevelFilter').value = '';
+                const url = new URL(location.href);
+                if (programCategory) url.searchParams.set('category', programCategory); else url.searchParams.delete('category');
+                history.replaceState(null, '', url);
+                loadPrograms(1);
+            });
+        });
         programRows.addEventListener('click', function (event) {
             const action = event.target.closest('button, a, input, select');
             if (action) {
                 event.stopPropagation();
+                if (action.matches('[data-row-menu]')) { openRowMenu(action); return; }
+                closeRowMenus(false);
                 const editButton = action.closest('[data-edit-program]');
                 if (editButton) openEditProgram(editButton.dataset.editProgram);
                 const archiveButton = action.closest('[data-archive-program]');
@@ -1518,14 +1568,26 @@
                 return;
             }
             const row = event.target.closest('tr[data-record-view]');
-            if (row) openProgramDetails(row.dataset.recordView);
+            if (row) { row.focus(); openProgramDetails(row.dataset.recordView); }
         });
         programRows.addEventListener('keydown', function (event) {
             const row = event.target.closest('tr[data-record-view]');
             if (row && event.target === row && (event.key === 'Enter' || event.key === ' ')) {
                 event.preventDefault();
                 openProgramDetails(row.dataset.recordView);
+                return;
             }
+            const list = event.target.closest('.row-menu__list');
+            if (!list || (event.key !== 'ArrowDown' && event.key !== 'ArrowUp')) return;
+            event.preventDefault();
+            const items = Array.from(list.querySelectorAll('button'));
+            items[(items.indexOf(event.target) + (event.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].focus();
+        });
+        document.addEventListener('click', function (event) { if (!event.target.closest('.row-menu')) closeRowMenus(false); });
+        window.addEventListener('scroll', function () { closeRowMenus(false); }, { passive: true, capture: true });
+        document.addEventListener('keydown', function (event) {
+            if (event.key !== 'Escape' || document.querySelector('.curriculum-modal:not([hidden])')) return;
+            if (document.querySelector('.row-menu__list:not([hidden])')) closeRowMenus(true);
         });
         loadPrograms(1);
         return;

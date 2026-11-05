@@ -82,6 +82,8 @@ async function main() {
         clip: { x: 0, y: 0, width: size.width, height: Math.min(size.height, 12000), scale: 1 } });
       fs.writeFileSync(file, Buffer.from(r.data, 'base64'));
     };
+    // Viewport only: fixed dialogs are not reliable in a beyond-viewport capture.
+    const shotView = async file => { const r = await send('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(file, Buffer.from(r.data, 'base64')); };
     for (const domain of ['Page', 'Runtime', 'Log', 'Network']) await send(`${domain}.enable`);
 
     // Sidebar check, run on every visited page: a real mouse click on the burger must flip the
@@ -565,6 +567,85 @@ async function main() {
         results[width] = { opened, centered, tabbed, afterEscape, keepAliveCallsAfterEscape: keepAliveCalls, reopenedAfterStay: reopened, issues };
       }
       report.warnPreview = results;
+    }
+
+    if (arg('probe', '') === 'programs') {
+      // Academic Programs: row menu, record modal and its keyboard behaviour. Super Admin also clicks through
+      // Edit and Archive on UITEST-PA (sms_db_uitest only, rebuild afterwards) with --programwrite=1.
+      report.programsProbe = {};
+      const rowOf = code => `[...document.querySelectorAll('#programRows tr[data-record-view]')].find(r => r.querySelector('.record-code').textContent.trim() === '${code}')`;
+      const key = async (k, code) => { for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: k, code: code || k }); };
+      for (const width of widths) {
+        issues = [];
+        await setWidth(width);
+        await navigate(`${base}/modules/curriculum/pages/academic_programs.php`);
+        await sleep(1200);
+        const result = {};
+        for (const code of ['ASD', 'BSIT']) {
+          result['menu' + code] = await evaluate(`(() => { const row = ${rowOf(code)}; const t = row.querySelector('[data-row-menu]'); if (!t) return null; t.click(); const l = t.parentElement.querySelector('.row-menu__list'); const r = l.getBoundingClientRect(); return { status: row.querySelector('.status-badge')?.textContent, inView: r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight, items: [...l.querySelectorAll('button')].map(b => b.textContent) }; })()`);
+          if (result['menu' + code]) { await shotView(path.join(out, `${role}-programs-menu-${code}-${width}.png`)); await evaluate(`document.body.click(); true`); }
+        }
+        result.actionsHeader = await evaluate(`(() => { const th = document.querySelector('#programPanel th:last-child'); return { text: th.innerText, clipped: th.scrollWidth > th.clientWidth, right: Math.round(th.getBoundingClientRect().right), tableScroll: document.querySelector('#programPanel .table-scroll').scrollWidth - document.querySelector('#programPanel .table-scroll').clientWidth }; })()`);
+        await evaluate(`document.querySelector('[data-program-tab="shs"]').click(); true`);
+        await sleep(700);
+        result.shsRows = await evaluate(`document.querySelectorAll('#programRows tr[data-record-view]').length`);
+        await evaluate(`document.querySelector('[data-program-tab=""]').click(); true`);
+        await sleep(700);
+        await evaluate(`${rowOf('BSIT')}.querySelector('.record-name').click(); true`);
+        await sleep(1400);
+        const modalState = `(() => { const m = document.getElementById('programDetailsModal'); const d = m.querySelector('.modal-dialog').getBoundingClientRect(); const a = document.activeElement; return { open: !m.hidden, w: Math.round(d.width), h: Math.round(d.height), focusInside: m.contains(a), focusRow: a.dataset ? a.dataset.recordView || null : null, summary: [...m.querySelectorAll('.program-record__summary dd')].map(x => x.textContent), blocks: m.querySelectorAll('.program-record__curriculum').length, links: m.querySelectorAll('.program-record__curriculum a').length, footer: [...m.querySelectorAll('.modal-footer button')].filter(b => !b.hidden).map(b => b.textContent.trim()), bodyScrolls: getComputedStyle(m.querySelector('.modal-body')).overflowY }; })()`;
+        result.modal = await evaluate(modalState);
+        await shotView(path.join(out, `${role}-programs-modal-${width}.png`));
+        for (let i = 0; i < 30; i++) await key('Tab');
+        result.afterTabs = (await evaluate(modalState)).focusInside;
+        await key('Escape');
+        await sleep(200);
+        result.afterEscape = await evaluate(modalState);
+        await evaluate(`${rowOf('BSIT')}.querySelector('.record-name').click(); true`);
+        await sleep(600);
+        await evaluate(`document.querySelector('#programDetailsModal .modal-backdrop').click(); true`);
+        await sleep(200);
+        result.afterBackdrop = await evaluate(modalState);
+        if (arg('programwrite', '') === '1' && width === widths[0]) {
+          await evaluate(`${rowOf('UITEST-PA')}.querySelector('.record-name').click(); true`);
+          await sleep(1000);
+          await evaluate(`document.getElementById('programDetailsEdit').click(); true`);
+          await sleep(800);
+          result.editDialog = await evaluate(`({ open: !document.getElementById('programModal').hidden, title: document.getElementById('programModalTitle').textContent, subtitle: document.getElementById('programModalContext').textContent, code: document.getElementById('programCode').value })`);
+          await shotView(path.join(out, `${role}-programs-edit-${width}.png`));
+          await evaluate(`document.getElementById('programName').value = 'UI test program edited'; document.getElementById('programSubmitButton').click(); true`);
+          await sleep(1200);
+          result.afterEdit = await evaluate(`(() => { const r = ${rowOf('UITEST-PA')}; return { name: r.querySelector('.record-name').textContent, formOpen: !document.getElementById('programModal').hidden }; })()`);
+          await evaluate(`${rowOf('UITEST-PA')}.querySelector('[data-row-menu]').click(); ${rowOf('UITEST-PA')}.querySelector('[data-archive-program]').click(); true`);
+          await sleep(800);
+          result.archiveDialog = await evaluate(`({ open: !document.getElementById('programArchiveModal').hidden, message: document.getElementById('programArchiveMessage').textContent })`);
+          await shotView(path.join(out, `${role}-programs-archive-${width}.png`));
+          await evaluate(`document.getElementById('confirmProgramArchive').click(); true`);
+          await sleep(1400);
+          result.afterArchive = await evaluate(`({ rowGone: !${rowOf('UITEST-PA')}, dialogOpen: !document.getElementById('programArchiveModal').hidden, toast: document.querySelector('[class*=toast]')?.textContent || '' })`);
+          // An inactive program (set up by the caller on UITEST-PB): archive it from the menu, restore it from Archives, expect it inactive again.
+          result.inactiveBefore = await evaluate(`({ status: ${rowOf('UITEST-PB')}.querySelector('.status-badge').textContent, items: (${rowOf('UITEST-PB')}.querySelector('[data-row-menu]').click(), [...${rowOf('UITEST-PB')}.querySelectorAll('.row-menu__list button')].map(b => b.textContent)) })`);
+          await shotView(path.join(out, `${role}-programs-menu-inactive-${width}.png`));
+          await evaluate(`${rowOf('UITEST-PB')}.querySelector('[data-archive-program]').click(); true`);
+          await sleep(700);
+          await evaluate(`document.getElementById('confirmProgramArchive').click(); true`);
+          await sleep(1400);
+          result.inactiveArchived = await evaluate(`({ rowGone: !${rowOf('UITEST-PB')}, toast: document.querySelector('[class*=toast]')?.textContent || '' })`);
+          await navigate(`${base}/dashboard/account.php?tab=archives`);
+          await sleep(1800);
+          result.inArchives = await evaluate(`(() => { const r = [...document.querySelectorAll('#archiveRows tr')].find(t => t.textContent.includes('UITEST-PB')); if (!r) return null; r.querySelector('.archive-actions button:nth-child(2)').click(); return true; })()`);
+          await sleep(1200);
+          result.restoreConfirm = await evaluate(`({ open: !document.getElementById('archiveConfirmModal').hidden, title: document.getElementById('archiveConfirmTitle').textContent })`);
+          await shotView(path.join(out, `${role}-archives-restore-${width}.png`));
+          await evaluate(`document.getElementById('archiveConfirmRestore').click(); true`);
+          await sleep(1500);
+          await navigate(`${base}/modules/curriculum/pages/academic_programs.php`);
+          await sleep(1200);
+          result.restoredInactive = await evaluate(`(() => { const r = ${rowOf('UITEST-PB')}; return r ? { status: r.querySelector('.status-badge').textContent, items: [...r.querySelectorAll('.row-menu__list button')].map(b => b.textContent) } : null; })()`);
+        }
+        result.issues = issues.slice();
+        report.programsProbe[width] = result;
+      }
     }
 
     if (arg('picker', '') === '1') {
