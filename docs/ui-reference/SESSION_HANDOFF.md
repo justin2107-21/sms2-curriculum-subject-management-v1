@@ -5,7 +5,9 @@ Written 2026-11-05 for whoever (or whichever session) continues this work. Read 
 ## Where things stand
 - Project: `C:\xampp\htdocs\sms-csms` (CSMS-SMS2, Bestlink College). PHP 8.0.30 (`C:\xampp\php\php.exe`, not on PATH), MariaDB 10.4, database `sms_db`.
 - Branch: `ui-redesign-pilot`. Nothing has been pushed; `main` is the PR target.
-- Recent commits, newest first. The last two are the name fixes and this file, so use `git log` for their hashes:
+- Recent commits, newest first. The newest are the dashboard verification tools, the dashboard finalization and this file's updates; use `git log` for hashes:
+  - Dashboard verification tools: count verifier, synthetic volume (uitest only), timing
+  - Finalize role dashboards: donuts, top-10, colours, export status, footer, data checks
   - `6917a51` Role dashboards
   - `7735827` Curriculum review: submit, approve and return
   - `ec795cb` Final user types: migration 027
@@ -25,7 +27,10 @@ Written 2026-11-05 for whoever (or whichever session) continues this work. Read 
 | Final roles and migration 027 | Done and applied to `sms_db` by the owner: Super Admin, Admin, Staff, Acad Office, Acad Faculty. Old roles stay inactive. Rollback script in `database/rollbacks/`. `users.role` is deprecated and ignored |
 | Review workflow | Done: submit, approve, return with a reason, review events, audit entries, nobody decides their own submission |
 | Faculty read scope | One setting, `CurriculumReadScope::FACULTY_READ_SCOPE`: `active_or_approved` now, switch to `approved` once approvals exist |
-| Role dashboards | Done: one profile per role chosen from permissions on the server, only that role's cards in the payload. Counted-version rule: approved, then active, then draft with placements |
+| Role dashboards | **Finished.** One profile per role chosen from permissions on the server, only that role's cards in the payload. Counted-version rule: approved, then active, then draft with placements. Final chart rules: donut only for part-of-whole with at most six categories, bars with a value label at every end (zero included), top 10 with "View all", colour-blind-safe palette, "—" for averages without data, each fact once per dashboard, the CIMF launcher gets a clear strip beside the content at 601 px and wider (D8) |
+| Official exports | The export audit entry now stores `review_status`, `version_label` and the version id. The Admin card "Official exports" lists only exports stored as approved; older entries are not listed |
+| Footer | "Bestlink College of the Philippines · CSMS-SMS2 © 2026" on every page that had the old text |
+| Dashboard data checks | `tools/verify-dashboard-counts.php` compares every card, chart total and list with its own read-only SELECT: 109 checks on `sms_db`, 116 on `sms_db_uitest` with synthetic volume, 0 mismatches. Timing with 500 versions, 20,000 placements and 50,000 audit rows: every role under 210 ms, so no index migration is proposed |
 | Scenario fixtures | Done: the UI scenario uses its own `UITEST-*` records, so real programs and curricula can be renamed freely |
 
 ## Standing rules (from the owner, still in force)
@@ -58,7 +63,7 @@ Written 2026-11-05 for whoever (or whichever session) continues this work. Read 
 Split `curriculum.update` so Admin cannot edit placements; drop `users.role`; faculty-subject link; switch the Faculty read scope to `approved`.
 
 ## Next tasks, in order
-0. **Resolve the baseline blocker above.** It gates tasks 3 to 5, which need migrations.
+0. **Resolve the baseline blocker above (next task; the dashboards are finished).** It gates tasks 3 to 5, which need migrations. Do not weaken the fingerprint check.
 1. **Password reset for Admin and Super Admin:** `KENNETH123` still needs the reset the owner planned from the Users page as `csms_admin`. Review the reset flow and its audit entry before relying on it.
 2. **Module page redesigns, starting with Pre-requisite Configuration.** Follow `UI_Audit.md`, `UI_Decisions.md` and the shared header, picker and state components. Then the other module pages in the sidebar order.
 3. **Subject category field:** a migration adding a category to `subjects` (list to be agreed), the Subject Master form field and import support, then enable the "Units by subject category" card (currently a pending card).
@@ -69,5 +74,12 @@ Split `curriculum.update` so Admin cannot edit placements; drop `users.role`; fa
 - Rebuild the test database and users: `powershell -ExecutionPolicy Bypass -File tools\uitest\setup-db.ps1` (currently fails at the migration step, see the blocker above)
 - One role, both widths: `powershell -ExecutionPolicy Bypass -File tools\uitest\run.ps1 -Role staff -Widths 1440,390 -Urls /dashboard/dashboard.php`
 - Scenario then checker: `-CtxScenario`, then `node tools\uitest\check-scenario.cjs <folder>`
+- Dashboard correctness, read-only, any database: `php tools\verify-dashboard-counts.php sms_db` (the connection is opened READ ONLY)
+- Dashboard load test on `sms_db_uitest` only: `DB_NAME=sms_db_uitest php tools/uitest/synthetic-volume.php` (rows prefixed `SYN-`; `--remove` deletes them, or rebuild the test database), then `DB_NAME=sms_db_uitest php tools/uitest/time-dashboard.php 15`
 - Authorization tests: `DB_NAME=sms_db_uitest php tests/rbac-final-roles.php`, `tests/rbac-safety-http.php`, `tests/dashboard-role-payload.php`; node tests: `tests/*.cjs`
 - Git Bash loses backslashes in `node -e` and heredocs; write scripts with the Write tool. Files have mixed LF/CRLF, so edit helpers must match `\r?\n`.
+
+## Notes from the dashboard finalization
+- On `sms_db` the Staff and Faculty dashboards default to the counted version, which is the 3-unit active BSIT "123 v1", not PREORAL-2026 (157 units). That follows the approved counted-version rule; choosing a version in the filter changes it.
+- `sms_db` has no Staff account (the old staff account became Acad Office in 027), so the Staff dashboard was checked there with the Staff permission set and an existing account.
+- The test database rebuild still stops at the migration step because of the fingerprint blocker; run `seed-users.php` afterwards as described above.
