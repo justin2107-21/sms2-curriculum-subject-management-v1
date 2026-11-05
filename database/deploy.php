@@ -124,6 +124,16 @@ try {
         }
     }
     $pending = array_diff_key($scripts, $applied);
+    if ($apply) {
+        // Before anything changes: every pending migration, including any beyond --until, must declare what it does to covered state.
+        $undeclared = [];
+        foreach ($pending as $name => $sql) {
+            foreach (csms_legacy_baseline_migration_problems($name, $sql) as $problem) $undeclared[] = "$name: $problem";
+        }
+        if ($undeclared) {
+            throw new RuntimeException("Nothing was applied. Declare these changes in database/legacy_baseline.php (see database/README.md):\n" . implode("\n", $undeclared));
+        }
+    }
     if ($until !== null) {
         if (!isset($pending[$until])) {
             throw new RuntimeException('--until must name the next unapplied migration.');

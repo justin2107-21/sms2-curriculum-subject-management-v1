@@ -128,6 +128,23 @@ cannot automatically adopt untracked databases. The local development
 environment and the HostForge database are not the same environment.
 Live production migration state was **not** inspected in Task 1.
 
+### Legacy baseline fingerprint: declaring a migration's changes
+
+`deploy.php` compares the `legacy_schema_v1` record in `schema_baseline_adoptions` with a fingerprint of the covered legacy schema and of `roles`, `permissions` and `role_permissions`. The record is never rewritten. Approved later changes are declared in `csms_legacy_baseline_declared_changes()` (`database/legacy_baseline.php`), and the check removes exactly those changes before comparing.
+
+A migration needs an entry if it changes the schema of a covered table (for example `subjects`, `users`, `roles`), or rows in `roles`, `permissions` or `role_permissions`. New tables, tables outside the baseline, and ordinary rows of other tables need none.
+
+1. Write the migration with named clauses: `ADD COLUMN`, `ADD INDEX name`, `ADD CONSTRAINT name`. `MODIFY`, `CHANGE`, `DROP` and renames of baseline schema cannot be declared and need a separate review.
+2. Add an entry under the migration's file name: `checksum` (see step 3), `columns` (table => column => `COLUMN_TYPE`, `IS_NULLABLE`, `COLUMN_DEFAULT` as `INFORMATION_SCHEMA` reports them), `indexes`, `foreign_keys`, `checks` (table => names), `roles_added`, `roles_renamed` (current name => baseline name), `permissions_added`. Use `new_role_grants_only => true` when a migration only changes grants on roles declared by an earlier entry.
+3. Run `php tests/legacy-baseline-declarations.php`. It fails on an undeclared change or a wrong checksum, and prints nothing that needs a database. The checksum is the SHA-256 of the file with CRLF normalised and the `USE sms_db;` line removed; `schema_migrations.checksum` on a test copy shows the same value.
+4. On `sms_db_uitest`: apply it, then run `deploy.php --status` and `tests/legacy-baseline-fingerprint.php`.
+
+`deploy.php --apply` runs the same check on every pending migration from 027 onward before it changes anything, and refuses if one fails.
+
+An entry takes effect only while `schema_migrations` shows that migration applied with that checksum, and only if everything it declares exists as declared. Otherwise deploy stops with "Legacy baseline adoption record is invalid". Do not re-adopt or edit the record to get past that message.
+
+Grants on the five current roles are outside the fingerprint, because Super Admin edits them on the Permissions page. `php tools/rbac-drift-report.php` lists differences from the approved matrix; it is read-only and blocks nothing.
+
 ### Safe rollback and rollout boundary
 
 MySQL/MariaDB DDL can implicitly commit; do not assume an entire migration is
