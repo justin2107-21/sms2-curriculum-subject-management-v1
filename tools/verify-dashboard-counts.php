@@ -100,7 +100,7 @@ foreach ([null, (int)one("SELECT c.academic_program_id FROM curricula c JOIN cur
                 check($R, $scope, 'Active accounts', $S['active_accounts'], (int)one('SELECT COUNT(*) FROM users WHERE is_active=1'));
                 check($R, $scope, 'Need password change', $S['password_change'], (int)one('SELECT COUNT(*) FROM users WHERE is_active=1 AND must_change_password=1'));
                 check($R, $scope, 'Audit events, 7 days', $S['audit_7d'], (int)one('SELECT COUNT(*) FROM audit_logs WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)'));
-                check($R, $scope, 'Awaiting review', $S['awaiting'], $review('under_review', $programId));
+                check($R, $scope, 'Awaiting review (all programs: the filter reaches only the pipeline)', $S['awaiting'], $review('under_review', null));
                 $seg = []; foreach ($C['accounts_by_role']['data']['segments'] ?? [] as $s) $seg[$s['label']] = $s['value'];
                 $exp = []; foreach (rows("SELECT r.display_name n, COUNT(*) c FROM user_roles ur JOIN roles r ON r.id=ur.role_id AND r.is_active=1 JOIN users u ON u.id=ur.user_id AND u.is_active=1 GROUP BY r.id, r.display_name") as $r) $exp[$r['n']] = (int)$r['c'];
                 ksort($seg); ksort($exp);
