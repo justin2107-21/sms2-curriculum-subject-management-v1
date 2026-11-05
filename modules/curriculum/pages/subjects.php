@@ -159,7 +159,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
     <?php endif; ?>
   </main>
 
-  <div class="footer">eLearning Commons &copy; 2026</div>
+  <div class="footer">Bestlink College of the Philippines &middot; CSMS-SMS2 &copy; 2026</div>
 </div>
 
 <div class="curriculum-modal record-details-modal" id="subjectDetailsModal" hidden aria-hidden="true">

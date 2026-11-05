@@ -210,3 +210,17 @@ a.csms-stat:hover { border-color: var(--csms-navy, #1a3a8c); }
 .csms-state-compact { margin: 0; padding: 2px 0 4px; color: var(--csms-text-secondary, #374151); font-size: var(--csms-text-sm, 14px); }
 .csms-card .csms-data-table { width: 100%; }
 .csms-card--compact { align-self: start; }
+
+/* Donut: total in the centre, count and share in the legend */
+.csms-donut { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px 28px; padding: 6px 0; }
+.csms-donut__chart { position: relative; flex: 0 0 auto; width: 190px; height: 190px; }
+.csms-legend { flex: 1 1 11rem; max-width: 16rem; margin: 0; padding: 0; list-style: none; }
+.csms-legend li { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--dash-border); font-size: var(--csms-text-sm, .875rem); }
+.csms-legend li:last-child { border-bottom: 0; }
+.csms-legend__swatch { flex: 0 0 auto; width: 14px; height: 14px; border-radius: 3px; }
+.csms-legend__label { flex: 1 1 auto; min-width: 0; color: var(--csms-text, #1f2937); }
+.csms-legend__value { flex: 0 0 auto; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--csms-text, #1f2937); }
+.csms-legend__value small { font-weight: 500; color: var(--dash-muted); }
+
+/* D8: the fixed CIMF launcher (right 24px, 60px wide) must never cover content, so wide screens keep a clear strip beside it. */
+@media (min-width: 601px) { .csms-dash #dashboardResults, .csms-dash #dashboardEmpty { margin-right: 72px; } }

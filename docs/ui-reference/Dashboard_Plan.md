@@ -439,3 +439,14 @@ None for step 1. Optional later: the backend tasks in §9.
 Approved: drafts with placements count first; sixth pipeline bucket "Active (not reviewed)"; targets only from `MIN_TOTAL_UNITS` rules (none loaded, so "No target set"); Required vs optional, Grade weighting and I/P/D charts removed. Staff "Needs attention" lists validator failures and placements with incomplete grade weighting in their versions.
 
 CMO 25 s.2015 figures for the adviser: Section 8.1, p.10, minimum total 146 units (GE 54, Common 18, Professional 48, Electives 12, Math 0, PE 8, NSTP 6); COE minimum 134. Section 23, p.48: from AY 2018-2019 GE falls from 54 to a minimum of 36 under CMO 20 s.2013; the balance of 18 "may be replaced by professional/domain courses... as long as the minimum total number of units is satisfied as articulated in Section 8.1".
+
+## V3 finalization (2026-11-05)
+Chart rules applied everywhere: donut only for part-of-whole with at most six fixed categories (centre total, legend with count and share); bars for comparison, integer ticks, a value label at the end of every bar including zero; long lists sort meaningfully and show the top 10 with "View all"; Okabe-Ito colours with white separators and counts on segments; averages without data show "—" and a reason. The program filter narrows program-scoped cards only; account and audit cards say nothing about programs. "No curriculum yet" appears once per dashboard (Admin: only in the Programs with no curriculum list).
+
+Official exports: the export audit entry now stores `review_status`, `version_label` and the version id. The Admin card lists only exports stored as approved; older entries without the field are not listed.
+
+### Correctness
+`php tools/verify-dashboard-counts.php [database]` builds each role's dashboard read-only (session set READ ONLY) and compares every stat, chart total and list with a separate SELECT, for all programs and for one program. Result on `sms_db`: 109 checks, 0 mismatches. On `sms_db_uitest` with synthetic volume: 116 checks, 0 mismatches.
+
+### Scale (sms_db_uitest only, synthetic rows prefixed SYN-)
+60 programs, 300 curricula, 500 versions, 20,000 placements, 5,000 prerequisite rules, 2,000 review events, 50,160 audit rows. `php tools/uitest/time-dashboard.php` over HTTP, 15 runs after a warm-up, median ms: Super Admin 77 / 65 (all programs / one program), Admin 98 / 45, Staff 186 / 63, Acad Office 94 / 50, Acad Faculty 50 / 41. Slowest single request 205 ms. Every role is far under the 1 s target, so **no index migration 028 is proposed**. The synthetic rows were removed by rebuilding the test database.

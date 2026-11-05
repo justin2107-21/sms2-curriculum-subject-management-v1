@@ -139,7 +139,7 @@ require __DIR__ . '/../shared/sidebar.php';
     <section id="dashboardEmpty" class="dashboard-empty" hidden></section>
   </main>
 
-  <footer class="footer">eLearning Commons &copy; 2026</footer>
+  <footer class="footer">Bestlink College of the Philippines &middot; CSMS-SMS2 &copy; 2026</footer>
 </div>
 
 <div class="sidebar-overlay" id="sidebarOverlay"></div>

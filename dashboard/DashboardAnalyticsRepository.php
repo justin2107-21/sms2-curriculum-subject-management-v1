@@ -235,6 +235,27 @@ final class DashboardAnalyticsRepository
         )[0] ?? ['placements' => 0, 'configured' => 0, 'complete' => 0];
     }
 
+    /** Placements and complete grade-weighting schemes (components total 100) per version, one query. @param int[] $versionIds */
+    public function gradeWeightingForVersions(array $versionIds): array
+    {
+        if ($versionIds === []) return [];
+        [$in, $types, $ids] = self::idList($versionIds);
+        $rows = $this->rows(
+            "SELECT m.curriculum_version_id AS version_id, COUNT(DISTINCT m.id) AS placements,
+                    COUNT(DISTINCT CASE WHEN t.total = 100 THEN m.id END) AS complete
+             FROM curriculum_version_subjects AS m
+             LEFT JOIN grade_weighting_schemes AS g ON g.curriculum_version_subject_id = m.id
+             LEFT JOIN (SELECT scheme_id, SUM(weight_percentage) AS total FROM grade_weighting_components GROUP BY scheme_id) AS t ON t.scheme_id = g.id
+             WHERE m.curriculum_version_id IN ($in)
+             GROUP BY m.curriculum_version_id",
+            $types,
+            $ids
+        );
+        $out = [];
+        foreach ($rows as $r) $out[(int)$r['version_id']] = ['placements' => (int)$r['placements'], 'complete' => (int)$r['complete']];
+        return $out;
+    }
+
     public function electiveGroupCount(int $versionId): int
     {
         return (int)($this->rows('SELECT COUNT(*) AS total FROM curriculum_elective_groups WHERE curriculum_version_id = ?', 'i', [$versionId])[0]['total'] ?? 0);
@@ -467,17 +488,20 @@ final class DashboardAnalyticsRepository
              ORDER BY e.id DESC LIMIT ?", $types . 'i', [...$params, $limit]);
     }
 
+    /** Exports whose audit entry stored review_status = approved. Older entries without it are not listed. */
     public function officialExports(?int $programId, int $limit): array
     {
         [$where, $types, $params] = self::programClause($programId, 'c.academic_program_id');
         return $this->rows(
-            "SELECT a.created_at, v.version_label, c.curriculum_code, p.program_code, u.username, u.first_name, u.last_name
+            "SELECT a.created_at, JSON_UNQUOTE(JSON_EXTRACT(a.metadata_json, '$.version_label')) AS stored_label,
+                    v.version_label, c.curriculum_code, p.program_code, u.username, u.first_name, u.last_name
              FROM audit_logs AS a
-             JOIN curriculum_versions AS v ON v.id = a.entity_id AND v.review_status = 'approved'
+             JOIN curriculum_versions AS v ON v.id = a.entity_id
              JOIN curricula AS c ON c.id = v.curriculum_id
              JOIN academic_programs AS p ON p.id = c.academic_program_id
              LEFT JOIN users AS u ON u.id = a.user_id
-             WHERE a.action = 'CURRICULUM_EXPORT_GENERATE' AND a.entity_type = 'curriculum_version' AND $where
+             WHERE a.action = 'CURRICULUM_EXPORT_GENERATE' AND a.entity_type = 'curriculum_version'
+               AND JSON_UNQUOTE(JSON_EXTRACT(a.metadata_json, '$.review_status')) = 'approved' AND $where
              ORDER BY a.id DESC LIMIT ?", $types . 'i', [...$params, $limit]);
     }
 

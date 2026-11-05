@@ -104,6 +104,19 @@ shapeCheck(!str_contains(DashboardShaper::activityLabel('SUBJECT_UPDATE', 'subje
 shapeCheck(DashboardShaper::activityLabel('ODD_THING', 'mystery')['label'] === 'Odd thing' && DashboardShaper::activityLabel('ODD_THING', 'mystery')['link'] === null, 'Unknown action fallback');
 shapeCheck(DashboardShaper::draftNextStep(0, 0) === 'Add subject placements' && DashboardShaper::draftNextStep(5, 0) === 'Run compliance validation' && DashboardShaper::draftNextStep(5, 1) === 'Review and update', 'Draft next step');
 
+// Pipeline: busiest first, top N only, "no curriculum" listed once and only when asked.
+$many = []; $versionsMany = [];
+for ($i = 1; $i <= 14; $i++) {
+    $many[] = ['id' => $i, 'program_code' => sprintf('P%02d', $i)];
+    for ($j = 0; $j < $i; $j++) $versionsMany[] = ['program_id' => $i, 'status' => 'draft', 'review_status' => 'not_started'];
+}
+$many[] = ['id' => 99, 'program_code' => 'EMPTY'];
+$top = DashboardShaper::pipeline($many, $versionsMany, 10, true);
+shapeCheck(count($top['data']['rows']) === 10 && $top['data']['total_rows'] === 14, 'Pipeline shows the top 10 of 14 programs');
+shapeCheck($top['data']['rows'][0]['label'] === 'P14' && $top['data']['rows'][9]['label'] === 'P05', 'Pipeline rows are sorted by version count, busiest first');
+shapeCheck($top['data']['no_curriculum'] === ['EMPTY'], 'Pipeline lists programs without versions when asked');
+shapeCheck(DashboardShaper::pipeline($many, $versionsMany, 10, false)['data']['no_curriculum'] === [], 'Pipeline omits "no curriculum" when another card owns that fact');
+shapeCheck(DashboardShaper::pipeline([['id' => 99, 'program_code' => 'EMPTY']], [], 10, false)['status'] === DashboardShaper::EMPTY, 'A program with no versions gives an empty pipeline when not listed');
 // No hard-coded chart values in the dashboard data layer (no sample/demo arrays).
 foreach (['DashboardShaper.php', 'DashboardAnalyticsService.php', 'DashboardAnalyticsRepository.php'] as $file) {
     $source = file_get_contents(__DIR__ . '/../dashboard/' . $file);

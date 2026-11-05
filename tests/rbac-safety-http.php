@@ -138,6 +138,12 @@ try {
     $truth(in_array($reference, $ids, true) && !in_array($proposed, $ids, true), 'Faculty version list filtered');
     $expect(200, $staff->req("$vapi?action=get&id=$proposed"), 'Staff reads draft');
 
+    // The export audit entry stores the review state at generation time (the dashboard's Official exports list reads it).
+    $firstSubject = (int)$db->query('SELECT id FROM subjects ORDER BY id LIMIT 1')->fetch_row()[0];
+    $db->query("INSERT INTO curriculum_version_subjects(curriculum_version_id,subject_id,year_level,semester,is_required) VALUES($proposed,$firstSubject,'1st Year','1st Semester',1)");
+    $csv = static fn(Client $c, int $v): array => $c->post($xapi, ['action' => 'download_csv', 'academic_program_id' => (int)$db->query("SELECT academic_program_id FROM curricula WHERE id=$curriculum")->fetch_row()[0], 'curriculum_id' => $curriculum, 'curriculum_version_id' => $v]);
+    $expect(200, $csv($staff, $proposed), 'Staff downloads a draft CSV');
+
     // Export split.
     $preview = static fn(Client $c, int $v): array => $c->req("$xapi?action=preview&curriculum_version_id=$v");
     $expect(403, $preview($admin, $proposed), 'Admin exports unapproved');
@@ -170,6 +176,16 @@ try {
     $truth($preview($admin, $proposed)[0] !== 403, 'Admin official export');
     $truth($preview($office, $proposed)[0] !== 403, 'Office official export');
     $expect(403, $preview($staff, $proposed), 'Staff cannot export approved');
+    $expect(403, $csv($staff, $proposed), 'Staff cannot download an approved CSV');
+    $expect(200, $csv($admin, $proposed), 'Admin downloads an approved CSV');
+    $stored = [];
+    $res = $db->query("SELECT metadata_json FROM audit_logs WHERE action='CURRICULUM_EXPORT_GENERATE' AND entity_id=$proposed ORDER BY id");
+    while ($row = $res->fetch_row()) $stored[] = json_decode($row[0], true);
+    $truth(count($stored) === 2 && $stored[0]['review_status'] === 'not_started' && $stored[1]['review_status'] === 'approved', 'Export audit stores the review state at export time');
+    $truth(($stored[1]['version_label'] ?? '') === "rev$suffix" && (int)$stored[1]['curriculum_version_id'] === $proposed, 'Export audit stores the version label and id');
+    require_once __DIR__ . '/../dashboard/DashboardAnalyticsRepository.php';
+    $official = array_column((new DashboardAnalyticsRepository($db))->officialExports(null, 500), 'stored_label');
+    $truth(in_array("rev$suffix", $official, true) && count(array_keys($official, "rev$suffix", true)) === 1, 'Official exports lists the approved export once and not the draft export');
     $subject = (int)$db->query('SELECT id FROM subjects ORDER BY id LIMIT 1')->fetch_row()[0];
     $locked = $staff->post($amapi, ['action' => 'assign', 'curriculum_version_id' => $proposed, 'subject_id' => $subject, 'year_level' => '1st Year', 'semester' => '1st Semester']);
     $truth($locked[0] >= 400, 'Approved version refuses placement edits, got ' . $locked[0]);

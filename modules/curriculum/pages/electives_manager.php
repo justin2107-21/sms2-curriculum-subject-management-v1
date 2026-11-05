@@ -77,7 +77,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
     <section id="reviewPanel" role="tabpanel" aria-labelledby="reviewTab" hidden><div id="reviewCounters" class="elective-review-grid"></div><div id="reviewIssues"></div></section>
     </section>
   </main>
-  <div class="footer">eLearning Commons &copy; 2026</div>
+  <div class="footer">Bestlink College of the Philippines &middot; CSMS-SMS2 &copy; 2026</div>
 </div>
 <div class="curriculum-modal" id="viewGroupModal" hidden><div class="modal-backdrop" data-modal-close></div>
   <section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="viewGroupTitle">

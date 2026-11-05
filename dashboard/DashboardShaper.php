@@ -86,7 +86,11 @@ final class DashboardShaper
         };
     }
 
-    public static function pipeline(array $programs, array $versions): array
+    /**
+     * One row per program, busiest first, at most $top rows. Programs without a version are listed once
+     * under no_curriculum when $listNone is true. total_rows counts every program that has versions.
+     */
+    public static function pipeline(array $programs, array $versions, int $top = 10, bool $listNone = true): array
     {
         $rows = []; $none = [];
         $byProgram = [];
@@ -96,10 +100,13 @@ final class DashboardShaper
             if ($list === []) { $none[] = (string)$p['program_code']; continue; }
             $counts = array_fill_keys(array_keys(self::PIPELINE), 0);
             foreach ($list as $v) $counts[self::pipelineBucket($v)]++;
-            $rows[] = ['label' => (string)$p['program_code'], 'counts' => $counts];
+            $rows[] = ['label' => (string)$p['program_code'], 'counts' => $counts, 'total' => array_sum($counts)];
         }
-        if ($rows === [] && $none === []) return self::empty();
-        return self::ok(['buckets' => self::PIPELINE, 'rows' => $rows, 'no_curriculum' => $none]);
+        if ($rows === [] && ($none === [] || !$listNone)) return self::empty($rows === [] && $none !== [] ? 'No versions yet.' : 'No data yet for this selection.');
+        usort($rows, static fn($a, $b) => [$b['total'], $a['label']] <=> [$a['total'], $b['label']]);
+        $totalRows = count($rows);
+        return self::ok(['buckets' => self::PIPELINE, 'rows' => array_slice($rows, 0, $top), 'total_rows' => $totalRows,
+            'no_curriculum' => $listNone ? $none : []]);
     }
 
     /** A curriculum's own rule beats its program's. */

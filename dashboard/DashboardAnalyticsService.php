@@ -18,6 +18,10 @@ final class DashboardAnalyticsService
     private const OUTCOME_PROGRAM_CODE = 'BSIT';
     private const CURRICULA = 'modules/curriculum/pages/curricula.php';
     private const MAPPING = 'modules/curriculum/pages/subject_mapping.php';
+    private const PROGRAMS = 'modules/curriculum/pages/academic_programs.php';
+    private const VALIDATION = 'modules/curriculum/pages/validate_curriculum.php';
+    /** Long item lists show this many rows; the rest is behind the module's own page. */
+    public const TOP = 10;
 
     private DashboardAnalyticsRepository $repo;
     private array $can = [];
@@ -114,18 +118,18 @@ final class DashboardAnalyticsService
     {
         $accounts = $this->allow('user.manage') ? $this->repo->accountCounts() : ['active' => 0, 'must_change' => 0];
         $stats = [
-            $this->stat('active_accounts', 'Active accounts', $accounts['active'], 'admin/users.php', 'All programs'),
-            $this->stat('password_change', 'Need password change', $accounts['must_change'], 'admin/users.php', 'All programs'),
-            $this->stat('audit_7d', 'Audit events, 7 days', $this->repo->auditCountSince($this->daysAgo(7)), 'admin/audit_logs.php', 'All programs'),
+            $this->stat('active_accounts', 'Active accounts', $accounts['active'], 'admin/users.php'),
+            $this->stat('password_change', 'Need password change', $accounts['must_change'], 'admin/users.php'),
+            $this->stat('audit_7d', 'Audit events, 7 days', $this->allow('audit.view') ? $this->repo->auditCountSince($this->daysAgo(7)) : 0, 'admin/audit_logs.php'),
             $this->stat('awaiting', 'Awaiting review', $this->countReview('under_review'), self::CURRICULA),
         ];
-        $roles = array_map(static fn($r) => ['label' => $r['display_name'], 'value' => (int)$r['accounts']], $this->repo->accountsByRole());
+        $roles = $this->allow('user.manage') ? array_map(static fn($r) => ['label' => $r['display_name'], 'value' => (int)$r['accounts']], $this->repo->accountsByRole()) : [];
         $charts = [
-            'accounts_by_role' => $this->meta('Accounts by role', 'bar', 'admin/users.php', 'Active accounts in each current role, all programs.',
-                $roles === [] ? DashboardShaper::empty('No active accounts.') : DashboardShaper::ok(['bars' => $roles])),
-            'audit_weekly' => $this->meta('Audit events per week', 'bar', 'admin/audit_logs.php', 'All logged events, last 12 weeks, all programs.',
-                DashboardShaper::buckets(['Events' => $this->repo->auditPerDay($this->daysAgo(90))], 'week')),
-            'pipeline' => $this->pipeline(),
+            'accounts_by_role' => $this->meta('Accounts by role', 'donut', 'admin/users.php', 'Active accounts in each current role.',
+                $this->donut($roles, 'No active accounts.')),
+            'audit_weekly' => $this->meta('Audit events per week', 'bar', 'admin/audit_logs.php', 'All logged events, last 12 weeks.',
+                $this->allow('audit.view') ? DashboardShaper::buckets(['Events' => $this->repo->auditPerDay($this->daysAgo(90))], 'week') : DashboardShaper::empty()),
+            'pipeline' => $this->pipeline(true),
         ];
         $lists = [
             'rbac_changes' => $this->meta('Recent role and permission changes', 'list', 'admin/audit_logs.php', '', $this->listOf(array_map(fn($r) => [
@@ -145,24 +149,24 @@ final class DashboardAnalyticsService
         $active = count(array_filter($programs, static fn($p) => strtolower((string)$p['status']) === 'active'));
         $counts = $this->repo->overallCounts($this->programId);
         $stats = [
-            $this->stat('programs', 'Active programs', $active, 'modules/curriculum/pages/academic_programs.php', 'All programs'),
+            $this->stat('programs', 'Active programs', $active, self::PROGRAMS),
             $this->stat('curricula', 'Curricula', $counts['curricula'], self::CURRICULA),
             $this->stat('approved', 'Approved versions', $this->countReview('approved'), self::CURRICULA),
             $this->stat('awaiting', 'Awaiting review', $this->countReview('under_review'), self::CURRICULA),
         ];
-        $charts = ['pipeline' => $this->pipeline(), 'completeness' => $this->completeness()];
-        $charts['programs_by_level'] = $this->meta('Programs by level', 'bar', 'modules/curriculum/pages/academic_programs.php', 'Active programs and strands, all programs.',
-            $this->programsByLevel($programs));
+        // "No curriculum yet" is stated once on this dashboard: in the Programs with no curriculum list.
+        $charts = ['pipeline' => $this->pipeline(false), 'completeness' => $this->completeness()];
+        $charts['programs_by_level'] = $this->meta('Programs by level', 'donut', self::PROGRAMS, 'Active programs and strands.', $this->programsByLevel($programs));
         $lists = [
             'recently_approved' => $this->approvedList('Recently approved curricula'),
-            'export_log' => $this->meta('Exports of versions now approved', 'list', 'modules/curriculum/pages/curriculum_export.php',
-                'The log does not store review state at export time, so this lists versions that are approved today.',
+            'export_log' => $this->meta('Official exports', 'list', 'modules/curriculum/pages/curriculum_export.php', '',
                 $this->allow('audit.view', 'curriculum_export.official') ? $this->listOf(array_map(fn($r) => [
-                    'primary' => $this->versionName($r), 'secondary' => $this->person($r), 'meta' => $r['created_at'],
-                ], $this->repo->officialExports($this->programId, 5)), 'No exports of approved versions yet.') : DashboardShaper::empty()),
-            'no_curriculum' => $this->meta('Programs with no curriculum', 'list', 'modules/curriculum/pages/academic_programs.php', '', $this->listOf(array_map(static fn($p) => [
+                    'primary' => $r['program_code'] . ' · ' . $r['curriculum_code'] . ' · ' . ($r['stored_label'] ?: $r['version_label']),
+                    'secondary' => 'Exported by ' . $this->person($r), 'meta' => $r['created_at'],
+                ], $this->repo->officialExports($this->programId, 5)), 'No official exports yet.') : DashboardShaper::empty()),
+            'no_curriculum' => $this->meta('Programs with no curriculum', 'list', self::PROGRAMS, '', $this->listOf(array_map(static fn($p) => [
                 'primary' => $p['program_code'], 'secondary' => $p['program_name'], 'meta' => strtolower((string)$p['status']) === 'active' ? '' : 'Inactive',
-            ], array_values(array_filter($programs, static fn($p) => (int)$p['curricula'] === 0))), 'All programs have a curriculum.')),
+            ], array_values(array_filter($programs, fn($p) => (int)$p['curricula'] === 0 && ($this->programId === null || (int)$p['id'] === $this->programId)))), 'All programs have a curriculum.')),
         ];
         return compact('stats', 'charts', 'lists');
     }
@@ -180,18 +184,20 @@ final class DashboardAnalyticsService
             $this->stat('waiting', 'Awaiting decision', count($waiting), self::CURRICULA),
             $this->stat('failing', 'Failing checks', count($failing), 'modules/curriculum/pages/validation_history.php'),
         ];
-        $charts = ['term_load' => $this->termLoad($selected), 'prerequisite_health' => $this->prerequisiteHealth()];
-        $charts['units_by_category'] = $this->meta('Units by subject category', 'bar', 'modules/curriculum/pages/subjects.php', 'Units per subject category.',
-            DashboardShaper::unavailable('Subjects do not have a category yet. This chart starts working when that field is added.'));
+        $charts = ['term_load' => $this->termLoad($selected), 'prerequisite_health' => $this->prerequisiteHealth(),
+            'compliance_working' => $this->complianceWorking($selected)];
+        $charts['units_by_category'] = $this->unitsByCategory();
 
         $attention = [];
         foreach ($failing as $v) {
             $attention[] = ['primary' => $this->versionName($v), 'secondary' => (int)$v['failed_count'] . ' failed validator checks', 'meta' => ''];
         }
         if ($this->allow('grade_weighting.view')) {
-            foreach ($mine as $v) {
-                if ($v['status'] === 'archived') continue;
-                $w = array_map('intval', $this->repo->gradeWeighting((int)$v['id']));
+            $ids = [];
+            foreach ($mine as $v) if ($v['status'] !== 'archived' && (int)$v['placements'] > 0) $ids[(int)$v['id']] = $v;
+            $weights = $this->repo->gradeWeightingForVersions(array_keys($ids));
+            foreach ($ids as $id => $v) {
+                $w = $weights[$id] ?? ['placements' => 0, 'complete' => 0];
                 $incomplete = $w['placements'] - $w['complete'];
                 if ($w['placements'] > 0 && $incomplete > 0) {
                     $attention[] = ['primary' => $this->versionName($v), 'secondary' => $incomplete . ' of ' . $w['placements'] . ' placements with incomplete grade weighting', 'meta' => ''];
@@ -201,7 +207,7 @@ final class DashboardAnalyticsService
         $lists = [
             'returned_list' => $this->meta('Returned for revision', 'list', self::CURRICULA, '', $this->listOf(array_map(fn($v) => [
                 'primary' => $this->versionName($v), 'secondary' => 'Reason: ' . ($v['last_reason'] ?: 'none recorded'), 'meta' => $v['updated_at'],
-            ], $returned), 'Nothing returned.')),
+            ], array_slice($returned, 0, 5)), 'Nothing returned.')),
             'my_drafts' => $this->meta('My drafts', 'list', self::CURRICULA, '', $this->listOf(array_map(fn($v) => [
                 'primary' => $this->versionName($v),
                 'secondary' => (int)$v['placements'] . ' placements · Next: ' . DashboardShaper::draftNextStep((int)$v['placements'], (int)$v['runs']),
@@ -218,25 +224,30 @@ final class DashboardAnalyticsService
         $awaiting = $this->repo->awaitingReview($this->userId, $this->programId);
         $events = $this->repo->reviewEvents($this->programId, $this->daysAgo(365));
         $thisMonth = date('Y-m');
+        $since90 = $this->daysAgo(90);
         $inMonth = static fn(string $action): int => count(array_filter($events, static fn($e) => $e['action'] === $action && str_starts_with((string)$e['created_at'], $thisMonth)));
-        $average = DashboardShaper::averageDaysInReview(array_filter($events, fn($e) => (string)$e['created_at'] >= $this->daysAgo(90) || $e['action'] === 'submit'));
+        $average = DashboardShaper::averageDaysInReview(array_filter($events, static fn($e) => (string)$e['created_at'] >= $since90 || $e['action'] === 'submit'));
         $stats = [
             $this->stat('awaiting_mine', 'Awaiting my review', count($awaiting), self::CURRICULA),
-            $this->stat('avg_days', 'Average days in review', $average ?? 0, self::CURRICULA, $average === null ? 'No decisions yet' : 'Last 90 days'),
+            $this->stat('avg_days', 'Average days in review', $average, self::CURRICULA, $average === null ? 'No decisions in the last 90 days' : 'Last 90 days'),
             $this->stat('approved_month', 'Approved this month', $inMonth('approve'), self::CURRICULA),
             $this->stat('returned_month', 'Returned this month', $inMonth('return'), self::CURRICULA),
         ];
         $series = ['Submitted' => [], 'Approved' => [], 'Returned' => []];
         $names = ['submit' => 'Submitted', 'approve' => 'Approved', 'return' => 'Returned'];
+        $split = ['Approved' => 0, 'Returned' => 0];
         foreach ($events as $e) {
             if (isset($names[$e['action']])) $series[$names[$e['action']]][] = ['day' => substr((string)$e['created_at'], 0, 10), 'total' => 1];
+            if (in_array($e['action'], ['approve', 'return'], true) && (string)$e['created_at'] >= $since90) $split[$names[$e['action']]]++;
         }
-        $underReview = array_values(array_filter($this->counted === [] ? [] : $this->versions, static fn($v) => $v['review_status'] === 'under_review'));
+        $underReview = array_values(array_filter($this->versions, static fn($v) => $v['review_status'] === 'under_review' && $v['status'] !== 'archived'));
         $charts = [
-            'review_outcomes' => $this->meta('Review outcomes', 'bar', self::CURRICULA, 'Versions submitted, approved and returned.',
-                $events === [] ? DashboardShaper::empty('No reviews yet.') : DashboardShaper::buckets($series)),
-            'pipeline' => $this->pipeline(),
-            'compliance_under_review' => $this->meta('Compliance of versions under review', 'bar', 'modules/curriculum/pages/validate_curriculum.php', 'Latest validation run of each version under review.',
+            'review_outcomes' => $this->meta('Review outcomes per month', 'bar', self::CURRICULA, 'Versions submitted, approved and returned.',
+                $events === [] ? DashboardShaper::empty('No reviews yet.') : DashboardShaper::buckets($series, 'month')),
+            'decision_split' => $this->meta('Decisions, last 90 days', 'donut', self::CURRICULA, 'Approved against returned.',
+                $this->donut(array_map(static fn($k, $v) => ['label' => $k, 'value' => $v], array_keys($split), $split), 'No decisions in the last 90 days.')),
+            'pipeline' => $this->pipeline(true),
+            'compliance_under_review' => $this->meta('Compliance of versions under review', 'bar', self::VALIDATION, 'Latest validation run of each version under review.',
                 $this->allow('compliance.view') ? $this->compliance($underReview) : DashboardShaper::empty()),
         ];
         $lists = [
@@ -268,6 +279,7 @@ final class DashboardAnalyticsService
             'outcome_coverage' => $this->meta('Outcome coverage', 'radar', self::MAPPING,
                 $selected === null ? 'Subjects mapped to each graduate outcome.' : 'Subjects mapped to each graduate outcome in ' . $this->versionName($selected) . '.', $outcomes),
             'term_load' => $this->termLoad($selected),
+            'units_by_category' => $this->unitsByCategory(),
         ];
         $approved = array_values(array_filter($this->versions, static fn($v) => $v['review_status'] === 'approved' && $v['status'] !== 'archived'));
         $lists = [
@@ -281,11 +293,11 @@ final class DashboardAnalyticsService
 
     // ---- Cards ----
 
-    private function pipeline(): array
+    private function pipeline(bool $listNone): array
     {
         $programs = $this->programId === null ? $this->repo->programs() : array_values(array_filter($this->repo->programs(), fn($p) => (int)$p['id'] === $this->programId));
         return $this->meta('Curriculum pipeline by program', 'bar', self::CURRICULA, 'Every version of each program, by lifecycle stage.',
-            $this->allow('curriculum.view') ? DashboardShaper::pipeline($programs, $this->versions) : DashboardShaper::empty());
+            $this->allow('curriculum.view') ? DashboardShaper::pipeline($programs, $this->versions, self::TOP, $listNone) : DashboardShaper::empty());
     }
 
     private function completeness(): array
@@ -301,13 +313,10 @@ final class DashboardAnalyticsService
             $rows[] = ['label' => $v['program_code'] . ' · ' . $v['curriculum_code'] . ' · ' . $v['version_label'],
                 'units' => $totals[(int)$v['id']] ?? 0.0, 'target' => $target['value'] ?? null, 'target_name' => $target['name'] ?? null];
         }
-        $covered = array_flip(array_map(static fn($v) => (int)$v['program_id'], $this->counted));
-        $none = [];
-        foreach ($this->repo->programs() as $p) {
-            if (($this->programId === null || (int)$p['id'] === $this->programId) && !isset($covered[(int)$p['id']])) $none[] = $p['program_code'];
-        }
-        return $this->meta('Curriculum completeness', 'bar', self::MAPPING, 'Placed units of each counted version against its required units.',
-            $rows === [] && $none === [] ? DashboardShaper::empty() : DashboardShaper::ok(['rows' => $rows, 'no_curriculum' => $none]));
+        usort($rows, static fn($a, $b) => [$b['units'], $a['label']] <=> [$a['units'], $b['label']]);
+        $total = count($rows);
+        return $this->meta('Curriculum completeness', 'bar', self::CURRICULA, 'Placed units of each counted version against its required units, largest first.',
+            $rows === [] ? DashboardShaper::empty('No curriculum with subjects yet.') : DashboardShaper::ok(['rows' => array_slice($rows, 0, self::TOP), 'total_rows' => $total]));
     }
 
     private function prerequisiteHealth(): array
@@ -316,23 +325,26 @@ final class DashboardAnalyticsService
         $module = 'modules/curriculum/pages/prerequisite_configuration.php';
         if (!$this->allow('curriculum.view', 'prerequisite.view')) return $this->meta($title, 'bar', $module, '', DashboardShaper::empty());
         $ids = array_map(static fn($v) => (int)$v['id'], $this->counted);
-        $placements = $this->repo->placementsForVersions($ids);
-        $edges = $this->repo->prerequisiteEdges($ids);
+        $byVersionPlacements = [];
+        foreach ($this->repo->placementsForVersions($ids) as $p) $byVersionPlacements[(int)$p['version_id']][] = $p;
+        $byVersionEdges = [];
+        foreach ($this->repo->prerequisiteEdges($ids) as $e) $byVersionEdges[(int)$e['version_id']][] = $e;
         $rows = [];
         foreach ($this->counted as $v) {
             $id = (int)$v['id'];
+            if (empty($byVersionPlacements[$id])) continue;
             $rows[] = DashboardShaper::prerequisiteHealthRow($v['program_code'] . ' · ' . $v['curriculum_code'] . ' · ' . $v['version_label'],
-                array_values(array_filter($placements, static fn($p) => (int)$p['version_id'] === $id)),
-                array_values(array_filter($edges, static fn($e) => (int)$e['version_id'] === $id)));
+                $byVersionPlacements[$id], $byVersionEdges[$id] ?? []);
         }
-        $rows = array_values(array_filter($rows, static fn($r) => $r['placements'] > 0));
         if ($rows === []) return $this->meta($title, 'bar', $module, '', DashboardShaper::empty('No placed subjects to check yet.'));
-        $data = ['rows' => $rows];
+        // Curricula with the most conflicts first, then the lowest prerequisite coverage.
+        usort($rows, static fn($a, $b) => [-($a['later_term'] + $a['circular']), $a['percent'] ?? 101, $a['label']] <=> [-($b['later_term'] + $b['circular']), $b['percent'] ?? 101, $b['label']]);
+        $data = ['total_rows' => count($rows), 'rows' => array_slice($rows, 0, self::TOP)];
         if ($this->programId !== null) {
             $histogram = DashboardShaper::prerequisiteHistogram($this->repo->prerequisiteCounts($ids));
             if ($histogram['status'] === DashboardShaper::OK) $data['histogram'] = $histogram['data'];
         }
-        return $this->meta($title, 'bar', $module, 'Sequence conflicts and how many Year 2–4 subjects have a prerequisite.', DashboardShaper::ok($data));
+        return $this->meta($title, 'bar', $module, 'Share of Year 2–4 subjects that have a prerequisite, and sequence conflicts.', DashboardShaper::ok($data));
     }
 
     private function termLoad(?array $selected): array
@@ -372,7 +384,32 @@ final class DashboardAnalyticsService
             $bars[] = $r === null ? ['label' => $label, 'validated' => false]
                 : ['label' => $label, 'validated' => true, 'pass' => (int)$r['passed_count'], 'fail' => (int)$r['failed_count'], 'not_evaluated' => (int)$r['not_evaluated_count']];
         }
-        return DashboardShaper::ok(['bars' => $bars]);
+        $validated = array_values(array_filter($bars, static fn($b) => $b['validated']));
+        usort($validated, static fn($a, $b) => [$b['fail'], $a['label']] <=> [$a['fail'], $b['label']]);
+        $pending = array_values(array_filter($bars, static fn($b) => !$b['validated']));
+        return DashboardShaper::ok(['bars' => array_slice($validated, 0, self::TOP), 'total_rows' => count($validated), 'pending' => array_column($pending, 'label')]);
+    }
+
+    private function complianceWorking(?array $selected): array
+    {
+        $title = 'Compliance of working version';
+        $module = self::VALIDATION;
+        if (!$this->allow('compliance.view')) return $this->meta($title, 'donut', $module, '', DashboardShaper::empty());
+        if ($selected === null) return $this->meta($title, 'donut', $module, 'Latest validation run.', DashboardShaper::empty('Choose a version in the picker or the filter above.'));
+        $run = $this->repo->latestComplianceRuns([(int)$selected['id']])[0] ?? null;
+        $description = 'Latest validation run of ' . $this->versionName($selected) . '.';
+        if ($run === null) return $this->meta($title, 'donut', $module, $description, DashboardShaper::empty('This version has not been validated yet.'));
+        return $this->meta($title, 'donut', $module, $description, $this->donut([
+            ['label' => 'Pass', 'value' => (int)$run['passed_count']],
+            ['label' => 'Fail', 'value' => (int)$run['failed_count']],
+            ['label' => 'Not evaluated', 'value' => (int)$run['not_evaluated_count']],
+        ], 'The latest run evaluated no rules.'));
+    }
+
+    private function unitsByCategory(): array
+    {
+        return $this->meta('Units by subject category', 'donut', 'modules/curriculum/pages/subjects.php', 'Units per subject category.',
+            DashboardShaper::unavailable('Subjects do not have a category yet. This chart starts working when that field is added.'));
     }
 
     private function programsByLevel(array $programs): array
@@ -382,8 +419,14 @@ final class DashboardAnalyticsService
             if (strtolower((string)$p['status']) !== 'active') continue;
             $counts[DashboardShaper::isShs($p['program_type'] ?? null) ? 'Senior High School' : 'College']++;
         }
-        if (array_sum($counts) === 0) return DashboardShaper::empty('No active programs.');
-        return DashboardShaper::ok(['bars' => array_map(static fn($k, $v) => ['label' => $k, 'value' => $v], array_keys($counts), $counts)]);
+        return $this->donut(array_map(static fn($k, $v) => ['label' => $k, 'value' => $v], array_keys($counts), $counts), 'No active programs.');
+    }
+
+    /** Part of a whole, at most six fixed categories. Zero categories stay in the legend. */
+    private function donut(array $segments, string $emptyReason): array
+    {
+        $total = array_sum(array_column($segments, 'value'));
+        return $total > 0 ? DashboardShaper::ok(['segments' => array_values($segments), 'total' => $total]) : DashboardShaper::empty($emptyReason);
     }
 
     private function approvedList(string $title): array
@@ -438,7 +481,7 @@ final class DashboardAnalyticsService
         return (new DateTimeImmutable("-$days days"))->format('Y-m-d 00:00:00');
     }
 
-    private function stat(string $key, string $label, int|float $value, ?string $module, string $detail = ''): array
+    private function stat(string $key, string $label, int|float|null $value, ?string $module, string $detail = ''): array
     {
         return ['key' => $key, 'label' => $label, 'value' => $value, 'detail' => $detail, 'module' => $module];
     }

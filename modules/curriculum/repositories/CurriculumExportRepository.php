@@ -19,7 +19,8 @@ class CurriculumExportRepository
                     curricula.curriculum_name, curricula.status AS curriculum_status,
                     versions.id AS curriculum_version_id, versions.version_label,
                     versions.effective_academic_year, versions.description AS version_description,
-                    versions.status AS version_status, versions.created_at AS version_created_at,
+                    versions.status AS version_status, versions.review_status AS version_review_status,
+                    versions.created_at AS version_created_at,
                     versions.updated_at AS version_updated_at
              FROM curriculum_versions AS versions
              INNER JOIN curricula ON curricula.id = versions.curriculum_id

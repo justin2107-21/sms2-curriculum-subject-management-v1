@@ -89,7 +89,7 @@ require_once __DIR__ . '/../shared/sidebar.php';
 
   </div><!-- end content -->
 
-  <div class="footer">eLearning Commons &copy; 2026</div>
+  <div class="footer">Bestlink College of the Philippines &middot; CSMS-SMS2 &copy; 2026</div>
 
 </div><!-- end main -->
 

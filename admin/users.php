@@ -71,7 +71,7 @@ require __DIR__ . '/../shared/sidebar.php';
       <?php endif; ?>
     </section>
   </main>
-  <footer class="footer">eLearning Commons &copy; 2026</footer>
+  <footer class="footer">Bestlink College of the Philippines &middot; CSMS-SMS2 &copy; 2026</footer>
 </div>
 <?php require __DIR__.'/account_form.php'; ?>
 <div class="sidebar-overlay" id="sidebarOverlay"></div>

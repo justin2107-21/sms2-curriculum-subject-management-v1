@@ -66,7 +66,7 @@ require __DIR__ . '/../shared/sidebar.php';
     </section>
     <?php require __DIR__.'/role_permission_forms.php'; ?>
   </main>
-  <footer class="footer">eLearning Commons &copy; 2026</footer>
+  <footer class="footer">Bestlink College of the Philippines &middot; CSMS-SMS2 &copy; 2026</footer>
 </div>
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 <script src="../modules/curriculum/assets/curriculum-common.js?v=<?= (int)filemtime(__DIR__.'/../modules/curriculum/assets/curriculum-common.js') ?>"></script>

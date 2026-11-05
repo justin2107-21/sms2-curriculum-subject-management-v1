@@ -274,6 +274,8 @@ class CurriculumExportService
                 'academic_program_id' => (int)$context['academic_program_id'],
                 'curriculum_id' => (int)$context['curriculum_id'],
                 'curriculum_version_id' => (int)$context['curriculum_version_id'],
+                'version_label' => (string)$context['version_label'],
+                'review_status' => (string)$context['version_review_status'],
                 'format' => $format,
                 'subject_count' => (int)$dataset['summary']['total_subjects'],
                 'total_units' => (string)$dataset['summary']['total_units'],

@@ -32,7 +32,7 @@ require __DIR__ . '/../shared/sidebar.php';
     <div class="page-title-bar"><div><h1 class="page-title">System Settings</h1><p class="system-admin-subtitle">Security administration and current technical configuration.</p></div></div>
     <section class="system-admin-card"><div class="system-admin-summary"><h2>Session Security</h2><p>Inactivity timeout: <?= CSMS_IDLE_TIMEOUT_SECONDS ?> seconds. Authentication, CSRF and database-backed permissions remain enforced.</p><p>Deployment configuration and provider credentials are managed by the local operator; secrets are never displayed here.</p></div><div class="system-admin-summary"><a class="secondary-action-button" href="users.php">Manage Accounts and Activation</a> <a class="secondary-action-button" href="permissions.php">Manage Role Permissions</a></div></section>
   </main>
-  <footer class="footer">eLearning Commons &copy; 2026</footer>
+  <footer class="footer">Bestlink College of the Philippines &middot; CSMS-SMS2 &copy; 2026</footer>
 </div>
 
 <div class="sidebar-overlay" id="sidebarOverlay"></div>

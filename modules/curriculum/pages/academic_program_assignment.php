@@ -54,7 +54,7 @@ $cimfStatus = CIMFConfig::status(CIMFConfig::load());
 <label class="select-control compact-select"><span>Rows</span><select id="perPage"><option>10</option><option selected>20</option><option>50</option></select></label><span class="record-count" id="assignmentCount">0 records</span></div>
 <div class="table-scroll"><table class="domain-table"><thead id="assignmentHead"></thead><tbody id="assignmentRows"><tr><td class="state-cell" id="initialState"><?= $programView ? 'Select a Program / Strand to view its assigned subjects.' : 'Select a subject to view its Program / Strand assignments.' ?></td></tr></tbody></table></div>
 <div class="pagination-bar" id="assignmentPagination" hidden></div></section>
-</main><div class="footer">eLearning Commons &copy; 2026</div></div>
+</main><div class="footer">Bestlink College of the Philippines &middot; CSMS-SMS2 &copy; 2026</div></div>
 
 <?php if ($canManageAssignments): ?><div class="curriculum-modal" id="assignModal" hidden><div class="modal-backdrop" data-modal-close></div><section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="assignModalTitle">
 <div class="modal-header"><div><h2 id="assignModalTitle"><?= $programView ? 'Assign Subjects to Program' : 'Assign Subject to Program / Strand' ?></h2><p class="modal-context" id="assignModalContext"></p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>

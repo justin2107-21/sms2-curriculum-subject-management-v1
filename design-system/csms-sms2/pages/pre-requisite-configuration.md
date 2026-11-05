@@ -37,7 +37,7 @@ The current JS (`prerequisite-configuration.js`, `curriculum-common.js`, `cimf-p
 - Existing JS and CSS rely on legacy class names (`record-autocomplete`, `curriculum-modal`, `pr-*`, `button-*`). Bootstrap-profile versions need equivalent markup or the JS selectors must be made class-agnostic without changing behavior.
 - CIMF panel (`shared/cimf_panel.php`) loads legacy CSS and Font Awesome, so it cannot be included as-is on a Bootstrap page. Need a Bootstrap presentation with unchanged behavior (advisory-only, route token, CSRF), and the floating launcher must not cover content (D8 spacing).
 - `curriculum-context.js` session-memory is legacy; the D4 memory has to coexist or replace it without breaking other legacy pages.
-- Footer "eLearning Commons © 2026" exists in the legacy layout; keep as a quiet footer line.
+- Footer "Bestlink College of the Philippines · CSMS-SMS2 © 2026" exists in the legacy layout; keep as a quiet footer line.
 
 ## Page-specific checks (add to MASTER §13)
 - [ ] Rules list, filters, chain viewer, validation review, add/edit/remove produce the same results as legacy against the same disposable DB.
