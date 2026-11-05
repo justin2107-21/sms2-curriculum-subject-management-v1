@@ -45,6 +45,8 @@ Written 2026-11-05 for whoever (or whichever session) continues this work. Read 
 9. **The 15:32 incident on 2026-11-04 is still unexplained.** `sms_db/grade_weighting_components.ibd` was emptied to 0 bytes at 15:32:27 and MySQL crashed at 15:33:05 while a backup read it; a second crash followed at 16:23:32 with no file empty. The table was rebuilt from the 15:31 backup, all 38 tables passed `CHECK TABLE` and matched row counts, the disk is healthy, and MySQL has been stable since the exclusion. The cause was not found. If it repeats, stop and report; the next suspect is the XAMPP MariaDB install itself.
 
 ## Blocker found on 2026-11-05: deploy.php refuses sms_db after migration 027
+**Fixed 2026-11-05: declared per-migration changes in `database/legacy_baseline.php`; the stored record is unchanged. The owner confirmed on `sms_db`: `deploy.php --status` shows 28 applied, none pending; the drift report shows no differences. Migrations 028 and later are now possible. `deploy.php --apply` refuses, before changing anything, a pending migration that changes covered state without a declared entry (`database/README.md`). The text below describes the problem as found and no longer applies.**
+
 `php database\deploy.php --status` on the real `sms_db` now stops with **"Legacy baseline adoption record is invalid; manual review required."** The adoption record stores a fingerprint of the legacy `roles`, `permissions` and `role_permissions` tables (`csms_legacy_baseline_fingerprint()` in `database/legacy_baseline.php`), and 027 changed all three (new columns, the legacy admin role renamed, new roles, permissions and grants). Earlier migrations were kept out of the fingerprint by listing mutated tables and future permissions; 027 was not. Consequences:
 - **No new migration (028 or later) can be applied to `sms_db` until this is resolved.** Nothing is broken at runtime; the site works.
 - `tools/uitest/setup-db.ps1` fails for the same reason, because it runs `deploy.php` on a copy of `sms_db`. Workaround used on 2026-11-05: after the failed rebuild, run `DB_NAME=sms_db_uitest php tools/uitest/seed-users.php` (it also seeds the scenario fixtures); the copy is already imported by then.
@@ -60,10 +62,10 @@ Written 2026-11-05 for whoever (or whichever session) continues this work. Read 
 | `students` table | Decided | Kept for SMS2 integration, synthetic data, not used by CSMS; only Super Admin holds `student.*` |
 
 ## Later tasks recorded in the docs
-Split `curriculum.update` so Admin cannot edit placements; drop `users.role`; faculty-subject link; switch the Faculty read scope to `approved`.
+Split `curriculum.update` so Admin cannot edit placements; drop `users.role`; faculty-subject link; switch the Faculty read scope to `approved`; update `tests/original_post_migration_readonly.php`, which is out of date: it still expects 5 migration history rows and 37 tables, and has not been changed since before migrations 026 and 027.
 
 ## Next tasks, in order
-0. **Resolve the baseline blocker above (next task; the dashboards are finished).** It gates tasks 3 to 5, which need migrations. Do not weaken the fingerprint check.
+0. **Curriculum Builder (next task).** The baseline blocker is fixed. Task 3 changes `subjects`, so its migration needs a declared entry (`database/README.md`).
 1. **Password reset for Admin and Super Admin:** `KENNETH123` still needs the reset the owner planned from the Users page as `csms_admin`. Review the reset flow and its audit entry before relying on it.
 2. **Module page redesigns, starting with Pre-requisite Configuration.** Follow `UI_Audit.md`, `UI_Decisions.md` and the shared header, picker and state components. Then the other module pages in the sidebar order.
 3. **Subject category field:** a migration adding a category to `subjects` (list to be agreed), the Subject Master form field and import support, then enable the "Units by subject category" card (currently a pending card).
@@ -71,11 +73,13 @@ Split `curriculum.update` so Admin cannot edit placements; drop `users.role`; fa
 5. **Faculty-subject link:** a table linking faculty users to subjects, an admin screen, and the permission it needs (needs the owner's approval). Then give Acad Faculty CLO management of their own subjects, and fill "My subjects" on their dashboard.
 
 ## How to run things
-- Rebuild the test database and users: `powershell -ExecutionPolicy Bypass -File tools\uitest\setup-db.ps1` (currently fails at the migration step, see the blocker above)
+- Rebuild the test database and users: `powershell -ExecutionPolicy Bypass -File tools\uitest\setup-db.ps1`
 - One role, both widths: `powershell -ExecutionPolicy Bypass -File tools\uitest\run.ps1 -Role staff -Widths 1440,390 -Urls /dashboard/dashboard.php`
 - Scenario then checker: `-CtxScenario`, then `node tools\uitest\check-scenario.cjs <folder>`
 - Dashboard correctness, read-only, any database: `php tools\verify-dashboard-counts.php sms_db` (the connection is opened READ ONLY)
 - Dashboard load test on `sms_db_uitest` only: `DB_NAME=sms_db_uitest php tools/uitest/synthetic-volume.php` (rows prefixed `SYN-`; `--remove` deletes them, or rebuild the test database), then `DB_NAME=sms_db_uitest php tools/uitest/time-dashboard.php 15`
+- Baseline tests: `php tests/legacy-baseline-declarations.php` (no database), `DB_NAME=sms_db_uitest php tests/legacy-baseline-fingerprint.php`
+- Grants against the approved matrix, read-only, warns only: `DB_NAME=<database> php tools/rbac-drift-report.php`
 - Authorization tests: `DB_NAME=sms_db_uitest php tests/rbac-final-roles.php`, `tests/rbac-safety-http.php`, `tests/dashboard-role-payload.php`; node tests: `tests/*.cjs`
 - Git Bash loses backslashes in `node -e` and heredocs; write scripts with the Write tool. Files have mixed LF/CRLF, so edit helpers must match `\r?\n`.
 
@@ -83,4 +87,3 @@ Split `curriculum.update` so Admin cannot edit placements; drop `users.role`; fa
 - On `sms_db` the Staff and Faculty dashboards default to the counted version, which is the 3-unit active BSIT "123 v1", not PREORAL-2026 (157 units). That follows the approved counted-version rule; choosing a version in the filter changes it.
 - `sms_db` has no Staff account (the old staff account became Acad Office in 027), so the Staff dashboard was checked there with the Staff permission set and an existing account.
 - Screenshots taken right after load can catch charts mid-animation (blank bars at 390 px once); a second run was complete.
-- The test database rebuild still stops at the migration step because of the fingerprint blocker; run `seed-users.php` afterwards as described above.
