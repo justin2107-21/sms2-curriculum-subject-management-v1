@@ -28,6 +28,8 @@ class Element {
     replaceChildren(...items) { this.children = items; this.innerHTML = ''; }
     add(item) { this.children.push(item); }
     focus() {}
+    select() { this.selected = true; }
+    requestSubmit() { return this.handlers.submit && this.handlers.submit({ preventDefault() {} }); }
     reset() {}
     reportValidity() { return true; }
     querySelector(selector) { return el(this.id + '-save'); }
@@ -46,7 +48,8 @@ let mappings = Array.from({ length: 52 }, (_, index) => row(index + 1));
 const edge = { id: 1, curriculum_version_id: 3, subject_id: 2, required_subject_id: 1,
     requirement_type: 'prerequisite', subject_code: 'S2', subject_title: 'Subject 2', required_subject_code: 'S1', required_subject_title: 'Subject 1' };
 let requirements = [edge];
-let outcomeLinks = [{ placement_id: 101, outcome_id: 1 }, { placement_id: 102, outcome_id: 1 }];
+let outcomeLinks = [{ id: 501, placement_id: 101, outcome_id: 1 }, { id: 502, placement_id: 102, outcome_id: 1 }];
+let workspaceEditable = true, removeRefusal = false;
 const selectors = {}, calls = [], posted = [];
 let delayedVersion = null;
 let previewValidation = {valid:true, conflicts:[], relationships:[]};
@@ -81,7 +84,7 @@ const ui = {
     async fetchJson(endpoint, params) {
         calls.push({ endpoint, params });
         if (endpoint === 'outcomes' && params.action === 'workspace' && String(params.curriculum_version_id) === '21') throw new Error('CHED CMO 25 BSIT outcomes are available only for BSIT curriculum versions.');
-        if (endpoint === 'outcomes' && params.action === 'workspace') return {context:{version_id:3,version_label:'V1',program_code:'BSIT',curriculum_name:'Information Technology',editable:true},
+        if (endpoint === 'outcomes' && params.action === 'workspace') return {context:{version_id:3,version_label:'V1',program_code:'BSIT',curriculum_name:'Information Technology',editable:workspaceEditable},
             outcomes:[{id:1,outcome_code:'IT01',outcome_text:'Apply knowledge of computing, science, and mathematics appropriate to the discipline',document_code:'CHED Memorandum Order No. 25, series of 2015',source_section:'Section 6.3',printed_page:8,pdf_page_index:8,coverage_status:'not_assessed',mapping_count:2}],
             placements:mappings.map(m=>({...m,placement_id:m.id+100})),mappings:outcomeLinks,limitations:{}};
         if (params.action === 'preview_placement') return {validation: previewValidation};
@@ -104,6 +107,14 @@ const ui = {
     clearFormError() {}, showFormError(element, message) { element.error = message; }, showToast() {}, setFormSubmitting() {},
     async postForm(endpoint, payload) {
         posted.push(Object.fromEntries(payload));
+        if (endpoint === 'outcomes') {
+            if (payload.get('action') === 'remove') {
+                if (removeRefusal) throw new Error('Withdraw dependent CLO alignments before removing this graduate-outcome mapping.');
+                outcomeLinks = outcomeLinks.filter(link => link.id !== Number(payload.get('mapping_id')));
+            }
+            if (payload.get('action') === 'add') outcomeLinks.push({ id: 600 + outcomeLinks.length, placement_id: Number(payload.get('placement_id')), outcome_id: Number(payload.get('outcome_id')) });
+            return { message: 'Saved' };
+        }
         if (payload.get('action') === 'remove') mappings = mappings.filter(item => item.id !== Number(payload.get('id')));
         if (payload.get('action') === 'update_mapping') {
             const mapping = mappings.find(item => item.id === Number(payload.get('id')));
@@ -156,7 +167,7 @@ const terms = () => [...el('mappingMap').innerHTML.matchAll(/<tr class="map-tabl
     assert.equal(el('mappingVersionFilter').value, '3');
     assert.deepEqual(terms(), ['1st Year · 1st Semester · 52 subjects']);
     assert.equal(rowCount(), 52); assert.equal(el('mappingCount').textContent, '52 subjects');
-    assert.ok(!/data-open-mapping|data-map-year|Place Subject|data-connection|<button/.test(el('mappingMap').innerHTML), 'read-only: no buttons, pills or placement editing in the map');
+    assert.ok(!/data-open-mapping|data-map-year|Place Subject|data-connection/.test(el('mappingMap').innerHTML), 'no placement editing, pills or prerequisite connections in the map');
     // Matrix: outcome columns with full text, check marks, footer counts from the visible rows.
     assert.ok(el('mappingMap').innerHTML.includes('title="Apply knowledge of computing'));
     assert.ok(el('mappingMap').innerHTML.includes('<span class="sr-only">IT01: Apply knowledge'));
@@ -185,6 +196,41 @@ const terms = () => [...el('mappingMap').innerHTML.matchAll(/<tr class="map-tabl
     selectors.mappingVersionInput.setSelected(version); await settle();
     delayedVersion(); await settle();
     assert.equal(el('mappingVersionFilter').value, '3'); assert.equal(rowCount(), 3);
+    // Slice 3: editing. Cells are buttons; checking asks for a rationale, clearing asks for confirmation; the server's refusal is shown.
+    const cell = (placement, mapping) => ({ dataset: { placement: String(placement), outcome: '1', ...(mapping ? { mapping: String(mapping) } : {}) } });
+    const clickCell = target => el('mappingMap').handlers.click({ target: { closest: selector => selector === '.map-toggle' ? target : null } });
+    const sendAdd = async () => { await el('mapAddForm').handlers.submit({ preventDefault() {} }); await settle(); };
+    outcomeLinks = [{ id: 501, placement_id: 101, outcome_id: 1 }, { id: 502, placement_id: 102, outcome_id: 1 }];
+    selectors.mappingVersionInput.setSelected(version); await settle();
+    assert.match(el('mappingMap').innerHTML, /class="map-toggle" aria-pressed="false" aria-label="Map S3 to IT01"/);
+    assert.match(el('mappingMap').innerHTML, /aria-pressed="true" aria-label="Remove mapping of S1 to IT01"/);
+    assert.match(el('mapAccessNote').textContent, /Click a cell/);
+    clickCell(cell(103));
+    assert.equal(el('mapAddModal').hidden, false); assert.equal(el('mapAddRationale').value, ''); assert.equal(el('mapAddRationale').selected, true);
+    assert.equal(posted.length, 0, 'opening the dialog saves nothing');
+    await sendAdd(); assert.equal(posted.length, 0, 'a blank rationale is not sent'); assert.equal(el('mapAddModal').hidden, false);
+    el('mapAddRationale').value = 'Covers IT01 through lab work.'; await sendAdd();
+    assert.deepEqual([posted[0].action, posted[0].placement_id, posted[0].outcome_id, posted[0].rationale], ['add', '103', '1', 'Covers IT01 through lab work.']);
+    assert.equal(el('mapAddModal').hidden, true);
+    assert.match(el('mappingMap').innerHTML, /aria-label="Remove mapping of S3 to IT01"/);
+    clickCell(cell(101, 501));
+    assert.equal(el('mapRemoveModal').hidden, false); assert.equal(posted.length, 1, 'opening the confirmation removes nothing');
+    await el('mapRemoveConfirm').handlers.click.call(el('mapRemoveConfirm')); await settle();
+    assert.deepEqual([posted[1].action, posted[1].mapping_id], ['remove', '501']);
+    assert.match(el('mappingMap').innerHTML, /aria-label="Map S1 to IT01"/);
+    clickCell(cell(101));
+    assert.equal(el('mapAddRationale').value, 'Covers IT01 through lab work.', 'last rationale is prefilled'); assert.equal(el('mapAddRationale').selected, true);
+    assert.equal(posted.length, 2, 'the prefilled rationale is not saved until confirmed');
+    el('mapAddModal').hidden = true;
+    removeRefusal = true; clickCell(cell(102, 502));
+    await el('mapRemoveConfirm').handlers.click.call(el('mapRemoveConfirm')); await settle();
+    assert.match(el('mapRemoveModal').error, /Withdraw dependent CLO alignments/); assert.equal(el('mapRemoveModal').hidden, false, 'refusal keeps the dialog open');
+    assert.match(el('mappingMap').innerHTML, /aria-label="Remove mapping of S2 to IT01"/, 'refused removal leaves the mapping');
+    removeRefusal = false; el('mapRemoveModal').hidden = true;
+    workspaceEditable = false; selectors.mappingVersionInput.setSelected(version); await settle();
+    assert.ok(!/<button|map-toggle/.test(el('mappingMap').innerHTML), 'read-only version has no cell controls');
+    assert.match(el('mapAccessNote').textContent, /Read-only: this curriculum version cannot be edited/);
+    workspaceEditable = true; selectors.mappingVersionInput.setSelected(version); await settle();
     // Subject Trace and Mapping Review keep working.
     selectors.mappingTraceSearch.setSelected({ id: 1, subject_code: 'S1', subject_title: '<unsafe>', units: .1 }); await settle();
     assert.match(el('mappingTraceResults').innerHTML, /&lt;unsafe&gt;/);
@@ -197,5 +243,5 @@ const terms = () => [...el('mappingMap').innerHTML.matchAll(/<tr class="map-tabl
     selectors.mappingVersionInput.setSelected({ ...version, id: 21, curriculum_id: 20 }); await settle();
     assert.match(el('mappingMap').innerHTML, /No outcome catalog for this program yet./);
     assert.ok(!el('mappingMap').innerHTML.includes('<table'), 'no empty or invented matrix without a catalog');
-    console.log('PASS: complete pagination, read-only Builder-style map (terms, order, escaping, filters, Builder link), stale-response guard, Subject Trace, Mapping Review, empty state');
+    console.log('PASS: complete pagination, editing (rationale dialog with prefill, remove confirmation, server refusal shown, read-only version), Builder-style map (terms, order, escaping, filters, Builder link), stale-response guard, Subject Trace, Mapping Review, empty state');
 })().catch(error => { console.error(error); process.exitCode = 1; });

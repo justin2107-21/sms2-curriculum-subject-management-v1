@@ -95,7 +95,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
       </nav>
       <section id="mappingPanelMap" class="mapping-workspace-panel csms-panel" role="tabpanel" aria-labelledby="mappingTabMap" <?= $activeTab === 'map' ? '' : 'hidden' ?>>
         <div class="csms-panel__bar">
-          <p class="csms-panel__note">Which program outcomes each subject supports. Placements are edited in the Curriculum Builder.</p>
+          <p class="csms-panel__note" id="mapAccessNote">Which program outcomes each subject supports. Placements are edited in the Curriculum Builder.</p>
           <a class="secondary-action-button" id="mappingBuilderLink" href="curriculum_builder.php" hidden><i class="fa-solid fa-table-list" aria-hidden="true"></i> Edit placements in Builder</a>
         </div>
         <div class="mapping-map-toolbar">
@@ -202,6 +202,26 @@ require __DIR__ . '/../../../shared/sidebar.php';
     </section>
   </div>
 
+<div class="curriculum-modal" id="mapAddModal" hidden aria-hidden="true">
+  <div class="modal-backdrop" data-modal-close></div>
+  <section class="modal-dialog modal-dialog-small" role="dialog" aria-modal="true" aria-labelledby="mapAddTitle">
+    <div class="modal-header"><div><h2 id="mapAddTitle">Record outcome mapping</h2><p class="modal-context" id="mapAddContext"></p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
+    <form class="domain-form" id="mapAddForm" novalidate>
+      <div class="form-error" role="alert" hidden></div>
+      <label class="form-field form-field-wide"><span>Rationale <strong>*</strong></span><textarea id="mapAddRationale" name="rationale" rows="4" maxlength="3000" required></textarea></label>
+      <p class="mapping-edit-note">Why this subject supports this outcome. Enter saves; Shift+Enter adds a line.</p>
+      <div class="modal-actions"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="submit" class="button-primary">Save mapping</button></div>
+    </form>
+  </section>
+</div>
+<div class="curriculum-modal" id="mapRemoveModal" hidden aria-hidden="true">
+  <div class="modal-backdrop" data-modal-close></div>
+  <section class="modal-dialog modal-dialog-small" role="alertdialog" aria-modal="true" aria-labelledby="mapRemoveTitle">
+    <div class="modal-header"><div><h2 id="mapRemoveTitle">Remove outcome mapping?</h2></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
+    <div class="confirmation-body"><div id="mapRemoveMessage"></div><div class="form-error" role="alert" hidden></div></div>
+    <div class="modal-actions modal-actions-padded"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="button" class="button-danger" id="mapRemoveConfirm">Remove mapping</button></div>
+  </section>
+</div>
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 <script src="../assets/curriculum-common.js?v=<?= $curriculumCommonVersion ?>"></script>
 <script src="../assets/placement-groups.js?v=<?= (int)filemtime(__DIR__ . '/../assets/placement-groups.js') ?>"></script>

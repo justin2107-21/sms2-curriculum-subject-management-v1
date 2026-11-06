@@ -451,7 +451,7 @@
         try {
             const data = await ui.fetchJson(api.outcomes, { action: 'workspace', curriculum_version_id: version });
             if (request !== state.mapRequest) return;
-            state.matrix = { status: 'ready', outcomes: arr(data.outcomes), rows: arr(data.placements).map(p => ({ ...p, id: p.placement_id })), index: matrixView.index(data.mappings) };
+            state.matrix = { status: 'ready', editable: permission.manageOutcomes && Boolean(data.context && data.context.editable), outcomes: arr(data.outcomes), rows: arr(data.placements).map(p => ({ ...p, id: p.placement_id })), index: matrixView.index(data.mappings) };
         } catch (error) {
             if (request !== state.mapRequest) return;
             state.matrix = /only for BSIT/i.test(error.message || '') ? { status: 'nocatalog' } : { status: 'error', message: error.message || 'Outcome mappings could not be loaded.' };
@@ -473,8 +473,89 @@
             (!status || (status === 'mapped') === matrixView.isMapped(matrix.index, row)));
         el('mappingCount').textContent = rows.length + (rows.length === 1 ? ' subject' : ' subjects');
         if (!rows.length) { mapTarget.innerHTML = emptyBox('No subjects match these filters.'); return; }
-        mapTarget.innerHTML = matrixView.render(rows, matrix.outcomes, matrix.index, { esc, group: placementView.group, yearLabel: placementView.yearLabel });
+        mapTarget.innerHTML = matrixView.render(rows, matrix.outcomes, matrix.index, { esc, group: placementView.group, yearLabel: placementView.yearLabel, editable: matrix.editable });
+        updateAccessNote();
+        fitMatrix();
+        if (pendingFocus) { const b = mapTarget.querySelector('[data-placement="' + pendingFocus.placement + '"][data-outcome="' + pendingFocus.outcome + '"]'); pendingFocus = null; if (b) b.focus(); }
     }
+    let pendingFocus = null;
+    // Horizontal scroll only when the matrix is wider than its card; otherwise the header and footer stay sticky against the page scroll.
+    function fitMatrix() {
+        const box = mapTarget.querySelector('.map-scroll'), table = box && box.querySelector('table');
+        if (!box) return;
+        box.classList.remove('is-scrollable');
+        if (table.scrollWidth > box.clientWidth + 1) box.classList.add('is-scrollable');
+    }
+    window.addEventListener('resize', ui.debounce(fitMatrix, 150));
+    function updateAccessNote() {
+        const note = el('mapAccessNote'), matrix = state.matrix;
+        if (!note || !matrix || matrix.status !== 'ready') return;
+        const base = 'Which program outcomes each subject supports. Placements are edited in the Curriculum Builder.';
+        note.textContent = matrix.editable ? 'Click a cell to map or remove a subject-outcome link. Placements are edited in the Curriculum Builder.'
+            : (permission.manageOutcomes ? 'Read-only: this curriculum version cannot be edited. ' : 'Read-only for your role. ') + base;
+    }
+    // Editing: a rationale dialog when a cell is checked, a confirmation when it is cleared. The server decides; its message is shown.
+    const addModal = ui.createModal(el('mapAddModal'), { restoreFocus: () => null });
+    const removeModal = ui.createModal(el('mapRemoveModal'), { restoreFocus: () => null });
+    let lastRationale = '';
+    try { lastRationale = window.sessionStorage?.getItem('csms.map.lastRationale') || ''; } catch (e) { lastRationale = ''; }
+    let pendingAdd = null, pendingRemove = null;
+    mapTarget?.addEventListener('click', event => {
+        const button = event.target.closest('.map-toggle');
+        if (!button || !state.matrix || !state.matrix.editable) return;
+        const row = state.matrix.rows.find(r => Number(r.placement_id) === Number(button.dataset.placement));
+        const outcome = state.matrix.outcomes.find(o => Number(o.id) === Number(button.dataset.outcome));
+        if (!row || !outcome) return;
+        if (button.dataset.mapping) {
+            pendingRemove = { mapping: Number(button.dataset.mapping), placement: row.placement_id, outcome: outcome.id };
+            ui.clearFormError(el('mapRemoveModal'));
+            el('mapRemoveMessage').innerHTML = '<p>Remove the mapping of</p><strong>' + esc(row.subject_code + ' \u2014 ' + row.subject_title) + '</strong><p>to</p><strong>' + esc(outcome.outcome_code) + '</strong>';
+            removeModal.open(); el('mapRemoveConfirm').focus();
+        } else {
+            pendingAdd = { placement: row.placement_id, outcome: outcome.id };
+            ui.clearFormError(el('mapAddForm'));
+            el('mapAddContext').textContent = row.subject_code + ' \u2192 ' + outcome.outcome_code;
+            el('mapAddRationale').value = lastRationale;
+            addModal.open(); el('mapAddRationale').focus(); el('mapAddRationale').select();
+        }
+    });
+    el('mapAddRationale')?.addEventListener('keydown', event => {
+        if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); el('mapAddForm').requestSubmit(); }
+    });
+    el('mapAddForm')?.addEventListener('submit', async event => {
+        event.preventDefault();
+        if (!pendingAdd || !state.version) return;
+        const text = el('mapAddRationale').value.trim();
+        if (!text) { ui.showFormError(el('mapAddForm'), 'Enter the rationale for this mapping.'); el('mapAddRationale').focus(); return; }
+        ui.clearFormError(el('mapAddForm'));
+        const data = new FormData();
+        data.set('action', 'add'); data.set('curriculum_version_id', String(versionIdInput.value)); data.set('placement_id', String(pendingAdd.placement)); data.set('outcome_id', String(pendingAdd.outcome)); data.set('rationale', text);
+        ui.setFormSubmitting(el('mapAddForm'), true, 'Saving\u2026');
+        try {
+            const result = await ui.postForm(api.outcomes, data);
+            lastRationale = text;
+            try { window.sessionStorage?.setItem('csms.map.lastRationale', text); } catch (e) { /* storage unavailable */ }
+            pendingFocus = { placement: pendingAdd.placement, outcome: pendingAdd.outcome };
+            addModal.close(); ui.showToast(result.message || 'Mapping recorded.', 'success');
+            await loadMatrix(versionIdInput.value, state.mapRequest);
+        } catch (error) { ui.showFormError(el('mapAddForm'), error.message || 'The mapping could not be saved.'); }
+        finally { ui.setFormSubmitting(el('mapAddForm'), false); }
+    });
+    el('mapRemoveConfirm')?.addEventListener('click', async function () {
+        if (!pendingRemove) return;
+        const button = this;
+        ui.clearFormError(el('mapRemoveModal'));
+        button.disabled = true;
+        try {
+            const data = new FormData();
+            data.set('action', 'remove'); data.set('curriculum_version_id', String(versionIdInput.value)); data.set('mapping_id', String(pendingRemove.mapping));
+            const result = await ui.postForm(api.outcomes, data);
+            pendingFocus = { placement: pendingRemove.placement, outcome: pendingRemove.outcome };
+            removeModal.close(); ui.showToast(result.message || 'Mapping removed.', 'success');
+            await loadMatrix(versionIdInput.value, state.mapRequest);
+        } catch (error) { ui.showFormError(el('mapRemoveModal'), error.message || 'The mapping could not be removed.'); }
+        finally { button.disabled = false; }
+    });
 
     async function openMappingDetails(mapping, fromTrace = false) {
         if (!mapping || !detailsModal) return;
@@ -630,10 +711,6 @@
         const tab = tabs[next];
         setTab(tab.id === 'mappingTabMap' ? 'map' : tab.id === 'mappingTabTrace' ? 'trace' : tab.id === 'mappingTabOutcomes' ? 'outcomes' : 'review');
         tab.focus();
-    });
-    mapTarget?.addEventListener('click', event => {
-        const card = event.target.closest('[data-open-mapping]');
-        if (card) openMappingDetails(state.mappings.get(Number(card.dataset.openMapping)));
     });
     el('mappingTraceResults')?.addEventListener('click', event => {
         const row = event.target.closest('[data-open-trace-mapping]');

@@ -264,10 +264,10 @@
 }
 
 /* Curriculum Map matrix */
-.map-scroll { min-height: 12rem; overflow: auto; background: #fff; border: 1px solid var(--csms-border, #dfe4ee); border-radius: var(--csms-radius-surface, 12px); }
+.map-scroll { overflow: clip; background: #fff; border: 1px solid var(--csms-border, #dfe4ee); border-radius: var(--csms-radius-surface, 12px); }
 .map-table { width: max-content; min-width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px; }
 .map-table th, .map-table td { padding: 6px 8px; border-bottom: 1px solid var(--csms-border, #dfe4ee); background: #fff; color: var(--csms-text, #1f2937); text-align: left; vertical-align: baseline; }
-.map-table thead th { position: sticky; top: 0; z-index: 3; font-size: 12px; font-weight: 600; color: var(--csms-text-secondary, #374151); background: var(--csms-surface-muted, #f4f6fb); }
+.map-table thead th { position: sticky; top: 52px; z-index: 3; font-size: 12px; font-weight: 600; color: var(--csms-text-secondary, #374151); background: var(--csms-surface-muted, #f4f6fb); }
 .map-table th.map-table__outcome { text-align: center; min-width: 3.5rem; cursor: help; }
 .map-table th.map-table__outcome:focus-visible { outline: 3px solid var(--csms-focus, #2563eb); outline-offset: -3px; }
 .map-table th.map-table__outcome:is(:hover, :focus)::after { content: attr(data-tip); position: absolute; z-index: 6; top: 100%; left: 0; width: 18rem; max-width: 70vw; padding: 8px 10px; background: #1f2937; color: #fff; border-radius: 8px; font-size: 13px; font-weight: 400; line-height: 1.4; text-align: left; white-space: normal; }
@@ -285,5 +285,11 @@
 @media (max-width: 600px) { .map-table .map-table__name { position: static; min-width: 11rem; } .map-table .map-table__code { width: 5.5rem; min-width: 5.5rem; padding-left: 10px; } }
 /* The matrix scrolls inside its card; no ancestor may grow to its width. */
 #subjectMappingWorkspace, #subjectMappingWorkspace .mapping-workspace-shell, #subjectMappingWorkspace .mapping-workspace-panel, #mappingMap { min-width: 0; max-width: 100%; }
-.map-scroll { max-height: 36rem; }
 .map-scroll { position: relative; }
+/* No nested vertical scroll: the page scrolls and the header/footer stick to it. Horizontal scroll only when the matrix is wider than its card. */
+.map-scroll.is-scrollable { overflow-x: auto; overflow-y: hidden; }
+.map-table .map-code { font-family: ui-monospace, 'Cascadia Mono', Consolas, 'Liberation Mono', monospace; font-variant-numeric: slashed-zero tabular-nums; font-feature-settings: 'zero' 1; letter-spacing: 0; }
+.map-toggle { display: inline-flex; align-items: center; justify-content: center; width: 100%; min-width: 2.25rem; min-height: 1.75rem; padding: 0; background: transparent; border: 1px solid transparent; border-radius: 8px; color: inherit; font: inherit; cursor: pointer; }
+.map-toggle:hover { background: var(--csms-surface-muted, #f4f6fb); border-color: var(--csms-border, #dfe4ee); }
+.map-toggle:focus-visible { outline: 3px solid var(--csms-focus, #2563eb); outline-offset: 0; }
+@media (max-width: 600px) { .map-toggle { min-width: 2.75rem; min-height: 2.75rem; } }
