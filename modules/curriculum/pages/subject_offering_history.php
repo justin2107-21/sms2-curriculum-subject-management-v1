@@ -73,6 +73,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
       <div>
         <h1 class="page-title"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> <?= htmlspecialchars($viewLabel, ENT_QUOTES, 'UTF-8') ?></h1>
         <p class="page-subtitle"><?= htmlspecialchars($viewDescription, ENT_QUOTES, 'UTF-8') ?></p>
+        <?php $moduleViews = 'history'; include __DIR__ . '/_module_views.php'; ?>
       </div>
       <div class="history-title-actions">
         <button type="button" class="button-muted" id="historyCimfButton"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> <?= $isSubjectHistoryView ? 'Summarize History with CIMF' : 'Explain History with CIMF' ?></button>

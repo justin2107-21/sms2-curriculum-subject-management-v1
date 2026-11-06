@@ -34,7 +34,7 @@ $cimfStatus = CIMFConfig::status(CIMFConfig::load());
  data-program-api="../http/program_actions.php" data-subject-api="../http/subject_actions.php"
  data-can-manage="<?= $canManageAssignments ? '1' : '0' ?>" data-cimf-status="<?= htmlspecialchars($cimfStatus, ENT_QUOTES, 'UTF-8') ?>">
 <div class="page-title-bar curriculum-title-bar"><div><h1 class="page-title"><i class="fa-solid fa-share-nodes" aria-hidden="true"></i> Academic Strand/Course Assignment</h1>
-<p class="page-subtitle"><?= $programView ? 'Manage subject assignments across academic programs and strands.' : 'Review and manage program or strand assignments for each subject.' ?></p></div>
+<p class="page-subtitle"><?= $programView ? 'Manage subject assignments across academic programs and strands.' : 'Review and manage program or strand assignments for each subject.' ?></p><?php $moduleViews = 'assignment'; include __DIR__ . '/_module_views.php'; ?></div>
 <div class="card-header-actions assignment-page-actions"><button type="button" class="button-muted" id="cimfReviewButton" disabled><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> CIMF Assignment Review</button>
 <button type="button" class="primary-action-button" id="assignButton" <?= $canManageAssignments ? '' : 'hidden' ?> disabled><i class="fa-solid fa-plus" aria-hidden="true"></i> <?= $programView ? 'Assign Subjects' : 'Assign to Program / Strand' ?></button></div></div>
 <div class="assignment-context-row"><section class="domain-card mapping-filter-card assignment-selector-card">

@@ -65,7 +65,7 @@
       $('contextStatus').textContent = context.status; $('contextStatus').hidden = false;
       $('currentSnapshot').hidden = false;
       $('snapshotChips').innerHTML = `<span>${metrics.mapped_subjects} Mapped Subjects</span><span>${metrics.units} Units</span><span>${metrics.year_levels} Year Levels</span>`;
-      $('openSnapshotCurriculum').href = contextHref('../modules/curriculum/pages/curricula.php');
+      $('openSnapshotCurriculum').href = contextHref('../modules/curriculum/pages/curriculum_builder.php');
       const links = {
         'Mapped Subjects': ['../modules/curriculum/pages/subject_mapping.php', true],
         'Total Units': ['../modules/curriculum/pages/subject_mapping.php', true],

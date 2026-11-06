@@ -62,17 +62,17 @@ Written 2026-11-05 for whoever (or whichever session) continues this work. Read 
 | `students` table | Decided | Kept for SMS2 integration, synthetic data, not used by CSMS; only Super Admin holds `student.*` |
 
 ## Curriculum Builder redesign (in progress)
-Plan: `Curriculum_Builder_Plan.md` (section 11 is the build log). Slice 1 is committed; slice 2 is built and awaiting review; slices 3 to 5 are next. Test scenario for the Builder: `DB_NAME=sms_db_uitest php tools/uitest/builder-fixtures.php` on a freshly rebuilt test database (adds UITEST-REF, UITEST-REV, UITEST-REVIEW and a unit-target rule), then `tests/curriculum-builder-http.php` and `tools/uitest/run.ps1 -Probe builder -BuilderFlow`.
+Plan: `Curriculum_Builder_Plan.md` (section 11 is the build log). **Finished** (slices 1 to 4 committed; slice 5, sidebar and retirement of the Curricula list, built and awaiting review). Test scenario for the Builder: `DB_NAME=sms_db_uitest php tools/uitest/builder-fixtures.php` on a freshly rebuilt test database (adds UITEST-REF, UITEST-REV, UITEST-REVIEW and a unit-target rule), then `tests/curriculum-builder-http.php` and `tools/uitest/run.ps1 -Probe builder -BuilderFlow`.
 
 ## Later tasks recorded in the docs
-**First task after the Curriculum Builder module:** split `curriculum.update` so Admin can't edit placements.
+**Right after Subject Mapping:** split `curriculum.update` so Admin can't edit placements.
 
 Also later: version archive (own design); summer term support (pending BCP answer).
 
 Drop `users.role`; faculty-subject link; switch the Faculty read scope to `approved`; update `tests/original_post_migration_readonly.php`, which is out of date: it still expects 5 migration history rows and 37 tables, and has not been changed since before migrations 026 and 027.
 
 ## Next tasks, in order
-0. **Curriculum Builder (next task).** The baseline blocker is fixed. Task 3 changes `subjects`, so its migration needs a declared entry (`database/README.md`).
+0. **Subject Mapping module redesign (next module).** Follow `UI_Audit.md`, `UI_Decisions.md` (D12 sidebar) and the shared picker. Then the **`curriculum.update` split** so Admin cannot edit placements. Task 3 changes `subjects`, so its migration needs a declared entry (`database/README.md`).
 1. **Password reset for Admin and Super Admin:** `KENNETH123` still needs the reset the owner planned from the Users page as `csms_admin`. Review the reset flow and its audit entry before relying on it.
 2. **Module page redesigns, starting with Pre-requisite Configuration.** Follow `UI_Audit.md`, `UI_Decisions.md` and the shared header, picker and state components. Then the other module pages in the sidebar order.
 3. **Subject category field:** a migration adding a category to `subjects` (list to be agreed), the Subject Master form field and import support, then enable the "Units by subject category" card (currently a pending card).

@@ -43,7 +43,7 @@ $subjectsRedesignVersion = substr(hash_file('sha256', __DIR__ . '/../assets/subj
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <meta name="csrf-token" content="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>"/>
-  <title><?= $isProgramView ? 'Program Subjects' : 'Subject Master' ?> - BCP Student Management System</title>
+  <title><?= $isProgramView ? 'Program Subjects' : 'Subjects' ?> - BCP Student Management System</title>
   <link rel="stylesheet" href="../../../css/dashboard.css"/>
   <link rel="stylesheet" href="../assets/curriculum.css?v=<?= $curriculumCssVersion ?>"/>
   <link rel="stylesheet" href="../../../css/csms-typography.css?v=<?= $typographyCssVersion ?>"/>
@@ -73,7 +73,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
         data-can-update-subjects="<?= $canUpdateSubjects ? '1' : '0' ?>">
     <?php if (!$isProgramView): ?>
     <section class="subject-landing" id="subjectLanding">
-      <header class="subject-landing-header"><div><h1 class="page-title">Subject Master</h1><p class="page-subtitle">Browse subjects by program or strand.</p></div></header>
+      <header class="subject-landing-header"><div><h1 class="page-title">Subjects</h1><p class="page-subtitle">Master list of subjects used across curricula.</p></div></header>
       <div class="subject-landing-controls">
         <label class="search-control subject-card-search"><span class="sr-only">Search programs or strands</span><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input type="search" id="subjectCardSearch" placeholder="Search program code or name..." maxlength="100"/></label>
         <nav class="subject-category-tabs" aria-label="Program categories" role="tablist">

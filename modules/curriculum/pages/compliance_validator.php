@@ -95,6 +95,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
       <div>
         <h1 class="page-title"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> <?= htmlspecialchars($viewLabel, ENT_QUOTES, 'UTF-8') ?></h1>
         <p class="page-subtitle"><?= htmlspecialchars($viewDescription, ENT_QUOTES, 'UTF-8') ?></p>
+        <?php $moduleViews = 'compliance'; include __DIR__ . '/_module_views.php'; ?>
       </div>
       <span class="read-only-pill"><i class="fa-solid fa-list-check" aria-hidden="true"></i> Deterministic checks</span>
     </div>

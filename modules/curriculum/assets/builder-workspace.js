@@ -773,7 +773,6 @@
         if (can.editPlan && ws.editable) items.push({ label: 'Rename version', run: () => openVersionForm('rename', { id: ws.id, version_label: ws.version_label }) });
         if (can.editPlan) items.push({ label: 'Rename curriculum', run: () => openCurriculumForm('rename') });
         if (can.history) items.push({ label: 'Compare versions', href: 'curriculum_history_view.php?' + new URLSearchParams({ curriculum_id: ws.curriculum_id, version_b_id: ws.id }).toString() });
-        if (can.clone && ws.version_role === 'reference') items.push({ label: 'Create revision', run: () => openClone() });
         return items;
     }
     let moreCurrent = [];

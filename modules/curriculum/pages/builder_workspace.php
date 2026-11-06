@@ -31,7 +31,7 @@ $assetVersion = static fn(string $file): int => (int)filemtime(__DIR__ . '/../as
 <body>
 <?php
 $APP_ROOT = '../../../';
-$ACTIVE_NAV = 'curricula';
+$ACTIVE_NAV = 'curriculum-builder';
 require __DIR__ . '/../../../shared/sidebar.php';
 ?>
 

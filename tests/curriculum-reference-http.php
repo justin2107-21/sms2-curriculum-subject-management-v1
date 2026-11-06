@@ -83,17 +83,16 @@ try {
     task3HttpCheck($currentWorkspaceResponse['json']['workspace']['references'][0]['current_assessments']['document_identity']['status']==='confirmed'
         && $currentEvents[0]['current_assessment_result']==='confirmed' && $currentEvents[1]['current_assessment_result']==='stale_for_current_metadata', 'new matching assessment is current while prior event remains historical');
 
-    $builder=$editor->request('modules/curriculum/pages/curricula.php',['program_id'=>$program,'curriculum_id'=>$curriculum,'version_id'=>$version]);
-    task3HttpStatus($builder,200,'existing Curriculum Builder References & Baseline panel');
-    task3HttpCheck(str_contains($builder['body'],'References &amp; Baseline') && str_contains($builder['body'],'Institutional adoption/approval not verified'),'Builder shows provenance and honest adoption label');
-    $builderScript=file_get_contents(__DIR__.'/../modules/curriculum/assets/curriculum-builder.js');
-    task3HttpCheck(str_contains($builderScript,'current_assessments') && str_contains($builderScript,'STALE — previous recorded result')
-        && str_contains($builderScript,'Attachment-time snapshot:'),'Builder distinguishes stale current assessments from immutable attachment-time evidence');
+    $builder=$editor->request('modules/curriculum/pages/curriculum_builder.php',['program_id'=>$program,'curriculum_id'=>$curriculum,'version_id'=>$version]);
+    task3HttpStatus($builder,200,'Curriculum Builder page');
+    task3HttpCheck(str_contains($builder['body'],'id="builderRoot"') && str_contains(file_get_contents(__DIR__.'/../modules/curriculum/assets/builder-workspace.js'),'Institutional adoption/approval not verified'),'Builder shows provenance and honest adoption label');
+    $builderScript=file_get_contents(__DIR__.'/../modules/curriculum/assets/builder-workspace.js');
+    task3HttpCheck(str_contains($builderScript,'current_assessments') && str_contains($builderScript,'STALE (previous result: '),'Builder distinguishes stale current assessments from immutable attachment-time evidence');
     $dom=new DOMDocument();@$dom->loadHTML($builder['body']);$ids=[];foreach((new DOMXPath($dom))->query('//*[@id]') as $node)$ids[]=$node->getAttribute('id');
     task3HttpCheck(count($ids)===count(array_unique($ids)),'Builder panel adds no duplicate DOM IDs');
-    $readerBuilder=$reader->request('modules/curriculum/pages/curricula.php',['program_id'=>$program,'curriculum_id'=>$curriculum,'version_id'=>$version]);
+    $readerBuilder=$reader->request('modules/curriculum/pages/curriculum_builder.php',['program_id'=>$program,'curriculum_id'=>$curriculum,'version_id'=>$version]);
     task3HttpStatus($readerBuilder,200,'read-only Builder access');
-    task3HttpCheck(!str_contains($readerBuilder['body'],'id="classifyReferenceForm"') && !str_contains($readerBuilder['body'],'id="attachVersionReferenceForm"'),'read-only Builder contains no unauthorized mutation forms');
+    task3HttpCheck(!str_contains($readerBuilder['body'],'id="builderClassifyForm"') && !str_contains($readerBuilder['body'],'id="builderAttachForm"'),'read-only Builder contains no unauthorized mutation forms');
     $referencesPage=$editor->request('modules/curriculum/pages/compliance_references.php');
     task3HttpCheck($referencesPage['status']===200 && str_contains($referencesPage['body'],'complianceEvidenceForm'),'verification permission exposes evidence-based form');
     $readerReferencesPage=$reader->request('modules/curriculum/pages/compliance_references.php');

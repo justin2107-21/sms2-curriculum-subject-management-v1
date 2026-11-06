@@ -468,7 +468,7 @@
         list.innerHTML = mappings.map(function (mapping) {
             const placement = Number(mapping.is_required) === 1 ? 'Required' : 'Optional';
             const location = [mapping.year_level, mapping.semester].filter(Boolean).join(' / ') || 'Placement not specified';
-            const target = '../../../modules/curriculum/pages/curricula.php?curriculum_id=' + encodeURIComponent(mapping.curriculum_id);
+            const target = '../../../modules/curriculum/pages/curriculum_builder.php?curriculum_id=' + encodeURIComponent(mapping.curriculum_id);
             return '<li><div class="subject-usage-context"><a href="' + target + '">' +
                 ui.escapeHtml(mapping.curriculum_code + ' — ' + mapping.curriculum_name) + '</a>' +
                 '<span>' + ui.escapeHtml(mapping.version_label) + ' · ' + ui.escapeHtml(location) +

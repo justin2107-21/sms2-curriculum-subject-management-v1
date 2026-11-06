@@ -19,7 +19,7 @@ $server = proc_open([PHP_BINARY, '-S', "127.0.0.1:$port", '-t', dirname(__DIR__)
 for ($i = 0; $i < 40; $i++) { $c = @stream_socket_client("tcp://127.0.0.1:$port", $e, $s, .2); if ($c) { fclose($c); break; } usleep(100000); }
 
 final class BuilderClient {
-    private array $cookies = []; public string $csrf = '';
+    private array $cookies = []; public string $csrf = ''; public string $location = '';
     public function __construct(private int $port) {}
     public function req(string $path, ?array $post = null): array {
         $headers = []; if ($this->cookies) $headers[] = 'Cookie: ' . http_build_query($this->cookies, '', '; ');
@@ -27,8 +27,9 @@ final class BuilderClient {
         if ($post !== null) { $headers[] = 'Content-Type: application/x-www-form-urlencoded'; $opts['content'] = http_build_query($post); }
         $opts['header'] = implode("\r\n", $headers);
         $body = (string)file_get_contents("http://127.0.0.1:{$this->port}/$path", false, stream_context_create(['http' => $opts]));
-        $status = 0;
+        $status = 0; $this->location = '';
         foreach ($http_response_header as $h) {
+            if (preg_match('/^Location: (.*)$/i', $h, $m)) $this->location = trim($m[1]);
             if (preg_match('#^HTTP/\S+ (\d+)#', $h, $m)) $status = (int)$m[1];
             if (preg_match('/^Set-Cookie: ([^=]+)=([^;]*)/i', $h, $m)) $this->cookies[$m[1]] = urldecode($m[2]);
         }
@@ -64,8 +65,24 @@ try {
         $check($c->req("$page?program_id=1&curriculum_id=1&version_id=$rev")[0] === 200, "$key opens the Builder with context in the address");
         foreach ($flags[$key] as $name => $expected) $check(str_contains($body, 'data-can-' . $name . '="' . $expected . '"'), "$key flag $name = $expected");
         $check(str_contains($body, 'id="builderClassifyModal"') === (bool)$flags[$key]['classify'] && str_contains($body, 'id="builderCloneModal"') === (bool)$flags[$key]['clone'], "$key only gets the dialogs it may use");
-        $check($c->req('modules/curriculum/pages/curricula.php')[0] === 200, "$key: the classic Curricula page still opens");
     }
+    // Slice 5: the Curricula list is retired; every old address redirects with its context.
+    $redirect = static function (BuilderClient $c, string $path): array { $status = $c->req($path)[0]; return [$status, $c->location]; };
+    $old = 'modules/curriculum/pages/curricula.php';
+    foreach (['staff', 'acadoffice'] as $key) {
+        $check($redirect($who[$key], $old) === [302, 'curriculum_builder.php'], "$key: the old Curricula address redirects to the Builder");
+        $check($redirect($who[$key], "$old?program_id=7") === [302, 'curriculum_builder.php?program_id=7'], "$key: a program address keeps its program");
+        $check($redirect($who[$key], "$old?curriculum_id=5&program_id=7&version_id=9") === [302, 'curriculum_builder.php?program_id=7&curriculum_id=5&version_id=9'], "$key: curriculum, program and version are kept");
+        $check($redirect($who[$key], "$old?id=5") === [302, 'curriculum_builder.php?curriculum_id=5'], "$key: the old ?id= becomes curriculum_id");
+        $check($redirect($who[$key], "$old?program_id=abc&version_id=-1&x=<script>") === [302, 'curriculum_builder.php'], "$key: invalid values are dropped");
+    }
+    // Sidebar: plain links in the approved order, no Curriculum Builder dropdown.
+    [, $dash] = $who['staff']->req('dashboard/dashboard.php');
+    $check(!str_contains($dash, 'data-sidebar-menu-toggle') && !str_contains($dash, 'curricula.php'), 'the sidebar has no dropdowns and no Curricula link');
+    $order = ['Dashboard', 'Academic Programs', 'Subjects', 'Curriculum Builder', 'Subject Mapping', 'Pre-requisite Configuration', 'Electives Manager', 'Academic Strand/<wbr>Course Assignment', 'Subject Offering History', 'Subject Equivalency Tool', 'Grade Weighting Setup', 'CHED / DepEd Compliance Validator', 'Curriculum Export Tool'];
+    $nav = substr($dash, (int)strpos($dash, '<nav class="sidebar-nav"'), 20000);
+    $positions = array_map(static fn(string $label) => strpos($nav, '>' . $label . '<'), $order);
+    $check(!in_array(false, $positions, true) && $positions === (static function (array $p): array { sort($p); return $p; })($positions), 'the sidebar lists Main, Records and the ten Curriculum modules in order');
     $guest = new BuilderClient($port);
     $check($guest->req($page)[0] !== 200, 'a guest does not get the Builder');
     $check($guest->req("$vapi?action=builder_summary&curriculum_version_id=$rev")[0] === 401, 'a guest gets 401 from builder_summary');
@@ -165,6 +182,15 @@ try {
     $wsProgram = $who['staff']->req("modules/curriculum/http/version_reference_actions.php?action=workspace&curriculum_version_id=$rev");
     $check(array_key_exists('program_type', $wsProgram[2]['workspace'] ?? []), 'the workspace carries the program type for the term choices');
 
+    // Partial addresses open the newest active version under them (shared working context).
+    $partial = $who['staff']->req("modules/curriculum/http/working_context_actions.php?action=read&module=builder&curriculum_id=$curriculum&program_id=$program");
+    $check($partial[0] === 200 && ($partial[2]['rule'] ?? '') === 'url' && (string)($partial[2]['context']['curriculum']['id'] ?? '') === (string)$curriculum, 'a curriculum address without a version opens a version of that curriculum');
+    $partialProgram = $who['staff']->req("modules/curriculum/http/working_context_actions.php?action=read&module=builder&program_id=$program");
+    $check($partialProgram[0] === 200 && ($partialProgram[2]['rule'] ?? '') === 'url' && (string)($partialProgram[2]['context']['program']['id'] ?? '') === (string)$program, 'a program address without a version opens a version under that program');
+    $mismatch = $who['staff']->req("modules/curriculum/http/working_context_actions.php?action=read&module=builder&curriculum_id=$curriculum&program_id=999999");
+    $check(($mismatch[2]['rule'] ?? '') !== 'url', 'a curriculum that does not belong to the program is not opened');
+    $facultyPartial = $who['acadfaculty']->req("modules/curriculum/http/working_context_actions.php?action=read&module=builder&curriculum_id=$curriculum");
+    $check(($facultyPartial[2]['rule'] ?? '') === 'url' && (int)($facultyPartial[2]['context']['version']['id'] ?? 0) === $ref, 'Faculty is only offered a version it may read');
     // Slice 4: versions list, new curriculum, new version, renames. Same endpoints and rules as before.
     $capi = 'modules/curriculum/http/curriculum_actions.php';
     $list = $who['staff']->req("$vapi?action=list&curriculum_id=$curriculum&page=1&per_page=50&search=");

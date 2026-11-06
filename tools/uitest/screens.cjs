@@ -353,59 +353,28 @@ async function main() {
       });
     }
 
-    if (arg('reviewflow', '')) {
-      // Real browser actions on the review panel and export. --reviewflow=<action>:<program>:<curriculum>:<version>
-      const [action, program, curriculum, version] = arg('reviewflow', '').split(':');
-      const P = base + '/modules/curriculum/pages/';
-      const ids = 'program_id=' + program + '&curriculum_id=' + curriculum + '&version_id=' + version;
-      await setWidth(widths[0]);
-      issues = [];
-      const panel = () => evaluate(`(() => { const p = document.getElementById('versionReviewPanel'); if (!p) return { present: false };
-        const vis = el => !!el && !el.hidden && el.getClientRects().length > 0;
-        return { present: true, visible: vis(p), status: (p.querySelector('[data-review-status]') || {}).textContent || '',
-          submit: vis(p.querySelector('[data-review-submit]')), approve: vis(p.querySelector('[data-review-decide="approve"]')), ret: vis(p.querySelector('[data-review-decide="return"]')),
-          field: vis(p.querySelector('[data-review-field]')), message: vis(p.querySelector('[data-review-message]')) ? p.querySelector('[data-review-message]').textContent : '',
-          events: [...p.querySelectorAll('[data-review-events] tr')].map(r => r.textContent.replace(/\s+/g, ' ').trim()) }; })()`);
-      const press = async (selector, text) => {
-        if (text !== undefined) {
-          await evaluate(`(() => { const a = document.querySelector('#versionReviewPanel textarea'); a.scrollIntoView({block:'center'}); a.value = ''; a.focus(); return true; })()`);
-          if (text) await send('Input.insertText', { text });
+    // The old review-panel flow drove the retired Curricula page; the Builder probe (-Probe builder -BuilderFlow) covers review dialogs.
+    if (arg('probe', '') === 'nav') {
+      // Sidebar sections, links and the active link per page, plus the in-module view links.
+      report.navProbe = {};
+      for (const url of urls) {
+        for (const width of widths) {
+          await setWidth(width);
+          await navigate(base + url);
+          await sleep(2500);
+          if (width < 700) { await evaluate(`(() => { const b = document.querySelector('.menu-toggle, #menuToggle, .burger, [aria-controls="sidebar"]'); if (b) b.click(); return true; })()`); await sleep(500); }
+          report.navProbe[url.split('/').pop() + '@' + width] = await evaluate(`(() => ({
+            path: location.pathname.split('/').pop(), title: (document.querySelector('h1') || {}).textContent.trim().slice(0, 50),
+            sections: [...document.querySelectorAll('.sidebar-nav .brand-title')].map(e => e.textContent.trim()),
+            links: [...document.querySelectorAll('.sidebar-nav a.sidebar-item')].map(a => a.textContent.trim().replace(/\s+/g, ' ')),
+            active: [...document.querySelectorAll('.sidebar-nav a.sidebar-item.active')].map(a => a.textContent.trim().replace(/\s+/g, ' ')),
+            dropdowns: document.querySelectorAll('.sidebar-nav [data-sidebar-menu-toggle], .sidebar-nav .sidebar-builder-submenu').length,
+            views: [...document.querySelectorAll('.module-views a')].map(a => a.textContent.trim() + (a.classList.contains('is-active') ? '*' : '')),
+            overflow: document.documentElement.scrollWidth > innerWidth
+          }))()`);
+          if (url.includes('subject_history_view') || url.includes('validate_curriculum') || url === urls[0]) await shotView(path.join(out, `${role}-nav-${url.split('/').pop().replace(/[^a-z0-9]+/gi, '_')}-${width}.png`));
         }
-        const box = await evaluate(`(() => { const b = document.querySelector('#versionReviewPanel ${selector}'); if (!b) return null; b.scrollIntoView({block:'center'}); const r = b.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
-        if (!box) throw new Error('button not found: ' + selector);
-        for (const type of ['mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', { type, x: box.x, y: box.y, button: 'left', clickCount: 1 });
-        await sleep(1800);
-      };
-      const r = report.reviewflow = { action, version };
-      await navigate(P + 'curricula.php?' + ids);
-      await sleep(3500);
-      if (action === 'export' || action === 'read') {
-        const q = ids.replace('program_id', 'academic_program_id').replace('version_id', 'curriculum_version_id');
-        r.api = await evaluate(`(async () => { const go = async (u, o) => (await fetch(u, Object.assign({ credentials: 'same-origin' }, o || {}))).status; const t = (document.querySelector('meta[name="csrf-token"]') || {}).content;
-          const out = { versionGet: await go('../http/version_actions.php?action=get&id=${version}'), placements: await go('../http/assignment_actions.php?action=list&curriculum_version_id=${version}'), prerequisites: await go('../http/requirement_actions.php?action=workspace&curriculum_version_id=${version}'),
-            preview: await go('../http/export_actions.php?action=preview&${q}') };
-          const b = new URLSearchParams('action=download_csv&${q}'); b.set('_csrf_token', t || ''); out.csv = await go('../http/export_actions.php', { method: 'POST', body: b }); return out; })()`);
-        r.panel = await panel();
-        await navigate(P + 'curriculum_export.php?' + ids); await sleep(4500);
-        r.exportPicker = await pickerState();
-        r.exportBody = await evaluate(`(document.querySelector('main') || document.body).innerText.slice(0, 400)`);
-        await shot(path.join(out, role + '-review-export-' + widths[0] + '.png'));
-        await navigate(P + 'subject_mapping.php?' + ids); await sleep(4500);
-        r.mappingPicker = await pickerState();
-      } else {
-        r.before = await panel();
-        await shot(path.join(out, role + '-review-' + action + '-before-' + widths[0] + '.png'));
-        if (action === 'submit') await press('[data-review-submit]', 'Ready for review');
-        if (action === 'return' || action === 'approve') {
-          const sel = '[data-review-decide="' + action + '"]';
-          await press(sel, '');            // no reason: must be refused
-          r.noReason = await panel();
-          await press(sel, action === 'return' ? 'Fix the units in first year' : 'Reviewed and approved');
-        }
-        r.after = await panel();
-        await shot(path.join(out, role + '-review-' + action + '-after-' + widths[0] + '.png'));
       }
-      r.issues = issues.map(i => String(i.text).slice(0, 160));
     }
 
     if (arg('probe', '') === 'sidebar') {

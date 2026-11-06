@@ -60,9 +60,9 @@ try {
     revisionHttpStatus($editor->api('export','preview',['academic_program_id'=>$f['program'],'curriculum_id'=>$f['curriculum'],'curriculum_version_id'=>$v]),200,'new revision export preview');
     revisionHttpCheck(revisionSourceDigest($db,$f)===$digest,'HTTP clone and later edits preserve source and global data');
     $params=['program_id'=>$f['program'],'curriculum_id'=>$f['curriculum'],'version_id'=>$f['version']];
-    $page=$editor->request('modules/curriculum/pages/curricula.php',$params);revisionHttpStatus($page,200,'Builder creation form');
-    revisionHttpCheck(str_contains($page['body'],'id="cloneReferenceForm"') && str_contains($page['body'],'Create Curriculum Revision'),'authorized Builder contains existing-style compact form');
-    $page=$ordinary->request('modules/curriculum/pages/curricula.php',$params);revisionHttpCheck(!str_contains($page['body'],'id="cloneReferenceForm"'),'ordinary admin has no clone form');
+    $page=$editor->request('modules/curriculum/pages/curriculum_builder.php',$params);revisionHttpStatus($page,200,'Builder creation form');
+    revisionHttpCheck(str_contains($page['body'],'id="builderCloneForm"') && str_contains($page['body'],'Create revision from this reference'),'authorized Builder contains the revision form');
+    $page=$ordinary->request('modules/curriculum/pages/curriculum_builder.php',$params);revisionHttpCheck(!str_contains($page['body'],'id="builderCloneForm"'),'ordinary admin has no clone form');
     echo json_encode(['passed'=>true,'checks'=>$checks,'suite'=>'Task 4 revision HTTP'],JSON_THROW_ON_ERROR).PHP_EOL;
 } finally {
     foreach($clients as $client)$client->close();if(is_resource($server)){proc_terminate($server);proc_close($server);}

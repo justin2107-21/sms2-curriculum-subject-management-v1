@@ -99,7 +99,7 @@ shapeCheck(DashboardShaper::monthlySeries(['Versions created' => []], $months)['
 
 // Activity wording and next steps.
 $label = DashboardShaper::activityLabel('CURRICULUM_VERSION_CREATE', 'curriculum_version');
-shapeCheck($label['label'] === 'Created curriculum version' && $label['link'] === 'modules/curriculum/pages/curricula.php', 'Human activity wording');
+shapeCheck($label['label'] === 'Created curriculum version' && $label['link'] === 'modules/curriculum/pages/curriculum_builder.php', 'Human activity wording');
 shapeCheck(!str_contains(DashboardShaper::activityLabel('SUBJECT_UPDATE', 'subject')['label'], '#'), 'No internal ids');
 shapeCheck(DashboardShaper::activityLabel('ODD_THING', 'mystery')['label'] === 'Odd thing' && DashboardShaper::activityLabel('ODD_THING', 'mystery')['link'] === null, 'Unknown action fallback');
 shapeCheck(DashboardShaper::draftNextStep(0, 0) === 'Add subject placements' && DashboardShaper::draftNextStep(5, 0) === 'Run compliance validation' && DashboardShaper::draftNextStep(5, 1) === 'Review and update', 'Draft next step');

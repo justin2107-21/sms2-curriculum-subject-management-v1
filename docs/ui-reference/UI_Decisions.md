@@ -47,6 +47,13 @@ Stack: plain PHP + Bootstrap 5.3 (custom Sass build, compiled CSS committed), va
 ## D6. Text size floor
 - Body 16px, tables and menus 14px, nothing below 12px. Contrast at least 4.5:1.
 
+- **Partial addresses:** an address with a program and/or curriculum but no version opens the newest active version under it (active first, then most recently updated; read scope applies to every candidate). Old Curricula links rely on this. Choosing the program or curriculum only is not possible, because the working context is always a full chain.
+
+## D12. Sidebar (Curriculum Builder slice 5)
+- Sections in order: **Main** (Dashboard); **Records** (Academic Programs, Subjects); **Curriculum**, the ten official modules as plain links in this order: Curriculum Builder, Subject Mapping, Pre-requisite Configuration, Electives Manager, Academic Strand/Course Assignment, Subject Offering History, Subject Equivalency Tool, Grade Weighting Setup, CHED / DepEd Compliance Validator, Curriculum Export Tool; **Setup** (Users, Permissions, Audit Logs, System Settings, Account Settings), each shown only to roles with the permission.
+- No dropdowns. Modules with several views link to their first view, and every view page shows a small view switcher under the title (`pages/_module_views.php`): Program-centric/Subject-centric, Subject history/Curriculum version history, Subject comparison/Equivalency records, and the four Compliance views. The module's sidebar link stays active on every view.
+- The classic Curricula list is retired; `curricula.php` redirects to the Builder with the same ids. Subjects is titled "Subjects" with subtitle "Master list of subjects used across curricula".
+
 ## D7. Current-sidebar fixes to include
 - "Academic Strand/Course Assignment" must not break mid-word.
 - Raise the contrast of section headings (MAIN, CURRICULUM & SUBJECT MANAGEMENT); measure it.

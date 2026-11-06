@@ -326,7 +326,7 @@
             document.getElementById('programDetailsType').textContent = programDegreeLevel(program);
             document.getElementById('programDetailsStatusBadge').innerHTML = ui.statusBadge(program.status);
             const curriculaLink = document.getElementById('programSeeCurricula');
-            if (curriculaLink) curriculaLink.href = 'curricula.php?program_id=' + Number(program.id);
+            if (curriculaLink) curriculaLink.href = 'curriculum_builder.php?program_id=' + Number(program.id);
             const archiveAction = document.getElementById('programDetailsArchive');
             if (archiveAction) { archiveAction.hidden = Boolean(program.archived_at); archiveAction.disabled = false; }
             if (permissions.viewCurricula) {
@@ -610,7 +610,7 @@
     }
 
     function programCurriculumCard(curriculum) {
-        const href = 'curricula.php?program_id=' + Number(curriculum.academic_program_id) + '&curriculum_id=' + Number(curriculum.id);
+        const href = 'curriculum_builder.php?program_id=' + Number(curriculum.academic_program_id) + '&curriculum_id=' + Number(curriculum.id);
         const versionCount = Number(curriculum.version_count) || 0;
         const subjectCount = Number(curriculum.subject_count) || 0;
         return '<a class="subject-program-card curriculum-record-card" href="' + href + '" aria-label="Open curriculum ' +
@@ -678,8 +678,8 @@
             document.getElementById('workspaceCurriculumStatus').innerHTML = ui.statusBadge(curriculum.status);
             const archiveButton = document.getElementById('archiveCurriculumButton');
             if (archiveButton) archiveButton.hidden = curriculum.status !== 'active';
-            document.getElementById('backToProgramCurricula').href = 'curricula.php?program_id=' + Number(curriculum.academic_program_id);
-            document.getElementById('backToCurricula').href = 'curricula.php?program_id=' + Number(curriculum.academic_program_id) + '&curriculum_id=' + Number(curriculum.id);
+            document.getElementById('backToProgramCurricula').href = 'curriculum_builder.php?program_id=' + Number(curriculum.academic_program_id);
+            document.getElementById('backToCurricula').href = 'curriculum_builder.php?program_id=' + Number(curriculum.academic_program_id) + '&curriculum_id=' + Number(curriculum.id);
             document.getElementById('backProgramCurriculaLabel').textContent = curriculum.program_code || 'Program Curricula';
             document.getElementById('versionBackCurriculumLabel').textContent = curriculum.curriculum_code || 'Curriculum';
             await loadVersions(1, initialVersionId || null, Boolean(initialVersionId));
@@ -890,7 +890,7 @@
                                 '" data-version-label="' + ui.escapeHtml(version.version_label) + '"><i class="fa-solid fa-pen" aria-hidden="true"></i> Edit</button>'
                             : '') + '<a class="view-button" data-version-id="' +
                         Number(version.id) + '" data-version-label="' + ui.escapeHtml(version.version_label) +
-                        '" data-version-status="' + ui.escapeHtml(version.status) + '" href="curricula.php?program_id=' +
+                        '" data-version-status="' + ui.escapeHtml(version.status) + '" href="curriculum_builder.php?program_id=' +
                         Number(state.selectedCurriculum.academic_program_id) + '&amp;curriculum_id=' + Number(curriculumId) +
                         '&amp;version_id=' + Number(version.id) + '">Open Version</a></div></article>';
                 }).join('');
@@ -934,8 +934,8 @@
         document.getElementById('workspaceBreadcrumbVersion').textContent = state.selectedVersionLabel;
         const programId = Number(state.selectedCurriculum?.academic_program_id) || 0;
         const curriculumId = Number(state.selectedCurriculum?.id) || 0;
-        document.getElementById('workspaceProgramCode').href = 'curricula.php?program_id=' + programId;
-        document.getElementById('workspaceCurriculumCode').href = 'curricula.php?program_id=' + programId + '&curriculum_id=' + curriculumId;
+        document.getElementById('workspaceProgramCode').href = 'curriculum_builder.php?program_id=' + programId;
+        document.getElementById('workspaceCurriculumCode').href = 'curriculum_builder.php?program_id=' + programId + '&curriculum_id=' + curriculumId;
         const exportLink = document.getElementById('versionExportLink');
         if (exportLink) exportLink.href = 'curriculum_export.php';
         const outcomesLink = document.getElementById('outcomeMappingLink');
@@ -1632,13 +1632,13 @@
                 return;
             }
             const row = event.target.closest('tr[data-program-view]');
-            if (row) window.location.href = 'curricula.php?program_id=' + Number(row.dataset.programView);
+            if (row) window.location.href = 'curriculum_builder.php?program_id=' + Number(row.dataset.programView);
         });
         curriculumProgramRows.addEventListener('keydown', function (event) {
             const row = event.target.closest('tr[data-program-view]');
             if (row && event.target === row && (event.key === 'Enter' || event.key === ' ')) {
                 event.preventDefault();
-                window.location.href = 'curricula.php?program_id=' + Number(row.dataset.programView);
+                window.location.href = 'curriculum_builder.php?program_id=' + Number(row.dataset.programView);
             }
         });
         loadCurriculaPrograms(1);
@@ -1673,7 +1673,7 @@
             await ui.postForm(endpoints.curricula, data);
             curriculumArchiveModal.close();
             ui.showToast('Curriculum archived.', 'success');
-            window.location.href = 'curricula.php?program_id=' + Number(state.selectedCurriculum.academic_program_id);
+            window.location.href = 'curriculum_builder.php?program_id=' + Number(state.selectedCurriculum.academic_program_id);
         } catch (error) { ui.showFormError(document.getElementById('curriculumArchiveModal'), error.message); }
         finally { this.disabled = false; }
     });

@@ -76,6 +76,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
       <div>
         <h1 class="page-title"><i class="fa-solid fa-right-left" aria-hidden="true"></i> <?= htmlspecialchars($viewLabel, ENT_QUOTES, 'UTF-8') ?></h1>
         <p class="page-subtitle"><?= htmlspecialchars($viewDescription, ENT_QUOTES, 'UTF-8') ?></p>
+        <?php $moduleViews = 'equivalency'; include __DIR__ . '/_module_views.php'; ?>
       </div>
       <?php if ($isComparisonView): ?><div class="equivalency-header-actions"><button type="button" class="button-muted" id="reviewWithCimf" disabled><i class="fa-solid fa-sparkles" aria-hidden="true"></i> Review with CIMF</button><?php if ($canManageEquivalencies): ?><button type="button" class="button-primary" id="headerRecordDecision" disabled><i class="fa-solid fa-plus" aria-hidden="true"></i> Record Decision</button><?php endif; ?></div><?php else: ?><span class="read-only-pill"><i class="fa-solid fa-user-check" aria-hidden="true"></i> Human authority required</span><?php endif; ?>
     </div>

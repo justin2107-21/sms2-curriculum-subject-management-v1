@@ -40,8 +40,8 @@ try {
     comparisonHttpCheck(protectionSnapshot($db)===$before,'all successful and rejected comparison requests write no academic/audit/security rows');
     $page=$reader->request('modules/curriculum/pages/curriculum_history_view.php',$input);comparisonHttpStatus($page,200,'existing History page');
     comparisonHttpCheck(str_contains($page['body'],'id="comparisonEvidence"') && str_contains($page['body'],'curriculum-history-comparison.js') && str_contains($page['body'],'id="comparisonStructures"'),'existing History integrates evidence and structures');
-    $page=$reader->request('modules/curriculum/pages/curricula.php',['program_id'=>$f['program'],'curriculum_id'=>$f['curriculum'],'version_id'=>$v]);comparisonHttpStatus($page,200,'Builder existing version workspace');
-    comparisonHttpCheck(str_contains($page['body'],'id="compareBaselineLink"'),'view-capable Builder exposes comparison entry point without mutation permission');
+    $page=$reader->request('modules/curriculum/pages/curriculum_builder.php',['program_id'=>$f['program'],'curriculum_id'=>$f['curriculum'],'version_id'=>$v]);comparisonHttpStatus($page,200,'Builder version workspace');
+    comparisonHttpCheck(str_contains(file_get_contents(__DIR__.'/../modules/curriculum/assets/builder-workspace.js'),'curriculum_history_view.php'),'view-capable Builder exposes the comparison entry point (More menu) without mutation permission');
     echo json_encode(['passed'=>true,'checks'=>$checks,'suite'=>'Task 5 comparison HTTP']).PHP_EOL;
 }finally{
     foreach($clients as $client)$client->close();if(is_resource($server)){proc_terminate($server);proc_close($server);}

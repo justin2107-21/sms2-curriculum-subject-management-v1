@@ -338,8 +338,8 @@ final class DashboardShaper
     ];
     private const ENTITY_LINKS = [
         'academic_program' => 'modules/curriculum/pages/academic_programs.php',
-        'curriculum' => 'modules/curriculum/pages/curricula.php',
-        'curriculum_version' => 'modules/curriculum/pages/curricula.php',
+        'curriculum' => 'modules/curriculum/pages/curriculum_builder.php',
+        'curriculum_version' => 'modules/curriculum/pages/curriculum_builder.php',
         'curriculum_version_subject' => 'modules/curriculum/pages/subject_mapping.php',
         'subject' => 'modules/curriculum/pages/subjects.php',
         'curriculum_subject_requirement' => 'modules/curriculum/pages/prerequisite_configuration.php',

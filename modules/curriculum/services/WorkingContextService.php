@@ -59,6 +59,18 @@ class WorkingContextService
             $context = $this->chain($linked, $this->optionalId($input['curriculum_id'] ?? null), $this->optionalId($input['program_id'] ?? null));
             $rule = $context ? 'url' : null;
         }
+        // A partial address (program and/or curriculum, no version) opens the newest active version under it, so old
+        // Curricula links land on the right curriculum. Read scope still applies to every candidate.
+        if (!$context && $linked === null) {
+            $linkedCurriculum = $this->optionalId($input['curriculum_id'] ?? null);
+            $linkedProgram = $this->optionalId($input['program_id'] ?? null);
+            if ($linkedCurriculum !== null || $linkedProgram !== null) {
+                foreach ($this->versionsUnder($linkedCurriculum, $linkedProgram) as $candidate) {
+                    $context = $this->chain($candidate, $linkedCurriculum, $linkedProgram);
+                    if ($context) { $rule = 'url'; break; }
+                }
+            }
+        }
         if (!$context && !empty($stored['version_id'])) {
             $context = $this->chain((int)$stored['version_id'], (int)($stored['curriculum_id'] ?? 0), (int)($stored['program_id'] ?? 0));
             $rule = $context ? 'saved' : null;
@@ -210,6 +222,23 @@ class WorkingContextService
         $row = $stmt->get_result()->fetch_row();
         $stmt->close();
         return $row ? (int)$row[0] : null;
+    }
+
+    /** Candidate versions under a curriculum or program: active first, then newest. */
+    private function versionsUnder(?int $curriculum, ?int $program): array
+    {
+        $where = [];
+        $types = '';
+        $params = [];
+        if ($curriculum !== null) { $where[] = 'v.curriculum_id = ?'; $types .= 'i'; $params[] = $curriculum; }
+        if ($program !== null) { $where[] = 'c.academic_program_id = ?'; $types .= 'i'; $params[] = $program; }
+        $stmt = RepositoryQuery::execute($this->db,
+            'SELECT v.id FROM curriculum_versions v JOIN curricula c ON c.id = v.curriculum_id
+             WHERE ' . implode(' AND ', $where) . "
+             ORDER BY (v.status = 'active') DESC, v.updated_at DESC, v.id DESC LIMIT 25", $types, $params);
+        $ids = array_map('intval', array_column($stmt->get_result()->fetch_all(MYSQLI_NUM), 0));
+        $stmt->close();
+        return $ids;
     }
 
     private function newestActiveVersion(): ?int

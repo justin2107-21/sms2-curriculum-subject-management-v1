@@ -503,7 +503,7 @@
         if (!found.length) { note.textContent = 'No curriculum placements are stored for this subject.'; return; }
         note.hidden = true;
         list.innerHTML = found.map(mapping => {
-            const usageTarget = 'curricula.php?curriculum_id=' + encodeURIComponent(mapping.curriculum_id);
+            const usageTarget = 'curriculum_builder.php?curriculum_id=' + encodeURIComponent(mapping.curriculum_id);
             const term = [mapping.year_level, mapping.semester].filter(Boolean).join(' · ') || 'Placement not specified';
             return '<li><div class="subject-usage-context"><a href="' + usageTarget + '">' + escape(mapping.program_code) + '</a><span>' + escape(mapping.curriculum_code + ' · ' + mapping.version_label) + '</span></div><span class="subject-usage-term">' + escape(term) + '</span></li>';
         }).join('');

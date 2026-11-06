@@ -16,7 +16,7 @@ final class DashboardAnalyticsService
     public const VERSION_RULE_NOTE = 'Each curriculum counts one version: approved, otherwise active, otherwise the latest draft with subjects.';
     private const OUTCOME_SOURCE_KEY = 'CHED-CMO-25-2015-BSIT';
     private const OUTCOME_PROGRAM_CODE = 'BSIT';
-    private const CURRICULA = 'modules/curriculum/pages/curricula.php';
+    private const CURRICULA = 'modules/curriculum/pages/curriculum_builder.php';
     private const MAPPING = 'modules/curriculum/pages/subject_mapping.php';
     private const PROGRAMS = 'modules/curriculum/pages/academic_programs.php';
     private const VALIDATION = 'modules/curriculum/pages/validate_curriculum.php';
