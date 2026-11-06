@@ -1,11 +1,18 @@
 # Session handoff
 
-Written 2026-11-05 for whoever (or whichever session) continues this work. Read this first, then `Roles_and_Permissions.md`, `Dashboard_Plan.md`, `UI_Decisions.md` and `UI_Testing.md`.
+Updated 2026-11-06 (first written 2026-11-05) for whoever (or whichever session) continues this work. Read this first, then `Roles_and_Permissions.md`, `Dashboard_Plan.md`, `UI_Decisions.md` and `UI_Testing.md`.
 
 ## Where things stand
 - Project: `C:\xampp\htdocs\sms-csms` (CSMS-SMS2, Bestlink College). PHP 8.0.30 (`C:\xampp\php\php.exe`, not on PATH), MariaDB 10.4, database `sms_db`.
 - Branch: `ui-redesign-pilot`. Nothing has been pushed; `main` is the PR target.
-- Recent commits, newest first. The newest are the dashboard verification tools, the dashboard finalization and this file's updates; use `git log` for hashes:
+- Recent commits, newest first (use `git log` for the rest):
+  - `4b666fd` Builder tables: Code column text in the Subject Mapping blue (`#2163c5`)
+  - `f592332` Builder slice 5: plain sidebar, view switchers, Curricula list retired
+  - `369f66b` Builder slice 4: new version / new curriculum from the selector, More menu, renames
+  - `2084287` Builder slice 3: plan editing (add, move, remove), subject table layout
+  - `b70ceda` UI polish pass and selector / table / conflict refinements
+  - `3c6b34a` Builder workspace (slice 2), `5de99cf` Academic Programs (slice 1)
+  - Earlier (dashboards, baseline fingerprint fix, handoffs):
   - Dashboard verification tools: count verifier, synthetic volume (uitest only), timing
   - Finalize role dashboards: donuts, top-10, colours, export status, footer, data checks
   - `6917a51` Role dashboards
@@ -44,6 +51,16 @@ Written 2026-11-05 for whoever (or whichever session) continues this work. Read 
 8. Defender: the exclusion for `C:\xampp\mysql\data` is in place (added by the owner on 2026-11-04). Do not change Defender settings.
 9. **The 15:32 incident on 2026-11-04 is still unexplained.** `sms_db/grade_weighting_components.ibd` was emptied to 0 bytes at 15:32:27 and MySQL crashed at 15:33:05 while a backup read it; a second crash followed at 16:23:32 with no file empty. The table was rebuilt from the 15:31 backup, all 38 tables passed `CHECK TABLE` and matched row counts, the disk is healthy, and MySQL has been stable since the exclusion. The cause was not found. If it repeats, stop and report; the next suspect is the XAMPP MariaDB install itself.
 
+## Curriculum Builder: finished (2026-11-06)
+All five slices are committed. What it is now:
+- **Pages:** `curriculum_builder.php` is the Builder (`builder_workspace.php` renders it); the same file with `$curriculumWorkspacePage='programs'` renders Academic Programs. `curricula.php` only redirects (302) with `program_id`, `curriculum_id` (or `id`), `version_id`. A partial address opens the newest active version under it (D4).
+- **Builder:** shared Phase 1 / Phase 2 picker (footers "+ New curriculum" for Super Admin and Admin, "+ New version"), version header with More menu (rename version, rename curriculum, compare versions), tabs Plan / Details and references / Review history, editable Plan (add, move, remove per term, server refusals shown, conflict dialog), Code column blue. "Create revision" is the header button for references only.
+- **Sidebar:** Main, Records, Curriculum (ten plain links), Setup (D12). Multi-view modules link to their first view and show a view switcher under the title (`pages/_module_views.php`). System Settings stays in Setup.
+- **Tests (sms_db_uitest, one at a time):** `tests/curriculum-builder-http.php` (126 checks), `academic-programs-http.php` (86), `rbac-safety-http.php` (110), `rbac-final-roles.php`, `ui-consistency-static.cjs`. Probes in `tools/uitest/screens.cjs`: `builder` (-BuilderFlow), `planedit`, `versions`, `nav`, `ctxlayout`.
+- **Not run:** `curriculum-revision-http.php`, `curriculum-reference-http.php`, `curriculum-comparison-http.php` were repointed to the Builder page but need the isolated Docker database.
+- **Unused code left:** `curriculum-builder.js` still has Curricula-page branches (Academic Programs uses the file). Remove them in a later clean-up.
+- `tools/uitest/setup-db.ps1` works again (the fingerprint blocker is fixed). After a rebuild run `DB_NAME=sms_db_uitest php tools/uitest/builder-fixtures.php`. Browser probes that create rows (-BuilderFlow, planedit, versions) leave rows behind; rebuild before the next module.
+
 ## Blocker found on 2026-11-05: deploy.php refuses sms_db after migration 027
 **Fixed 2026-11-05: declared per-migration changes in `database/legacy_baseline.php`; the stored record is unchanged. The owner confirmed on `sms_db`: `deploy.php --status` shows 28 applied, none pending; the drift report shows no differences. Migrations 028 and later are now possible. `deploy.php --apply` refuses, before changing anything, a pending migration that changes covered state without a declared entry (`database/README.md`). The text below describes the problem as found and no longer applies.**
 
@@ -61,8 +78,8 @@ Written 2026-11-05 for whoever (or whichever session) continues this work. Read 
 | Drop `sms_db_reconcile_test_20261102_retry01` | The owner | A 2 Nov baseline-reconciliation test copy with 7 user rows; nothing references it. `sms_db_archive_test` is required by `tests/archives.php` and is kept |
 | `students` table | Decided | Kept for SMS2 integration, synthetic data, not used by CSMS; only Super Admin holds `student.*` |
 
-## Curriculum Builder redesign (in progress)
-Plan: `Curriculum_Builder_Plan.md` (section 11 is the build log). **Finished** (slices 1 to 4 committed; slice 5, sidebar and retirement of the Curricula list, built and awaiting review). Test scenario for the Builder: `DB_NAME=sms_db_uitest php tools/uitest/builder-fixtures.php` on a freshly rebuilt test database (adds UITEST-REF, UITEST-REV, UITEST-REVIEW and a unit-target rule), then `tests/curriculum-builder-http.php` and `tools/uitest/run.ps1 -Probe builder -BuilderFlow`.
+## Curriculum Builder redesign
+Plan: `Curriculum_Builder_Plan.md` (section 11 is the build log). **Finished**, see the section above.
 
 ## Later tasks recorded in the docs
 **Right after Subject Mapping:** split `curriculum.update` so Admin can't edit placements.
@@ -72,7 +89,7 @@ Also later: version archive (own design); summer term support (pending BCP answe
 Drop `users.role`; faculty-subject link; switch the Faculty read scope to `approved`; update `tests/original_post_migration_readonly.php`, which is out of date: it still expects 5 migration history rows and 37 tables, and has not been changed since before migrations 026 and 027.
 
 ## Next tasks, in order
-0. **Subject Mapping module redesign (next module).** Follow `UI_Audit.md`, `UI_Decisions.md` (D12 sidebar) and the shared picker. Then the **`curriculum.update` split** so Admin cannot edit placements. Task 3 changes `subjects`, so its migration needs a declared entry (`database/README.md`).
+0. **Subject Mapping redesign (next module): the plan is written, awaiting the owner's approval: `Subject_Mapping_Plan.md`.** Do not build before approval. Six open questions are at its end (rationale per mapping, non-BSIT programs, Code blue token, overlap with the Graduate Outcomes tab, prerequisite connections, BCP notation). Then the **`curriculum.update` split** so Admin cannot edit placements. Task 3 changes `subjects`, so its migration needs a declared entry (`database/README.md`).
 1. **Password reset for Admin and Super Admin:** `KENNETH123` still needs the reset the owner planned from the Users page as `csms_admin`. Review the reset flow and its audit entry before relying on it.
 2. **Module page redesigns, starting with Pre-requisite Configuration.** Follow `UI_Audit.md`, `UI_Decisions.md` and the shared header, picker and state components. Then the other module pages in the sidebar order.
 3. **Subject category field:** a migration adding a category to `subjects` (list to be agreed), the Subject Master form field and import support, then enable the "Units by subject category" card (currently a pending card).
