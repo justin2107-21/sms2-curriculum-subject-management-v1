@@ -46,6 +46,7 @@ let mappings = Array.from({ length: 52 }, (_, index) => row(index + 1));
 const edge = { id: 1, curriculum_version_id: 3, subject_id: 2, required_subject_id: 1,
     requirement_type: 'prerequisite', subject_code: 'S2', subject_title: 'Subject 2', required_subject_code: 'S1', required_subject_title: 'Subject 1' };
 let requirements = [edge];
+let outcomeLinks = [{ placement_id: 101, outcome_id: 1 }, { placement_id: 102, outcome_id: 1 }];
 const selectors = {}, calls = [], posted = [];
 let delayedVersion = null;
 let previewValidation = {valid:true, conflicts:[], relationships:[]};
@@ -79,9 +80,10 @@ const ui = {
     },
     async fetchJson(endpoint, params) {
         calls.push({ endpoint, params });
+        if (endpoint === 'outcomes' && params.action === 'workspace' && String(params.curriculum_version_id) === '21') throw new Error('CHED CMO 25 BSIT outcomes are available only for BSIT curriculum versions.');
         if (endpoint === 'outcomes' && params.action === 'workspace') return {context:{version_id:3,version_label:'V1',program_code:'BSIT',curriculum_name:'Information Technology',editable:true},
             outcomes:[{id:1,outcome_code:'IT01',outcome_text:'Apply knowledge of computing, science, and mathematics appropriate to the discipline',document_code:'CHED Memorandum Order No. 25, series of 2015',source_section:'Section 6.3',printed_page:8,pdf_page_index:8,coverage_status:'not_assessed',mapping_count:2}],
-            placements:[row(1,{placement_id:101}),row(2,{placement_id:102})],mappings:[],limitations:{}};
+            placements:mappings.map(m=>({...m,placement_id:m.id+100})),mappings:outcomeLinks,limitations:{}};
         if (params.action === 'preview_placement') return {validation: previewValidation};
         if (endpoint === 'mappings' && params.subject_id && delayNextTrace) {
             delayNextTrace = false;
@@ -142,33 +144,41 @@ assert.equal(issues.missingYear.length, 1); assert.equal(issues.missingSemester.
 assert.equal(data.edges(mappings, [edge, edge, { ...edge, requirement_type: 'corequisite' }, { ...edge, subject_id: 999 }]).length, 1);
 vm.runInNewContext(fs.readFileSync('modules/curriculum/assets/outcomes-presentation.js', 'utf8'), context);
 vm.runInNewContext(fs.readFileSync('modules/curriculum/assets/placement-groups.js', 'utf8'), context);
+vm.runInNewContext(fs.readFileSync('modules/curriculum/assets/subject-mapping-matrix.js', 'utf8'), context);
 vm.runInNewContext(fs.readFileSync('modules/curriculum/assets/subject-mapping-final.js', 'utf8'), context);
 const settle = async () => { for (let i = 0; i < 12; i++) await new Promise(resolve => setImmediate(resolve)); };
 const click = (id, selector, dataset) => el(id).handlers.click({ target: { closest: name => name === selector ? { dataset } : null } });
-const rowCount = () => (el('mappingMap').innerHTML.match(/<tr><td class="csms-ctable__code">/g) || []).length;
-const terms = () => [...el('mappingMap').innerHTML.matchAll(/<strong>([^<]*)<\/strong><span class="csms-term__count">([^<]*)<\/span>/g)].map(m => m[1] + ' | ' + m[2]);
+const rowCount = () => (el('mappingMap').innerHTML.match(/<td class="map-table__code">/g) || []).length;
+const terms = () => [...el('mappingMap').innerHTML.matchAll(/<tr class="map-table__term"><th colspan="\d+" scope="colgroup"><span>([^<]*)<\/span>/g)].map(m => m[1]);
 (async () => {
     await settle();
     // Slice 1: the Curriculum Map tab is a read-only, Builder-style list of the version's placements.
     assert.equal(el('mappingVersionFilter').value, '3');
-    assert.deepEqual(terms(), ['1st Year · 1st Semester | 52 subjects']);
+    assert.deepEqual(terms(), ['1st Year · 1st Semester · 52 subjects']);
     assert.equal(rowCount(), 52); assert.equal(el('mappingCount').textContent, '52 subjects');
-    assert.ok(!/data-open-mapping|data-map-year|Place Subject|data-connection/.test(el('mappingMap').innerHTML), 'no placement editing or pills in the map');
+    assert.ok(!/data-open-mapping|data-map-year|Place Subject|data-connection|<button/.test(el('mappingMap').innerHTML), 'read-only: no buttons, pills or placement editing in the map');
+    // Matrix: outcome columns with full text, check marks, footer counts from the visible rows.
+    assert.ok(el('mappingMap').innerHTML.includes('title="Apply knowledge of computing'));
+    assert.ok(el('mappingMap').innerHTML.includes('<span class="sr-only">IT01: Apply knowledge'));
+    assert.equal((el('mappingMap').innerHTML.match(/map-cell--on/g) || []).length, 2 + 1, 'two mapped cells plus the legend sample');
+    assert.ok(el('mappingMap').innerHTML.includes('<th colspan="2" scope="row">Subjects mapped</th><td class="map-table__cell">2</td>'));
+    assert.equal(context.window.SubjectMappingMatrix.mapCell(false).includes('not mapped'), true);
     assert.equal(el('mappingBuilderLink').hidden, false);
     assert.equal(el('mappingBuilderLink').href, 'curriculum_builder.php?program_id=1&curriculum_id=2&version_id=3');
     el('mappingSubjectSearch').value = 'Subject 52'; el('mappingSubjectSearch').handlers.input();
     assert.equal(rowCount(), 1); assert.equal(el('mappingCount').textContent, '1 subject');
-    el('mappingPlacementFilter').value = '0'; el('mappingPlacementFilter').handlers.change();
+    el('mappingStatusFilter').value = 'mapped'; el('mappingStatusFilter').handlers.change();
     assert.match(el('mappingMap').innerHTML, /No subjects match these filters/);
     el('mappingSubjectSearch').value = ''; el('mappingSubjectSearch').handlers.input();
-    el('mappingPlacementFilter').value = ''; el('mappingYearFilter').value = '2nd Year'; el('mappingYearFilter').handlers.change();
+    el('mappingStatusFilter').value = 'unmapped'; el('mappingStatusFilter').handlers.change(); assert.equal(rowCount(), 50);
+    el('mappingStatusFilter').value = ''; el('mappingYearFilter').value = '2nd Year'; el('mappingYearFilter').handlers.change();
     assert.match(el('mappingMap').innerHTML, /No subjects match these filters/);
     el('mappingYearFilter').value = ''; el('mappingYearFilter').handlers.change();
     assert.equal(rowCount(), 52);
     // Terms are grouped and ordered like the Builder; text is escaped.
     mappings = [row(1, { subject_title: '<b>x</b>', semester: '2nd Semester' }), row(2, { year_level: '2nd Year' }), row(3)];
     selectors.mappingVersionInput.setSelected(version); await settle();
-    assert.deepEqual(terms(), ['1st Year · 1st Semester | 1 subject', '1st Year · 2nd Semester | 1 subject', '2nd Year · 1st Semester | 1 subject']);
+    assert.deepEqual(terms(), ['1st Year · 1st Semester · 1 subject', '1st Year · 2nd Semester · 1 subject', '2nd Year · 1st Semester · 1 subject']);
     assert.ok(el('mappingMap').innerHTML.includes('&lt;b&gt;x&lt;/b&gt;'));
     // A slow response for a previous version cannot overwrite the current map.
     selectors.mappingVersionInput.setSelected({ id: 88, curriculum_id: 2, version_label: 'Slow previous version' }); await settle();
@@ -185,7 +195,7 @@ const terms = () => [...el('mappingMap').innerHTML.matchAll(/<strong>([^<]*)<\/s
     mappings = [];
     selectors.mappingCurriculumInput.setSelected({ ...curriculum, id: 20, academic_program_id: 7 });
     selectors.mappingVersionInput.setSelected({ ...version, id: 21, curriculum_id: 20 }); await settle();
-    assert.match(el('mappingMap').innerHTML, /No subjects placed yet./);
-    assert.match(el('mappingMap').innerHTML, /Place subjects in the Curriculum Builder/);
+    assert.match(el('mappingMap').innerHTML, /No outcome catalog for this program yet./);
+    assert.ok(!el('mappingMap').innerHTML.includes('<table'), 'no empty or invented matrix without a catalog');
     console.log('PASS: complete pagination, read-only Builder-style map (terms, order, escaping, filters, Builder link), stale-response guard, Subject Trace, Mapping Review, empty state');
 })().catch(error => { console.error(error); process.exitCode = 1; });

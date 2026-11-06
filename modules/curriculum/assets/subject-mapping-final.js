@@ -162,7 +162,7 @@
             if (index === 1) { state.curriculum = action === 'select' ? item : null; state.version = null; }
             if (index === 2) state.version = action === 'select' ? item : null;
             state.year = ''; selectedReviewIssue = null;
-            ['mappingSubjectSearch', 'mappingYearFilter', 'mappingSemesterFilter', 'mappingPlacementFilter'].forEach(key => { el(key).value = ''; });
+            ['mappingSubjectSearch', 'mappingYearFilter', 'mappingSemesterFilter', 'mappingStatusFilter'].forEach(key => { el(key).value = ''; });
             if (contextReset) return;
             contextRequest++;
             writeUrl();
@@ -250,7 +250,7 @@
         showPanelState(el('cloAssessmentContent'), 'Select a curriculum version and subject placement.');
         showPanelState(el('outcomeMatrix'), 'Select a BSIT curriculum version to view its recorded outcome mappings.');
         if (state.currentTab === 'outcomes') loadOutcomes();
-        state.loaded = false; state.reviewLoaded = false; state.allMappings = []; state.requirements = []; state.relationshipRequest = null; state.relationshipsLoaded = false; state.requirementError = '';
+        state.matrix = null; state.loaded = false; state.reviewLoaded = false; state.allMappings = []; state.requirements = []; state.relationshipRequest = null; state.relationshipsLoaded = false; state.requirementError = '';
         state.mappings.clear(); state.detailRequest++; traceRequest++;
         detailsModal?.close();
         state.selectedMapping = null;
@@ -266,7 +266,7 @@
         try {
             const mappings = await fetchAll(api.mappings, 'mappings', { action: 'mapping_list', curriculum_version_id: version });
             if (request !== state.mapRequest) return;
-            state.mappings = new Map(mappings.map(item => [Number(item.id), item])); state.allMappings = mappings; state.loaded = true;
+            state.mappings = new Map(mappings.map(item => [Number(item.id), item])); state.allMappings = mappings; state.loaded = true; loadMatrix(version, request);
             state.yearValues = yearChoices();
             setSelectOptions(el('mappingYearFilter'), state.yearValues, isShs() ? 'All Grades' : 'All Years', state.year);
             state.semesterValues = [...new Set(mappings.map(item => item.semester).filter(value => !isBlank(value)))].sort(sortLabel);
@@ -444,34 +444,37 @@
         catch(error) { ui.showToast(error.message || 'Mapping could not be removed.','error'); }
     });
     const placementView = window.CurriculumPlacementView;
+    const matrixView = window.SubjectMappingMatrix;
+    const emptyBox = (title, hint) => '<div class="csms-empty"><i class="fa-solid fa-table-list" aria-hidden="true"></i><strong>' + esc(title) + '</strong>' + (hint ? '<span>' + esc(hint) + '</span>' : '') + '</div>';
+    async function loadMatrix(version, request) {
+        state.matrix = { status: 'loading' };
+        try {
+            const data = await ui.fetchJson(api.outcomes, { action: 'workspace', curriculum_version_id: version });
+            if (request !== state.mapRequest) return;
+            state.matrix = { status: 'ready', outcomes: arr(data.outcomes), rows: arr(data.placements).map(p => ({ ...p, id: p.placement_id })), index: matrixView.index(data.mappings) };
+        } catch (error) {
+            if (request !== state.mapRequest) return;
+            state.matrix = /only for BSIT/i.test(error.message || '') ? { status: 'nocatalog' } : { status: 'error', message: error.message || 'Outcome mappings could not be loaded.' };
+        }
+        renderFilteredMap();
+    }
     function renderFilteredMap() {
         if (!state.loaded) return;
         state.year = el('mappingYearFilter').value;
+        const matrix = state.matrix;
+        if (!matrix || matrix.status === 'loading') { el('mappingCount').textContent = 'Loading...'; showPanelState(mapTarget, 'Loading the curriculum map...'); return; }
+        if (matrix.status === 'nocatalog') { el('mappingCount').textContent = ''; mapTarget.innerHTML = emptyBox('No outcome catalog for this program yet.', 'Graduate outcomes are loaded for BSIT only.'); return; }
+        if (matrix.status === 'error') { el('mappingCount').textContent = ''; showPanelState(mapTarget, matrix.message, true); return; }
+        if (!matrix.outcomes.length) { el('mappingCount').textContent = ''; mapTarget.innerHTML = emptyBox('No graduate outcomes are loaded for this program.'); return; }
+        if (!matrix.rows.length) { el('mappingCount').textContent = '0 subjects'; mapTarget.innerHTML = emptyBox('No subjects placed yet.', 'Place subjects in the Curriculum Builder.'); return; }
         const query = el('mappingSubjectSearch').value.trim().toLowerCase();
-        const semester = el('mappingSemesterFilter').value, placement = el('mappingPlacementFilter').value;
-        const rows = ui.searchRecords(state.allMappings, query, row => [row.subject_code, row.subject_title]).filter(row => (!state.year || row.year_level === state.year) && (!semester || row.semester === semester) && (!placement || String(row.is_required) === placement));
+        const semester = el('mappingSemesterFilter').value, status = el('mappingStatusFilter').value;
+        const rows = ui.searchRecords(matrix.rows, query, row => [row.subject_code, row.subject_title]).filter(row => (!state.year || row.year_level === state.year) && (!semester || row.semester === semester) &&
+            (!status || (status === 'mapped') === matrixView.isMapped(matrix.index, row)));
         el('mappingCount').textContent = rows.length + (rows.length === 1 ? ' subject' : ' subjects');
-        renderMap(rows);
+        if (!rows.length) { mapTarget.innerHTML = emptyBox('No subjects match these filters.'); return; }
+        mapTarget.innerHTML = matrixView.render(rows, matrix.outcomes, matrix.index, { esc, group: placementView.group, yearLabel: placementView.yearLabel });
     }
-
-    function renderMap(rows) {
-        if (!rows.length) {
-            const filtered = el('mappingSubjectSearch').value.trim() || state.year || el('mappingSemesterFilter').value || el('mappingPlacementFilter').value;
-            mapTarget.innerHTML = '<div class="csms-empty"><i class="fa-solid fa-table-list" aria-hidden="true"></i><strong>' + (filtered ? 'No subjects match these filters.' : 'No subjects placed yet.') + '</strong>' + (filtered ? '' : '<span>Place subjects in the Curriculum Builder.</span>') + '</div>';
-            return;
-        }
-        const data = placementView.group(rows);
-        let html = '';
-        data.years.forEach((semesters, year) => semesters.forEach((term, semester) => {
-            html += '<section class="csms-term"><header><strong>' + esc(placementView.yearLabel(year) || 'Year level not specified') + ' · ' + esc(semester || 'Semester not specified') + '</strong><span class="csms-term__count">' + term.rows.length + (term.rows.length === 1 ? ' subject' : ' subjects') + '</span></header>' +
-                '<div class="csms-table-scroll"><table class="csms-ctable"><thead><tr><th class="csms-ctable__code">Code</th><th>Subject name</th><th class="csms-ctable__num">Units</th><th class="csms-ctable__kind">Placement</th></tr></thead><tbody>' +
-                term.rows.map(row => '<tr><td class="csms-ctable__code">' + esc(row.subject_code).replaceAll('/', '/<wbr>') + '</td><td>' + esc(row.subject_title) + '</td><td class="csms-ctable__num">' + esc(ui.formatUnits(row.units)) + '</td><td class="csms-ctable__kind">' + (String(row.is_required) === '1' ? 'Required' : String(row.is_required) === '0' ? 'Optional' : 'Not set') + '</td></tr>').join('') +
-                '</tbody></table></div></section>';
-        }));
-        mapTarget.innerHTML = html;
-    }
-
-
 
     async function openMappingDetails(mapping, fromTrace = false) {
         if (!mapping || !detailsModal) return;
@@ -646,7 +649,7 @@
     });
     el('mappingSubjectSearch')?.addEventListener('input', ui.debounce(renderFilteredMap, 150));
     el('mappingYearFilter').addEventListener('change', () => { state.year = el('mappingYearFilter').value; renderFilteredMap(); });
-    el('mappingPlacementFilter').addEventListener('change', renderFilteredMap);
+    el('mappingStatusFilter').addEventListener('change', renderFilteredMap);
     el('mappingSemesterFilter')?.addEventListener('change', renderFilteredMap);
 
     initializeContext();

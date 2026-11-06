@@ -95,17 +95,17 @@ require __DIR__ . '/../../../shared/sidebar.php';
       </nav>
       <section id="mappingPanelMap" class="mapping-workspace-panel csms-panel" role="tabpanel" aria-labelledby="mappingTabMap" <?= $activeTab === 'map' ? '' : 'hidden' ?>>
         <div class="csms-panel__bar">
-          <p class="csms-panel__note">Subjects placed in this version. Edit placements in the Curriculum Builder.</p>
+          <p class="csms-panel__note">Which program outcomes each subject supports. Placements are edited in the Curriculum Builder.</p>
           <a class="secondary-action-button" id="mappingBuilderLink" href="curriculum_builder.php" hidden><i class="fa-solid fa-table-list" aria-hidden="true"></i> Edit placements in Builder</a>
         </div>
         <div class="mapping-map-toolbar">
           <label class="csms-search"><span class="sr-only">Search subjects</span><input id="mappingSubjectSearch" type="search" maxlength="100" placeholder="Search subject code or title"/></label>
           <label class="form-field"><span class="sr-only">Year / Grade</span><select id="mappingYearFilter"><option value="">All Years</option></select></label>
           <label class="form-field"><span class="sr-only">Semester</span><select id="mappingSemesterFilter"><option value="">All Semesters</option></select></label>
-          <label class="form-field"><span class="sr-only">Placement</span><select id="mappingPlacementFilter"><option value="">All Placements</option><option value="1">Required</option><option value="0">Optional</option></select></label>
+          <label class="form-field"><span class="sr-only">Mapped status</span><select id="mappingStatusFilter"><option value="">All subjects</option><option value="mapped">Mapped to an outcome</option><option value="unmapped">Not mapped to any</option></select></label>
           <span class="mapping-map-total" id="mappingCount" role="status">Select a version</span>
         </div>
-        <div class="mapping-year-sections csms-plan" id="mappingMap"><p class="mapping-state">Select a curriculum version to view its map.</p></div>
+        <div class="csms-plan" id="mappingMap"><p class="mapping-state">Select a curriculum version to view its map.</p></div>
       </section>
       <section id="mappingPanelTrace" class="mapping-workspace-panel" role="tabpanel" aria-labelledby="mappingTabTrace" <?= $activeTab === 'trace' ? '' : 'hidden' ?>>
         <div class="mapping-trace-search"><p class="eyebrow">Find Subject Usage</p><h2>Where is this subject placed?</h2><p id="mappingTraceHelper">Search a Subject Master record to view all curriculum placements.</p><label class="mapping-context-field"><span>Subject</span><div class="record-autocomplete">
@@ -207,6 +207,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <script src="../assets/placement-groups.js?v=<?= (int)filemtime(__DIR__ . '/../assets/placement-groups.js') ?>"></script>
 <script src="../assets/subject-mapping-data.js?v=<?= (int)filemtime(__DIR__ . '/../assets/subject-mapping-data.js') ?>"></script>
 <script src="../assets/outcomes-presentation.js?v=<?= (int)filemtime(__DIR__ . '/../assets/outcomes-presentation.js') ?>"></script>
+<script src="../assets/subject-mapping-matrix.js?v=<?= (int)filemtime(__DIR__ . '/../assets/subject-mapping-matrix.js') ?>"></script>
 <script src="../assets/subject-mapping-final.js?v=<?= $mappingWorkspaceVersion ?>"></script>
 </body>
 </html>
