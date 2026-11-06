@@ -686,6 +686,36 @@ async function main() {
       }
     }
 
+    if (arg('probe', '') === 'mappingtabs') {
+      // Subject Mapping: Mapping Review with every check expanded, then a Subject Trace search; overflow and console are reported per width.
+      report.mappingTabs = {};
+      for (const width of widths) {
+        const result = {};
+        await setWidth(width);
+        await navigate(base + urls[0]);
+        await sleep(3500);
+        await evaluate(`document.getElementById('mappingTabReview').click(); true`);
+        await sleep(600);
+        result.checks = await evaluate(`[...document.querySelectorAll('.mapping-check__head')].map(b => b.querySelector('.mapping-check__label').firstChild.textContent + ': ' + b.querySelector('.mapping-check__count').textContent)`);
+        await shotView(path.join(out, `${role}-review-collapsed-${width}.png`));
+        for (const key of ['outcomesNoSubject', 'subjectsNoOutcome']) await evaluate(`(() => { const b = document.querySelector('[data-review-issue="${key}"]:not([aria-disabled])'); if (b) b.click(); return true; })()`);
+        await sleep(400);
+        result.expanded = await evaluate(`document.querySelectorAll('.mapping-check.is-open').length`);
+        await evaluate(`window.scrollTo(0, 0); true`);
+        await shotView(path.join(out, `${role}-review-expanded-${width}.png`));
+        await evaluate(`document.getElementById('mappingTabTrace').click(); true`);
+        await sleep(400);
+        await evaluate(`(() => { const i = document.getElementById('mappingTraceSearch'); i.focus(); i.value = 'a'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+        await sleep(1500);
+        await evaluate(`(() => { const o = document.querySelector('#mappingTraceOptions [role=option]'); if (!o) return false; o.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); o.click(); return true; })()`);
+        await sleep(2000);
+        result.trace = await evaluate(`({ rows: document.querySelectorAll('#mappingTraceResults tbody tr').length, link: (document.querySelector('.mapping-open-link') || {}).textContent, legacy: /Open Placement/.test(document.getElementById('mappingTraceResults').textContent) })`);
+        await shotView(path.join(out, `${role}-trace-${width}.png`));
+        result.overflow = await evaluate(`document.documentElement.scrollWidth > innerWidth`);
+        report.mappingTabs[width] = result;
+      }
+    }
+
     if (arg('probe', '') === 'versions') {
       // Selector footers (+ New curriculum / + New version) and the More menu in the version header, for this role.
       // With --builderflow=1 also the create and rename flows in the browser.

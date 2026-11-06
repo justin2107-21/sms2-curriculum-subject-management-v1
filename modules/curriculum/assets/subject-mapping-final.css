@@ -92,7 +92,7 @@
 .mapping-detail-facts dd { color: #263b58; margin: 0; font-size: .85rem; font-weight: 600; overflow-wrap: anywhere; }
 #addMappingModal .modal-dialog, #editMappingModal .modal-dialog, #removeMappingModal .modal-dialog { max-height: 88dvh; overflow-y: auto; }
 .mapping-details-modal .modal-footer { flex-wrap: wrap; }
-#mappingPanelTrace { display: grid; grid-template-columns: minmax(260px, .8fr) minmax(0, 1.4fr); gap: 18px; align-items: start; }
+#mappingPanelTrace { display: flex; }
 .mapping-trace-search { background: #fff; border: 1px solid #dbe3ee; border-radius: 10px; padding: 20px; max-width: none; margin: 0; }
 .mapping-trace-search h2 { font-size: 1rem; margin: 8px 0; color: #172b49; }
 .mapping-trace-search > p:not(.eyebrow), .mapping-trace-subject p { color: #64748b; font-size: .8rem; line-height: 1.55; }
@@ -157,7 +157,6 @@
 .mapping-graph-empty .button-muted { display: inline-block; margin-top: 10px; text-decoration: none; }
 .mapping-graph-hint { color: #52647f; font-size: .78rem; }
 @media (max-width: 1000px) {
-  #mappingPanelTrace { grid-template-columns: minmax(240px, .8fr) minmax(0, 1.2fr); }
   .mapping-card-main { grid-template-columns: 70px minmax(0, 1fr); gap: 10px; }
   .mapping-card-meta { display: grid; gap: 5px; }
   .mapping-map-toolbar { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -167,7 +166,6 @@
   .mapping-content { --mapping-page-gutter: 24px; }
   .mapping-content > .mapping-workspace-shell { margin-bottom: 26px; }
   .mapping-content > .mapping-workspace-header { margin-bottom: 20px; padding: 22px var(--mapping-page-gutter) 18px; }
-  #mappingPanelTrace { grid-template-columns: 1fr; }
   .mapping-context-bar { grid-template-columns: 1fr; gap: 12px; }
   .mapping-context-separator { display: none; }
   .mapping-semester-grid { grid-template-columns: 1fr; }
@@ -293,3 +291,56 @@
 .map-toggle:hover { background: var(--csms-surface-muted, #f4f6fb); border-color: var(--csms-border, #dfe4ee); }
 .map-toggle:focus-visible { outline: 3px solid var(--csms-focus, #2563eb); outline-offset: 0; }
 @media (max-width: 600px) { .map-toggle { min-width: 2.75rem; min-height: 2.75rem; } }
+
+/* Slice 4: Subject Trace and Mapping Review in the Builder style (shared csms-card / csms-term / csms-ctable). */
+#mappingPanelTrace .mapping-trace-search { max-width: none; padding: 14px 18px; gap: 6px; background: #fff; border: 1px solid var(--csms-border, #dfe4ee); border-radius: var(--csms-radius-surface, 12px); }
+#mappingPanelTrace .mapping-trace-search h3 { margin: 0; font-size: 16px; }
+#mappingPanelTrace .mapping-trace-search > p { margin: 0 0 4px; font-size: 14px; color: var(--csms-text-secondary, #374151); }
+.mapping-trace-subject { margin-bottom: 0; padding: 12px 18px; border-radius: var(--csms-radius-surface, 12px); border-color: var(--csms-border, #dfe4ee); }
+.mapping-trace-subject h2 { color: var(--csms-code-blue, #2163c5); font-size: 16px; margin: 0 0 2px; }
+.mapping-trace-subject p { margin: 2px 0 0; font-size: 14px; }
+.mapping-trace-usage { gap: 8px; }
+.mapping-trace-usage > header h3 { font-size: 14px; }
+.mapping-trace-usage > header span { font-size: 13px; }
+.csms-ctable__scroll { overflow-x: auto; }
+.csms-ctable--trace { min-width: 44rem; }
+.csms-ctable--trace tr.is-current td { background: #f3f7fe; }
+.csms-ctable__action { width: 1%; white-space: nowrap; text-align: right; }
+.csms-ctable__muted { color: var(--csms-text-secondary, #374151); }
+.mapping-open-link { padding: 0; background: none; border: 0; font: inherit; font-size: 14px; color: var(--csms-code-blue, #2163c5); text-decoration: underline; cursor: pointer; }
+.mapping-open-link:hover { text-decoration: none; }
+.mapping-open-link:focus-visible, .mapping-check__head:focus-visible { outline: 2px solid var(--csms-code-blue, #2163c5); outline-offset: 2px; }
+/* Review: one compact row per check, count on the right, list opens below the row. */
+.mapping-checks { display: block; }
+.mapping-check { border-top: 1px solid var(--csms-border, #dfe4ee); }
+.mapping-checks > header + .mapping-check { border-top: 0; }
+.mapping-check h3 { margin: 0; font-size: 14px; font-weight: 400; }
+.mapping-check__head { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 14px; background: none; border: 0; font: inherit; color: var(--csms-text, #1f2937); text-align: left; cursor: pointer; }
+.mapping-check__head:hover { background: var(--csms-surface-muted, #f4f6fb); }
+.mapping-check__head[aria-disabled="true"] { cursor: default; }
+.mapping-check__head[aria-disabled="true"]:hover { background: none; }
+.mapping-check__head[aria-disabled="true"] .mapping-check__chev { visibility: hidden; }
+.mapping-check__chev { flex: none; width: 10px; font-size: 11px; color: var(--csms-text-secondary, #374151); transition: transform .15s; }
+.mapping-check.is-open .mapping-check__chev { transform: rotate(90deg); }
+.mapping-check__label { flex: 1 1 auto; min-width: 0; font-weight: 600; }
+.mapping-check__label small { display: block; font-weight: 400; font-size: 13px; color: var(--csms-text-secondary, #374151); }
+.mapping-check__count { flex: none; min-width: 2rem; padding: 1px 8px; text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; border-radius: 999px; background: #e5e7eb; color: #374151; }
+.mapping-check__count.has-issues { background: #fdf0c8; color: #7a4a00; }
+.mapping-check__list { border-top: 1px solid var(--csms-border, #dfe4ee); overflow-x: auto; }
+.mapping-check__list[hidden] { display: none; }
+
+.mapping-check__list .csms-ctable thead th { background: var(--csms-surface-muted, #f4f6fb); }
+@media (prefers-reduced-motion: reduce) { .mapping-check__chev { transition: none; } }
+#mappingReviewCards { display: flex; flex-direction: column; gap: 16px; margin: 0; }
+.mapping-check h3 { font-family: inherit; }
+.mapping-check__chev { align-self: center; }
+.mapping-check__head { align-items: flex-start; }
+.mapping-check__chev { margin-top: 5px; }
+.mapping-check__count { align-self: center; }
+.mapping-check__list .csms-ctable td { overflow-wrap: anywhere; }
+.mapping-check__head, .mapping-check__label { font-family: var(--sms2-font-family, "DM Sans", "Segoe UI", sans-serif); }
+.mapping-check__list .csms-ctable { min-width: 0; }
+.csms-ctable--trace thead th { white-space: nowrap; }
+#mappingTraceResults { display: flex; flex-direction: column; gap: 16px; }
+.mapping-trace-usage > header { padding: 0 4px; }
+@media (max-width: 600px) { .mapping-check__head { padding: 8px 10px; } }

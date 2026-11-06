@@ -152,6 +152,9 @@ const badRows = [row(1), row(2, { subject_id: 1 }), row(3, { subject_id: 1, seme
 const issues = data.review(badRows);
 assert.equal(issues.duplicates.length, 2, 'different semester placements are not duplicates');
 assert.equal(issues.missingYear.length, 1); assert.equal(issues.missingSemester.length, 1); assert.equal(issues.placement.length, 1);
+const cover = data.outcomeReview([{ id: 1 }, { id: 2 }, { id: 3 }], [{ placement_id: 10 }, { placement_id: 11 }], [{ placement_id: 10, outcome_id: 1 }, { placement_id: 10, outcome_id: 3 }]);
+assert.deepEqual(cover.outcomesNoSubject.map(o => o.id), [2]); assert.deepEqual(cover.subjectsNoOutcome.map(p => p.placement_id), [11]);
+assert.equal(JSON.stringify(data.outcomeReview([], [], [])), '{"outcomesNoSubject":[],"subjectsNoOutcome":[]}');
 assert.equal(data.edges(mappings, [edge, edge, { ...edge, requirement_type: 'corequisite' }, { ...edge, subject_id: 999 }]).length, 1);
 vm.runInNewContext(fs.readFileSync('modules/curriculum/assets/outcomes-presentation.js', 'utf8'), context);
 vm.runInNewContext(fs.readFileSync('modules/curriculum/assets/placement-groups.js', 'utf8'), context);
@@ -234,7 +237,32 @@ const terms = () => [...el('mappingMap').innerHTML.matchAll(/<tr class="map-tabl
     // Subject Trace and Mapping Review keep working.
     selectors.mappingTraceSearch.setSelected({ id: 1, subject_code: 'S1', subject_title: '<unsafe>', units: .1 }); await settle();
     assert.match(el('mappingTraceResults').innerHTML, /&lt;unsafe&gt;/);
-    assert.match(el('mappingReviewResults').innerHTML, /No structural mapping issues detected/);
+    // Slice 4: Trace rows are a compact table linking out to the Builder; no placement modal button.
+    assert.match(el('mappingTraceResults').innerHTML, /<td class="csms-ctable__code">S1<\/td>/);
+    assert.match(el('mappingTraceResults').innerHTML, /href="curriculum_builder\.php\?program_id=1&amp;curriculum_id=2&amp;version_id=3"[^>]*>Open in Builder/);
+    assert.ok(!/Open Placement|data-open-trace-mapping/.test(el('mappingTraceResults').innerHTML));
+    // Mapping Review: structural checks plus the two outcome-coverage checks, each a row with a count and an expandable list.
+    outcomeLinks = [{ id: 501, placement_id: 101, outcome_id: 1 }, { id: 502, placement_id: 102, outcome_id: 1 }]; selectors.mappingVersionInput.setSelected(version); await settle();
+    const review = () => el('mappingReviewCards').innerHTML;
+    const count = key => Number(new RegExp('data-review-issue="' + key + '"[^>]*>.*?<span class="mapping-check__count[^"]*">(\\d+)<\/span>').exec(review())[1]);
+    const toggle = key => el('mappingReviewCards').handlers.click({ target: { closest: sel => sel === '[data-review-issue]' ? { dataset: { reviewIssue: key }, getAttribute: () => null } : null } });
+    ['placement', 'duplicates', 'missingYear', 'missingSemester', 'outcomesNoSubject', 'subjectsNoOutcome'].forEach(key => assert.ok(review().includes('data-review-issue="' + key + '"'), key));
+    assert.ok(!review().includes('outcomes never') && !/never reach/i.test(review()), 'no level-based check');
+    assert.equal(count('missingYear'), 0); assert.equal(count('outcomesNoSubject'), 0, 'IT01 is mapped'); assert.equal(count('subjectsNoOutcome'), 1, 'S3 has no mapping');
+    assert.ok(review().includes('aria-expanded="false"')); assert.ok(!/<td class="csms-ctable__code">S3/.test(review()));
+    toggle('subjectsNoOutcome');
+    assert.match(review(), /aria-expanded="true"[^>]*aria-controls="reviewList-subjectsNoOutcome"/);
+    assert.match(review(), /<td class="csms-ctable__code">S3<\/td><td>Subject 3<\/td>/);
+    toggle('outcomesNoSubject'); assert.ok(!/reviewList-outcomesNoSubject"[^>]*>\s*<table/.test(review()), 'an empty check does not expand');
+    toggle('subjectsNoOutcome'); assert.ok(!/<td class="csms-ctable__code">S3/.test(review()), 'second click collapses');
+    // Nothing is mapped: every outcome is unsupported and every placement unmapped.
+    outcomeLinks = []; selectors.mappingVersionInput.setSelected(version); await settle();
+    assert.equal(count('outcomesNoSubject'), 1); assert.equal(count('subjectsNoOutcome'), 3);
+    toggle('outcomesNoSubject'); assert.match(review(), /<td class="csms-ctable__code">IT01<\/td><td>Apply knowledge/);
+    outcomeLinks = [{ id: 501, placement_id: 101, outcome_id: 1 }, { id: 502, placement_id: 102, outcome_id: 1 }, { id: 503, placement_id: 103, outcome_id: 1 }];
+    selectors.mappingVersionInput.setSelected(version); await settle();
+    assert.equal(count('subjectsNoOutcome'), 0); assert.equal(count('outcomesNoSubject'), 0);
+    assert.match(el('mappingReviewResults').innerHTML, /No mapping issues detected/);
     // Another program: context clears, SHS grade levels are offered.
     selectors.mappingProgramInput.setSelected({ id: 7, program_code: 'STEM', program_name: 'STEM', program_type: 'SHS' }); await settle();
     assert.equal(el('mappingVersionFilter').value, ''); assert.equal(el('mappingBuilderLink').hidden, true);
@@ -243,5 +271,8 @@ const terms = () => [...el('mappingMap').innerHTML.matchAll(/<tr class="map-tabl
     selectors.mappingVersionInput.setSelected({ ...version, id: 21, curriculum_id: 20 }); await settle();
     assert.match(el('mappingMap').innerHTML, /No outcome catalog for this program yet./);
     assert.ok(!el('mappingMap').innerHTML.includes('<table'), 'no empty or invented matrix without a catalog');
+    assert.match(el('mappingReviewCards').innerHTML, /No outcome catalog for this program yet./);
+    assert.ok(!/outcomesNoSubject|subjectsNoOutcome/.test(el('mappingReviewCards').innerHTML), 'no outcome checks without a catalog, not zero');
+    assert.ok(el('mappingReviewCards').innerHTML.includes('data-review-issue="missingYear"'), 'structural checks still apply');
     console.log('PASS: complete pagination, editing (rationale dialog with prefill, remove confirmation, server refusal shown, read-only version), Builder-style map (terms, order, escaping, filters, Builder link), stale-response guard, Subject Trace, Mapping Review, empty state');
 })().catch(error => { console.error(error); process.exitCode = 1; });

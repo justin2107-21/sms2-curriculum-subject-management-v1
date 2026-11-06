@@ -20,6 +20,15 @@
             missingSemester: rows.filter(row => blank(row.semester))
         };
     }
+    // Outcome-coverage checks from the outcomes workspace (real mappings only): outcomes nobody supports, placements that support no outcome.
+    function outcomeReview(outcomes, placements, mappings) {
+        const usedOutcomes = new Set((mappings || []).map(m => Number(m.outcome_id)));
+        const usedPlacements = new Set((mappings || []).map(m => Number(m.placement_id)));
+        return {
+            outcomesNoSubject: (outcomes || []).filter(o => !usedOutcomes.has(Number(o.id))),
+            subjectsNoOutcome: (placements || []).filter(p => !usedPlacements.has(Number(p.placement_id)))
+        };
+    }
     function edges(rows, requirements) {
         const ids = new Set(rows.map(row => Number(row.subject_id)));
         const versions = new Set(rows.map(row => Number(row.curriculum_version_id)));
@@ -33,5 +42,5 @@
             return true;
         });
     }
-    window.SubjectMappingData = { blank, compare, unitCents, review, edges };
+    window.SubjectMappingData = { blank, compare, unitCents, review, outcomeReview, edges };
 }());
