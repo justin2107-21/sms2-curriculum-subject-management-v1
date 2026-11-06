@@ -182,3 +182,5 @@
 .builder-more__menu :is(a, button):hover, .builder-more__menu :is(a, button):focus { background: var(--csms-surface-muted, #f4f6fb); }
 @media (max-width: 600px) { .builder-more__btn { width: 44px; height: 44px; } .builder-more__menu :is(a, button) { min-height: 44px; } }
 .builder-more__menu { left: auto; right: 0; max-width: calc(100vw - 32px); }
+/* Code column text uses the blue of the Subject Mapping Code column (#2163c5; no token exists for it yet). */
+.builder-subjects td.builder-subjects__code { color: #2163c5; }
