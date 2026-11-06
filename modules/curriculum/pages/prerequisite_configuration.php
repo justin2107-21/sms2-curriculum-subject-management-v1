@@ -58,7 +58,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <div>
 <h1 class="page-title">Pre-requisite Configuration</h1>
 <p class="page-subtitle">Manage subject prerequisite rules and progression requirements.</p>
-</div><div class="pr-title-actions"><?php if ($canManageRequirements): ?>
+</div><div class="pr-title-actions"><?php if (!$canManageRequirements): ?><span class="csms-chip csms-chip--draft" id="readOnlyBadge">Read-only for your role</span><?php endif; ?><?php if ($canManageRequirements): ?>
 <button class="primary-action-button" id="addRequirementButton" disabled>+ Add Prerequisite</button><?php endif; ?>
 </div>
 </div>
@@ -67,7 +67,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <div class="record-autocomplete">
 <input type="search" id="programSearch" placeholder="Search program / strand" />
 <input type="hidden" id="programId"/>
-<button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Program / Strand" hidden>&times;</button>
+<button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Program / Strand" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
 <div class="record-autocomplete-options" id="programOptions" role="listbox" hidden>
 </div>
 </div>
@@ -77,7 +77,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <div class="record-autocomplete">
 <input type="search" id="curriculumSearch" placeholder="Search curriculum" disabled/>
 <input type="hidden" id="curriculumId"/>
-<button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Curriculum" hidden>&times;</button>
+<button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Curriculum" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
 <div class="record-autocomplete-options" id="curriculumOptions" role="listbox" hidden>
 </div>
 </div>
@@ -87,29 +87,30 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <div class="record-autocomplete">
 <input type="search" id="versionSearch" placeholder="Search curriculum version" disabled/>
 <input type="hidden" id="versionId"/>
-<button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Curriculum Version" hidden>&times;</button>
+<button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Curriculum Version" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
 <div class="record-autocomplete-options" id="versionOptions" role="listbox" hidden>
 </div>
 </div>
 </label>
 </section>
-    <nav class="pr-tabs" role="tablist" aria-label="Prerequisite workspace">
+    <nav class="csms-tabs pr-tabs" role="tablist" aria-label="Prerequisite workspace">
 <button role="tab" id="tab-rules" aria-controls="panel-rules" aria-selected="true" data-tab="rules">Prerequisite Rules</button>
 <button role="tab" id="tab-chain" aria-controls="panel-chain" aria-selected="false" tabindex="-1" data-tab="chain">Chain Viewer</button>
 <button role="tab" id="tab-review" aria-controls="panel-review" aria-selected="false" tabindex="-1" data-tab="review">Validation Review</button>
 </nav>
+    <p class="csms-panel__note pr-note" id="prNote">A prerequisite must be placed in an earlier term (a system rule, not a CHED rule). Co-requisites and standing requirements are not handled here. SHS strand groups are not supported.</p>
     <p id="workspaceStatus" role="status"></p>
-    <section id="panel-rules" role="tabpanel" aria-labelledby="tab-rules">
-<div class="pr-toolbar">
-<input type="search" id="ruleSearch" aria-label="Search subjects" placeholder="Search subject code or title..."/>
-<select id="yearFilter" aria-label="Year or grade"><option value="">All Years</option></select>
-<select id="semesterFilter" aria-label="Semester"><option value="">All Semesters</option></select>
-<select id="stateFilter" aria-label="Configured state"><option value="">All Subjects</option><option value="with">With Prerequisites</option><option value="without">Without Prerequisites</option></select>
+    <section id="panel-rules" class="csms-panel" role="tabpanel" aria-labelledby="tab-rules">
+<div class="csms-filter-row pr-toolbar">
+<label class="csms-search"><span class="sr-only">Search subjects</span><input type="search" id="ruleSearch" maxlength="100" placeholder="Search subject code or title"/></label>
+<select class="csms-select" id="yearFilter" aria-label="Year or grade"><option value="">All Years</option></select>
+<select class="csms-select" id="semesterFilter" aria-label="Semester"><option value="">All Semesters</option></select>
+<select class="csms-select" id="stateFilter" aria-label="Rules"><option value="">All subjects</option><option value="with">Has rules</option><option value="without">No rules</option></select>
 </div>
 <div id="ruleCards" class="pr-rules">
 </div>
 </section>
-    <section id="panel-chain" role="tabpanel" aria-labelledby="tab-chain" hidden>
+    <section id="panel-chain" class="csms-panel" role="tabpanel" aria-labelledby="tab-chain" hidden>
 <p class="eyebrow">FOCUSED DEPENDENCY INSPECTION</p>
 <h2>Prerequisite Chain</h2>
 <p class="pr-muted">View the dependency path leading to one selected subject.</p>
@@ -119,7 +120,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <div class="record-autocomplete">
 <input type="search" id="focusSearch" placeholder="Search select subject" />
 <input type="hidden" id="focusId"/>
-<button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Select Subject" hidden>&times;</button>
+<button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Select Subject" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
 <div class="record-autocomplete-options" id="focusOptions" role="listbox" hidden>
 </div>
 </div>
@@ -142,7 +143,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 </div>
 </div>
 </section>
-    <section id="panel-review" role="tabpanel" aria-labelledby="tab-review" hidden>
+    <section id="panel-review" class="csms-panel" role="tabpanel" aria-labelledby="tab-review" hidden>
 <div class="pr-review-grid" id="reviewCounts">
 </div>
 <div id="reviewIssues">
@@ -161,7 +162,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="detailsModalTitle">
 <div class="modal-header">
 <h2 id="detailsModalTitle">Prerequisite Details</h2>
-<button type="button" class="modal-close-button" data-modal-close aria-label="Close">&times;</button>
+<button type="button" class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
 </div>
 <div class="pr-modal-body">
 <div id="detailsBody">
@@ -180,7 +181,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="editorModalTitle">
 <div class="modal-header">
 <h2 id="editorModalTitle">Add Prerequisite</h2>
-<button type="button" class="modal-close-button" data-modal-close aria-label="Close">&times;</button>
+<button type="button" class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
 </div>
 <div class="pr-modal-body">
 <form id="ruleForm" class="domain-form">
@@ -191,7 +192,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <div class="record-autocomplete">
 <input type="search" id="targetSearch" placeholder="Search target subject" aria-required="true" />
 <input type="hidden" id="targetId"/>
-<button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear target subject" hidden>&times;</button>
+<button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear target subject" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
 <div class="record-autocomplete-options" id="targetOptions" role="listbox" hidden>
 </div>
 </div>
@@ -206,7 +207,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <div class="record-autocomplete">
 <input type="search" id="requiredSearch" placeholder="Search required subject" aria-required="true" />
 <input type="hidden" id="requiredId"/>
-<button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear required subject" hidden>&times;</button>
+<button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear required subject" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
 <div class="record-autocomplete-options" id="requiredOptions" role="listbox" hidden>
 </div>
 </div>
@@ -230,7 +231,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="removeModalTitle">
 <div class="modal-header">
 <h2 id="removeModalTitle">Remove Prerequisite Rule?</h2>
-<button type="button" class="modal-close-button" data-modal-close aria-label="Close">&times;</button>
+<button type="button" class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
 </div>
 <div class="pr-modal-body">
 <div class="form-error" role="alert" hidden>

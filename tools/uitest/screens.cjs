@@ -716,6 +716,25 @@ async function main() {
       }
     }
 
+    if (arg('probe', '') === 'prereq') {
+      // Pre-requisite Configuration: viewport shots of each tab, chrome measurements, and (with --builderflow=1) a row click.
+      report.prereq = {};
+      for (const width of widths) {
+        const result = {};
+        await setWidth(width);
+        await navigate(base + urls[0]);
+        await sleep(3500);
+        await shotView(path.join(out, `${role}-prereq-rules-${width}.png`));
+        result.chrome = await evaluate(`(() => { const sel = [...document.querySelectorAll('.csms-filter-row select')]; const x = document.querySelector('.record-autocomplete-clear:not([hidden])'); const r = x && x.getBoundingClientRect(); return { tabs: document.querySelectorAll('.csms-tabs [role=tab]').length, badge: !!document.getElementById('readOnlyBadge'), clippedSelects: sel.filter(e => e.scrollWidth > e.clientWidth + 1).length, selectHeights: sel.map(e => Math.round(e.getBoundingClientRect().height)), clearSize: r ? [Math.round(r.width), Math.round(r.height)] : null, overflow: document.documentElement.scrollWidth > innerWidth, rows: document.querySelectorAll('#ruleCards tbody tr, #ruleCards article').length }; })()`);
+        if (arg('builderflow', '') === '1') {
+          result.rowClick = await evaluate(`(() => { const r = document.querySelector('#ruleCards tr.csms-row-click'); if (!r) return null; r.click(); const m = [...document.querySelectorAll('.curriculum-modal')].find(m => !m.hidden); return m ? m.id : 'none'; })()`);
+          await sleep(500);
+          await shotView(path.join(out, `${role}-prereq-dialog-${width}.png`));
+        }
+        report.prereq[width] = result;
+      }
+    }
+
     if (arg('probe', '') === 'versions') {
       // Selector footers (+ New curriculum / + New version) and the More menu in the version header, for this role.
       // With --builderflow=1 also the create and rename flows in the browser.

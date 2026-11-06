@@ -160,6 +160,7 @@
     $('removeModal')?.addEventListener('keydown', event => { if (event.key === 'Escape' && state.remove?.draft) dialogs.editor.open(); });
     $('ruleCards').addEventListener('keydown',e=>{if(e.target.matches('article')&&['Enter',' '].includes(e.key)){e.preventDefault();details(Number(e.target.dataset.details));}});
     document.querySelector('.pr-tabs').addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();const tabs=[...document.querySelectorAll('[data-tab]')],i=tabs.indexOf(e.target),next=e.key==='Home'?0:e.key==='End'?2:(i+(e.key==='ArrowRight'?1:2))%3;tabs[next].click();tabs[next].focus();});
+    $('ruleSearch').addEventListener('keydown',e=>{if(e.key==='Escape'&&$('ruleSearch').value){$('ruleSearch').value='';renderRules();}});
     $('ruleSearch').addEventListener('input',ui.debounce(renderRules,150)); ['yearFilter','semesterFilter','stateFilter'].forEach(id=>$(id).addEventListener('change',renderRules));
     $('addRequirementButton')?.addEventListener('click',()=>openEditor()); $('appendRequired')?.addEventListener('click',append);
     $('detailsEdit')?.addEventListener('click',()=>openEditor(state.target)); $('detailsRemove')?.addEventListener('click',()=>confirmRemoval(state.target));

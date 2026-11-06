@@ -41,7 +41,6 @@
 .mapping-context-field .record-autocomplete input.has-selection { background: #fff; border-color: #dbe3ee; }
 .mapping-context-field .record-autocomplete input:focus { border-color: #87b3f5; box-shadow: 0 0 0 3px rgba(37, 99, 197, .1); }
 .mapping-context-field input::-webkit-search-cancel-button { display: none; }
-.mapping-context-field .record-autocomplete-clear { top: 7px; }
 .mapping-context-field .record-autocomplete-options { border-color: #dbe3ee; border-radius: 8px; }
 .mapping-context-separator { align-self: end; font-size: var(--csms-text-xs, .75rem); padding: 0 0 13px; color: #a9bbd1; }
 .mapping-year-tabs { display: flex; gap: 9px; flex-wrap: wrap; margin-bottom: 14px; }

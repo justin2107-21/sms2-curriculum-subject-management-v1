@@ -529,3 +529,26 @@ body .main .module-views a:focus-visible { outline: 2px solid var(--csms-primary
 .csms-ctable__code { width: 8rem; }
 .csms-ctable__num { width: 4rem; text-align: right !important; font-variant-numeric: tabular-nums; }
 .csms-ctable__kind { width: 6.5rem; }
+
+/* ---- Shared standard (Prerequisite plan, section 3). One tab focus rule, one clear button, one filter row and select, one row-click table. ---- */
+/* 1. Tabs: the focus box shows for the keyboard only, never after a mouse click. */
+:is(.csms-tabs, .builder-tabs) [role="tab"]:focus:not(:focus-visible) { outline: 0; box-shadow: none; }
+/* 2. Clear X: one control, 32 px target (44 on small screens), centred on the field; the browser's own search cancel is hidden so there is never a second X. */
+.record-autocomplete input[type="search"]::-webkit-search-cancel-button, .csms-filter-row input[type="search"]::-webkit-search-cancel-button { display: none; -webkit-appearance: none; }
+.record-autocomplete .record-autocomplete-clear { width: 32px; height: 32px; top: 50%; right: 4px; transform: translateY(-50%); border-radius: 6px; font-size: 16px; line-height: 1; }
+.record-autocomplete .record-autocomplete-clear i { font-size: 14px; }
+@media (max-width: 600px), (pointer: coarse) { .record-autocomplete .record-autocomplete-clear { width: 44px; height: 44px; right: 0; } }
+/* 3. Compact filter row and select: 40 px high, room for the arrow, text never clipped (ellipsis plus a floor wide enough for the longest option). */
+.csms-filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.csms-filter-row .csms-search { flex: 1 1 16rem; min-width: 12rem; max-width: 24rem; position: relative; display: block; }
+.csms-filter-row input[type="search"], .csms-select { box-sizing: border-box; height: 40px; width: 100%; padding: 0 12px; background: #fff; border: 1px solid var(--csms-border-strong, #cbd5e1); border-radius: 8px; font: inherit; font-size: 14px; color: var(--csms-text, #1f2937); }
+.csms-select { width: auto; min-width: 10.5rem; max-width: 100%; padding-right: 32px; text-overflow: ellipsis; }
+.csms-filter-row input[type="search"]:focus-visible, .csms-select:focus-visible { outline: 3px solid var(--csms-focus, #2563eb); outline-offset: 1px; }
+.csms-filter-row__summary { margin-left: auto; font-size: 14px; color: var(--csms-text-secondary, #374151); }
+@media (max-width: 600px) { .csms-filter-row .csms-search, .csms-select { flex: 1 1 100%; max-width: none; width: 100%; } .csms-filter-row__summary { margin-left: 0; } }
+/* 4. Row-click tables: the whole row opens the detail dialog (Enter and Space too); controls inside the row keep their own action. */
+.csms-ctable tr.csms-row-click { cursor: pointer; }
+.csms-ctable tr.csms-row-click:hover td { background: var(--csms-surface-muted, #f4f6fb); }
+.csms-ctable tr.csms-row-click:focus-visible { outline: 3px solid var(--csms-focus, #2563eb); outline-offset: -3px; }
+.csms-filter-row .csms-select { height: 40px; min-height: 40px; padding-top: 0; padding-bottom: 0; }
+.csms-tabs { overflow: visible; }
