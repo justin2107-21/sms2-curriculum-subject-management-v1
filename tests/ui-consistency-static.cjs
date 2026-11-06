@@ -41,8 +41,9 @@ assert.ok(!reports.includes('$sess_initial'), 'unescaped avatar initial is gone'
 
 // Subject Mapping: the year dropdown is a hidden state holder (page script and tests keep their element); pills stay.
 const mapping = read('modules/curriculum/pages/subject_mapping.php');
-assert.match(mapping, /csms-hidden-field[^>]*><span class="sr-only">Year \/ Grade<\/span><select id="mappingYearFilter" tabindex="-1" aria-hidden="true">/);
-assert.ok(mapping.includes('id="mappingYearTabs"'), 'year pills stay');
+assert.ok(!mapping.includes('id="mappingYearTabs"') && !mapping.includes('addMappingButton'), 'year pills and Place Subject are gone');
+assert.match(mapping, /<select id="mappingYearFilter">/);
+assert.match(mapping, /class="csms-tabs" id="mappingWorkspaceTabs"/);
 assert.match(components, /\.csms-hidden-field \{ display: none !important; \}/);
 
 // Context picker: labels above select-like fields, searchable panels, Reset only (no collapsed summary / Change).

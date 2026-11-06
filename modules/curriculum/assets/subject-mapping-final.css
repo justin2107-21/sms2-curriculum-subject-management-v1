@@ -17,11 +17,8 @@
   margin: 0 0 24px;
   padding: 28px var(--mapping-page-gutter) 22px;
 }
-.mapping-content:not(.has-mapping-context) #mappingPanelMap > .mapping-year-tabs,
-.mapping-content:not(.has-mapping-context) #mappingPanelMap > .mapping-map-toolbar,
-.mapping-content:not(.has-mapping-context) #mappingPanelMap > .mapping-connections-toggle,
-.mapping-content:not(.has-mapping-context) #mappingPanelMap > #mappingConnections,
-.mapping-content:not(.has-mapping-context) #mappingPanelMap > #mappingMap { display: none !important; }
+.mapping-content:not(.has-mapping-context) #mappingPanelMap > .csms-panel__bar,
+.mapping-content:not(.has-mapping-context) #mappingPanelMap > .mapping-map-toolbar { display: none !important; }
 .mapping-context-field { font-size: .75rem; gap: 7px; }
 .mapping-context-field .record-autocomplete input {
   appearance: none;
@@ -249,4 +246,19 @@
   .outcome-browse-list > li { grid-template-columns:1fr; gap:8px; padding:12px 14px; }
   .outcome-row-actions { display:flex; align-items:center; justify-content:space-between; }
   .academic-modal-body .record-detail-grid,.academic-modal-body .form-grid { grid-template-columns:1fr; }
+}
+/* Curriculum Map tab: one filter row in the Builder's spacing. */
+#mappingPanelMap.csms-panel { padding-top: 16px; }
+#mappingPanelMap .mapping-map-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; margin-bottom: 0; }
+#mappingPanelMap .mapping-map-toolbar .csms-search { flex: 1 1 16rem; min-width: 0; }
+#mappingPanelMap .mapping-map-toolbar .csms-search input { width: 100%; height: 40px; padding: 0 12px; background: #fff; border: 1px solid var(--csms-border-strong, #cbd5e1); border-radius: 8px; font: inherit; font-size: 14px; }
+#mappingPanelMap .mapping-map-toolbar .form-field { flex: 0 1 11rem; }
+#mappingPanelMap .mapping-map-total { margin-left: auto; }
+@media (max-width: 600px) { #mappingPanelMap .mapping-map-toolbar .form-field { flex: 1 1 45%; } #mappingPanelMap .mapping-map-total { flex: 1 1 100%; margin-left: 0; } #mappingBuilderLink { width: 100%; justify-content: center; } }
+#mappingPanelMap .mapping-map-toolbar .form-field { flex: 0 0 11rem; width: 11rem; }
+#mappingPanelMap .mapping-map-toolbar .form-field select { width: 100%; }
+@media (max-width: 600px) {
+  #mappingPanelMap .mapping-map-toolbar .form-field { flex: 1 1 45%; width: auto; }
+  .csms-ctable__kind { display: none; }
+  .csms-ctable__code { width: 5.5rem; }
 }

@@ -68,8 +68,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
         data-can-manage-plans="<?= $canManageAssessmentPlans ? '1' : '0' ?>"
         data-can-add-mappings="<?= $canAddMappings ? '1' : '0' ?>">
     <header class="mapping-workspace-header">
-        <div><h1 class="page-title">Subject Mapping</h1><p class="page-subtitle">Organize subjects within curriculum versions.</p></div>
-        <?php if ($canAddMappings): ?><button type="button" class="primary-action-button" id="addMappingButton" disabled><i class="fa-solid fa-plus" aria-hidden="true"></i> Place Subject</button><?php endif; ?>
+        <div><h1 class="page-title">Subject Mapping</h1><p class="page-subtitle">Map subjects to program outcomes.</p></div>
     </header>
     <section class="mapping-workspace-shell">
       <section class="mapping-context-bar" aria-label="Curriculum mapping context">
@@ -88,24 +87,25 @@ require __DIR__ . '/../../../shared/sidebar.php';
           <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear version" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button><div class="record-autocomplete-options" id="mappingVersionOptions" role="listbox" aria-label="Version options" hidden></div>
         </div></label>
       </section>
-      <nav class="mapping-workspace-tabs" id="mappingWorkspaceTabs" role="tablist" aria-label="Subject Mapping views">
+      <nav class="csms-tabs" id="mappingWorkspaceTabs" role="tablist" aria-label="Subject Mapping views">
         <button type="button" class="<?= $activeTab === 'map' ? 'is-active' : '' ?>" id="mappingTabMap" role="tab" tabindex="<?= $activeTab === 'map' ? '0' : '-1' ?>" aria-selected="<?= $activeTab === 'map' ? 'true' : 'false' ?>" aria-controls="mappingPanelMap">Curriculum Map</button>
         <button type="button" class="<?= $activeTab === 'trace' ? 'is-active' : '' ?>" id="mappingTabTrace" role="tab" tabindex="<?= $activeTab === 'trace' ? '0' : '-1' ?>" aria-selected="<?= $activeTab === 'trace' ? 'true' : 'false' ?>" aria-controls="mappingPanelTrace">Subject Trace</button>
         <button type="button" class="<?= $activeTab === 'review' ? 'is-active' : '' ?>" id="mappingTabReview" role="tab" tabindex="<?= $activeTab === 'review' ? '0' : '-1' ?>" aria-selected="<?= $activeTab === 'review' ? 'true' : 'false' ?>" aria-controls="mappingPanelReview">Mapping Review</button>
         <button type="button" class="<?= $activeTab === 'outcomes' ? 'is-active' : '' ?>" id="mappingTabOutcomes" role="tab" tabindex="<?= $activeTab === 'outcomes' ? '0' : '-1' ?>" aria-selected="<?= $activeTab === 'outcomes' ? 'true' : 'false' ?>" aria-controls="mappingPanelOutcomes">Graduate Outcomes</button>
       </nav>
-      <section id="mappingPanelMap" class="mapping-workspace-panel" role="tabpanel" aria-labelledby="mappingTabMap" <?= $activeTab === 'map' ? '' : 'hidden' ?>>
-        <div class="mapping-year-tabs" id="mappingYearTabs" aria-label="Year / Grade filter"></div>
+      <section id="mappingPanelMap" class="mapping-workspace-panel csms-panel" role="tabpanel" aria-labelledby="mappingTabMap" <?= $activeTab === 'map' ? '' : 'hidden' ?>>
+        <div class="csms-panel__bar">
+          <p class="csms-panel__note">Subjects placed in this version. Edit placements in the Curriculum Builder.</p>
+          <a class="secondary-action-button" id="mappingBuilderLink" href="curriculum_builder.php" hidden><i class="fa-solid fa-table-list" aria-hidden="true"></i> Edit placements in Builder</a>
+        </div>
         <div class="mapping-map-toolbar">
-          <label class="search-control"><span class="sr-only">Search subjects</span><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input id="mappingSubjectSearch" type="search" maxlength="100" placeholder="Search subject code or title..."/></label>
-          <label class="form-field csms-hidden-field"><span class="sr-only">Year / Grade</span><select id="mappingYearFilter" tabindex="-1" aria-hidden="true"><option value="">All Years</option></select></label>
+          <label class="csms-search"><span class="sr-only">Search subjects</span><input id="mappingSubjectSearch" type="search" maxlength="100" placeholder="Search subject code or title"/></label>
+          <label class="form-field"><span class="sr-only">Year / Grade</span><select id="mappingYearFilter"><option value="">All Years</option></select></label>
           <label class="form-field"><span class="sr-only">Semester</span><select id="mappingSemesterFilter"><option value="">All Semesters</option></select></label>
           <label class="form-field"><span class="sr-only">Placement</span><select id="mappingPlacementFilter"><option value="">All Placements</option><option value="1">Required</option><option value="0">Optional</option></select></label>
-          <span class="mapping-map-total" id="mappingCount">Select a version</span>
+          <span class="mapping-map-total" id="mappingCount" role="status">Select a version</span>
         </div>
-        <?php if ($canViewPrerequisites): ?><label class="mapping-connections-toggle"><input type="checkbox" id="mappingShowConnections"/> Show prerequisite connections</label><?php endif; ?>
-        <div id="mappingConnections" hidden></div>
-        <div class="mapping-year-sections" id="mappingMap"><p class="mapping-state">Select a curriculum version to view its map.</p></div>
+        <div class="mapping-year-sections csms-plan" id="mappingMap"><p class="mapping-state">Select a curriculum version to view its map.</p></div>
       </section>
       <section id="mappingPanelTrace" class="mapping-workspace-panel" role="tabpanel" aria-labelledby="mappingTabTrace" <?= $activeTab === 'trace' ? '' : 'hidden' ?>>
         <div class="mapping-trace-search"><p class="eyebrow">Find Subject Usage</p><h2>Where is this subject placed?</h2><p id="mappingTraceHelper">Search a Subject Master record to view all curriculum placements.</p><label class="mapping-context-field"><span>Subject</span><div class="record-autocomplete">
@@ -198,102 +198,13 @@ require __DIR__ . '/../../../shared/sidebar.php';
       </div>
       <div class="modal-footer">
         <button type="button" class="button-muted" data-modal-close>Close</button>
-        <?php if ($canManageMappings): ?><button type="button" class="button-primary" id="mappingDetailsEdit"><i class="fa-solid fa-pen" aria-hidden="true"></i> Edit Placement</button><button type="button" class="button-danger" id="mappingDetailsRemove"><i class="fa-solid fa-link-slash" aria-hidden="true"></i> Remove Placement</button><?php endif; ?>
       </div>
     </section>
   </div>
 
-<?php if ($canAddMappings): ?>
-<div class="curriculum-modal" id="addMappingModal" hidden>
-  <div class="modal-backdrop" data-modal-close></div>
-  <section class="modal-dialog modal-dialog-scroll" role="dialog" aria-modal="true" aria-labelledby="addMappingTitle">
-    <div class="modal-header">
-      <div>
-        <h2 id="addMappingTitle">Place Subject</h2>
-        <p class="modal-context" id="addMappingContext"></p>
-      </div>
-      <button type="button" class="modal-close-button" data-modal-close aria-label="Close add subject mapping form"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
-    </div>
-    <form class="domain-form" id="addMappingForm">
-      <input type="hidden" name="curriculum_version_id" id="addMappingVersionId"/>
-      <input type="hidden" name="academic_program_id" id="addMappingProgramId"/>
-      <input type="hidden" name="curriculum_id" id="addMappingCurriculumId"/>
-      <div class="form-error" role="alert" hidden></div>
-      <div class="form-grid">
-        <div class="form-field form-field-wide">
-          <label for="mappingSubjectSelectorSearch">Subject <strong>*</strong></label>
-          <div class="record-autocomplete">
-            <input type="search" id="mappingSubjectSelectorSearch" maxlength="100" placeholder="Search all subjects by code or title" required/>
-            <input type="hidden" name="subject_id" id="mappingSubjectId"/>
-            <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear subject" title="Clear selection" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
-            <div class="record-autocomplete-options" id="mappingSubjectOptions" role="listbox" aria-label="Subject suggestions" hidden></div>
-          </div>
-          <small id="mappingSubjectHint" role="status">Type a code or title and select a Subject Master record.</small><a href="subjects.php">Go to Subject Master</a>
-        </div>
-        <label class="form-field"><span>Year / Grade Level <strong>*</strong></span><select name="year_level" id="addMappingYear" required><option value="">Select year / grade level</option></select></label>
-        <label class="form-field"><span>Semester <strong>*</strong></span><select name="semester" id="addMappingSemester" required><option value="">Select semester</option></select></label>
-        <label class="form-field"><span>Placement <strong>*</strong></span><select name="is_required" required><option value="">Choose placement</option><option value="1">Required</option><option value="0">Optional</option></select></label>
-      </div>
-      <div class="modal-actions"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="submit" class="button-primary">Save Placement</button></div>
-    </form>
-  </section>
-</div>
-<?php endif; ?>
-
-<?php if ($canManageMappings): ?>
-<div class="curriculum-modal" id="editMappingModal" hidden>
-  <div class="modal-backdrop" data-modal-close></div>
-  <section class="modal-dialog modal-dialog-scroll" role="dialog" aria-modal="true" aria-labelledby="editMappingTitle">
-    <div class="modal-header">
-      <div><h2 id="editMappingTitle">Edit Placement</h2><p class="modal-context" id="editMappingContext"></p></div>
-      <button type="button" class="modal-close-button" data-modal-close aria-label="Close edit subject mapping form"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
-    </div>
-    <form class="domain-form" id="editMappingForm">
-      <input type="hidden" name="id" id="editMappingId"/>
-      <div class="form-error" role="alert" hidden></div>
-      <div class="mapping-fixed-context" role="note">
-        <div><span>Subject</span><strong id="editMappingSubject"></strong></div>
-        <div><span>Curriculum Version</span><strong id="editMappingVersion"></strong></div>
-      </div>
-      <div class="form-grid">
-        <label class="form-field"><span>Year / Grade Level <strong>*</strong></span><select name="year_level" id="editMappingYear" required><option value="">Select year / grade level</option></select></label>
-        <label class="form-field"><span>Semester <strong>*</strong></span><select name="semester" id="editMappingSemester" required><option value="">Select semester</option></select></label>
-        <input type="hidden" name="sequence_order" id="editMappingSequence"/>
-        <label class="form-field"><span>Placement <strong>*</strong></span><select name="is_required" id="editMappingRequired" required><option value="">Choose placement</option><option value="1">Required</option><option value="0">Optional</option></select></label>
-      </div>
-      <p class="mapping-edit-note">Subject and curriculum version stay fixed. Only placement details can be edited.</p>
-      <div id="mappingSequenceResult" class="mapping-fixed-context" role="status" aria-live="polite"></div>
-      <div class="modal-actions"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="submit" class="button-primary">Save Changes</button></div>
-    </form>
-  </section>
-</div>
-
-<div class="curriculum-modal" id="removeMappingModal" hidden>
-  <div class="modal-backdrop" data-modal-close></div>
-  <section class="modal-dialog modal-dialog-small" role="alertdialog" aria-modal="true" aria-labelledby="removeMappingTitle">
-    <div class="modal-header">
-      <div><h2 id="removeMappingTitle">Remove Subject Placement?</h2></div>
-      <button type="button" class="modal-close-button" data-modal-close aria-label="Close removal confirmation"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
-    </div>
-    <div class="confirmation-body">
-      <div id="removeMappingMessage"></div><p>This removes only the placement. The Subject Master record will remain.</p>
-      <div class="form-error" role="alert" hidden></div>
-    </div>
-    <div class="modal-actions modal-actions-padded"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="button" class="button-danger" id="confirmRemoveMapping">Remove Placement</button></div>
-  </section>
-</div>
-<?php endif; ?>
-
-<div class="curriculum-modal mapping-details-modal" id="mappingConnectionModal" hidden>
-  <div class="modal-backdrop" data-modal-close></div>
-  <section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="mappingConnectionTitle">
-    <div class="modal-header"><div><p class="modal-kicker">Prerequisite Connection</p><h2 id="mappingConnectionTitle"></h2></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close connection">&times;</button></div>
-    <div class="modal-body"><p id="mappingConnectionSubjects"></p><p id="mappingConnectionText"></p><p>Read-only connection from Pre-requisite Configuration.</p></div>
-    <div class="modal-footer"><button type="button" class="button-muted" data-modal-close>Close</button><a class="button-primary" id="mappingConnectionManage">Manage in Pre-requisite Configuration</a></div>
-  </section>
-</div>
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 <script src="../assets/curriculum-common.js?v=<?= $curriculumCommonVersion ?>"></script>
+<script src="../assets/placement-groups.js?v=<?= (int)filemtime(__DIR__ . '/../assets/placement-groups.js') ?>"></script>
 <script src="../assets/subject-mapping-data.js?v=<?= (int)filemtime(__DIR__ . '/../assets/subject-mapping-data.js') ?>"></script>
 <script src="../assets/outcomes-presentation.js?v=<?= (int)filemtime(__DIR__ . '/../assets/outcomes-presentation.js') ?>"></script>
 <script src="../assets/subject-mapping-final.js?v=<?= $mappingWorkspaceVersion ?>"></script>
