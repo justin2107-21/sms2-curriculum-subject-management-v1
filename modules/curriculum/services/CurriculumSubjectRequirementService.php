@@ -4,6 +4,7 @@ require_once __DIR__ . '/CurriculumVersionEditPolicy.php';
 
 require_once __DIR__ . '/../validators/DomainValidator.php';
 require_once __DIR__ . '/PrerequisiteGraph.php';
+require_once __DIR__ . '/AcademicSequenceValidator.php';
 require_once __DIR__ . '/../repositories/CurriculumVersionSubjectRepository.php';
 require_once __DIR__ . '/../repositories/CurriculumSubjectRequirementRepository.php';
 require_once __DIR__ . '/../../../shared/audit.php';
@@ -168,6 +169,8 @@ class CurriculumSubjectRequirementService
         if (!$this->requirements->versionExists($versionId)) throw new DomainNotFoundException('Curriculum version not found.');
         $placements = $this->requirements->allPlacements($versionId, $forUpdate);
         $edges = $this->requirements->allPrerequisites($versionId, $forUpdate);
+        // period_position: the validator's own academic order (null when year or semester cannot be verified), so clients never parse labels.
+        $placements = array_map(fn($p) => $p + ['period_position' => AcademicSequenceValidator::position($p)], $placements);
         return ['placements' => $placements, 'relationships' => $edges,
             'review' => PrerequisiteGraph::review($placements, $edges)];
     }

@@ -106,9 +106,11 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <select class="csms-select" id="yearFilter" aria-label="Year or grade"><option value="">All Years</option></select>
 <select class="csms-select" id="semesterFilter" aria-label="Semester"><option value="">All Semesters</option></select>
 <select class="csms-select" id="stateFilter" aria-label="Rules"><option value="">All subjects</option><option value="with">Has rules</option><option value="without">No rules</option></select>
+<span class="csms-filter-row__summary" id="ruleSummary" role="status"></span>
 </div>
 <div id="ruleCards" class="pr-rules">
 </div>
+<div id="prRowMenu" class="pr-menu" role="menu" aria-label="Row actions" hidden></div>
 </section>
     <section id="panel-chain" class="csms-panel" role="tabpanel" aria-labelledby="tab-chain" hidden>
 <p class="eyebrow">FOCUSED DEPENDENCY INSPECTION</p>
@@ -174,6 +176,21 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <button class="button-danger" id="detailsRemove">Remove Rule</button><?php endif; ?>
 </div>
 </section>
+</div>
+<div class="curriculum-modal" id="warnModal" hidden>
+<div class="modal-backdrop" data-modal-close>
+</div>
+<section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="warnTitle">
+<div class="modal-header">
+<h2 id="warnTitle">Issues</h2>
+<button type="button" class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+</div>
+<div class="pr-modal-body"><div id="warnBody"></div></div>
+<div class="modal-actions modal-actions-padded">
+<button type="button" class="button-muted" data-modal-close>Close</button><?php if ($canManageRequirements): ?>
+<button type="button" class="button-primary" id="warnEdit">Edit rule</button><?php endif; ?>
+</div>
+</section>
 </div><?php if ($canManageRequirements): ?>
 <div class="curriculum-modal" id="editorModal" hidden>
 <div class="modal-backdrop" data-modal-close>
@@ -202,6 +219,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 </div>
 <div id="existingRequired">
 </div>
+<div id="editorUnlocks"></div>
 <div id="requiredField">
 <label class="form-field"><span>Required Subject <span aria-hidden="true">*</span><span class="sr-only">(required)</span></span>
 <div class="record-autocomplete">
@@ -213,6 +231,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 </div>
 </label>
 </div>
+<p class="pr-muted" id="requiredHint" role="status" hidden></p>
 <button type="button" class="button-muted" id="appendRequired" hidden>+ Add another prerequisite</button>
 <div id="relationshipPreview">
 </div>
@@ -252,6 +271,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <div class="sidebar-overlay" id="sidebarOverlay">
 </div>
 <script src="../assets/curriculum-common.js?v=<?= $curriculumCommonVersion ?>"></script>
+<script src="../assets/placement-groups.js?v=<?= (int)filemtime(__DIR__ . '/../assets/placement-groups.js') ?>"></script>
 <script src="../assets/prerequisite-configuration.js?v=<?= $prerequisiteScriptVersion ?>"></script>
 <script src="../assets/cimf-prerequisite.js?v=<?= $cimfScriptVersion ?>"></script>
 </body>

@@ -61,6 +61,9 @@ try{
  status($admin->api('requirement','create',array_replace($input,['subject_id'=>1,'required_subject_id'=>2]),'POST'),422,'Cycle HTTP rejection');
  status($admin->api('requirement','update_rule',['curriculum_version_id'=>1,'subject_id'=>2,'required_subject_ids'=>[1,3],'expected_ids'=>[$id]],'POST'),200,'Atomic multi-rule update');
  $workspace=status($admin->api('requirement','workspace',['curriculum_version_id'=>1]),200,'Workspace HTTP');checkHttp(count($workspace['relationships'])===2,'Two prerequisites visible over HTTP');
+  $positions=array_column($workspace['placements'],'period_position','subject_id');checkHttp(count($positions)===4&&!in_array(null,$positions,true)&&count(array_unique($positions))>=1,'Workspace placements carry a numeric period_position');
+ $db->query("UPDATE curriculum_version_subjects SET semester='Summer' WHERE subject_id=4");$odd=status($admin->api('requirement','workspace',['curriculum_version_id'=>1]),200,'Workspace with unverifiable term');$oddPositions=array_column($odd['placements'],'period_position','subject_id');checkHttp($oddPositions[4]===null,'Unknown term gives a null period_position');
+ $db->query("UPDATE curriculum_version_subjects SET semester=(SELECT s FROM (SELECT semester s FROM curriculum_version_subjects WHERE subject_id=3) t) WHERE subject_id=4");
  status($admin->api('requirement','remove',['id'=>$id],'POST'),200,'Confirmed edge removal');
  checkHttp((int)$db->query('SELECT COUNT(*) FROM subjects')->fetch_row()[0]===4,'HTTP mutations preserve subjects');checkHttp((int)$db->query('SELECT COUNT(*) FROM curriculum_version_subjects')->fetch_row()[0]===4,'HTTP mutations preserve placements');
  foreach(['SUBJECT_REQUIREMENT_CREATE','SUBJECT_REQUIREMENT_UPDATE','SUBJECT_REQUIREMENT_REMOVE']as $action)checkHttp((int)$db->query("SELECT COUNT(*) FROM audit_logs WHERE action='$action'")->fetch_row()[0]>0,'HTTP audit '.$action);
