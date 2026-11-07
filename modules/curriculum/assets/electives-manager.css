@@ -2,15 +2,11 @@
 .elective-context { position: relative; z-index: 5; overflow: visible; }
 #groupFormModal .record-autocomplete-options { max-height: 194px; overflow-y: auto; }
 #groupFormModal .record-autocomplete-option { min-height: 64px; }
-.elective-tabs { margin-bottom: 20px; }
 .elective-empty { padding: 36px 24px; text-align: center; border: 1px dashed #cbdcf4; border-radius: 10px; background: #fafcff; color: #64748b; }
 .elective-empty i { font-size: var(--csms-icon-xl, 28px); color: #2563eb; margin-bottom: 16px; }
 .elective-empty h2 { font-size: 15px; margin: 0 0 8px; }
 .elective-empty p { margin: 0; }
 .elective-empty button { margin-top: 16px; }
-.elective-filters { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
-.elective-filters input, .elective-filters select { padding: 10px 12px; border: 1px solid #dce4ef; border-radius: 8px; background: white; color: #475569; font: inherit; min-width: 140px; }
-.elective-filters input { flex: 1; max-width: 420px; }
 .elective-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
 .elective-card { background: #fff; border: 1px solid #e0e7f1; border-radius: 10px; padding: 18px; min-width: 0; box-shadow: 0 5px 20px #1e3a5f06; }
 .elective-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
@@ -37,4 +33,10 @@
 .elective-warning { padding: 14px; border: 1px solid #efcf87; background: #fffbeb; border-radius: 8px; margin-top: 12px; }
 #groupFormModal .modal-dialog, #viewGroupModal .modal-dialog { max-width: 700px; }
 #groupFormModal .modal-dialog, #viewGroupModal .modal-dialog { max-height: min(90vh, 850px); overflow-y: auto; }
-@media(max-width:750px) { .elective-grid,.elective-review-grid { grid-template-columns: 1fr; } .elective-issue { flex-direction: column; align-items: flex-start; } .elective-filters > * { flex: 1; } }
+@media(max-width:750px) { .elective-grid,.elective-review-grid { grid-template-columns: 1fr; } .elective-issue { flex-direction: column; align-items: flex-start; } }
+
+/* Slice 1: shared chrome (tabs, filter row, panel) as on Subject Mapping */
+.electives-content .mapping-context-bar + .csms-tabs { margin-top: 16px; }
+.electives-content > .mapping-workspace-shell > .csms-panel { padding-top: 17px; }
+.electives-content > .mapping-workspace-shell > .csms-empty { margin-top: 17px; }
+.mapping-workspace-header .csms-chip { align-self: center; }

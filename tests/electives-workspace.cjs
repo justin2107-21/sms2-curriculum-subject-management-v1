@@ -10,12 +10,12 @@ const root=el('electivesWorkspace');root.dataset={groupApi:'/electives',canManag
 const form=el('groupForm');form.elements=Object.fromEntries(['group_name','year_level','semester','required_selections','status'].map(k=>[k,el(k)]));
 const requests=[],writes=[],modals={},selectors=[];let cascade,selected=false,response,pending;
 const esc=s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
-const ui={...require('./search-ranking.cjs'),escapeHtml:esc,formatUnits:v=>v,statusBadge:s=>esc(s),showToast(){},showFormError:(f,m)=>f.error=m,clearFormError:f=>f.error='',setFormSubmitting(){},
+const ui={...require('./search-ranking.cjs'),debounce:fn=>fn,escapeHtml:esc,formatUnits:v=>v,statusBadge:s=>esc(s),showToast(){},showFormError:(f,m)=>f.error=m,clearFormError:f=>f.error='',setFormSubmitting(){},
  createModal:element=>{if(!element)return null;return modals[element.id]={open(){element.hidden=false;},close(){element.hidden=true;}};},
  createCascadingAutocomplete:config=>{cascade=config;return{hasSelection:()=>selected};},createAutocomplete:config=>{selectors.push(config);return{clear(){}};},
  fetchJson:async(api,args)=>{requests.push(args);if(pending)return await pending;return response;},postForm:async(api,data)=>{writes.push(data);return{success:true};}};
 class Data{constructor(f){this.values={};if(f)Object.entries(f.elements).forEach(([k,e])=>this.set(k,e.value));}set(k,v){this.values[k]=v;}append(k,v){(this.values[k]??=[]).push(v);}}
-vm.runInNewContext(fs.readFileSync('modules/curriculum/assets/electives-manager.js','utf8'),{document:{getElementById:el,querySelector:()=>el('tabs')},window:{CurriculumUI:ui},FormData:Data,URLSearchParams,console});
+vm.runInNewContext(fs.readFileSync('modules/curriculum/assets/electives-manager.js','utf8'),{document:{getElementById:el,querySelector:()=>el('tabs')},window:{CurriculumUI:ui,CurriculumPlacementView:{yearLabel:v=>v==='3rd'?'3rd Year':v}},FormData:Data,URLSearchParams,console});
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 const s=(id,year='3rd Year')=>({subject_id:id,subject_status:'active',subject_code:'S'+id,subject_title:id===1?'<script>unsafe</script>':'Subject '+id,units:3,year_level:year,semester:'2nd Semester'});
 const base={groups:[{id:10,group_name:'<b>Group</b>',status:'active',year_level:'3rd Year',semester:'2nd Semester',required_selections:1,members:[s(1),s(2)]}],placements:[s(1),s(2),s(3,'4th Year')],years:['3rd Year','4th Year'],terms:['2nd Semester'],prerequisites:[{subject_id:2,subject_code:'S1',subject_title:'Prior'}],review:{counts:{empty:0,selection:0,duplicate:0,mismatch:0,unmapped:0,inactive:0},issues:[]}};
@@ -26,8 +26,12 @@ const base={groups:[{id:10,group_name:'<b>Group</b>',status:'active',year_level:
  assert.equal(requests[0].program_id,'1');assert.equal(requests[0].curriculum_version_id,'3');assert.equal(el('createElectiveGroupButton').disabled,false);
  assert.match(el('groupCards').innerHTML,/&lt;b>Group/);assert.doesNotMatch(el('groupCards').innerHTML,/<script>/);assert.match(el('reviewIssues').innerHTML,/No elective configuration issues detected/);
  el('reviewTab').handlers.click();assert.equal(el('reviewPanel').hidden,false);assert.equal(el('groupsPanel').hidden,true);
- el('groupsTab').handlers.click();el('groupSearch').value='not present';el('groupSearch').handlers.input();assert.match(el('groupCards').innerHTML,/No elective groups match/);el('groupSearch').value='';el('groupSearch').handlers.input();
- const click=(kind,id)=>root.handlers.click({target:{closest:selector=>selector==='[data-create-group]'?null:({dataset:{[kind]:String(id)}})}});
+ el('groupsTab').handlers.click();el('groupSearch').value='not present';el('groupSearch').handlers.input();assert.match(el('groupCards').innerHTML,/No groups match these filters/);assert.match(el('groupCards').innerHTML,/data-clear-filters/);assert.match(el('groupSummary').innerHTML,/<strong>0<\/strong> groups/);
+ root.handlers.click({target:{closest:selector=>selector==='[data-clear-filters]'?{}:null}});assert.equal(el('groupSearch').value,'');assert.match(el('groupSummary').innerHTML,/<strong>1<\/strong> group /);assert.match(el('groupSummary').innerHTML,/<strong>2<\/strong> pool subjects/);
+ el('groupSearch').value='subject 2';el('groupSearch').handlers.input();assert.match(el('groupCards').innerHTML,/&lt;b>Group/,'search also matches pool subjects');
+ el('groupSearch').value='zzz';el('groupSearch').handlers.input();assert.match(el('groupCards').innerHTML,/No groups match/);el('groupSearch').handlers.keydown({key:'Escape'});assert.equal(el('groupSearch').value,'');assert.match(el('groupCards').innerHTML,/elective-grid/);
+ assert.equal(el('statusFilter').value,'');el('groupSearch').value='';el('groupSearch').handlers.input();
+ const click=(kind,id)=>root.handlers.click({target:{closest:selector=>['[data-create-group]','[data-clear-filters]'].includes(selector)?null:({dataset:{[kind]:String(id)}})}});
  click('view',10);assert.match(el('viewGroupBody').innerHTML,/Prerequisite: S1/);assert.equal((el('viewGroupBody').innerHTML.match(/prerequisite_configuration.php/g)||[]).length,1);assert.match(el('viewGroupBody').innerHTML,/Manage in Pre-requisite Configuration/);
  el('createElectiveGroupButton').handlers.click();assert.equal(el('groupFormTitle').textContent,'Create Elective Group');
  form.elements.year_level.value='3rd Year';form.elements.semester.value='2nd Semester';form.elements.group_name.value='New';form.elements.status.value='active';

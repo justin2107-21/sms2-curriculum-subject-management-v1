@@ -13,6 +13,9 @@
     const context = () => ({program_id:$('programId').value,curriculum_id:$('curriculumId').value,curriculum_version_id:$('versionId').value});
     const link = (page, subject) => page + '?' + new URLSearchParams({...context(),version_id:$('versionId').value,...(subject ? {subject_id:subject} : {})});
     const option = (value, label) => '<option value="'+esc(value)+'">'+esc(label ?? value)+'</option>';
+    const yearText = v => window.CurriculumPlacementView?.yearLabel ? window.CurriculumPlacementView.yearLabel(v) : v;
+    const stateBox = (title, text, icon = 'fa-bullseye') => { $('electiveState').innerHTML = '<i class="fa-solid ' + icon + '" aria-hidden="true"></i><strong>' + esc(title) + '</strong>' + (text ? '<span>' + esc(text) + '</span>' : ''); };
+    const plural = (n, one, many) => '<strong>' + n + '</strong> ' + (n === 1 ? one : many);
     const placement = s => [s.year_level || 'Unset year',s.semester || 'Unset semester'].join(' / ');
     const cascade = ui.createCascadingAutocomplete({levels:['program','curriculum','version'].map((key,index) => ({
         input:$(key+'Search'),valueInput:$(key+'Id'),list:$(key+'Options'),minimumLength:0,showSuggestionsOnFocus:true,showSuggestionsOnEnable:true,
@@ -29,19 +32,19 @@
     }});
     async function load() {
         const ticket=++state.request;
-        $('electiveState').hidden=false; $('electiveState').textContent='Loading elective groups…';
+        $('electiveState').hidden=false; stateBox('Loading elective groups…','','fa-spinner');
         $('groupsPanel').hidden=true; $('reviewPanel').hidden=true;
         try {
             const data=await ui.fetchJson(api,{action:'workspace',...context()});
             if (ticket!==state.request) return;
             state.data=data;
-            $('yearFilter').innerHTML=option('','Year / Grade')+data.years.map(v=>option(v)).join('');
-            $('termFilter').innerHTML=option('','Semester / Term')+data.terms.map(v=>option(v)).join('');
+            $('yearFilter').innerHTML=option('','All Years')+data.years.map(v=>option(v,yearText(v))).join('');
+            $('termFilter').innerHTML=option('','All Semesters')+data.terms.map(v=>option(v)).join('');
             if ($('createElectiveGroupButton')) $('createElectiveGroupButton').disabled=false;
             render();
         } catch(error) {
             if(ticket!==state.request) return;
-            state.data=null; $('electiveState').textContent=error.message;
+            state.data=null; $('electiveState').hidden=false; stateBox(error.message,'','fa-triangle-exclamation');
             if ($('createElectiveGroupButton')) $('createElectiveGroupButton').disabled=true;
         }
     }
@@ -57,17 +60,24 @@
             '</div>'+(removable?'<button type="button" class="button-muted" data-remove="'+Number(subject.subject_id)+'" aria-label="Remove '+esc(subject.subject_code)+'">Remove</button>':'')+'</div>';
     }
     const rule = g => '<div class="elective-rule"><strong>Choose '+Number(g.required_selections)+'</strong> of '+g.members.length+' available subjects</div>'+(g.members.length >= 2 && Number(g.required_selections)===g.members.length?'<p class="elective-rule-warning">All available subjects are currently required. This group does not provide an alternative choice.</p>':'');
+    function emptyGroups() {
+        if (state.data.groups.length) return '<div class="csms-empty"><i class="fa-solid fa-filter" aria-hidden="true"></i><strong>No groups match these filters</strong><button type="button" class="secondary-action-button" data-clear-filters>Clear filters</button></div>';
+        return '<div class="csms-empty"><i class="fa-solid fa-layer-group" aria-hidden="true"></i><strong>No elective groups yet</strong><span>Create a group when this curriculum contains alternative subject choices.</span>'+(canManage?'<button type="button" class="primary-action-button" data-create-group>Create elective group</button>':'<span>Ask someone who can manage electives to create one.</span>')+'</div>';
+    }
     function render() {
         const ready=!!state.data;
         $('electiveState').hidden=ready;
         $('groupsPanel').hidden=!ready || state.tab!=='groups'; $('reviewPanel').hidden=!ready || state.tab!=='review';
         if(!ready) {
             $('groupCards').innerHTML=''; $('reviewCounters').innerHTML=''; $('reviewIssues').innerHTML='';
-            $('electiveState').innerHTML='<i class="fa-solid fa-bullseye" aria-hidden="true"></i><h2>Select a Program, Curriculum, and Version</h2><p>Select context to view elective groups.</p>';
+            stateBox('Select a Program, Curriculum, and Version','Select context to view elective groups.');
+            $('groupSummary').innerHTML='';
             return;
         }
-        const groups=ui.searchRecords(state.data.groups,$('groupSearch').value,g=>[g.group_name]).filter(g=> (!$('yearFilter').value || g.year_level===$('yearFilter').value) && (!$('termFilter').value || g.semester===$('termFilter').value) && (!$('statusFilter').value ? g.status!=='archived' : g.status===$('statusFilter').value));
-        $('groupCards').innerHTML=groups.length?groups.map(g=>'<article class="elective-card"><h2>'+esc(g.group_name)+'</h2><div class="elective-card-top"><span class="elective-placement">'+esc(placement(g))+'</span>'+ui.statusBadge(g.status)+'</div>'+rule(g)+'<p class="elective-label">Available Subjects</p>'+g.members.map(s=>subjectMarkup(s)).join('')+'<div class="elective-card-actions"><button class="button-muted" data-view="'+Number(g.id)+'">View</button>'+(canManage&&g.status!=='archived'?'<button class="button-muted" data-edit="'+Number(g.id)+'">Edit</button><button class="button-muted" data-archive="'+Number(g.id)+'">Archive</button>':'')+'</div></article>').join(''):'<div class="elective-empty"><h2>'+(state.data.groups.length?'No elective groups match these filters.':'No elective groups yet.')+'</h2>'+(state.data.groups.length?'':'<p>Create a group when this curriculum contains alternative subject choices.</p>'+(canManage?'<button class="button-primary" data-create-group>Create Elective Group</button>':''))+'</div>';
+        const groups=ui.searchRecords(state.data.groups,$('groupSearch').value,g=>[g.group_name,...g.members.flatMap(m=>[m.subject_code,m.subject_title])]).filter(g=> (!$('yearFilter').value || g.year_level===$('yearFilter').value) && (!$('termFilter').value || g.semester===$('termFilter').value) && (!$('statusFilter').value ? g.status!=='archived' : g.status===$('statusFilter').value));
+        const pools=new Set(groups.flatMap(g=>g.members.map(m=>Number(m.subject_id))));
+        $('groupSummary').innerHTML=plural(groups.length,'group','groups')+' · '+plural(pools.size,'pool subject','pool subjects');
+        $('groupCards').innerHTML=groups.length?'<div class="elective-grid">'+groups.map(g=>'<article class="elective-card"><h2>'+esc(g.group_name)+'</h2><div class="elective-card-top"><span class="elective-placement">'+esc(placement(g))+'</span>'+ui.statusBadge(g.status)+'</div>'+rule(g)+'<p class="elective-label">Available Subjects</p>'+g.members.map(s=>subjectMarkup(s)).join('')+'<div class="elective-card-actions"><button class="button-muted" data-view="'+Number(g.id)+'">View</button>'+(canManage&&g.status!=='archived'?'<button class="button-muted" data-edit="'+Number(g.id)+'">Edit</button><button class="button-muted" data-archive="'+Number(g.id)+'">Archive</button>':'')+'</div></article>').join('')+'</div>':emptyGroups();
         const review=state.data.review;
         $('reviewCounters').innerHTML=Object.entries(labels).map(([key,label])=>'<div class="elective-counter">'+label+'<strong>'+Number(review.counts[key])+'</strong><small>'+(review.counts[key]?'Issues found':'No issues found')+'</small></div>').join('');
         $('reviewIssues').innerHTML=review.issues.length?'<section class="elective-card"><p class="elective-placement">Review required</p><h2>Elective group issues</h2>'+review.issues.map(issue=>{
@@ -125,14 +135,17 @@
     function requestArchive(g) { if(!canManage || state.busy) return;view.close();state.selected=g;$('archiveGroupName').textContent=g.group_name;ui.clearFormError($('archiveGroupModal'));archive.open(); }
     root.addEventListener('click',event=>{
         if(event.target.closest('[data-create-group]')) { openEdit(); return; }
+        if(event.target.closest('[data-clear-filters]')) { ['groupSearch','yearFilter','termFilter','statusFilter'].forEach(id => { $(id).value=''; }); render(); return; }
         const button=event.target.closest('[data-view],[data-edit],[data-archive]'); if(!button || !state.data) return;
         const kind=['view','edit','archive'].find(key=>button.dataset[key]);
         const g=state.data.groups.find(item=>Number(item.id)===Number(button.dataset[kind]));if(!g)return;
         if(kind==='view')openView(g);else if(kind==='edit')openEdit(g);else requestArchive(g);
     });
     ['groups','review'].forEach(key=>$(key+'Tab').addEventListener('click',()=>setTab(key)));
-    document.querySelector('.elective-tabs').addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();setTab(event.key==='Home'?'groups':event.key==='End'?'review':state.tab==='groups'?'review':'groups');$(state.tab+'Tab').focus();});
-    ['groupSearch','yearFilter','termFilter','statusFilter'].forEach(id=>$(id).addEventListener(id==='groupSearch'?'input':'change',render));
+    document.querySelector('.csms-tabs').addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();setTab(event.key==='Home'?'groups':event.key==='End'?'review':state.tab==='groups'?'review':'groups');$(state.tab+'Tab').focus();});
+    $('groupSearch').addEventListener('keydown',e=>{if(e.key==='Escape'&&$('groupSearch').value){$('groupSearch').value='';render();}});
+    $('groupSearch').addEventListener('input',ui.debounce?ui.debounce(render,150):render);
+    ['yearFilter','termFilter','statusFilter'].forEach(id=>$(id).addEventListener('change',render));
     $('createElectiveGroupButton')?.addEventListener('click',()=>openEdit());
     $('viewEdit')?.addEventListener('click',()=>openEdit(state.selected));
     $('viewArchive')?.addEventListener('click',()=>requestArchive(state.selected));

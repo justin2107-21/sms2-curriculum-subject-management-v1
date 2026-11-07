@@ -47,6 +47,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
     <div class="mapping-workspace-header">
       <div><h1 class="page-title">Electives Manager</h1><p class="page-subtitle">Manage elective subject groups within curriculum versions.</p></div>
       <?php if ($canManageElectives): ?><button class="primary-action-button" id="createElectiveGroupButton" disabled><i class="fa-solid fa-plus" aria-hidden="true"></i> Create Elective Group</button><?php endif; ?>
+      <?php if (!$canManageElectives): ?><span class="csms-chip csms-chip--draft" id="readOnlyBadge">Read-only for your role</span><?php endif; ?>
     </div>
     <section class="mapping-workspace-shell">
     <section class="mapping-context-bar elective-context" aria-label="Curriculum context">
@@ -60,21 +61,23 @@ require __DIR__ . '/../../../shared/sidebar.php';
       <?php if ($key !== 'version'): ?><span class="mapping-context-separator" aria-hidden="true"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span><?php endif; ?>
       <?php endforeach; ?>
     </section>
-    <div class="elective-tabs" role="tablist" aria-label="Electives Manager">
-      <button id="groupsTab" role="tab" aria-selected="true" aria-controls="groupsPanel">Elective Groups</button>
-      <button id="reviewTab" role="tab" aria-selected="false" aria-controls="reviewPanel" tabindex="-1">Validation Review</button>
-    </div>
-    <div id="electiveState" class="elective-empty" role="status"><i class="fa-solid fa-bullseye" aria-hidden="true"></i><h2>Select a Program, Curriculum, and Version</h2><p>Select context to view elective groups.</p></div>
-    <section id="groupsPanel" role="tabpanel" aria-labelledby="groupsTab" hidden>
-      <div class="elective-filters">
-        <input type="search" id="groupSearch" placeholder="Search elective group…" aria-label="Search elective group"/>
-        <select id="yearFilter" aria-label="Year / Grade"><option value="">Year / Grade</option></select>
-        <select id="termFilter" aria-label="Semester / Term"><option value="">Semester / Term</option></select>
-        <select id="statusFilter" aria-label="Status"><option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="archived">Archived</option></select>
+    <nav class="csms-tabs" role="tablist" aria-label="Electives Manager">
+      <button type="button" id="groupsTab" role="tab" aria-selected="true" aria-controls="groupsPanel">Elective Groups</button>
+      <button type="button" id="reviewTab" role="tab" aria-selected="false" aria-controls="reviewPanel" tabindex="-1">Validation Review</button>
+    </nav>
+    <div id="electiveState" class="csms-empty" role="status"><i class="fa-solid fa-bullseye" aria-hidden="true"></i><strong>Select a Program, Curriculum, and Version</strong><span>Select context to view elective groups.</span></div>
+    <section id="groupsPanel" class="csms-panel" role="tabpanel" aria-labelledby="groupsTab" hidden>
+      <div class="csms-filter-row">
+        <label class="csms-search"><span class="sr-only">Search elective groups</span><input type="search" id="groupSearch" maxlength="100" placeholder="Search group name or subject"/></label>
+        <select class="csms-select" id="yearFilter" aria-label="Year or grade"><option value="">All Years</option></select>
+        <select class="csms-select" id="termFilter" aria-label="Semester"><option value="">All Semesters</option></select>
+        <select class="csms-select" id="statusFilter" aria-label="Status"><option value="">Active and inactive</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="archived">Archived</option></select>
+        <span class="csms-filter-row__summary" id="groupSummary" role="status"></span>
+        <span class="csms-info"><button type="button" class="csms-info__btn" aria-label="About this page" aria-describedby="electiveInfoTip"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button><span class="csms-info__tip" role="tooltip" id="electiveInfoTip">College curricula only: Senior High School elective categories are not supported here. Unit targets for electives are checked by the Compliance Validator, not on this page.</span></span>
       </div>
-      <div id="groupCards" class="elective-grid"></div>
+      <div id="groupCards"></div>
     </section>
-    <section id="reviewPanel" role="tabpanel" aria-labelledby="reviewTab" hidden><div id="reviewCounters" class="elective-review-grid"></div><div id="reviewIssues"></div></section>
+    <section id="reviewPanel" class="csms-panel" role="tabpanel" aria-labelledby="reviewTab" hidden><div id="reviewCounters" class="elective-review-grid"></div><div id="reviewIssues"></div></section>
     </section>
   </main>
   <div class="footer">Bestlink College of the Philippines &middot; CSMS-SMS2 &copy; 2026</div>
@@ -119,5 +122,6 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <?php endif; ?>
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 <script src="../assets/curriculum-common.js?v=<?= $curriculumCommonVersion ?>"></script>
+<script src="../assets/placement-groups.js?v=<?= (int)filemtime(__DIR__ . '/../assets/placement-groups.js') ?>"></script>
 <script src="../assets/electives-manager.js?v=<?= $electiveScriptVersion ?>"></script>
 </body></html>
