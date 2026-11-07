@@ -69,12 +69,6 @@
         ['groups','review'].forEach(key=>{ const active=key===tab; $(key+'Tab').setAttribute('aria-selected',String(active));$(key+'Tab').tabIndex=active?0:-1; });
         render();
     }
-    function subjectMarkup(subject, details=false, removable=false) {
-        const prerequisites=(state.data?.prerequisites || []).filter(p=>Number(p.subject_id)===Number(subject.subject_id));
-        return '<div class="elective-subject"><strong>'+esc(subject.subject_code || 'Missing subject')+'</strong><div><b>'+esc(subject.subject_title || '')+'</b><small>'+esc(ui.formatUnits(subject.units))+' Units'+(details?' · '+esc(placement(subject)):'')+'</small>'+
-            (details && prerequisites.length ? '<small>Prerequisite: '+prerequisites.map(p=>esc(p.subject_code)).join(', ')+'</small>' : '')+
-            '</div>'+(removable?'<button type="button" class="button-muted" data-remove="'+Number(subject.subject_id)+'" aria-label="Remove '+esc(subject.subject_code)+'">Remove</button>':'')+'</div>';
-    }
     const rule = g => '<div class="elective-rule"><strong>Choose '+Number(g.required_selections)+'</strong> of '+g.members.length+' available subjects</div>'+(g.members.length >= 2 && Number(g.required_selections)===g.members.length?'<p class="elective-rule-warning">All available subjects are currently required. This group does not provide an alternative choice.</p>':'');
     // Groups by Year / Semester; a group with no term goes last. The warning icon opens that group's issues.
     function checkData() {
@@ -205,15 +199,21 @@
     }
     function renderMembers() {
         $('subjectSearch').disabled=!form.elements.year_level.value || !form.elements.semester.value;
-        $('selectedSubjects').innerHTML=state.members.length?'<p class="elective-selected-count">Selected subjects ('+state.members.length+')</p>'+state.members.map(s=>subjectMarkup(s,true,true)).join(''):'';
+        // Pool: removable chips (one tab stop each) and a compact table with the units.
+        $('selectedSubjects').innerHTML=state.members.length?'<ul class="elective-chips" aria-label="Subjects in the pool">'+state.members.map(s=>'<li class="elective-chip"><span>'+esc(s.subject_code||'')+'</span><button type="button" data-remove="'+Number(s.subject_id)+'" aria-label="Remove '+esc(s.subject_code||'subject')+' from the pool"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></li>').join('')+'</ul>'+
+            '<div class="csms-table-scroll"><table class="csms-ctable elective-pool"><thead><tr><th class="csms-ctable__code" scope="col">Code</th><th scope="col">Subject</th><th class="csms-ctable__num" scope="col">Units</th></tr></thead><tbody>'+state.members.map(s=>'<tr><td class="csms-ctable__code">'+esc(s.subject_code||'')+'</td><td>'+esc(s.subject_title||'')+'</td><td class="csms-ctable__num">'+esc(ui.formatUnits(s.units))+'</td></tr>').join('')+'</tbody></table></div>':'';
         form.elements.required_selections.max=String(Math.max(1,state.members.length));
+        const wanted=Number(form.elements.required_selections.value), size=state.members.length, message=$('poolMessage');
+        message.hidden=false;
+        message.className='elective-pool-message'+(size<2||wanted>size?' is-warning':'');
+        message.textContent=size<2?(size?'Add at least one more subject: a group needs two or more.':'Add at least two subjects to form a group.'):wanted>size?'The pool has '+size+' subjects but students must choose '+wanted+'. Add subjects or lower the number to choose.':'Pool: '+size+' subjects · '+ui.formatUnits(unitsOf(state.members))+' units. Students choose '+wanted+'.';
         $('allRequiredWarning').hidden=state.members.length<2 || Number(form.elements.required_selections.value)!==state.members.length;
         const year=form.elements.year_level.value,term=form.elements.semester.value;
         const mismatch=state.members.find(s=>s.year_level!==year || s.semester!==term || !s.year_level || !s.semester);
         $('placementWarning').hidden=!mismatch || !year || !term;
         if(mismatch) {
             $('placementWarningText').textContent=(mismatch.subject_code || 'Subject')+' is currently placed in '+placement(mismatch)+' but this elective group is configured for '+year+' / '+term+'.';
-            $('mappingLink').href=link('subject_mapping.php',mismatch.subject_id);
+            $('mappingLink').href=link('curriculum_builder.php');
         }
         form.querySelector('[type="submit"]').disabled=!!mismatch || state.members.length<2;
     }
@@ -258,7 +258,7 @@
         Object.entries(context()).forEach(([key,value])=>data.set(key,value));state.members.forEach(s=>data.append('subject_ids[]',s.subject_id));
         state.busy=true;ui.setFormSubmitting(form,true);ui.clearFormError(form);
         try {await ui.postForm(api,data);editor.close();ui.showToast('Elective group saved.');await load();}
-        catch(error){ui.showFormError(form,error.message);}
+        catch(error){ui.showFormError(form,error.message);form.querySelector('.form-error')?.scrollIntoView?.({block:'nearest'});}
         finally{state.busy=false;ui.setFormSubmitting(form,false);if(!$('groupFormModal').hidden)renderMembers();}
     });
     $('confirmArchive')?.addEventListener('click',async()=>{

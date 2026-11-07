@@ -14,7 +14,7 @@ const esc=s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replac
 const ui={...require('./search-ranking.cjs'),debounce:fn=>fn,escapeHtml:esc,formatUnits:v=>v,statusBadge:s=>esc(s),showToast(){},showFormError:(f,m)=>f.error=m,clearFormError:f=>f.error='',setFormSubmitting(){},
  createModal:element=>{if(!element)return null;return modals[element.id]={open(){element.hidden=false;},close(){element.hidden=true;}};},
  createCascadingAutocomplete:config=>{cascade=config;return{hasSelection:()=>selected};},createAutocomplete:config=>{selectors.push(config);return{clear(){}};},
- fetchJson:async(api,args)=>{requests.push(args);if(pending)return await pending;return response;},postForm:async(api,data)=>{writes.push(data);return{success:true};}};
+ fetchJson:async(api,args)=>{requests.push(args);if(pending)return await pending;return response;},postForm:async(api,data)=>{if(globalThis.failNext){globalThis.failNext=false;throw new Error('Refused by server');}writes.push(data);return{success:true};}};
 class Data{constructor(f){this.values={};if(f)Object.entries(f.elements).forEach(([k,e])=>this.set(k,e.value));}set(k,v){this.values[k]=v;}append(k,v){(this.values[k]??=[]).push(v);}}
 const win={CurriculumUI:ui,CurriculumPlacementView:{yearLabel:v=>v==='3rd'?'3rd Year':v}};
 vm.runInNewContext(fs.readFileSync('js/csms-menu.js','utf8'),{window:win,console});
@@ -57,11 +57,14 @@ const base={groups:[{id:10,group_name:'<b>Group</b>',status:'active',year_level:
  base.placements.push({...s(4),subject_status:'inactive'});assert.equal((await autocomplete.search('S4')).length,0,'Inactive excluded');
  form.elements.semester.value='';assert.equal((await autocomplete.search('')).length,0,'Placement required');form.elements.semester.value='2nd Semester';
  autocomplete.onSelect(s(1));assert.equal((el('selectedSubjects').innerHTML.match(/data-remove=/g)||[]).length,1);
- autocomplete.onSelect(s(3,'4th Year'));assert.equal(el('placementWarning').hidden,false);assert.match(el('mappingLink').href,/subject_mapping.php\?program_id=1&curriculum_id=2&curriculum_version_id=3&version_id=3&subject_id=3/);
+ {const html=el('selectedSubjects').innerHTML;assert.match(html,/elective-chip/);assert.match(html,/<th class="csms-ctable__code" scope="col">Code<\/th>/);assert.match(html,/csms-ctable__num">3</);assert.match(html,/&lt;script>unsafe/);assert.doesNotMatch(html,/<script>/);assert.match(el('poolMessage').textContent,/at least one more/);assert.match(el('poolMessage').className,/is-warning/);}
+ autocomplete.onSelect(s(3,'4th Year'));assert.equal(el('placementWarning').hidden,false);assert.match(el('mappingLink').href,/^curriculum_builder.php\?program_id=1&curriculum_id=2&curriculum_version_id=3&version_id=3$/);
  el('selectedSubjects').handlers.click({target:{closest:()=>({dataset:{remove:'3'}})}});assert.equal(el('placementWarning').hidden,true);
  form.elements.required_selections.value='2';await form.handlers.submit({preventDefault(){}});assert.match(form.error,/at least two/);assert.equal(writes.length,0);
- autocomplete.onSelect(s(2));form.elements.required_selections.value='2';form.elements.required_selections.handlers.input();assert.equal(el('allRequiredWarning').hidden,false);
- form.elements.required_selections.value='1';await form.handlers.submit({preventDefault(){}});assert.equal(writes[0].values.action,'create');assert.deepEqual(writes[0].values['subject_ids[]'],[1,2]);assert.equal(writes[0].values.program_id,'1');
+ autocomplete.onSelect(s(2));form.elements.required_selections.value='2';form.elements.required_selections.handlers.input();assert.equal(el('allRequiredWarning').hidden,false);assert.doesNotMatch(el('poolMessage').className,/is-warning/);assert.match(el('poolMessage').textContent,/2 subjects · 6 units\. Students choose 2/);
+ form.elements.required_selections.value='3';form.elements.required_selections.handlers.input();assert.match(el('poolMessage').textContent,/pool has 2 subjects but students must choose 3/);assert.match(el('poolMessage').className,/is-warning/);form.elements.required_selections.value='2';form.elements.required_selections.handlers.input();
+ form.elements.required_selections.value='1';globalThis.failNext=true;await form.handlers.submit({preventDefault(){}});assert.equal(form.error,'Refused by server','Server refusal is shown inside the dialog');assert.equal(el('groupFormModal').hidden,false,'The dialog stays open');assert.equal(writes.length,0);
+ await form.handlers.submit({preventDefault(){}});assert.equal(writes[0].values.action,'create');assert.deepEqual(writes[0].values['subject_ids[]'],[1,2]);assert.equal(writes[0].values.program_id,'1');
  click('edit',10);assert.equal(form.elements.group_name.value,'<b>Group</b>');assert.equal(form.elements.required_selections.value,1);
  click('archive',10);assert.equal(writes.length,1);assert.equal(el('archiveGroupModal').hidden,false);await el('confirmArchive').handlers.click();assert.equal(writes[1].values.action,'archive');assert.equal(writes[1].values.id,10);
  // A stale response cannot resurrect cards after a context reset.

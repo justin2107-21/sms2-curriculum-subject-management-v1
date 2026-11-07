@@ -100,21 +100,22 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <?php if ($canManageElectives): ?>
 <div class="curriculum-modal" id="groupFormModal" hidden><div class="modal-backdrop" data-modal-close></div>
   <section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="groupFormTitle">
-    <div class="modal-header"><div><h2 id="groupFormTitle">Create Elective Group</h2><p class="modal-context">Define alternative subject choices for this curriculum version.</p></div><button class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
+    <div class="modal-header"><div><h2 id="groupFormTitle">Create Elective Group</h2><p class="modal-context">Students choose some of the subjects in the pool. All pool subjects must be placed in the group's term.</p></div><button class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
     <form id="groupForm" class="domain-form">
       <div class="form-error" role="alert" hidden></div>
       <div class="form-grid">
         <label class="form-field form-field-wide"><span>Group Name *</span><input name="group_name" maxlength="150" placeholder="Professional Elective 1" required/></label>
         <label class="form-field"><span>Year / Grade Level *</span><select name="year_level" required></select></label>
         <label class="form-field"><span>Semester / Term *</span><select name="semester" required></select></label>
-        <label class="form-field"><span>Number of Subjects to Choose *</span><input type="number" name="required_selections" min="1" step="1" value="1" required/><small>How many subjects must be selected from this elective group?</small></label>
+        <label class="form-field"><span>Subjects to Choose *</span><input type="number" name="required_selections" min="1" step="1" value="1" required/><small>How many pool subjects a student takes.</small></label>
         <label class="form-field"><span>Status *</span><select name="status" required><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
-        <div class="form-field form-field-wide"><label for="subjectSearch">Available Subjects for This Placement *</label><small>Only subjects mapped to the selected curriculum version and academic placement are shown.</small>
-          <div class="record-autocomplete"><input type="search" id="subjectSearch" placeholder="Search mapped subject code or title" autocomplete="off"/><input type="hidden" id="subjectId"/><div class="record-autocomplete-options" id="subjectOptions" role="listbox" aria-label="Eligible subject suggestions" hidden></div></div>
+        <div class="form-field form-field-wide elective-pool-field"><label for="subjectSearch">Subject pool *</label><small>Only active subjects placed in the selected year and semester are listed.</small>
+          <div class="record-autocomplete"><input type="search" id="subjectSearch" placeholder="Search subject code or title" autocomplete="off"/><input type="hidden" id="subjectId"/><button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear subject search" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button><div class="record-autocomplete-options" id="subjectOptions" role="listbox" aria-label="Eligible subject suggestions" hidden></div></div>
+          <p id="poolMessage" class="elective-pool-message" role="status" hidden></p>
           <div id="selectedSubjects"></div>
         </div>
       </div>
-      <div id="placementWarning" class="elective-warning" hidden><strong>Placement mismatch</strong><p id="placementWarningText"></p><button type="button" class="button-muted" id="cancelPlacement">Cancel</button> <a id="mappingLink" class="button-muted">Open Subject Mapping</a></div>
+      <div id="placementWarning" class="elective-warning" hidden><strong>Placement mismatch</strong><p id="placementWarningText"></p><button type="button" class="button-muted" id="cancelPlacement">Cancel</button> <a id="mappingLink" class="button-muted">Open Curriculum Builder</a></div>
       <div id="allRequiredWarning" class="elective-warning" role="status" hidden>All available subjects are currently required. This group does not provide an alternative choice.</div>
       <div class="modal-actions"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="submit" class="button-primary">Save Elective Group</button></div>
     </form>
