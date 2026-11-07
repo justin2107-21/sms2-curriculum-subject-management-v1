@@ -294,8 +294,7 @@ a.sidebar-item > i {
 .history-change-badge,
 .history-placement-badge,
 .history-program-type,
-.assignment-usage-badge,
-.elective-subject-count {
+.assignment-usage-badge {
   font-family: inherit;
   font-size: .75rem;
 }
@@ -316,9 +315,6 @@ a.sidebar-item > i {
 .requirement-placement-context,
 .requirement-placement-context span,
 .requirement-form-grid small,
-.elective-description,
-.elective-context-stack span,
-.elective-empty-note,
 .assignment-program-context span,
 .assignment-program-type,
 .assignment-dependency-warning,

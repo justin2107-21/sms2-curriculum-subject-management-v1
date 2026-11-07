@@ -10,7 +10,7 @@
   // (the dashboard announces updates through its own status line).
 
   const ALERTS = '.form-error, .error-state, .is-error, .dashboard-error, .record-autocomplete-state.error';
-  const STATUSES = '.state-cell, .mapping-state, .pr-empty, .empty-cell, .elective-empty, .export-empty-state, ' +
+  const STATUSES = '.state-cell, .mapping-state, .pr-empty, .empty-cell, .export-empty-state, ' +
     '.equivalency-empty-context, .grade-weighting-empty, .mapping-review-success, .record-autocomplete-state';
   const ALL = ALERTS + ', ' + STATUSES;
 

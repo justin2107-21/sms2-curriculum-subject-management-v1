@@ -106,7 +106,7 @@ body :is(th, td).num {
 body :is(.system-admin-table, .audit-table, .domain-table) th { color: var(--csms-text-secondary, #374151); }
 
 /* ---- Empty and error states: same text size, colour and line height wherever they appear ---- */
-body :is(.state-cell, .mapping-state, .pr-empty, .equivalency-empty-context, .elective-empty p, .grade-weighting-empty p, .export-empty-state p) {
+body :is(.state-cell, .mapping-state, .pr-empty, .equivalency-empty-context, .grade-weighting-empty p, .export-empty-state p) {
   color: var(--csms-text-muted, #4b5563);
   font-size: var(--csms-text-sm, .875rem);
   line-height: 1.5;
@@ -375,11 +375,11 @@ body :is(h1, h2, h3, h4, h5, h6, .page-title, .modal-section-title, .csms-card__
 body :is(.domain-card, .csms-card, .csms-stat, .info-card, .dashboard-card, .settings-card, .system-admin-card, .table-card, .form-card, .summary-card,
   .subject-master-card, .subject-results-card, .subject-filter-panel, .subject-context-panel, .subject-program-card, .subject-semester-card, .subject-form-section,
   .mapping-results-card, .mapping-filter-card, .mapping-review-card, .mapping-subject-card, .mapping-usage-card, .mapping-semester-panel, .mapping-workspace-panel, .mapping-context-bar:not(.has-context-picker),
-  .curriculum-record-card, .semester-panel, .version-card, .nested-section, .elective-card, .export-format-card, .export-scope-card, .export-preview-shell, .export-report-section,
+  .curriculum-record-card, .semester-panel, .version-card, .nested-section, .export-format-card, .export-scope-card, .export-preview-shell, .export-report-section,
   .grade-weighting-context-card, .grade-weighting-subject-card, .grade-weighting-component-card, .assignment-review-card, .assignment-selector-card, .equivalency-selector-card, .equivalency-summary-card,
   .history-summary-card, .archive-summary-card, .pr-panel, .notif-panel, .csms-picker__panel,
   .system-admin-table-wrap, .audit-table-wrap, .activity-table-wrap, .archive-table-wrap,
-  .elective-tabs, .pr-tabs, .export-tabs, .settings-tabs, .mapping-workspace-tabs, .mapping-year-tabs, .subject-year-tabs, .subject-category-tabs, .year-tabs,
+  .pr-tabs, .export-tabs, .settings-tabs, .mapping-workspace-tabs, .mapping-year-tabs, .subject-year-tabs, .subject-category-tabs, .year-tabs,
   .modal-dialog, .archive-dialog) {
   border-radius: var(--csms-radius-surface, 12px);
 }
@@ -460,7 +460,7 @@ body .program-tab__count {
 
 /* One table header and one tab text size (found by the consistency probe). */
 body .main table thead th { font-size: 13px; font-weight: 600; }
-body .main :is(.export-tab, .elective-tabs button, .pr-tabs button, .mapping-workspace-tabs button, .mapping-year-tabs button, .subject-year-tabs button, .subject-category-tabs button) { font-size: 14px; }
+body .main :is(.export-tab, .pr-tabs button, .mapping-workspace-tabs button, .mapping-year-tabs button, .subject-year-tabs button, .subject-category-tabs button) { font-size: 14px; }
 
 /* ---- Context picker, phase 2: read-only summary (UI_Decisions D2) and status chips ---- */
 body .main .csms-ctx.is-summary > :is(.csms-ctx-field, .csms-ctx-sep, .csms-ctx-reset, .csms-ctx-hint) { display: none; }

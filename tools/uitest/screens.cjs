@@ -773,6 +773,16 @@ async function main() {
         await shotView(path.join(out, `${role}-electives-issues-${width}.png`));
         await key('Escape', 'Escape', 27); await sleep(300);
         result.empty = await evaluate(`(() => { const s = document.getElementById('groupSearch'); s.value = 'zzzz-none'; s.dispatchEvent(new Event('input')); return new Promise(r => setTimeout(() => { const o = document.getElementById('groupCards').innerText; s.value = ''; s.dispatchEvent(new Event('input')); r(o); }, 400)); })()`);
+        // Review tab: shared component, all checks expanded.
+        result.review = await evaluate(`(() => { document.getElementById('reviewTab').click(); document.querySelectorAll('#reviewChecks .csms-check__head:not([aria-disabled=true])').forEach(h => h.click()); const heads = [...document.querySelectorAll('#reviewChecks .csms-check')].map(c => c.querySelector('.csms-check__label').firstChild.textContent.trim() + ':' + c.querySelector('.csms-check__count').textContent); return { heads, warning: !!document.querySelector('#reviewChecks .csms-chip--warning'), oldCards: document.querySelectorAll('.elective-counter').length, builderLinks: document.querySelectorAll('#reviewChecks a[href*=curriculum_builder]').length, overflow: document.documentElement.scrollWidth > innerWidth }; })()`);
+        await sleep(300);
+        await shotView(path.join(out, `${role}-electives-review-${width}.png`));
+        // Edit dialog (managers only): pool chips, table and the live message.
+        await evaluate(`document.getElementById('groupsTab').click(); true`);
+        result.editor = await evaluate(`(() => { const g = [...document.querySelectorAll('#groupCards tr[data-row]')].find(r => /Small pool/.test(r.textContent)); if (!g) return null; g.querySelector('.csms-rowmenu').click(); const item = document.querySelector('#electiveRowMenu [data-menu-action=edit]'); if (!item) return 'no-edit-item'; item.click(); const m = document.getElementById('groupFormModal'); return new Promise(r => setTimeout(() => r({ open: !m.hidden, chips: m.querySelectorAll('.elective-chip').length, rows: m.querySelectorAll('.elective-pool tbody tr').length, message: document.getElementById('poolMessage').textContent, warn: document.getElementById('poolMessage').classList.contains('is-warning') }), 300)); })()`);
+        await sleep(300);
+        await shotView(path.join(out, `${role}-electives-editor-${width}.png`));
+        await key('Escape', 'Escape', 27); await sleep(300);
         result.issues = issues.length;
         report.electives[width] = result;
       }

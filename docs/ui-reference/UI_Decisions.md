@@ -86,6 +86,13 @@ Stack: plain PHP + Bootstrap 5.3 (custom Sass build, compiled CSS committed), va
 - **All headings use Newsreader, the page-title font:** page titles, card and section titles, modal titles and tab-panel headings on every page, through `css/csms-components.css`. This extends D5. Body text is unchanged.
 - **One radius:** cards, table containers, tab bars, panels and modals use `--csms-radius-surface` (12px). Exceptions: the full-width page header band, and the full-screen phone sheet of the program modal.
 
+## D13. Electives Manager (approved 2026-11-07; plan in `Electives_Plan.md`)
+- **Same standard as Pre-requisite and Subject Mapping:** `csms-tabs`, `csms-filter-row` / `csms-select`, `csms-term` + `csms-ctable` tables grouped by Year / Semester, `csms-row-click` rows, `csms-empty`, `csms-info` tooltip, `CsmsReview` for Validation Review, and the shared `csms-menu` row menu (`js/csms-menu.js`). Group names use the Code blue. A "Read-only for your role" badge is shown by permission only.
+- **Groups:** college only (SHS categories are not supported; said in the info tooltip). Archived groups are hidden by default. A group with no term sorts last. The summary is derived from the loaded rows ("N groups · M pool subjects"); no unit targets are hardcoded (they belong to the Compliance Validator).
+- **Validation Review (six checks, computed in the browser from the workspace):** empty group; pool smaller than required (by subject count until a units column exists); same subject in two groups (a **warning**, not an error: the schema allows it); inactive subject in a pool (real status shown; active groups only); group has no placement; pool subject placed in a different term. Dropped: Duplicate (the unique key makes it impossible), Unmapped Subjects and Missing Context (covered by the placement checks). Fix links go to the Curriculum Builder. Archived groups are not checked. Legacy rows are flagged, never changed.
+- **Create/edit dialog:** pool picker as removable chips plus a small table (Code, Subject, Units) and a live message when the pool is smaller than the requirement; server refusals are shown inside the dialog. Save rules are unchanged.
+- **Not built (on hold):** elective type, required units, Free/Mandatory behaviour (slice 5, migration 028), pending the client's answers.
+
 ## Constraints that still apply
 - Functionality is never sacrificed. No page may load both legacy and Bootstrap CSS. Migrate page by page; pilot page = Pre-requisite Configuration. The legacy UI stays the default until a page is approved.
 - UI UX Pro Max output is advisory. Its auto design system for this project (dark glassmorphism, green accent) was rejected as a poor fit.

@@ -2,28 +2,12 @@
 .elective-context { position: relative; z-index: 5; overflow: visible; }
 #groupFormModal .record-autocomplete-options { max-height: 194px; overflow-y: auto; }
 #groupFormModal .record-autocomplete-option { min-height: 64px; }
-.elective-empty { padding: 36px 24px; text-align: center; border: 1px dashed #cbdcf4; border-radius: 10px; background: #fafcff; color: #64748b; }
-.elective-empty i { font-size: var(--csms-icon-xl, 28px); color: #2563eb; margin-bottom: 16px; }
-.elective-empty h2 { font-size: 15px; margin: 0 0 8px; }
-.elective-empty p { margin: 0; }
-.elective-empty button { margin-top: 16px; }
-.elective-card { background: #fff; border: 1px solid #e0e7f1; border-radius: 10px; padding: 18px; min-width: 0; box-shadow: 0 5px 20px #1e3a5f06; }
-.elective-placement { font-size: var(--csms-text-xs, .75rem); color: #1d5ed0; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
-.elective-card h2 { font-size: 16px; margin: 0 0 12px; overflow-wrap: anywhere; }
 .elective-rule { background: #f2f6fe; border-radius: 8px; padding: 12px; margin: 12px 0 18px; color: #64748b; }
 .elective-rule strong { color: #1d5ed0; }
 .elective-rule-warning { color: #92400e; background: #fffbeb; border: 1px solid #f3d69b; border-radius: 8px; font-size: 12px; padding: 9px 11px; margin: -8px 0 12px; }
-.elective-label { text-transform: uppercase; letter-spacing: .06em; color: var(--csms-text-muted, #4b5563); font-size: var(--csms-text-xs, .75rem); font-weight: 700; }
-.elective-subject { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #edf1f7; align-items: flex-start; overflow-wrap: anywhere; }
-.elective-subject > strong { color: #1d5ed0; min-width: 45px; }
-.elective-subject > div { flex: 1; min-width: 0; }
-.elective-subject small { display: block; color: var(--csms-text-muted, #4b5563); margin-top: 5px; }
-.elective-selected-count { color: #1d5ed0; font-size: 12px; font-weight: 700; margin: 14px 0 2px; }
 .elective-modal-body { padding: 0 24px 20px; }
 .elective-warning { padding: 14px; border: 1px solid #efcf87; background: #fffbeb; border-radius: 8px; margin-top: 12px; }
-#groupFormModal .modal-dialog, #viewGroupModal .modal-dialog { max-width: 700px; }
-#groupFormModal .modal-dialog, #viewGroupModal .modal-dialog { max-height: min(90vh, 850px); overflow-y: auto; }
-@media(max-width:750px) {  }
+#groupFormModal .modal-dialog, #viewGroupModal .modal-dialog { max-width: 700px; max-height: min(90vh, 850px); overflow-y: auto; }
 
 /* Slice 1: shared chrome (tabs, filter row, panel) as on Subject Mapping */
 .electives-content .mapping-context-bar + .csms-tabs { margin-top: 16px; }
