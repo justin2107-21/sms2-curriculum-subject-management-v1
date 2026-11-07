@@ -42,7 +42,11 @@ assert.ok(!reports.includes('$sess_initial'), 'unescaped avatar initial is gone'
 // Subject Mapping: the year dropdown is a hidden state holder (page script and tests keep their element); pills stay.
 const mapping = read('modules/curriculum/pages/subject_mapping.php');
 assert.ok(!mapping.includes('id="mappingYearTabs"') && !mapping.includes('addMappingButton'), 'year pills and Place Subject are gone');
-assert.match(mapping, /<select id="mappingYearFilter">/);
+assert.match(mapping, /<select class="csms-select" id="mappingYearFilter"/);
+assert.match(mapping, /class="csms-filter-row" id="mappingMapToolbar"/);
+assert.ok(!mapping.includes('mapping-map-toolbar'), 'Subject Mapping filter row uses the shared csms-filter-row');
+const prereq = read('modules/curriculum/pages/prerequisite_configuration.php');
+assert.ok(!/pr-tabs|pr-note/.test(prereq) && /class="csms-tabs"/.test(prereq) && /class="csms-filter-row pr-toolbar"/.test(prereq) && /class="csms-select"/.test(prereq), 'Prerequisite page uses the shared tab, filter row and select classes');
 assert.match(mapping, /class="csms-tabs" id="mappingWorkspaceTabs"/);
 assert.match(components, /\.csms-hidden-field \{ display: none !important; \}/);
 

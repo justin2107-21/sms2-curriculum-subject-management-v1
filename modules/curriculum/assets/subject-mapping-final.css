@@ -18,7 +18,7 @@
   padding: 28px var(--mapping-page-gutter) 22px;
 }
 .mapping-content:not(.has-mapping-context) #mappingPanelMap > .csms-panel__bar,
-.mapping-content:not(.has-mapping-context) #mappingPanelMap > .mapping-map-toolbar { display: none !important; }
+.mapping-content:not(.has-mapping-context) #mappingPanelMap > #mappingMapToolbar { display: none !important; }
 .mapping-context-field { font-size: .75rem; gap: 7px; }
 .mapping-context-field .record-autocomplete input {
   appearance: none;
@@ -47,16 +47,12 @@
 .mapping-year-tabs button { background: #fff; border: 1px solid #dbe3ee; border-radius: 8px; padding: 10px 16px; font: inherit; font-size: .8rem; font-weight: 600; color: #52647f; cursor: pointer; }
 .mapping-year-tabs button.is-active, .mapping-review-card.is-active, #mappingHighlightPrerequisites[aria-pressed="true"] { border-color: #9fc3fa; background: #edf4ff; color: #1d5fc7; }
 .mapping-year-tabs button:focus-visible { outline: 2px solid #2563c5; outline-offset: 2px; }
-.mapping-map-toolbar { grid-template-columns: minmax(220px, 1.8fr) repeat(2, minmax(130px, .65fr)) auto; margin-bottom: 28px; }
-.mapping-map-toolbar .search-control input, .mapping-map-toolbar .form-field select {
   height: 44px;
   border: 1px solid #dbe3ee;
   border-radius: 8px;
   background: #fff;
   font-weight: 400;
 }
-.mapping-map-toolbar .search-control input::placeholder { color: var(--csms-placeholder, #6b7280); }
-.mapping-map-toolbar .form-field select { padding-left: 14px; }
 .mapping-year-sections { gap: 30px; }
 .mapping-year-header { align-items: end; margin-bottom: 14px; }
 .mapping-year-header h2 { color: #526b8e; font-size: .875rem; font-weight: 500; letter-spacing: .065em; }
@@ -158,8 +154,6 @@
 @media (max-width: 1000px) {
   .mapping-card-main { grid-template-columns: 70px minmax(0, 1fr); gap: 10px; }
   .mapping-card-meta { display: grid; gap: 5px; }
-  .mapping-map-toolbar { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .mapping-map-toolbar .search-control { grid-column: 1 / -1; }
 }
 @media (max-width: 760px) {
   .mapping-content { --mapping-page-gutter: 24px; }
@@ -168,15 +162,10 @@
   .mapping-context-bar { grid-template-columns: 1fr; gap: 12px; }
   .mapping-context-separator { display: none; }
   .mapping-semester-grid { grid-template-columns: 1fr; }
-  .mapping-map-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .mapping-map-toolbar .search-control { grid-column: 1 / -1; }
-  .mapping-map-total { grid-column: 1 / -1; }
   .mapping-issue-row { grid-template-columns: 75px minmax(0, 1fr); }
   .mapping-issue-row > button { grid-column: 1 / -1; justify-self: start; }
 }
 @media (max-width: 450px) {
-  .mapping-map-toolbar { grid-template-columns: 1fr; }
-  .mapping-map-toolbar .search-control, .mapping-map-total { grid-column: auto; }
   .mapping-subject-card { padding: 12px 14px; gap: 10px; }
   .mapping-card-main { grid-template-columns: 1fr; gap: 4px; }
   .mapping-semester-panel:has(.mapping-code-long) .mapping-card-main { grid-template-columns: 1fr; }
@@ -246,16 +235,7 @@
 }
 /* Curriculum Map tab: one filter row in the Builder's spacing. */
 #mappingPanelMap.csms-panel { padding-top: 16px; }
-#mappingPanelMap .mapping-map-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; margin-bottom: 0; }
-#mappingPanelMap .mapping-map-toolbar .csms-search { flex: 1 1 16rem; min-width: 0; }
-#mappingPanelMap .mapping-map-toolbar .csms-search input { width: 100%; height: 40px; padding: 0 12px; background: #fff; border: 1px solid var(--csms-border-strong, #cbd5e1); border-radius: 8px; font: inherit; font-size: 14px; }
-#mappingPanelMap .mapping-map-toolbar .form-field { flex: 0 1 11rem; }
-#mappingPanelMap .mapping-map-total { margin-left: auto; }
-@media (max-width: 600px) { #mappingPanelMap .mapping-map-toolbar .form-field { flex: 1 1 45%; } #mappingPanelMap .mapping-map-total { flex: 1 1 100%; margin-left: 0; } #mappingBuilderLink { width: 100%; justify-content: center; } }
-#mappingPanelMap .mapping-map-toolbar .form-field { flex: 0 0 11rem; width: 11rem; }
-#mappingPanelMap .mapping-map-toolbar .form-field select { width: 100%; }
 @media (max-width: 600px) {
-  #mappingPanelMap .mapping-map-toolbar .form-field { flex: 1 1 45%; width: auto; }
   .csms-ctable__kind { display: none; }
   .csms-ctable__code { width: 5.5rem; }
 }

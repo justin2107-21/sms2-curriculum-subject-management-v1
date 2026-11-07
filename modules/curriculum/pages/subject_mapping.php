@@ -98,12 +98,12 @@ require __DIR__ . '/../../../shared/sidebar.php';
           <p class="csms-panel__note" id="mapAccessNote">Which program outcomes each subject supports. Placements are edited in the Curriculum Builder.</p>
           <a class="secondary-action-button" id="mappingBuilderLink" href="curriculum_builder.php" hidden><i class="fa-solid fa-table-list" aria-hidden="true"></i> Edit placements in Builder</a>
         </div>
-        <div class="mapping-map-toolbar">
+        <div class="csms-filter-row" id="mappingMapToolbar">
           <label class="csms-search"><span class="sr-only">Search subjects</span><input id="mappingSubjectSearch" type="search" maxlength="100" placeholder="Search subject code or title"/></label>
-          <label class="form-field"><span class="sr-only">Year / Grade</span><select id="mappingYearFilter"><option value="">All Years</option></select></label>
-          <label class="form-field"><span class="sr-only">Semester</span><select id="mappingSemesterFilter"><option value="">All Semesters</option></select></label>
-          <label class="form-field"><span class="sr-only">Mapped status</span><select id="mappingStatusFilter"><option value="">All subjects</option><option value="mapped">Mapped to an outcome</option><option value="unmapped">Not mapped to any</option></select></label>
-          <span class="mapping-map-total" id="mappingCount" role="status">Select a version</span>
+          <select class="csms-select" id="mappingYearFilter" aria-label="Year / Grade"><option value="">All Years</option></select>
+          <select class="csms-select" id="mappingSemesterFilter" aria-label="Semester"><option value="">All Semesters</option></select>
+          <select class="csms-select" id="mappingStatusFilter" aria-label="Mapped status"><option value="">All subjects</option><option value="mapped">Mapped to an outcome</option><option value="unmapped">Not mapped to any</option></select>
+          <span class="csms-filter-row__summary" id="mappingCount" role="status">Select a version</span>
         </div>
         <div class="csms-plan" id="mappingMap"><p class="mapping-state">Select a curriculum version to view its map.</p></div>
       </section>

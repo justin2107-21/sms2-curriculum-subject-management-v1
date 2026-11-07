@@ -81,7 +81,7 @@
         const q = $('ruleSearch').value.trim().toLowerCase(), year = $('yearFilter').value, term = $('semesterFilter').value, configured = $('stateFilter').value;
         const rows = ui.searchRecords(state.placements, q, p => [p.subject_code, p.subject_title]).filter(p => (!year || p.year_level === year) && (!term || p.semester === term) && (!configured || (rules(p.subject_id).length > 0) === (configured === 'with')));
         const withRules = rows.filter(p => rules(p.subject_id).length).length;
-        $('ruleSummary').textContent = state.loaded ? rows.length + (rows.length === 1 ? ' subject' : ' subjects') + ' \u00b7 ' + withRules + ' with rules \u00b7 ' + (rows.length - withRules) + ' without' : '';
+        $('ruleSummary').innerHTML = state.loaded ? '<strong>' + rows.length + '</strong>' + (rows.length === 1 ? ' subject' : ' subjects') + ' \u00b7 <strong>' + withRules + '</strong> with rules \u00b7 <strong>' + (rows.length - withRules) + '</strong> without' : '';
         if (!rows.length) { $('ruleCards').innerHTML = '<div class="csms-empty"><i class="fa-solid fa-diagram-project" aria-hidden="true"></i><strong>No subjects match the selected context and filters.</strong></div>'; return; }
         let html = '';
         groupView.group(rows).years.forEach((semesters, yearKey) => semesters.forEach((bucket, semesterKey) => {
@@ -240,7 +240,7 @@
     $('prRowMenu')?.addEventListener('keydown',e=>{const items=[...$('prRowMenu').querySelectorAll('button')],i=items.indexOf(e.target);if(e.key==='Escape'){e.preventDefault();closeMenu(true);}else if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();items[(i+(e.key==='ArrowDown'?1:items.length-1))%items.length]?.focus();}else if(e.key==='Tab')closeMenu(false);});
     $('warnEdit')?.addEventListener('click',()=>{dialogs.warn.close();openEditor(state.target);});
     window.addEventListener?.('scroll',()=>closeMenu(false),true);
-    document.querySelector('.pr-tabs').addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();const tabs=[...document.querySelectorAll('[data-tab]')],i=tabs.indexOf(e.target),next=e.key==='Home'?0:e.key==='End'?2:(i+(e.key==='ArrowRight'?1:2))%3;tabs[next].click();tabs[next].focus();});
+    document.querySelector('.csms-tabs').addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();const tabs=[...document.querySelectorAll('[data-tab]')],i=tabs.indexOf(e.target),next=e.key==='Home'?0:e.key==='End'?2:(i+(e.key==='ArrowRight'?1:2))%3;tabs[next].click();tabs[next].focus();});
     $('ruleSearch').addEventListener('keydown',e=>{if(e.key==='Escape'&&$('ruleSearch').value){$('ruleSearch').value='';renderRules();}});
     $('ruleSearch').addEventListener('input',ui.debounce(renderRules,150)); ['yearFilter','semesterFilter','stateFilter'].forEach(id=>$(id).addEventListener('change',renderRules));
     $('addRequirementButton')?.addEventListener('click',()=>openEditor()); $('appendRequired')?.addEventListener('click',append);

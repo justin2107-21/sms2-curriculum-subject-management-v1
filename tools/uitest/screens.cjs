@@ -725,6 +725,10 @@ async function main() {
         await navigate(base + urls[0]);
         await sleep(3500);
         await shotView(path.join(out, `${role}-prereq-rules-${width}.png`));
+        await evaluate(`(() => { const b = document.querySelector('.csms-info__btn'); if (b) b.focus(); return true; })()`);
+        await sleep(300);
+        await shotView(path.join(out, `${role}-prereq-tip-${width}.png`));
+        await evaluate(`document.activeElement.blur(); true`);
         result.chrome = await evaluate(`(() => { const sel = [...document.querySelectorAll('.csms-filter-row select')]; const x = document.querySelector('.record-autocomplete-clear:not([hidden])'); const r = x && x.getBoundingClientRect(); return { tabs: document.querySelectorAll('.csms-tabs [role=tab]').length, badge: !!document.getElementById('readOnlyBadge'), clippedSelects: sel.filter(e => e.scrollWidth > e.clientWidth + 1).length, selectHeights: sel.map(e => Math.round(e.getBoundingClientRect().height)), clearSize: r ? [Math.round(r.width), Math.round(r.height)] : null, overflow: document.documentElement.scrollWidth > innerWidth, rows: document.querySelectorAll('#ruleCards tbody tr, #ruleCards article').length }; })()`);
         if (arg('builderflow', '') === '1') {
           result.rowClick = await evaluate(`(() => { const r = document.querySelector('#ruleCards tr.csms-row-click'); if (!r) return null; r.click(); const m = [...document.querySelectorAll('.curriculum-modal')].find(m => !m.hidden); return m ? m.id : 'none'; })()`);
@@ -732,6 +736,27 @@ async function main() {
           await shotView(path.join(out, `${role}-prereq-dialog-${width}.png`));
         }
         report.prereq[width] = result;
+      }
+    }
+
+    if (arg('probe', '') === 'cmpstyles') {
+      // Computed styles of tabs, filter controls and table text, plus the gap between the context bar and the tabs, per page.
+      report.cmpStyles = {};
+      await setWidth(widths[0]);
+      for (const url of urls) {
+        await navigate(base + url);
+        await sleep(3500);
+        report.cmpStyles[url] = await evaluate(`(() => {
+          const q = s => document.querySelector(s);
+          const cs = (e, extra = []) => { if (!e) return null; const c = getComputedStyle(e); const o = { ff: c.fontFamily.split(',')[0], fs: c.fontSize, fw: c.fontWeight, color: c.color, h: Math.round(e.getBoundingClientRect().height) }; extra.forEach(k => o[k] = c[k]); return o; };
+          const ctx = q('.mapping-context-bar, .pr-selectors'), tabs = q('.csms-tabs');
+          const filter = q('.mapping-map-toolbar, .csms-filter-row');
+          const input = filter && filter.querySelector('input[type=search]'), select = filter && filter.querySelector('select');
+          const td = q('.csms-ctable td, .map-table td');
+          return { gapCtxToTabs: ctx && tabs ? Math.round(tabs.getBoundingClientRect().top - ctx.getBoundingClientRect().bottom) : null, tabsTop: tabs && Math.round(tabs.getBoundingClientRect().top),
+            tab: cs(q('.csms-tabs [role=tab][aria-selected=true]'), ['padding', 'minHeight', 'borderBottomColor']), tabInactive: cs(q('.csms-tabs [role=tab][aria-selected=false]')), input: cs(input, ['padding', 'borderRadius', 'borderColor']), select: cs(select, ['padding', 'borderRadius', 'borderColor', 'backgroundPosition', 'appearance']),
+            td: cs(td, ['padding']), th: cs(q('.csms-ctable thead th'), ['padding']), termHeader: cs(q('.csms-term > header')), note: cs(q('.csms-panel__note, .pr-note')) };
+        })()`);
       }
     }
 

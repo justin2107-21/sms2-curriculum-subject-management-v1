@@ -9,7 +9,7 @@
 .prerequisite-content > .pr-selectors {
   align-items:end; display:grid;
   grid-template-columns:minmax(0,1.25fr) 14px minmax(0,1fr) 14px minmax(0,1fr);
-  gap:14px; padding:16px 18px; margin:0 var(--pr-workspace-gutter) 20px;
+  gap:14px; padding:16px 18px; margin:0 var(--pr-workspace-gutter) 16px;
   background:#f5f9ff; border:1px solid #d6e5fb; border-radius:12px; box-shadow:none;
 }
 .pr-selectors .form-field { display:grid; gap:7px; margin:0; min-width:0; color:#52647f; font-size:.75rem; font-weight:700; }
@@ -25,8 +25,7 @@
 .pr-selectors .record-autocomplete input:focus { border-color:#87b3f5; box-shadow:0 0 0 3px rgba(37,99,197,.1); }
 .pr-selectors .record-autocomplete-options { border-color:#dbe3ee; border-radius:8px; }
 .pr-context-separator { align-self:end; color:#a9bbd1; font-size:var(--csms-text-xs, .75rem); padding:0 0 13px; text-align:center; }
-.prerequisite-content > .pr-tabs,
-.prerequisite-content > .pr-note,
+.prerequisite-content > .csms-tabs,
 .prerequisite-content > #workspaceStatus,
 .prerequisite-content > [role="tabpanel"] { margin-left:var(--pr-workspace-gutter); margin-right:var(--pr-workspace-gutter); padding-left:0; padding-right:0; }
 @media(max-width:760px) {
@@ -34,7 +33,6 @@
   .prerequisite-content > .pr-selectors { grid-template-columns:1fr; gap:12px; }
   .pr-context-separator { display:none; }
 }
-.pr-note { margin-top:0; margin-bottom:12px; }
 .pr-toolbar { margin-bottom:18px; }
 .pr-rules { display:flex; flex-direction:column; gap:14px; }
 .pr-rule { background:#fff; border:1px solid var(--pr-border); border-radius:9px; cursor:pointer; overflow:hidden; }

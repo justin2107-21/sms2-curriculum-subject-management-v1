@@ -35,7 +35,7 @@ async function context(program=programs[0]){[program,curriculum,version].forEach
  await settle();assert.equal(requests.length,0,'No unrelated records loaded without context');
  await context();assert.equal((el('ruleCards').innerHTML.match(/class="csms-row-click"/g)||[]).length,105);
  assert.equal((el('ruleCards').innerHTML.match(/data-row="3"/g)||[]).length,1,'One row per target subject');assert(el('ruleCards').innerHTML.includes('1st Year \u00b7 1st Semester'),'Grouped by year and semester');
- assert(el('ruleCards').innerHTML.includes('CC1, CC2'),'Requires column lists the required codes');assert(el('ruleSummary').textContent.includes('105 subjects \u00b7 2 with rules \u00b7 103 without'));
+ assert(el('ruleCards').innerHTML.includes('CC1, CC2'),'Requires column lists the required codes');assert(el('ruleSummary').innerHTML.replace(/<[^>]+>/g,'').includes('105 subjects \u00b7 2 with rules \u00b7 103 without'));
  el('stateFilter').value='with';await el('stateFilter').emit('change');assert.equal((el('ruleCards').innerHTML.match(/class="csms-row-click"/g)||[]).length,2);
  el('ruleSearch').value='Subject 3';await el('ruleSearch').emit('input');assert.equal((el('ruleCards').innerHTML.match(/class="csms-row-click"/g)||[]).length,1);
  el('yearFilter').value='2nd Year';await el('yearFilter').emit('change');assert(el('ruleCards').innerHTML.includes('No subjects match'));

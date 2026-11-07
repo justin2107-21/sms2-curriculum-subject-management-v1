@@ -552,3 +552,15 @@ body .main .module-views a:focus-visible { outline: 2px solid var(--csms-primary
 .csms-ctable tr.csms-row-click:focus-visible { outline: 3px solid var(--csms-focus, #2563eb); outline-offset: -3px; }
 .csms-filter-row .csms-select { height: 40px; min-height: 40px; padding-top: 0; padding-bottom: 0; }
 .csms-tabs { overflow: visible; }
+/* Select arrow ~14px from the right edge (shared by every filter select), summary and info tooltip. */
+.csms-select { -webkit-appearance: none; appearance: none; padding-right: 40px; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23475569' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 14px center / 12px 8px; }
+.csms-filter-row .csms-select { padding-right: 40px; }
+.csms-filter-row__summary { font-size: 15px; color: var(--csms-text, #1f2937); white-space: nowrap; }
+.csms-filter-row__summary strong { font-weight: 700; }
+.csms-info { position: relative; display: inline-flex; flex: none; }
+.csms-info__btn { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; background: none; border: 0; border-radius: 50%; color: var(--csms-text-secondary, #374151); font-size: 16px; cursor: help; }
+.csms-info__btn:hover, .csms-info__btn:focus-visible { color: var(--csms-navy, #1a3a8c); }
+.csms-info__btn:focus-visible { outline: 3px solid var(--csms-focus, #2563eb); outline-offset: 1px; }
+.csms-info__tip { position: absolute; z-index: 40; top: calc(100% + 6px); right: 0; width: min(22rem, 80vw); padding: 10px 12px; background: #1f2937; color: #fff; border-radius: 8px; font-size: 13px; font-weight: 400; line-height: 1.45; box-shadow: 0 6px 20px rgba(15, 23, 42, .2); visibility: hidden; opacity: 0; transition: opacity .12s; pointer-events: none; }
+.csms-info:hover .csms-info__tip, .csms-info:focus-within .csms-info__tip { visibility: visible; opacity: 1; }
+@media (max-width: 600px) { .csms-info { margin-left: auto; } .csms-info__tip { right: 0; } }

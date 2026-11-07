@@ -93,12 +93,11 @@ require __DIR__ . '/../../../shared/sidebar.php';
 </div>
 </label>
 </section>
-    <nav class="csms-tabs pr-tabs" role="tablist" aria-label="Prerequisite workspace">
+    <nav class="csms-tabs" role="tablist" aria-label="Prerequisite workspace">
 <button role="tab" id="tab-rules" aria-controls="panel-rules" aria-selected="true" data-tab="rules">Prerequisite Rules</button>
 <button role="tab" id="tab-chain" aria-controls="panel-chain" aria-selected="false" tabindex="-1" data-tab="chain">Chain Viewer</button>
 <button role="tab" id="tab-review" aria-controls="panel-review" aria-selected="false" tabindex="-1" data-tab="review">Validation Review</button>
 </nav>
-    <p class="csms-panel__note pr-note" id="prNote">A prerequisite must be placed in an earlier term (a system rule, not a CHED rule). Co-requisites and standing requirements are not handled here. SHS strand groups are not supported.</p>
     <p id="workspaceStatus" role="status"></p>
     <section id="panel-rules" class="csms-panel" role="tabpanel" aria-labelledby="tab-rules">
 <div class="csms-filter-row pr-toolbar">
@@ -107,6 +106,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <select class="csms-select" id="semesterFilter" aria-label="Semester"><option value="">All Semesters</option></select>
 <select class="csms-select" id="stateFilter" aria-label="Rules"><option value="">All subjects</option><option value="with">Has rules</option><option value="without">No rules</option></select>
 <span class="csms-filter-row__summary" id="ruleSummary" role="status"></span>
+<span class="csms-info"><button type="button" class="csms-info__btn" aria-label="About this page" aria-describedby="ruleInfoTip"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button><span class="csms-info__tip" role="tooltip" id="ruleInfoTip">A prerequisite must be placed in an earlier term (a system rule, not a CHED rule). Co-requisites and standing requirements are not handled here. SHS strand groups are not supported.</span></span>
 </div>
 <div id="ruleCards" class="pr-rules">
 </div>

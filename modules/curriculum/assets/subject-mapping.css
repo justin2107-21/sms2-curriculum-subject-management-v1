@@ -208,10 +208,6 @@
 .mapping-workspace-tabs button:focus-visible, .elective-tabs button:focus-visible, .pr-tabs button:focus-visible { outline: 2px solid #8cb4f4; outline-offset: -2px; }
 .mapping-workspace-panel { min-width: 0; padding-top: 17px; }
 .mapping-workspace-panel[hidden] { display: none !important; }
-.mapping-map-toolbar { align-items: center; display: grid; gap: 10px; grid-template-columns: minmax(240px, 1fr) minmax(130px, .32fr) minmax(140px, .35fr) auto; margin-bottom: 16px; }
-.mapping-map-toolbar .form-field { margin: 0; min-width: 0; }
-.mapping-map-toolbar select { min-width: 0; width: 100%; }
-.mapping-map-total { color: #64748b; font-size: var(--csms-text-xs, .75rem); justify-self: end; white-space: nowrap; }
 .mapping-year-sections { display: grid; gap: 20px; }
 .mapping-year-header { align-items: baseline; display: flex; flex-wrap: wrap; gap: 13px; justify-content: space-between; margin: 0 0 9px; }
 .mapping-year-header h2 { color: #172b49; font-size: .89rem; margin: 0; text-transform: uppercase; }
@@ -283,8 +279,6 @@ button.mapping-issue-row:hover { background: #f8fbff; }
 
 @media (max-width: 900px) {
   .mapping-review-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .mapping-map-toolbar { grid-template-columns: minmax(180px, 1fr) repeat(2, minmax(120px, .55fr)); }
-  .mapping-map-total { grid-column: 1 / -1; justify-self: start; }
 }
 @media (max-width: 700px) {
   .mapping-workspace-shell { margin: 20px 14px 26px; }
@@ -294,8 +288,6 @@ button.mapping-issue-row:hover { background: #f8fbff; }
   .mapping-context-separator { display: none; }
   .mapping-context-current { grid-column: auto; }
   .mapping-semester-grid { grid-template-columns: 1fr; }
-  .mapping-map-toolbar { grid-template-columns: 1fr 1fr; }
-  .mapping-map-toolbar .search-control { grid-column: 1 / -1; }
   .mapping-trace-row { align-items: flex-start; grid-template-columns: 1fr; }
   .mapping-issue-row { grid-template-columns: minmax(70px, .3fr) minmax(0, 1fr); }
   .mapping-issue-row small { grid-column: 1 / -1; }
@@ -305,7 +297,5 @@ button.mapping-issue-row:hover { background: #f8fbff; }
 @media (max-width: 420px) {
   .mapping-review-cards { grid-template-columns: 1fr 1fr; gap: 8px; }
   .mapping-review-card { min-height: 100px; padding: 11px; }
-  .mapping-map-toolbar { grid-template-columns: 1fr; }
-  .mapping-map-toolbar .search-control, .mapping-map-total { grid-column: auto; }
   .mapping-trace-subject { align-items: flex-start; flex-direction: column; }
 }
