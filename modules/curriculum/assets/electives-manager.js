@@ -5,7 +5,15 @@
     if (!root || !window.CurriculumUI) return;
     const ui = window.CurriculumUI, esc = ui.escapeHtml, api = root.dataset.groupApi;
     const canManage = root.dataset.canManageElectives === '1';
-    const labels = {empty:'Empty Elective Groups',selection:'Invalid Selection Rules',duplicate:'Duplicate Subjects',mismatch:'Placement Mismatches',unmapped:'Unmapped Subjects',inactive:'Inactive Subjects',context:'Missing Context'};
+    // Validation Review: one definition of the checks, computed here from the workspace (groups, members, placements).
+    const meta = {
+        empty: ['Empty group', 'A group with no subject in its pool'],
+        small: ['Pool smaller than required', 'Fewer subjects in the pool than the group asks students to choose (by subject count)'],
+        shared: ['Same subject in two groups', 'A subject in the pool of more than one active group; the schema allows it, so check it is intended'],
+        inactive: ['Inactive subject in a pool', 'A pool subject whose status in Subject Master is not active'],
+        noplacement: ['Group has no placement', 'A group with no year or semester, or no subject placed in that term'],
+        mismatch: ['Pool subject placed in a different term', 'A pool subject whose placement in the Builder differs from the group\'s term']
+    };
     const state = {data:null, request:0, tab:'groups', selected:null, edit:null, members:[], busy:false};
     window.CSMSPageCIMFContext = () => ({academic_program_id:$('programId').value,curriculum_id:$('curriculumId').value,curriculum_version_id:$('versionId').value,group_id:state.selected?.id || state.selected || ''});
     const view = ui.createModal($('viewGroupModal')), editor = ui.createModal($('groupFormModal')), archive = ui.createModal($('archiveGroupModal'));
@@ -69,7 +77,31 @@
     }
     const rule = g => '<div class="elective-rule"><strong>Choose '+Number(g.required_selections)+'</strong> of '+g.members.length+' available subjects</div>'+(g.members.length >= 2 && Number(g.required_selections)===g.members.length?'<p class="elective-rule-warning">All available subjects are currently required. This group does not provide an alternative choice.</p>':'');
     // Groups by Year / Semester; a group with no term goes last. The warning icon opens that group's issues.
-    function issuesFor(g) { return (state.data.review?.issues || []).filter(i => Number(i.group_id) === Number(g.id)); }
+    function checkData() {
+        const groups = state.data.groups.filter(g => g.status !== 'archived'), active = groups.filter(g => g.status === 'active'), out = { empty: [], small: [], shared: [], inactive: [], noplacement: [], mismatch: [] };
+        const placed = new Set((state.data.placements || []).map(p => p.year_level + '\u0000' + p.semester));
+        groups.forEach(g => {
+            const n = g.members.length, term = g.year_level && g.semester;
+            if (!n) out.empty.push({ g, detail: 'No subject in the pool.' });
+            else if (n < Number(g.required_selections)) out.small.push({ g, detail: 'Pool has ' + n + (n === 1 ? ' subject' : ' subjects') + ' but students choose ' + Number(g.required_selections) + '.' });
+            if (!term) out.noplacement.push({ g, detail: 'The group has no year or semester.' });
+            else if (!placed.has(g.year_level + '\u0000' + g.semester)) out.noplacement.push({ g, detail: 'No subject is placed in ' + placement(g) + ' in this version.' });
+            g.members.forEach(m => {
+                if (term && (m.year_level !== g.year_level || m.semester !== g.semester)) out.mismatch.push({ g, m, detail: (m.subject_code || 'Subject') + ' is placed in ' + placement(m) + ', the group is in ' + placement(g) + '.' });
+            });
+        });
+        active.forEach(g => g.members.forEach(m => { if (m.subject_status && m.subject_status !== 'active') out.inactive.push({ g, m, detail: 'Status: ' + m.subject_status + '.' }); }));
+        const bySubject = new Map();
+        active.forEach(g => g.members.forEach(m => { const k = Number(m.subject_id); if (!bySubject.has(k)) bySubject.set(k, { m, groups: [] }); bySubject.get(k).groups.push(g); }));
+        bySubject.forEach(v => { if (v.groups.length > 1) out.shared.push({ m: v.m, groups: v.groups, g: v.groups[0], detail: v.groups.map(x => x.group_name).join(', ') }); });
+        return out;
+    }
+    // Issues for one group, from the same checks as the Review tab.
+    function issuesFor(g) {
+        const data = checkData(), list = [];
+        Object.entries(data).forEach(([key, rows]) => rows.forEach(r => { if (Number(r.g.id) === Number(g.id) || (r.groups || []).some(x => Number(x.id) === Number(g.id))) list.push({ kind: meta[key][0], text: r.detail }); }));
+        return list;
+    }
     function groupTables(groups) {
         const cmp = new Intl.Collator('en', { numeric: true, sensitivity: 'base' }).compare, last = (a, b) => (a === '') - (b === '') || cmp(a, b);
         const buckets = new Map();
@@ -101,7 +133,7 @@
     function openWarn(g) {
         const issues = issuesFor(g); state.selected = g;
         $('warnGroupTitle').textContent = g.group_name + ' \u00b7 ' + issues.length + (issues.length === 1 ? ' issue' : ' issues');
-        $('warnGroupBody').innerHTML = issues.map(i => '<div class="elective-issue-item"><strong>' + esc(labels[i.type] || i.type) + '</strong><p>' + esc(i.message) + '</p></div>').join('') || '<p class="elective-muted">No issues.</p>';
+        $('warnGroupBody').innerHTML = issues.map(i => '<div class="elective-issue-item"><strong>' + esc(i.kind) + '</strong><p>' + esc(i.text) + '</p></div>').join('') || '<p class="elective-muted">No issues.</p>';
         if ($('warnGroupEdit')) $('warnGroupEdit').hidden = g.status === 'archived';
         warnModal.open();
     }
@@ -109,12 +141,29 @@
         if (state.data.groups.length) return '<div class="csms-empty"><i class="fa-solid fa-filter" aria-hidden="true"></i><strong>No groups match these filters</strong><button type="button" class="secondary-action-button" data-clear-filters>Clear filters</button></div>';
         return '<div class="csms-empty"><i class="fa-solid fa-layer-group" aria-hidden="true"></i><strong>No elective groups yet</strong><span>Create a group when this curriculum contains alternative subject choices.</span>'+(canManage?'<button type="button" class="primary-action-button" data-create-group>Create elective group</button>':'<span>Ask someone who can manage electives to create one.</span>')+'</div>';
     }
+    const reviewUi = window.CsmsReview.create($('reviewChecks'), { esc, onAction: (action, id) => { const g = groupById(id); if (!g) return; if (action === 'edit' && g.status !== 'archived') openEdit(g); else openView(g); } });
+    const groupAction = (g, label) => '<button type="button" class="csms-link" data-review-action="' + (canManage && g.status !== 'archived' ? 'edit' : 'view') + '" data-review-id="' + Number(g.id) + '">' + (canManage && g.status !== 'archived' ? 'Edit' : 'View') + ' group<span class="sr-only"> ' + esc(g.group_name) + '</span></button>';
+    function renderReview() {
+        const data = checkData(), builder = ' <a class="csms-link" href="' + esc(link('curriculum_builder.php')) + '">Open in Builder</a>';
+        const groupCol = { header: 'Group', code: true, cell: r => esc(r.g.group_name) }, subjectCol = { header: 'Subject', cell: r => esc((r.m.subject_code || '') + ' ' + (r.m.subject_title || '')) }, detailCol = { header: 'Detail', cell: r => esc(r.detail) };
+        const defs = {
+            empty: { columns: [groupCol, detailCol], actions: r => groupAction(r.g) },
+            small: { columns: [groupCol, detailCol], actions: r => groupAction(r.g) },
+            shared: { severity: 'warning', columns: [subjectCol, { header: 'In groups', cell: r => esc(r.detail) }], actions: r => r.groups.map(x => groupAction(x)).join(' ') },
+            inactive: { columns: [groupCol, subjectCol, detailCol], actions: r => groupAction(r.g) },
+            noplacement: { columns: [groupCol, detailCol], actions: r => groupAction(r.g) + builder },
+            mismatch: { columns: [groupCol, subjectCol, detailCol], actions: r => groupAction(r.g) + builder }
+        };
+        const checks = Object.keys(meta).map(key => ({ key, label: meta[key][0], hint: meta[key][1], rows: data[key], ...defs[key] }));
+        reviewUi.render([{ title: 'Group checks', note: 'Selected version only; archived groups are not checked', checks }]);
+        $('reviewResult').innerHTML = reviewUi.total() ? '' : '<div class="csms-empty"><i class="fa-solid fa-circle-check" aria-hidden="true"></i><strong>No elective group issues detected.</strong><span>Checks cover empty and short pools, shared and inactive subjects, and placement.</span></div>';
+    }
     function render() {
         const ready=!!state.data;
         $('electiveState').hidden=ready;
         $('groupsPanel').hidden=!ready || state.tab!=='groups'; $('reviewPanel').hidden=!ready || state.tab!=='review';
         if(!ready) {
-            $('groupCards').innerHTML=''; $('reviewCounters').innerHTML=''; $('reviewIssues').innerHTML='';
+            $('groupCards').innerHTML=''; $('reviewChecks').innerHTML=''; $('reviewResult').innerHTML='';
             stateBox('Select a Program, Curriculum, and Version','Select context to view elective groups.');
             $('groupSummary').innerHTML='';
             return;
@@ -123,15 +172,7 @@
         const pools=new Set(groups.flatMap(g=>g.members.map(m=>Number(m.subject_id))));
         $('groupSummary').innerHTML=plural(groups.length,'group','groups')+' · '+plural(pools.size,'pool subject','pool subjects');
         $('groupCards').innerHTML=groups.length?groupTables(groups):emptyGroups();
-        const review=state.data.review;
-        $('reviewCounters').innerHTML=Object.entries(labels).map(([key,label])=>'<div class="elective-counter">'+label+'<strong>'+Number(review.counts[key])+'</strong><small>'+(review.counts[key]?'Issues found':'No issues found')+'</small></div>').join('');
-        $('reviewIssues').innerHTML=review.issues.length?'<section class="elective-card"><p class="elective-placement">Review required</p><h2>Elective group issues</h2>'+review.issues.map(issue=>{
-            let action;
-            if(['mismatch','unmapped'].includes(issue.type)) action='<a href="'+esc(link('subject_mapping.php',issue.subject_id))+'">Open Subject Mapping</a>';
-            else if(issue.type==='inactive') action='<a href="'+esc(link('subjects.php',issue.subject_id))+'">Open Subject Master</a>';
-            else action='<button class="button-muted" data-'+(canManage?'edit':'view')+'="'+issue.group_id+'">'+(canManage?'Edit':'View')+' Elective Group</button>';
-            return '<div class="elective-issue"><div><strong>'+labels[issue.type]+'</strong><p>'+esc(issue.group_name)+' · '+esc(issue.message)+'</p></div>'+action+'</div>';
-        }).join('')+'</section>':'<div class="elective-empty"><h2>No elective configuration issues detected.</h2></div>';
+        renderReview();
     }
     function openView(g) {
         state.selected=g; $('viewGroupTitle').textContent=g.group_name;

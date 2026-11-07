@@ -621,3 +621,4 @@ body .main .module-views a:focus-visible { outline: 2px solid var(--csms-primary
 /* Type chip: neutral blue-grey, same shape as the status chips. */
 .csms-chip--type { background: #e8eefb; color: var(--csms-navy, #1a3a8c); }
 .csms-chip--type-unset { background: #f1f5f9; color: #475569; font-weight: 600; }
+.csms-chip--warning { margin-left: 6px; padding: 0 8px; background: #fdf0c8; color: #7a4a00; font-size: 12px; vertical-align: 1px; }

@@ -3,6 +3,7 @@
     // Shared review component: sections of compact check rows (label, hint, count) that expand to a table of the affected records.
     // The page supplies plain data; this file owns the markup, expand/collapse, focus and the action buttons inside rows.
     //   const review = CsmsReview.create(target, { esc, onAction(action, id) {} });
+    // A check may carry severity: 'warning' (shown as a Warning chip; the count still counts).
     //   review.render([{ title, note, checks: [{ key, label, hint, rows, columns: [{ header, code, cell(row) }], actions(row) }] },
     //                  { empty: '<div class="csms-empty">...</div>' }]);
     // cell() and actions() return HTML the page has already escaped. An action is any element with data-review-action and data-review-id.
@@ -20,7 +21,7 @@
         function checkRow(check) {
             const count = check.rows.length, open = expanded.has(check.key) && count > 0;
             return '<div class="csms-check' + (open ? ' is-open' : '') + '"><h3><button type="button" class="csms-check__head" data-review-issue="' + check.key + '" aria-expanded="' + open + '" aria-controls="reviewList-' + check.key + '"' + (count ? '' : ' aria-disabled="true"') + '>' +
-                '<i class="fa-solid fa-chevron-right csms-check__chev" aria-hidden="true"></i><span class="csms-check__label">' + esc(check.label) + '<small>' + esc(check.hint) + '</small></span>' +
+                '<i class="fa-solid fa-chevron-right csms-check__chev" aria-hidden="true"></i><span class="csms-check__label">' + esc(check.label) + (check.severity === 'warning' ? ' <span class="csms-chip csms-chip--warning">Warning</span>' : '') + '<small>' + esc(check.hint) + '</small></span>' +
                 '<span class="csms-check__count' + (count ? ' has-issues' : '') + '">' + count + '</span></button></h3>' +
                 '<div class="csms-check__list" id="reviewList-' + check.key + '"' + (open ? '' : ' hidden') + '>' + (open ? table(check) : '') + '</div></div>';
         }

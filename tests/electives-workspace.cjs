@@ -18,17 +18,18 @@ const ui={...require('./search-ranking.cjs'),debounce:fn=>fn,escapeHtml:esc,form
 class Data{constructor(f){this.values={};if(f)Object.entries(f.elements).forEach(([k,e])=>this.set(k,e.value));}set(k,v){this.values[k]=v;}append(k,v){(this.values[k]??=[]).push(v);}}
 const win={CurriculumUI:ui,CurriculumPlacementView:{yearLabel:v=>v==='3rd'?'3rd Year':v}};
 vm.runInNewContext(fs.readFileSync('js/csms-menu.js','utf8'),{window:win,console});
+vm.runInNewContext(fs.readFileSync('js/csms-review.js','utf8'),{window:win,console});
 vm.runInNewContext(fs.readFileSync('modules/curriculum/assets/electives-manager.js','utf8'),{document:{getElementById:el,querySelector:()=>el('tabs')},window:win,FormData:Data,URLSearchParams,console});
 const editor_close=()=>modals.groupFormModal.close();
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 const s=(id,year='3rd Year')=>({subject_id:id,subject_status:'active',subject_code:'S'+id,subject_title:id===1?'<script>unsafe</script>':'Subject '+id,units:3,year_level:year,semester:'2nd Semester'});
-const base={groups:[{id:10,group_name:'<b>Group</b>',status:'active',year_level:'3rd Year',semester:'2nd Semester',required_selections:1,members:[s(1),s(2)]}],placements:[s(1),s(2),s(3,'4th Year')],years:['3rd Year','4th Year'],terms:['2nd Semester'],prerequisites:[{subject_id:2,subject_code:'S1',subject_title:'Prior'}],review:{counts:{empty:0,selection:0,duplicate:0,mismatch:0,unmapped:0,inactive:0},issues:[]}};
+const base={groups:[{id:10,group_name:'<b>Group</b>',status:'active',year_level:'3rd Year',semester:'2nd Semester',required_selections:1,members:[s(1),s(2)]}],placements:[s(1),s(2),s(3,'4th Year')],years:['3rd Year','4th Year'],terms:['2nd Semester'],prerequisites:[{subject_id:2,subject_code:'S1',subject_title:'Prior'}]};
 (async()=>{
  assert.equal(el('groupsPanel').hidden,true);assert.match(el('electiveState').innerHTML,/Select a Program/);
  for(const [i,key]of ['program','curriculum','version'].entries()){assert.equal(cascade.levels[i].minimumLength,0);el(key+'Id').value=String(i+1);}
  response=base;selected=true;cascade.onChange();await tick();
  assert.equal(requests[0].program_id,'1');assert.equal(requests[0].curriculum_version_id,'3');assert.equal(el('createElectiveGroupButton').disabled,false);
- assert.match(el('groupCards').innerHTML,/&lt;b>Group/);assert.doesNotMatch(el('groupCards').innerHTML,/<script>/);assert.match(el('reviewIssues').innerHTML,/No elective configuration issues detected/);
+ assert.match(el('groupCards').innerHTML,/&lt;b>Group/);assert.doesNotMatch(el('groupCards').innerHTML,/<script>/);assert.match(el('reviewResult').innerHTML,/No elective group issues detected/);
  el('reviewTab').handlers.click();assert.equal(el('reviewPanel').hidden,false);assert.equal(el('groupsPanel').hidden,true);
  el('groupsTab').handlers.click();el('groupSearch').value='not present';el('groupSearch').handlers.input();assert.match(el('groupCards').innerHTML,/No groups match these filters/);assert.match(el('groupCards').innerHTML,/data-clear-filters/);assert.match(el('groupSummary').innerHTML,/<strong>0<\/strong> groups/);
  root.handlers.click({target:{closest:selector=>selector==='[data-clear-filters]'?{}:null}});assert.equal(el('groupSearch').value,'');assert.match(el('groupSummary').innerHTML,/<strong>1<\/strong> group /);assert.match(el('groupSummary').innerHTML,/<strong>2<\/strong> pool subjects/);
@@ -66,10 +67,17 @@ const base={groups:[{id:10,group_name:'<b>Group</b>',status:'active',year_level:
  // A stale response cannot resurrect cards after a context reset.
  let release;pending=new Promise(resolve=>{release=resolve;});cascade.onChange();selected=false;el('curriculumId').value='';el('versionId').value='';cascade.onChange();release(base);await tick();pending=null;
  assert.equal(el('createElectiveGroupButton').disabled,true);assert.equal(el('groupsPanel').hidden,true);assert.equal(el('groupCards').innerHTML,'');
- response={...base,review:{counts:{...base.review.counts,mismatch:1},issues:[{type:'mismatch',group_id:10,group_name:'Group',subject_id:2,message:'Different placement'}]}};
- selected=true;el('curriculumId').value='2';el('versionId').value='3';cascade.onChange();await tick();assert.match(el('reviewIssues').innerHTML,/Review required/);assert.match(el('reviewIssues').innerHTML,/Open Subject Mapping/);
+ const bad={...base,groups:[{...base.groups[0],members:[s(1),s(3,'4th Year')]},{id:12,group_name:'Dup',status:'active',year_level:'3rd Year',semester:'2nd Semester',required_selections:2,members:[s(1)]},{id:13,group_name:'Inact',status:'active',year_level:'3rd Year',semester:'2nd Semester',required_selections:1,members:[{...s(5),subject_status:'retired'},s(2)]},{id:14,group_name:'Empty',status:'active',year_level:null,semester:null,required_selections:1,members:[]},{id:15,group_name:'Gone',status:'archived',year_level:null,semester:null,required_selections:1,members:[]}]};
+ response=bad;selected=true;el('curriculumId').value='2';el('versionId').value='3';cascade.onChange();await tick();
+ {const html=el('reviewChecks').innerHTML,count=key=>Number(new RegExp('data-review-issue="'+key+'"[\\s\\S]*?csms-check__count[^>]*>(\\d+)<').exec(html)[1]);
+  assert.match(html,/Group checks/);assert.equal(count('empty'),1,'archived groups are not checked');assert.equal(count('small'),1);assert.equal(count('shared'),1);assert.equal(count('inactive'),1);assert.equal(count('noplacement'),1);assert.equal(count('mismatch'),1);
+  assert.match(html,/Same subject in two groups <span class="csms-chip csms-chip--warning">Warning/);assert.doesNotMatch(html,/Duplicate|Unmapped|Missing Context/);assert.equal(el('reviewResult').innerHTML,'');}
+ el('reviewChecks').handlers.click({target:{closest:sel=>sel==='[data-review-issue]'?{dataset:{reviewIssue:'inactive'},getAttribute:()=>null}:null}});
+ {const html=el('reviewChecks').innerHTML;assert.match(html,/Status: retired\./);assert.match(html,/Edit group/);}
+ el('reviewChecks').handlers.click({target:{closest:sel=>sel==='[data-review-issue]'?{dataset:{reviewIssue:'mismatch'},getAttribute:()=>null}:null}});
+ assert.match(el('reviewChecks').innerHTML,/curriculum_builder\.php/);assert.doesNotMatch(el('reviewChecks').innerHTML,/subject_mapping/);assert.match(el('reviewChecks').innerHTML,/placed in 4th Year \/ 2nd Semester/);
  // The warning icon opens that group's issues (the server's message), read in the dialog.
- assert.match(el('groupCards').innerHTML,/data-warn="10"/);hit('[data-warn]',{warn:'10'});assert.equal(el('warnGroupModal').hidden,false);assert.match(el('warnGroupTitle').textContent,/1 issue/);assert.match(el('warnGroupBody').innerHTML,/Different placement/);
+ assert.match(el('groupCards').innerHTML,/data-warn="10"/);hit('[data-warn]',{warn:'10'});assert.equal(el('warnGroupModal').hidden,false);assert.match(el('warnGroupTitle').textContent,/2 issues/);assert.match(el('warnGroupBody').innerHTML,/Pool subject placed in a different term/);assert.match(el('warnGroupBody').innerHTML,/Same subject in two groups/);
  // Type column appears only when the workspace carries a type; unset reads "Type not set".
  response={...base,groups:[{...base.groups[0],elective_type:'professional'},{...base.groups[0],id:11,group_name:'No term',year_level:null,semester:null,status:'inactive',elective_type:null,members:[]}]};cascade.onChange();await tick();
  {const html=el('groupCards').innerHTML;assert.match(html,/<th scope="col">Type<\/th>/);assert.match(html,/csms-chip--type">Professional Elective/);assert.match(html,/csms-chip--type-unset">Type not set/);assert.ok(html.indexOf('Year level not specified')>html.indexOf('3rd Year'),'A group with no term sorts last');assert.match(html,/csms-chip--inactive">Inactive/);assert.match(html,/0 subjects/);}assert.doesNotMatch(el('reviewIssues').innerHTML,/No elective group issues/);

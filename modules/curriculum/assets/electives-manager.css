@@ -19,17 +19,11 @@
 .elective-subject > div { flex: 1; min-width: 0; }
 .elective-subject small { display: block; color: var(--csms-text-muted, #4b5563); margin-top: 5px; }
 .elective-selected-count { color: #1d5ed0; font-size: 12px; font-weight: 700; margin: 14px 0 2px; }
-.elective-review-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; margin-bottom: 18px; }
-.elective-counter { background: white; border: 1px solid #dce4ef; border-radius: 10px; padding: 16px; color: var(--csms-text-muted, #4b5563); }
-.elective-counter strong { display: block; color: #234c7b; font-size: 24px; margin: 12px 0 6px; }
-.elective-issue { padding: 16px 0; border-bottom: 1px solid #e8eef7; display: flex; gap: 16px; justify-content: space-between; align-items: center; }
-.elective-issue p { color: var(--csms-text-muted, #4b5563); margin: 6px 0; }
-.elective-issue a { white-space: nowrap; }
 .elective-modal-body { padding: 0 24px 20px; }
 .elective-warning { padding: 14px; border: 1px solid #efcf87; background: #fffbeb; border-radius: 8px; margin-top: 12px; }
 #groupFormModal .modal-dialog, #viewGroupModal .modal-dialog { max-width: 700px; }
 #groupFormModal .modal-dialog, #viewGroupModal .modal-dialog { max-height: min(90vh, 850px); overflow-y: auto; }
-@media(max-width:750px) { .elective-review-grid { grid-template-columns: 1fr; } .elective-issue { flex-direction: column; align-items: flex-start; } }
+@media(max-width:750px) {  }
 
 /* Slice 1: shared chrome (tabs, filter row, panel) as on Subject Mapping */
 .electives-content .mapping-context-bar + .csms-tabs { margin-top: 16px; }
@@ -46,8 +40,6 @@
 .elective-pool { min-width: 30rem; }
 .elective-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; color: var(--csms-text-secondary, #374151); font-size: 14px; }
 .elective-muted { color: var(--csms-text-secondary, #374151); font-size: 13px; }
-.elective-issue-item { padding: 10px 0; border-bottom: 1px solid var(--csms-border, #dfe4ee); }
-.elective-issue-item p { margin: 4px 0 0; color: var(--csms-text-secondary, #374151); font-size: 14px; }
 #warnGroupModal [hidden], #viewGroupModal [hidden] { display: none !important; }
 .elective-table td.csms-ctable__code { min-width: 14rem; white-space: normal; }
 @media (max-width: 700px) { .elective-modal-body { padding: 0 16px 16px; } }

@@ -86,6 +86,7 @@ assert.ok(!sidebar.includes('sidebar-no-break">Academic Strand'), 'no no-break s
 assert.match(components, /body \.sidebar \{ height: calc\(100dvh - var\(--sms2-topbar-height, 56px\)\); top: var\(--sms2-topbar-height, 56px\); \}/);
 assert.match(components, /overflow-wrap: break-word;\s*word-break: normal;/);
 
+assert.ok(/csms-review[.]js/.test(electives) && /id="reviewChecks"/.test(electives) && !/elective-review-grid|reviewCounters|reviewIssues/.test(electives + read('modules/curriculum/assets/electives-manager.js')), 'Electives review uses the shared review component (no score cards)');
 // Shared row menu: one csms-menu component serves Pre-requisite and Electives; no page keeps its own copy.
 assert.ok(fs.existsSync('js/csms-menu.js') && /csms-menu[.]js/.test(prereq) && /csms-menu[.]js/.test(electives), 'both pages load the shared row menu');
 assert.ok(/class="csms-menu"/.test(prereq) && /class="csms-menu"/.test(electives) && !/pr-menu|pr-rowmenu|pr-warn(?!ing)/.test(prereq + read('modules/curriculum/assets/prerequisite-configuration.css') + read('modules/curriculum/assets/prerequisite-configuration.js')), 'row menu markup and styles are shared');

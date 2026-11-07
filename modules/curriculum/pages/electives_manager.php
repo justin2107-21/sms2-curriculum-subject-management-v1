@@ -78,7 +78,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
       <div id="groupCards"></div>
       <div id="electiveRowMenu" class="csms-menu" role="menu" aria-label="Row actions" hidden></div>
     </section>
-    <section id="reviewPanel" class="csms-panel" role="tabpanel" aria-labelledby="reviewTab" hidden><div id="reviewCounters" class="elective-review-grid"></div><div id="reviewIssues"></div></section>
+    <section id="reviewPanel" class="csms-panel" role="tabpanel" aria-labelledby="reviewTab" hidden><div id="reviewChecks"></div><div id="reviewResult"></div></section>
     </section>
   </main>
   <div class="footer">Bestlink College of the Philippines &middot; CSMS-SMS2 &copy; 2026</div>
@@ -131,6 +131,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 <script src="../assets/curriculum-common.js?v=<?= $curriculumCommonVersion ?>"></script>
 <script src="../../../js/csms-menu.js?v=<?= (int)filemtime(__DIR__ . '/../../../js/csms-menu.js') ?>"></script>
+<script src="../../../js/csms-review.js?v=<?= (int)filemtime(__DIR__ . '/../../../js/csms-review.js') ?>"></script>
 <script src="../assets/placement-groups.js?v=<?= (int)filemtime(__DIR__ . '/../assets/placement-groups.js') ?>"></script>
 <script src="../assets/electives-manager.js?v=<?= $electiveScriptVersion ?>"></script>
 </body></html>
