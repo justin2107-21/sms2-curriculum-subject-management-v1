@@ -7,9 +7,7 @@
 .elective-empty h2 { font-size: 15px; margin: 0 0 8px; }
 .elective-empty p { margin: 0; }
 .elective-empty button { margin-top: 16px; }
-.elective-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
 .elective-card { background: #fff; border: 1px solid #e0e7f1; border-radius: 10px; padding: 18px; min-width: 0; box-shadow: 0 5px 20px #1e3a5f06; }
-.elective-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
 .elective-placement { font-size: var(--csms-text-xs, .75rem); color: #1d5ed0; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
 .elective-card h2 { font-size: 16px; margin: 0 0 12px; overflow-wrap: anywhere; }
 .elective-rule { background: #f2f6fe; border-radius: 8px; padding: 12px; margin: 12px 0 18px; color: #64748b; }
@@ -21,8 +19,6 @@
 .elective-subject > div { flex: 1; min-width: 0; }
 .elective-subject small { display: block; color: var(--csms-text-muted, #4b5563); margin-top: 5px; }
 .elective-selected-count { color: #1d5ed0; font-size: 12px; font-weight: 700; margin: 14px 0 2px; }
-.elective-card-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
-.elective-card-actions button, .elective-subject button { padding: 6px 10px; font-size: 12px; }
 .elective-review-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; margin-bottom: 18px; }
 .elective-counter { background: white; border: 1px solid #dce4ef; border-radius: 10px; padding: 16px; color: var(--csms-text-muted, #4b5563); }
 .elective-counter strong { display: block; color: #234c7b; font-size: 24px; margin: 12px 0 6px; }
@@ -33,10 +29,25 @@
 .elective-warning { padding: 14px; border: 1px solid #efcf87; background: #fffbeb; border-radius: 8px; margin-top: 12px; }
 #groupFormModal .modal-dialog, #viewGroupModal .modal-dialog { max-width: 700px; }
 #groupFormModal .modal-dialog, #viewGroupModal .modal-dialog { max-height: min(90vh, 850px); overflow-y: auto; }
-@media(max-width:750px) { .elective-grid,.elective-review-grid { grid-template-columns: 1fr; } .elective-issue { flex-direction: column; align-items: flex-start; } }
+@media(max-width:750px) { .elective-review-grid { grid-template-columns: 1fr; } .elective-issue { flex-direction: column; align-items: flex-start; } }
 
 /* Slice 1: shared chrome (tabs, filter row, panel) as on Subject Mapping */
 .electives-content .mapping-context-bar + .csms-tabs { margin-top: 16px; }
 .electives-content > .mapping-workspace-shell > .csms-panel { padding-top: 17px; }
 .electives-content > .mapping-workspace-shell > .csms-empty { margin-top: 17px; }
 .mapping-workspace-header .csms-chip { align-self: center; }
+
+/* Slice 2: grouped table, detail dialog, issues dialog */
+#groupCards .csms-plan { gap: 16px; }
+.elective-table td, .elective-pool td { vertical-align: middle; }
+.elective-table td.csms-ctable__code .csms-chip { margin-left: 8px; vertical-align: 1px; }
+.elective-table .csms-ctable__action { width: 1%; white-space: nowrap; text-align: right; }
+.elective-table { min-width: 34rem; }
+.elective-pool { min-width: 30rem; }
+.elective-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; color: var(--csms-text-secondary, #374151); font-size: 14px; }
+.elective-muted { color: var(--csms-text-secondary, #374151); font-size: 13px; }
+.elective-issue-item { padding: 10px 0; border-bottom: 1px solid var(--csms-border, #dfe4ee); }
+.elective-issue-item p { margin: 4px 0 0; color: var(--csms-text-secondary, #374151); font-size: 14px; }
+#warnGroupModal [hidden], #viewGroupModal [hidden] { display: none !important; }
+.elective-table td.csms-ctable__code { min-width: 14rem; white-space: normal; }
+@media (max-width: 700px) { .elective-modal-body { padding: 0 16px 16px; } }

@@ -58,8 +58,6 @@
 .pr-draft-row { display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-bottom:1px solid #eef1f5; }
 .pr-preview { background:#f8fafc; border:1px solid #e6ecf5; border-radius:8px; padding:18px; margin-top:20px; text-align:center; }
 .pr-arrow { color:#7a8ca8; font-size:var(--csms-text-xs, .75rem); line-height:1.7; }
-.pr-warning { display:flex; gap:8px; background:#fffbeb; color:#8a651e; border:1px solid #f3dfaa; padding:14px; border-radius:6px; margin:16px 0; font-size:12px; line-height:1.5; }
-.pr-warning[hidden] { display:none; }
 #chainViewport { height:clamp(420px, calc(100dvh - 400px), 780px); overflow:auto; background:#fcfdff; border:1px solid var(--csms-border,#dfe4ee); border-radius:var(--csms-radius-surface,12px); }
 #chainCanvas { position:relative; min-height:150px; }
 #chainCanvas svg { position:absolute; inset:0; pointer-events:none; }
@@ -79,17 +77,6 @@
 /* Slice 2: grouped rules table */
 .pr-table td { vertical-align:middle; }
 .pr-table .csms-ctable__action { width:1%; white-space:nowrap; text-align:right; }
-.pr-warn, .pr-rowmenu { display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; padding:0; background:#fff; border-radius:8px; cursor:pointer; }
-.pr-warn { border:1px solid #fdba74; color:#c2410c; }
-.pr-warn:hover { background:#ffedd5; }
-.pr-rowmenu { border:1px solid transparent; color:var(--csms-text-secondary,#374151); }
-.pr-rowmenu:hover { background:var(--csms-surface-muted,#f4f6fb); border-color:var(--csms-border,#dfe4ee); }
-.pr-warn:focus-visible, .pr-rowmenu:focus-visible, .pr-menu button:focus-visible { outline:3px solid var(--csms-focus,#2563eb); outline-offset:1px; }
-.pr-menu { position:fixed; z-index:60; min-width:10.5rem; padding:4px; background:#fff; border:1px solid var(--csms-border,#dfe4ee); border-radius:8px; box-shadow:0 6px 20px rgba(15,23,42,.14); }
-.pr-menu[hidden] { display:none !important; }
-.pr-menu button { display:block; width:100%; padding:8px 12px; background:none; border:0; border-radius:6px; font:inherit; font-size:14px; text-align:left; cursor:pointer; color:var(--csms-text,#1f2937); }
-.pr-menu button:hover { background:var(--csms-surface-muted,#f4f6fb); }
-.pr-menu .pr-danger { color:#b74f50; }
 .pr-table .csms-ctable__code { white-space:normal; }
 #ruleCards .csms-empty { margin:0; }
 @media (max-width:700px) { .pr-table { min-width:34rem; } }

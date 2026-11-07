@@ -729,13 +729,52 @@ async function main() {
         await sleep(300);
         await shotView(path.join(out, `${role}-prereq-tip-${width}.png`));
         await evaluate(`document.activeElement.blur(); true`);
-        result.chrome = await evaluate(`(() => { const sel = [...document.querySelectorAll('.csms-filter-row select')]; const x = document.querySelector('.record-autocomplete-clear:not([hidden])'); const r = x && x.getBoundingClientRect(); return { tabs: document.querySelectorAll('.csms-tabs [role=tab]').length, badge: !!document.getElementById('readOnlyBadge'), clippedSelects: sel.filter(e => e.scrollWidth > e.clientWidth + 1).length, selectHeights: sel.map(e => Math.round(e.getBoundingClientRect().height)), clearSize: r ? [Math.round(r.width), Math.round(r.height)] : null, overflow: document.documentElement.scrollWidth > innerWidth, rows: document.querySelectorAll('#ruleCards tbody tr, #ruleCards article').length }; })()`);
+        result.chrome = await evaluate(`(() => { const sel = [...document.querySelectorAll('.csms-filter-row select')]; const x = document.querySelector('.record-autocomplete-clear:not([hidden])'); const r = x && x.getBoundingClientRect(); return { tabs: document.querySelectorAll('.csms-tabs [role=tab]').length, badge: !!document.getElementById('readOnlyBadge'), clippedSelects: sel.filter(e => e.scrollWidth > e.clientWidth + 1).length, selectHeights: sel.map(e => Math.round(e.getBoundingClientRect().height)), clearSize: r ? [Math.round(r.width), Math.round(r.height)] : null, overflow: document.documentElement.scrollWidth > innerWidth, iw: innerWidth, rows: document.querySelectorAll('#ruleCards tbody tr, #ruleCards article').length }; })()`);
         if (arg('builderflow', '') === '1') {
           result.rowClick = await evaluate(`(() => { const r = document.querySelector('#ruleCards tr.csms-row-click'); if (!r) return null; r.click(); const m = [...document.querySelectorAll('.curriculum-modal')].find(m => !m.hidden); return m ? m.id : 'none'; })()`);
           await sleep(500);
           await shotView(path.join(out, `${role}-prereq-dialog-${width}.png`));
         }
+        await evaluate(`document.querySelectorAll('.curriculum-modal').forEach(m => { m.hidden = true; }); true`);
+        result.menu = await evaluate(`(() => { const b = document.querySelector('#ruleCards .csms-rowmenu'); if (!b) return null; b.click(); const m = document.getElementById('prRowMenu'); const out = { open: !m.hidden, items: [...m.querySelectorAll('button')].map(i => i.textContent), cls: m.className }; return out; })()`);
         report.prereq[width] = result;
+      }
+    }
+
+    if (arg('probe', '') === 'electives') {
+      // Electives Manager: chrome measurements, grouped table, row click, row menu (keyboard), issues dialog, review tab; viewport shots.
+      // Needs the fixtures from tools/uitest/elective-fixtures.php (version PREORAL-2026). Pass --urls=/modules/curriculum/pages/electives_manager.php?version_id=<id>
+      report.electives = {};
+      const key = async (k, code, vk) => { for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: k, code: code || k, windowsVirtualKeyCode: vk || 0 }); };
+      for (const width of widths) {
+        const result = {};
+        await setWidth(width);
+        issues = [];
+        await navigate(base + urls[0]);
+        await sleep(4500);
+        await shotView(path.join(out, `${role}-electives-groups-${width}.png`));
+        result.chrome = await evaluate(`(() => { const sel = [...document.querySelectorAll('.csms-filter-row select')]; return { tabs: document.querySelectorAll('.csms-tabs [role=tab]').length, oldTabs: document.querySelectorAll('.elective-tabs').length, badge: !!document.getElementById('readOnlyBadge'), create: !!document.getElementById('createElectiveGroupButton'), clippedSelects: sel.filter(e => e.scrollWidth > e.clientWidth + 1).length, selectHeights: sel.map(e => Math.round(e.getBoundingClientRect().height)), summary: document.getElementById('groupSummary').textContent, terms: document.querySelectorAll('#groupCards .csms-term').length, rows: document.querySelectorAll('#groupCards tbody tr').length, warns: document.querySelectorAll('#groupCards .csms-warn').length, menus: document.querySelectorAll('#groupCards .csms-rowmenu').length, overflow: document.documentElement.scrollWidth > innerWidth, iw: innerWidth, docW: document.documentElement.scrollWidth, state: document.getElementById('electiveState').hidden ? 'hidden' : document.getElementById('electiveState').textContent, first: (document.querySelector('#groupCards tbody tr') || {}).innerText }; })()`);
+        result.codeColor = await evaluate(`(() => { const td = document.querySelector('#groupCards td.csms-ctable__code'); return td ? getComputedStyle(td).color : null; })()`);
+        result.rowClick = await evaluate(`(() => { const r = document.querySelector('#groupCards tr.csms-row-click'); if (!r) return null; r.focus(); r.click(); const m = [...document.querySelectorAll('.curriculum-modal')].find(m => !m.hidden); return m ? { id: m.id, title: m.querySelector('h2').textContent, rows: m.querySelectorAll('tbody tr').length, edit: !!m.querySelector('#viewEdit') } : 'none'; })()`);
+        await sleep(400);
+        result.dialogGeom = await evaluate(`(() => { const m = [...document.querySelectorAll('.curriculum-modal')].find(m => !m.hidden); if (!m) return null; const d = m.querySelector('.modal-dialog').getBoundingClientRect(), mr = m.getBoundingClientRect(); return { scrollX: Math.round(scrollX), docW: document.documentElement.scrollWidth, innerWidth, vv: visualViewport && [Math.round(visualViewport.width), Math.round(visualViewport.offsetLeft)], modal: [Math.round(mr.left), Math.round(mr.width)], dialog: [Math.round(d.left), Math.round(d.width)], position: getComputedStyle(m).position }; })()`);
+        await shotView(path.join(out, `${role}-electives-detail-${width}.png`));
+        await key('Escape', 'Escape', 27); await sleep(400);
+        result.afterEscape = await evaluate(`(() => [...document.querySelectorAll('.curriculum-modal')].filter(m => !m.hidden).length)()`);
+        // Row menu by keyboard: focus the button, Enter opens, ArrowDown moves, Escape returns focus to the button.
+        result.menu = await evaluate(`(() => { const b = document.querySelector('#groupCards .csms-rowmenu'); b.focus(); b.click(); const m = document.getElementById('electiveRowMenu'); return { open: !m.hidden, items: [...m.querySelectorAll('button')].map(i => i.textContent), focusedFirst: document.activeElement === m.querySelector('button'), expanded: b.getAttribute('aria-expanded') }; })()`);
+        await shotView(path.join(out, `${role}-electives-menu-${width}.png`));
+        await key('ArrowDown', 'ArrowDown', 40); await sleep(100);
+        result.menuDown = await evaluate(`document.activeElement.textContent`);
+        await key('Escape', 'Escape', 27); await sleep(200);
+        result.menuEscape = await evaluate(`(() => ({ closed: document.getElementById('electiveRowMenu').hidden, focusOnButton: document.activeElement.classList.contains('csms-rowmenu') }))()`);
+        result.warn = await evaluate(`(() => { const w = document.querySelector('#groupCards .csms-warn'); if (!w) return null; w.click(); const m = document.getElementById('warnGroupModal'); return { open: !m.hidden, title: document.getElementById('warnGroupTitle').textContent, items: [...m.querySelectorAll('.elective-issue-item strong')].map(e => e.textContent) }; })()`);
+        await sleep(300);
+        await shotView(path.join(out, `${role}-electives-issues-${width}.png`));
+        await key('Escape', 'Escape', 27); await sleep(300);
+        result.empty = await evaluate(`(() => { const s = document.getElementById('groupSearch'); s.value = 'zzzz-none'; s.dispatchEvent(new Event('input')); return new Promise(r => setTimeout(() => { const o = document.getElementById('groupCards').innerText; s.value = ''; s.dispatchEvent(new Event('input')); r(o); }, 400)); })()`);
+        result.issues = issues.length;
+        report.electives[width] = result;
       }
     }
 

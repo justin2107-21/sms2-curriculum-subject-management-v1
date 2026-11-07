@@ -88,7 +88,7 @@
             html += '<div class="csms-term"><header><strong>' + esc(groupView.yearLabel(yearKey) || 'Year level not specified') + ' \u00b7 ' + esc(semesterKey || 'Semester not specified') + '</strong><span class="csms-term__count">' + bucket.rows.length + (bucket.rows.length === 1 ? ' subject' : ' subjects') + '</span></header><div class="csms-table-scroll"><table class="csms-ctable pr-table"><thead><tr><th class="csms-ctable__code" scope="col">Code</th><th scope="col">Subject</th><th scope="col">Requires</th><th class="csms-ctable__action" scope="col"><span class="sr-only">Issues</span></th><th class="csms-ctable__action" scope="col"><span class="sr-only">Actions</span></th></tr></thead><tbody>';
             bucket.rows.forEach(p => {
                 const id = Number(p.subject_id), edges = rules(id), issues = issuesFor(id);
-                html += '<tr class="csms-row-click" tabindex="0" data-row="' + id + '" aria-haspopup="dialog" aria-label="' + (manage ? 'Edit' : 'View') + ' prerequisite rule for ' + esc(p.subject_code) + '"><td class="csms-ctable__code">' + codeText(p) + '</td><td>' + esc(p.subject_title) + '</td><td>' + (edges.length ? edges.map(e => codeText(row(e.required_subject_id)) || esc(e.required_subject_id)).join(', ') : '<span class="pr-muted">\u2013</span>') + '</td><td class="csms-ctable__action">' + (issues.length ? '<button type="button" class="pr-warn" data-warn="' + id + '" aria-label="' + issues.length + (issues.length === 1 ? ' issue' : ' issues') + ' for ' + esc(p.subject_code) + '" title="' + issues.length + (issues.length === 1 ? ' issue' : ' issues') + '"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i></button>' : '') + '</td><td class="csms-ctable__action"><button type="button" class="pr-rowmenu" data-menu="' + id + '" aria-haspopup="menu" aria-label="Actions for ' + esc(p.subject_code) + '"><i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i></button></td></tr>';
+                html += '<tr class="csms-row-click" tabindex="0" data-row="' + id + '" aria-haspopup="dialog" aria-label="' + (manage ? 'Edit' : 'View') + ' prerequisite rule for ' + esc(p.subject_code) + '"><td class="csms-ctable__code">' + codeText(p) + '</td><td>' + esc(p.subject_title) + '</td><td>' + (edges.length ? edges.map(e => codeText(row(e.required_subject_id)) || esc(e.required_subject_id)).join(', ') : '<span class="pr-muted">\u2013</span>') + '</td><td class="csms-ctable__action">' + (issues.length ? '<button type="button" class="csms-warn" data-warn="' + id + '" aria-label="' + issues.length + (issues.length === 1 ? ' issue' : ' issues') + ' for ' + esc(p.subject_code) + '" title="' + issues.length + (issues.length === 1 ? ' issue' : ' issues') + '"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i></button>' : '') + '</td><td class="csms-ctable__action"><button type="button" class="csms-rowmenu" data-menu="' + id + '" aria-haspopup="menu" aria-label="Actions for ' + esc(p.subject_code) + '"><i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i></button></td></tr>';
             });
             html += '</tbody></table></div></div>';
         }));
@@ -102,21 +102,13 @@
         if ($('warnEdit')) $('warnEdit').hidden = false;
         dialogs.warn.open();
     }
-    // Row menu: one floating menu; Edit (or View), Remove, View in chain.
-    let menuOpener = null;
-    function closeMenu(returnFocus) { const m = $('prRowMenu'); if (!m || m.hidden) return; m.hidden = true; if (returnFocus) menuOpener?.focus(); menuOpener = null; }
+    // Row menu: the shared CsmsMenu; Edit (or View), Remove, View in chain.
+    const rowMenu = window.CsmsMenu.create($('prRowMenu'), { esc, onSelect: (action, data) => menuAction(action, Number(data.subject)) });
     function openMenu(button) {
-        const m = $('prRowMenu'), id = Number(button.dataset.menu), edges = rules(id);
-        if (!m.hidden && menuOpener === button) { closeMenu(true); return; }
-        menuOpener = button;
-        m.innerHTML = '<button type="button" role="menuitem" data-menu-action="' + (manage ? 'edit' : 'view') + '" data-subject="' + id + '">' + (manage ? 'Edit rule' : 'View rule') + '</button>' + (manage && edges.length ? '<button type="button" role="menuitem" class="pr-danger" data-menu-action="remove" data-subject="' + id + '">Remove rule</button>' : '') + '<button type="button" role="menuitem" data-menu-action="chain" data-subject="' + id + '">View in chain</button>';
-        const box = button.getBoundingClientRect ? button.getBoundingClientRect() : { bottom: 0, right: 0 };
-        m.style.top = Math.round(box.bottom + 4) + 'px'; m.style.left = Math.max(8, Math.round(box.right - 168)) + 'px';
-        m.hidden = false; m.querySelector('button')?.focus();
+        const id = Number(button.dataset.menu), edges = rules(id), data = { subject: id };
+        rowMenu.open(button, [{ action: manage ? 'edit' : 'view', label: manage ? 'Edit rule' : 'View rule', data }, ...(manage && edges.length ? [{ action: 'remove', label: 'Remove rule', data, danger: true }] : []), { action: 'chain', label: 'View in chain', data }]);
     }
-    function menuAction(button) {
-        const id = Number(button.dataset.subject), action = button.dataset.menuAction;
-        closeMenu(false);
+    function menuAction(action, id) {
         if (action === 'edit') openEditor(id); else if (action === 'view') details(id); else if (action === 'remove') confirmRemoval(id);
         else if (action === 'chain') { showTab('chain'); focus.setSelected(row(id)); }
     }
@@ -266,11 +258,8 @@
         $('reviewResult').innerHTML = reviewUi.total() ? '' : '<div class="csms-empty"><i class="fa-solid fa-circle-check" aria-hidden="true"></i><strong>No prerequisite conflicts detected.</strong><span>Checks cover duplicate, circular, sequencing, missing-placement and non-active-subject rules.</span></div>';
     }
     document.addEventListener('click', event => {
-        const menu = $('prRowMenu');
-        if (menu && !menu.hidden && !event.target.closest('#prRowMenu') && !event.target.closest('[data-menu]')) closeMenu(false);
         const b=event.target.closest('button,[data-details],[data-row]'); if(!b)return;
         if(b.dataset.dir){state.dir=b.dataset.dir;renderChain();}
-        else if(b.dataset.menuAction)menuAction(b);
         else if(b.dataset.menu)openMenu(b);
         else if(b.dataset.warn)openWarn(Number(b.dataset.warn));
         else if(b.dataset.row)(manage?openEditor:details)(Number(b.dataset.row));
@@ -284,9 +273,7 @@
     $('removeModal')?.addEventListener('click', event => { if (event.target.closest('[data-modal-close]') && state.remove?.draft) dialogs.editor.open(); });
     $('removeModal')?.addEventListener('keydown', event => { if (event.key === 'Escape' && state.remove?.draft) dialogs.editor.open(); });
     $('ruleCards').addEventListener('keydown',e=>{if(e.target.matches('[data-row]')&&['Enter',' '].includes(e.key)){e.preventDefault();(manage?openEditor:details)(Number(e.target.dataset.row));}});
-    $('prRowMenu')?.addEventListener('keydown',e=>{const items=[...$('prRowMenu').querySelectorAll('button')],i=items.indexOf(e.target);if(e.key==='Escape'){e.preventDefault();closeMenu(true);}else if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();items[(i+(e.key==='ArrowDown'?1:items.length-1))%items.length]?.focus();}else if(e.key==='Tab')closeMenu(false);});
     $('warnEdit')?.addEventListener('click',()=>{dialogs.warn.close();openEditor(state.target);});
-    window.addEventListener?.('scroll',()=>closeMenu(false),true);
     window.addEventListener?.('resize',ui.debounce(()=>{if(!$('panel-chain').hidden)renderChain();},200));
     document.querySelector('.csms-tabs').addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();const tabs=[...document.querySelectorAll('[data-tab]')],i=tabs.indexOf(e.target),next=e.key==='Home'?0:e.key==='End'?2:(i+(e.key==='ArrowRight'?1:2))%3;tabs[next].click();tabs[next].focus();});
     $('ruleSearch').addEventListener('keydown',e=>{if(e.key==='Escape'&&$('ruleSearch').value){$('ruleSearch').value='';renderRules();}});

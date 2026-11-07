@@ -49,6 +49,9 @@ const prereq = read('modules/curriculum/pages/prerequisite_configuration.php');
 assert.ok(/csms-review[.]js/.test(prereq) && /csms-review[.]js/.test(mapping) && /id="reviewChecks"/.test(prereq) && !/pr-review-grid|reviewCounts/.test(prereq), 'Both review tabs use the shared review component');
 assert.ok(!/pr-tabs|pr-note/.test(prereq) && /class="csms-tabs"/.test(prereq) && /class="csms-filter-row pr-toolbar"/.test(prereq) && /class="csms-select"/.test(prereq), 'Prerequisite page uses the shared tab, filter row and select classes');
 assert.match(mapping, /class="csms-tabs" id="mappingWorkspaceTabs"/);
+const electives = read('modules/curriculum/pages/electives_manager.php');
+assert.ok(!/elective-tabs|elective-filters/.test(electives) && !/elective-tabs|elective-filters/.test(read('modules/curriculum/assets/electives-manager.css')), 'Electives page uses the shared tab and filter row classes');
+assert.ok(/class="csms-tabs"/.test(electives) && /class="csms-filter-row"/.test(electives) && /class="csms-select"/.test(electives) && /csms-info__tip/.test(electives) && /Read-only for your role/.test(electives), 'Electives page: shared tabs, filter row, selects, info tooltip, read-only badge');
 assert.match(components, /\.csms-hidden-field \{ display: none !important; \}/);
 
 // Context picker: labels above select-like fields, searchable panels, Reset only (no collapsed summary / Change).
@@ -83,4 +86,8 @@ assert.ok(!sidebar.includes('sidebar-no-break">Academic Strand'), 'no no-break s
 assert.match(components, /body \.sidebar \{ height: calc\(100dvh - var\(--sms2-topbar-height, 56px\)\); top: var\(--sms2-topbar-height, 56px\); \}/);
 assert.match(components, /overflow-wrap: break-word;\s*word-break: normal;/);
 
+// Shared row menu: one csms-menu component serves Pre-requisite and Electives; no page keeps its own copy.
+assert.ok(fs.existsSync('js/csms-menu.js') && /csms-menu[.]js/.test(prereq) && /csms-menu[.]js/.test(electives), 'both pages load the shared row menu');
+assert.ok(/class="csms-menu"/.test(prereq) && /class="csms-menu"/.test(electives) && !/pr-menu|pr-rowmenu|pr-warn(?!ing)/.test(prereq + read('modules/curriculum/assets/prerequisite-configuration.css') + read('modules/curriculum/assets/prerequisite-configuration.js')), 'row menu markup and styles are shared');
+assert.match(components, /.csms-menu {/);assert.match(components, /.csms-chip--type {/);
 console.log('PASS: Batch 5 wiring (shared header assets, h1 titles, reports on shared topbar, hidden year holder, context bar hooks, live-state helpers)');

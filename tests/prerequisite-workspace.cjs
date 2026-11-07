@@ -28,6 +28,7 @@ const ui={...require('./search-ranking.cjs'),escapeHtml:v=>String(v??'').replace
 const document={getElementById:el,querySelector:s=>el(s),querySelectorAll:s=>s==='[data-tab]'?tabs:[],addEventListener:(event,fn)=>{if(event==='click')docClick=fn;}};
 const win={CurriculumUI:ui};vm.runInNewContext(fs.readFileSync('modules/curriculum/assets/placement-groups.js','utf8'),{window:win,console});
 vm.runInNewContext(fs.readFileSync('js/csms-review.js','utf8'),{window:win,console});
+vm.runInNewContext(fs.readFileSync('js/csms-menu.js','utf8'),{window:win,console});
 vm.runInNewContext(fs.readFileSync('modules/curriculum/assets/prerequisite-configuration.js','utf8'),{window:win,document,location:{search:''},URLSearchParams,FormData,requestAnimationFrame:fn=>fn(),setTimeout,console});
 const settle=()=>new Promise(resolve=>setImmediate(resolve));
 const click=async dataset=>{const b=new Element('button');b.dataset=dataset;await docClick({target:b});await settle();};
@@ -68,7 +69,7 @@ async function context(program=programs[0]){[program,curriculum,version].forEach
  // Slice 2: row click, menu, warning modal, earlier-term picker.
  await click({row:'3'});assert.equal(el('editorModal').hidden,false,'Row click opens the edit dialog');el('editorModal').hidden=true;
  await click({menu:'3'});assert.equal(el('prRowMenu').hidden,false);assert(el('prRowMenu').innerHTML.includes('Edit rule')&&el('prRowMenu').innerHTML.includes('Remove rule')&&el('prRowMenu').innerHTML.includes('View in chain'));
- await click({menuAction:'chain',subject:'3'});assert.equal(el('prRowMenu').hidden,true);assert.equal(el('panel-chain').hidden,false);assert.equal(el('focusId').value,'3');await click({tab:'rules'});
+ {const item=new Element('item');item.dataset={menuAction:'chain',subject:'3'};await el('prRowMenu').emit('click',{target:item});await settle();}assert.equal(el('prRowMenu').hidden,true);assert.equal(el('panel-chain').hidden,false);assert.equal(el('focusId').value,'3');await click({tab:'rules'});
  placements=[p(1),p(2,{year_level:'2nd Year',period_position:3}),p(3,{year_level:'2nd Year',period_position:3}),p(4,{semester:null,period_position:null})];edges=[];review={cycles:[],duplicates:[],sequencing:[{...e(1,2,3),message:'CC3 is placed in the same term as CC2.'}],missing:[]};
  await context();assert(el('ruleCards').innerHTML.includes('data-warn="2"'),'Warning icon on the conflicted subject');assert(!el('ruleCards').innerHTML.includes('data-warn="1"'));
  await click({warn:'2'});assert.equal(el('warnModal').hidden,false);assert(el('warnBody').innerHTML.includes('same term as CC2'));assert(el('warnTitle').textContent.includes('1 issue'));el('warnModal').hidden=true;

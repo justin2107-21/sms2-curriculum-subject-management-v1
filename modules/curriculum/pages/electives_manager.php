@@ -76,11 +76,19 @@ require __DIR__ . '/../../../shared/sidebar.php';
         <span class="csms-info"><button type="button" class="csms-info__btn" aria-label="About this page" aria-describedby="electiveInfoTip"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button><span class="csms-info__tip" role="tooltip" id="electiveInfoTip">College curricula only: Senior High School elective categories are not supported here. Unit targets for electives are checked by the Compliance Validator, not on this page.</span></span>
       </div>
       <div id="groupCards"></div>
+      <div id="electiveRowMenu" class="csms-menu" role="menu" aria-label="Row actions" hidden></div>
     </section>
     <section id="reviewPanel" class="csms-panel" role="tabpanel" aria-labelledby="reviewTab" hidden><div id="reviewCounters" class="elective-review-grid"></div><div id="reviewIssues"></div></section>
     </section>
   </main>
   <div class="footer">Bestlink College of the Philippines &middot; CSMS-SMS2 &copy; 2026</div>
+</div>
+<div class="curriculum-modal" id="warnGroupModal" hidden><div class="modal-backdrop" data-modal-close></div>
+  <section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="warnGroupTitle">
+    <div class="modal-header"><h2 id="warnGroupTitle">Issues</h2><button type="button" class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
+    <div id="warnGroupBody" class="elective-modal-body"></div>
+    <div class="modal-actions modal-actions-padded"><button type="button" class="button-muted" data-modal-close>Close</button><?php if ($canManageElectives): ?><button type="button" class="button-primary" id="warnGroupEdit">Edit group</button><?php endif; ?></div>
+  </section>
 </div>
 <div class="curriculum-modal" id="viewGroupModal" hidden><div class="modal-backdrop" data-modal-close></div>
   <section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="viewGroupTitle">
@@ -122,6 +130,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <?php endif; ?>
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 <script src="../assets/curriculum-common.js?v=<?= $curriculumCommonVersion ?>"></script>
+<script src="../../../js/csms-menu.js?v=<?= (int)filemtime(__DIR__ . '/../../../js/csms-menu.js') ?>"></script>
 <script src="../assets/placement-groups.js?v=<?= (int)filemtime(__DIR__ . '/../assets/placement-groups.js') ?>"></script>
 <script src="../assets/electives-manager.js?v=<?= $electiveScriptVersion ?>"></script>
 </body></html>

@@ -603,3 +603,21 @@ body .main .module-views a:focus-visible { outline: 2px solid var(--csms-primary
 .csms-check__list .csms-ctable td { overflow-wrap: break-word; word-break: normal; }
 .csms-ctable__action .csms-link + .csms-link { margin-left: 12px; }
 @media (max-width: 600px) { .csms-check__list .csms-ctable { min-width: 30rem; } }
+
+/* ---- Shared row controls: warning icon button, row menu (js/csms-menu.js) and the type chip. Promoted from the Pre-requisite page. ---- */
+.csms-warn, .csms-rowmenu { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; background: #fff; border-radius: 8px; cursor: pointer; }
+.csms-warn { border: 1px solid #fdba74; color: #c2410c; }
+.csms-warn:hover { background: #ffedd5; }
+.csms-rowmenu { border: 1px solid transparent; color: var(--csms-text-secondary, #374151); }
+.csms-rowmenu:hover, .csms-rowmenu[aria-expanded="true"] { background: var(--csms-surface-muted, #f4f6fb); border-color: var(--csms-border, #dfe4ee); }
+.csms-warn:focus-visible, .csms-rowmenu:focus-visible, .csms-menu button:focus-visible { outline: 3px solid var(--csms-focus, #2563eb); outline-offset: 1px; }
+.csms-menu { position: fixed; z-index: 60; min-width: 10.5rem; padding: 4px; background: #fff; border: 1px solid var(--csms-border, #dfe4ee); border-radius: 8px; box-shadow: 0 6px 20px rgba(15, 23, 42, .14); }
+.csms-menu[hidden] { display: none !important; }
+.csms-menu button { display: block; width: 100%; padding: 8px 12px; background: none; border: 0; border-radius: 6px; font: inherit; font-size: 14px; text-align: left; cursor: pointer; color: var(--csms-text, #1f2937); }
+.csms-menu button:hover { background: var(--csms-surface-muted, #f4f6fb); }
+.csms-menu .is-danger { color: #b74f50; }
+@media (max-width: 600px), (pointer: coarse) { .csms-warn, .csms-rowmenu { width: 44px; height: 44px; } .csms-menu button { padding: 12px 14px; } }
+.csms-chip--inactive { background: #e5e7eb; color: #374151; }
+/* Type chip: neutral blue-grey, same shape as the status chips. */
+.csms-chip--type { background: #e8eefb; color: var(--csms-navy, #1a3a8c); }
+.csms-chip--type-unset { background: #f1f5f9; color: #475569; font-weight: 600; }
