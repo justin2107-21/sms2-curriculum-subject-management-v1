@@ -10,7 +10,7 @@
     const dependents = id => [...new Set(state.edges.filter(e => Number(e.required_subject_id) === Number(id)).map(e => Number(e.subject_id)))];
     const placement = p => [p?.year_level || 'Missing year / grade', p?.semester || 'Missing semester'].join(' · ');
     const subject = (id, showPlacementLabel = false) => { const p = row(id); return '<div class="pr-subject"><strong>' + esc(p?.subject_code || 'Subject #' + id) + '</strong><span>' + esc(p?.subject_title || '') + '</span><small>' + (showPlacementLabel === true ? 'Placement \u00b7 ' : '') + esc(placement(p)) + '</small></div>'; };
-    const mappingUrl = (subjectId = '') => 'subject_mapping.php?' + new URLSearchParams({ program_id: $('programId').value, curriculum_id: $('curriculumId').value, version_id: $('versionId').value, subject_id: subjectId });
+    const builderUrl = () => 'curriculum_builder.php?' + new URLSearchParams({ program_id: $('programId').value, curriculum_id: $('curriculumId').value, version_id: $('versionId').value });
     const controls = (id, name, search, onSelect, extra = {}) => ({ input: $(id + 'Search'), valueInput: $(id + 'Id'), list: $(id + 'Options'), minimumLength: 0, showSuggestionsOnFocus: true, showSuggestionsOnEnable: true, placeholder: 'Search ' + name,
         search: async q => await search(q), onSelect, ...extra });
     const cascade = ui.createCascadingAutocomplete({ restoreSavedContext: !new URLSearchParams(location.search).has('version_id'), levels: [
@@ -152,7 +152,7 @@
         $('relationshipPreview').innerHTML = t && r ? '<div class="pr-preview"><p class="eyebrow">REQUIRED SUBJECT</p>' + subject(r) + '<p class="pr-arrow">↓<br/>REQUIRED BEFORE<br/>↓</p><p class="eyebrow">TARGET SUBJECT</p>' + subject(t) + '</div>' : '';
         $('sequenceWarning').hidden = true;
         $('editorMapping').hidden = ![t, ...ids].filter(Boolean).some(id => !row(id)?.year_level?.trim() || !row(id)?.semester?.trim());
-        $('editorMapping').href = mappingUrl(t);
+        $('editorMapping').href = builderUrl();
         if (!t) return;
         try {
             const data = await ui.fetchJson(api, { action: 'preview_sequence', curriculum_version_id: $('versionId').value, subject_id: t, required_ids: ids.join(',') });
@@ -229,12 +229,41 @@
         requestAnimationFrame(fit);
     }
     function fit() { const v = $('chainViewport'), c = $('chainCanvas'); if (!c.querySelector('svg')) return; const w = Number(c.dataset.width), h = Number(c.dataset.height), scale = Math.max(.55, Math.min(1, (v.clientWidth - 8) / w, (v.clientHeight - 8) / h)); c.style.transformOrigin = 'top left'; c.style.transform = 'translate(' + Math.max(0, (v.clientWidth - w * scale) / 2) + 'px,' + 0 + 'px) scale(' + scale + ')'; v.scrollLeft = 0; v.scrollTop = 0; }
-    const reviewLabels = { cycles:'Circular Dependencies', duplicates:'Duplicate Rules', sequencing:'Sequencing Conflicts', missing:'Missing Placement' };
+    // Validation Review: the shared review component draws the rows; this page supplies the checks as data.
+    const reviewMeta = {
+        cycles: ['Circular Dependencies', 'Subjects that end up requiring themselves'],
+        duplicates: ['Duplicate Rules', 'The same prerequisite listed more than once for a subject'],
+        sequencing: ['Sequencing Conflicts', 'A prerequisite placed in the same term or later than its subject'],
+        missing: ['Missing Placement', 'A rule whose subject has no year or semester'],
+        inactive: ['Rule uses a non-active subject', 'A rule whose subject, or its prerequisite, is not active in Subject Master']
+    };
+    const reviewUi = window.CsmsReview.create($('reviewChecks'), { esc, onAction: (action, id) => (action === 'edit' && manage ? openEditor : details)(id) });
+    const codeOf = id => esc(row(id)?.subject_code || id);
+    const ruleAction = (id, extra = '') => '<button type="button" class="csms-link" data-review-action="' + (manage ? 'edit' : 'view') + '" data-review-id="' + Number(id) + '">' + (manage ? 'Edit rule' : 'View rule') + '<span class="sr-only"> for ' + codeOf(id) + '</span></button>' + extra;
+    // Rules that touch a subject whose status is not "active"; the row shows the real status.
+    function inactiveRows() {
+        const out = [];
+        state.edges.forEach(e => [Number(e.subject_id), Number(e.required_subject_id)].forEach(sid => {
+            const status = row(sid)?.subject_status;
+            if (status && status !== 'active') out.push({ subject_id: Number(e.subject_id), required_subject_id: Number(e.required_subject_id), bad: sid, status });
+        }));
+        return out;
+    }
+    function reviewChecks() {
+        const r = state.review || {}, pair = [{ header: 'Subject', code: true, cell: e => codeOf(e.subject_id) }, { header: 'Requires', code: true, cell: e => codeOf(e.required_subject_id) }];
+        const fix = e => ruleAction(e.subject_id, ' <a class="csms-link" href="' + esc(builderUrl()) + '">Open in Builder</a>');
+        return [
+            { key: 'cycles', rows: r.cycles || [], columns: [{ header: 'Path', cell: c => c.map(codeOf).join(' \u2192 ') }], actions: c => ruleAction(c[0]) },
+            { key: 'duplicates', rows: r.duplicates || [], columns: pair, actions: e => ruleAction(e.subject_id) },
+            { key: 'sequencing', rows: r.sequencing || [], columns: [...pair, { header: 'Detail', cell: e => esc(e.message || 'A prerequisite must be placed in an earlier term.') }], actions: fix },
+            { key: 'missing', rows: r.missing || [], columns: [...pair, { header: 'Detail', cell: () => 'Placement information is incomplete.' }], actions: fix },
+            { key: 'inactive', rows: inactiveRows(), columns: [...pair, { header: 'Not active', cell: e => codeOf(e.bad) + ' (' + esc(e.status) + ')' }], actions: e => ruleAction(e.subject_id) }
+        ].map(c => ({ ...c, label: reviewMeta[c.key][0], hint: reviewMeta[c.key][1] }));
+    }
     function renderReview() {
-        $('reviewCounts').innerHTML = Object.entries(reviewLabels).map(([key,label]) => '<button class="pr-panel pr-review-count" data-review="'+key+'"><strong>'+ (state.review[key]?.length || 0) +'</strong><span>'+label+'</span></button>').join('');
-        const structural = ['cycles','duplicates','sequencing','missing'].reduce((sum,k)=>sum+(state.review[k]?.length||0),0);
-        $('reviewIssues').innerHTML = !state.loaded ? '' : (!structural ? '<div class="pr-panel pr-success"><strong>No prerequisite conflicts detected.</strong><p>Current prerequisite rules contain no duplicate, circular, sequencing, or missing-placement conflicts.</p></div>' : '');
-        Object.keys(reviewLabels).forEach(key => { const items=state.review[key] || []; if (!items.length) return; $('reviewIssues').innerHTML += '<section class="pr-panel" id="issue-'+key+'"><h3>'+reviewLabels[key]+'</h3>'+items.map(e => { const id=key==='cycles'?e[0]:Number(e.subject_id); return '<div class="pr-issue">'+(key==='cycles'?'<strong>'+e.map(n=>esc(row(n)?.subject_code||n)).join(' → ')+'</strong>':'<div class="pr-issue-pair"><div><small>REQUIRED</small>'+subject(e.required_subject_id)+'</div><span>→</span><div><small>TARGET</small>'+subject(e.subject_id)+'</div></div>')+(key==='sequencing'?'<p>'+esc(e.message || 'A prerequisite must be placed in an earlier academic period.')+'</p>':'')+(key==='missing'?'<p>Placement information is incomplete.</p>':'')+'<div class="pr-issue-actions"><button class="button-muted" data-'+(manage?'edit':'details')+'="'+id+'">'+(key==='duplicates'&&manage?'Resolve':'View Rule')+'</button>'+(['sequencing','missing'].includes(key)?'<a class="button-muted" href="'+mappingUrl(e.required_subject_id)+'">'+'Fix Placement'+'</a>':'')+'</div></div>'; }).join('')+'</section>'; });
+        if (!state.loaded) { $('reviewChecks').innerHTML = ''; $('reviewResult').innerHTML = ''; return; }
+        reviewUi.render([{ title: 'Rule checks', note: 'Selected version only', checks: reviewChecks() }]);
+        $('reviewResult').innerHTML = reviewUi.total() ? '' : '<div class="csms-empty"><i class="fa-solid fa-circle-check" aria-hidden="true"></i><strong>No prerequisite conflicts detected.</strong><span>Checks cover duplicate, circular, sequencing, missing-placement and non-active-subject rules.</span></div>';
     }
     document.addEventListener('click', event => {
         const menu = $('prRowMenu');
@@ -250,7 +279,6 @@
         else if(b.dataset.draftRemove)confirmRemoval(state.target,Number(b.dataset.draftRemove));
         else if(b.dataset.details)details(Number(b.dataset.details));
         else if(b.hasAttribute('data-add-focused'))openEditor(state.focus);
-        else if(b.dataset.review)$('issue-'+b.dataset.review)?.scrollIntoView({behavior:'smooth',block:'start'});
         else if(b.dataset.tab) showTab(b.dataset.tab);
     });
     $('removeModal')?.addEventListener('click', event => { if (event.target.closest('[data-modal-close]') && state.remove?.draft) dialogs.editor.open(); });

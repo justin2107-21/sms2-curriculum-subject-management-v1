@@ -159,6 +159,7 @@ assert.equal(data.edges(mappings, [edge, edge, { ...edge, requirement_type: 'cor
 vm.runInNewContext(fs.readFileSync('modules/curriculum/assets/outcomes-presentation.js', 'utf8'), context);
 vm.runInNewContext(fs.readFileSync('modules/curriculum/assets/placement-groups.js', 'utf8'), context);
 vm.runInNewContext(fs.readFileSync('modules/curriculum/assets/subject-mapping-matrix.js', 'utf8'), context);
+vm.runInNewContext(fs.readFileSync('js/csms-review.js', 'utf8'), context);
 vm.runInNewContext(fs.readFileSync('modules/curriculum/assets/subject-mapping-final.js', 'utf8'), context);
 const settle = async () => { for (let i = 0; i < 12; i++) await new Promise(resolve => setImmediate(resolve)); };
 const click = (id, selector, dataset) => el(id).handlers.click({ target: { closest: name => name === selector ? { dataset } : null } });
@@ -244,7 +245,7 @@ const terms = () => [...el('mappingMap').innerHTML.matchAll(/<tr class="map-tabl
     // Mapping Review: structural checks plus the two outcome-coverage checks, each a row with a count and an expandable list.
     outcomeLinks = [{ id: 501, placement_id: 101, outcome_id: 1 }, { id: 502, placement_id: 102, outcome_id: 1 }]; selectors.mappingVersionInput.setSelected(version); await settle();
     const review = () => el('mappingReviewCards').innerHTML;
-    const count = key => Number(new RegExp('data-review-issue="' + key + '"[^>]*>.*?<span class="mapping-check__count[^"]*">(\\d+)<\/span>').exec(review())[1]);
+    const count = key => Number(new RegExp('data-review-issue="' + key + '"[^>]*>.*?<span class="csms-check__count[^"]*">(\\d+)<\/span>').exec(review())[1]);
     const toggle = key => el('mappingReviewCards').handlers.click({ target: { closest: sel => sel === '[data-review-issue]' ? { dataset: { reviewIssue: key }, getAttribute: () => null } : null } });
     ['placement', 'duplicates', 'missingYear', 'missingSemester', 'outcomesNoSubject', 'subjectsNoOutcome'].forEach(key => assert.ok(review().includes('data-review-issue="' + key + '"'), key));
     assert.ok(!review().includes('outcomes never') && !/never reach/i.test(review()), 'no level-based check');

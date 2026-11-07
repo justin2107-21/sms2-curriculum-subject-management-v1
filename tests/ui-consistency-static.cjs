@@ -46,6 +46,7 @@ assert.match(mapping, /<select class="csms-select" id="mappingYearFilter"/);
 assert.match(mapping, /class="csms-filter-row" id="mappingMapToolbar"/);
 assert.ok(!mapping.includes('mapping-map-toolbar'), 'Subject Mapping filter row uses the shared csms-filter-row');
 const prereq = read('modules/curriculum/pages/prerequisite_configuration.php');
+assert.ok(/csms-review[.]js/.test(prereq) && /csms-review[.]js/.test(mapping) && /id="reviewChecks"/.test(prereq) && !/pr-review-grid|reviewCounts/.test(prereq), 'Both review tabs use the shared review component');
 assert.ok(!/pr-tabs|pr-note/.test(prereq) && /class="csms-tabs"/.test(prereq) && /class="csms-filter-row pr-toolbar"/.test(prereq) && /class="csms-select"/.test(prereq), 'Prerequisite page uses the shared tab, filter row and select classes');
 assert.match(mapping, /class="csms-tabs" id="mappingWorkspaceTabs"/);
 assert.match(components, /\.csms-hidden-field \{ display: none !important; \}/);

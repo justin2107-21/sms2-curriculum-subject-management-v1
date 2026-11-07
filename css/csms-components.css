@@ -564,3 +564,42 @@ body .main .module-views a:focus-visible { outline: 2px solid var(--csms-primary
 .csms-info__tip { position: absolute; z-index: 40; top: calc(100% + 6px); right: 0; width: min(22rem, 80vw); padding: 10px 12px; background: #1f2937; color: #fff; border-radius: 8px; font-size: 13px; font-weight: 400; line-height: 1.45; box-shadow: 0 6px 20px rgba(15, 23, 42, .2); visibility: hidden; opacity: 0; transition: opacity .12s; pointer-events: none; }
 .csms-info:hover .csms-info__tip, .csms-info:focus-within .csms-info__tip { visibility: visible; opacity: 1; }
 @media (max-width: 600px) { .csms-info { margin-left: auto; } .csms-info__tip { right: 0; } }
+
+/* ---- Shared review component (js/csms-review.js) and row link / action cells. Moved from Subject Mapping. ---- */
+.csms-ctable__scroll { overflow-x: auto; }
+.csms-ctable__action { width: 1%; white-space: nowrap; text-align: right; }
+.csms-ctable__muted { color: var(--csms-text-secondary, #374151); }
+.csms-link { padding: 0; background: none; border: 0; font: inherit; font-size: 14px; color: var(--csms-code-blue, #2163c5); text-decoration: underline; cursor: pointer; }
+.csms-link:hover { text-decoration: none; }
+.csms-link:focus-visible, .csms-check__head:focus-visible { outline: 2px solid var(--csms-code-blue, #2163c5); outline-offset: 2px; }
+.csms-checks { display: block; }
+.csms-check { border-top: 1px solid var(--csms-border, #dfe4ee); }
+.csms-checks > header + .csms-check { border-top: 0; }
+.csms-check h3 { margin: 0; font-size: 14px; font-weight: 400; }
+.csms-check__head { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 14px; background: none; border: 0; font: inherit; color: var(--csms-text, #1f2937); text-align: left; cursor: pointer; }
+.csms-check__head:hover { background: var(--csms-surface-muted, #f4f6fb); }
+.csms-check__head[aria-disabled="true"] { cursor: default; }
+.csms-check__head[aria-disabled="true"]:hover { background: none; }
+.csms-check__head[aria-disabled="true"] .csms-check__chev { visibility: hidden; }
+.csms-check__chev { flex: none; width: 10px; font-size: 11px; color: var(--csms-text-secondary, #374151); transition: transform .15s; }
+.csms-check.is-open .csms-check__chev { transform: rotate(90deg); }
+.csms-check__label { flex: 1 1 auto; min-width: 0; font-weight: 600; }
+.csms-check__label small { display: block; font-weight: 400; font-size: 13px; color: var(--csms-text-secondary, #374151); }
+.csms-check__count { flex: none; min-width: 2rem; padding: 1px 8px; text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; border-radius: 999px; background: #e5e7eb; color: #374151; }
+.csms-check__count.has-issues { background: #fdf0c8; color: #7a4a00; }
+.csms-check__list { border-top: 1px solid var(--csms-border, #dfe4ee); overflow-x: auto; }
+.csms-check__list[hidden] { display: none; }
+.csms-check__list .csms-ctable thead th { background: var(--csms-surface-muted, #f4f6fb); }
+@media (prefers-reduced-motion: reduce) { .csms-check__chev { transition: none; } }
+.csms-check h3 { font-family: inherit; }
+.csms-check__chev { align-self: center; }
+.csms-check__head { align-items: flex-start; }
+.csms-check__chev { margin-top: 5px; }
+.csms-check__count { align-self: center; }
+.csms-check__list .csms-ctable td { overflow-wrap: anywhere; }
+.csms-check__head, .csms-check__label { font-family: var(--sms2-font-family, "DM Sans", "Segoe UI", sans-serif); }
+.csms-check__list .csms-ctable { min-width: 0; }
+@media (max-width: 600px) { .csms-check__head { padding: 8px 10px; } }
+.csms-check__list .csms-ctable td { overflow-wrap: break-word; word-break: normal; }
+.csms-ctable__action .csms-link + .csms-link { margin-left: 12px; }
+@media (max-width: 600px) { .csms-check__list .csms-ctable { min-width: 30rem; } }

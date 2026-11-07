@@ -159,7 +159,7 @@
             if (index === 0) { state.program = action === 'select' ? item : null; state.curriculum = null; state.version = null; }
             if (index === 1) { state.curriculum = action === 'select' ? item : null; state.version = null; }
             if (index === 2) state.version = action === 'select' ? item : null;
-            state.year = ''; expandedChecks.clear();
+            state.year = ''; reviewUi.reset();
             ['mappingSubjectSearch', 'mappingYearFilter', 'mappingSemesterFilter', 'mappingStatusFilter'].forEach(key => { el(key).value = ''; });
             if (contextReset) return;
             contextRequest++;
@@ -599,7 +599,7 @@
             const versions = new Set(usage.map(row => Number(row.curriculum_version_id))).size;
             const programs = new Set(usage.map(row => Number(row.academic_program_id))).size;
             const placementChip = row => String(row.is_required) === '1' ? chip('approved', 'Required') : String(row.is_required) === '0' ? chip('draft', 'Optional') : '<span class="csms-ctable__muted">Not set</span>';
-            const cards = usage.length ? '<div class="csms-term"><div class="csms-ctable__scroll"><table class="csms-ctable csms-ctable--trace"><thead><tr><th class="csms-ctable__code" scope="col">Code</th><th scope="col">Program</th><th scope="col">Curriculum</th><th scope="col">Version</th><th scope="col">Year / Semester</th><th scope="col">Placement</th><th class="csms-ctable__action" scope="col"><span class="sr-only">Action</span></th></tr></thead><tbody>' + usage.map(row => '<tr' + (String(row.curriculum_version_id) === versionIdInput.value ? ' class="is-current"' : '') + '><td class="csms-ctable__code">' + esc(subject.subject_code).replaceAll('/', '/<wbr>') + '</td><td>' + esc(row.program_code) + '</td><td>' + esc(row.curriculum_code) + '</td><td>' + esc(row.version_label) + '</td><td>' + esc((row.year_level || 'Year not set') + ' \u00b7 ' + (row.semester || 'Semester not set')) + '</td><td>' + placementChip(row) + '</td><td class="csms-ctable__action"><a class="mapping-open-link" href="' + esc(builderUrl(row)) + '">Open in Builder<span class="sr-only"> for ' + esc(row.program_code + ' ' + row.curriculum_code + ' ' + row.version_label) + '</span></a></td></tr>').join('') + '</tbody></table></div></div>' : '';
+            const cards = usage.length ? '<div class="csms-term"><div class="csms-ctable__scroll"><table class="csms-ctable csms-ctable--trace"><thead><tr><th class="csms-ctable__code" scope="col">Code</th><th scope="col">Program</th><th scope="col">Curriculum</th><th scope="col">Version</th><th scope="col">Year / Semester</th><th scope="col">Placement</th><th class="csms-ctable__action" scope="col"><span class="sr-only">Action</span></th></tr></thead><tbody>' + usage.map(row => '<tr' + (String(row.curriculum_version_id) === versionIdInput.value ? ' class="is-current"' : '') + '><td class="csms-ctable__code">' + esc(subject.subject_code).replaceAll('/', '/<wbr>') + '</td><td>' + esc(row.program_code) + '</td><td>' + esc(row.curriculum_code) + '</td><td>' + esc(row.version_label) + '</td><td>' + esc((row.year_level || 'Year not set') + ' \u00b7 ' + (row.semester || 'Semester not set')) + '</td><td>' + placementChip(row) + '</td><td class="csms-ctable__action"><a class="csms-link" href="' + esc(builderUrl(row)) + '">Open in Builder<span class="sr-only"> for ' + esc(row.program_code + ' ' + row.curriculum_code + ' ' + row.version_label) + '</span></a></td></tr>').join('') + '</tbody></table></div></div>' : '';
             if (contextualTrace() && !usage.length) {
                 selectedTraceSubject = null; traceAutocomplete.clear(false);
                 showPanelState(target, 'No matching subject is placed in the selected context.'); return;
@@ -618,7 +618,12 @@
     };
     const outcomeCheckKeys = ['outcomesNoSubject', 'subjectsNoOutcome'];
     const structuralKeys = ['placement', 'duplicates', 'missingYear', 'missingSemester'];
-    const expandedChecks = new Set();
+    // The shared review component (js/csms-review.js) draws the rows; this page supplies the checks as data.
+    const reviewUi = window.CsmsReview.create(el('mappingReviewCards'), { esc, onAction: (action, id) => openMappingDetails(state.mappings.get(id)) });
+    const placementColumns = [{ header: 'Code', code: true, cell: r => esc(r.subject_code).replaceAll('/', '/<wbr>') }, { header: 'Subject', cell: r => esc(r.subject_title) },
+        { header: 'Year / Semester', cell: r => esc((r.year_level || 'No year / grade') + ' · ' + (r.semester || 'No semester')) }];
+    const viewDetails = r => '<button type="button" class="csms-link" data-review-action="view" data-review-id="' + Number(r.placement_id || r.id) + '">View details<span class="sr-only"> for ' + esc(r.subject_code) + '</span></button>';
+    const outcomeColumns = [{ header: 'Outcome', code: true, cell: o => esc(o.outcome_code) }, { header: 'Description', cell: o => esc(o.outcome_text) }];
     function loadReview() {
         if (!state.loaded) return;
         reviewIssues = model.review(state.allMappings); state.reviewLoaded = true; renderReviewCards();
@@ -629,31 +634,18 @@
         if (matrix && matrix.status === 'ready' && matrix.outcomes.length) Object.assign(issues, model.outcomeReview(matrix.outcomes, matrix.rows, matrix.mappings));
         return issues;
     }
-    function reviewRows(key, items) {
-        if (key === 'outcomesNoSubject') return '<table class="csms-ctable"><thead><tr><th class="csms-ctable__code" scope="col">Outcome</th><th scope="col">Description</th></tr></thead><tbody>' + items.map(o => '<tr><td class="csms-ctable__code">' + esc(o.outcome_code) + '</td><td>' + esc(o.outcome_text) + '</td></tr>').join('') + '</tbody></table>';
-        return '<table class="csms-ctable"><thead><tr><th class="csms-ctable__code" scope="col">Code</th><th scope="col">Subject</th><th scope="col">Year / Semester</th><th class="csms-ctable__action" scope="col"><span class="sr-only">Action</span></th></tr></thead><tbody>' + items.map(row => {
-            const id = Number(row.placement_id || row.id);
-            return '<tr><td class="csms-ctable__code">' + esc(row.subject_code).replaceAll('/', '/<wbr>') + '</td><td>' + esc(row.subject_title) + '</td><td>' + esc((row.year_level || 'No year / grade') + ' \u00b7 ' + (row.semester || 'No semester')) + '</td><td class="csms-ctable__action"><button type="button" class="mapping-open-link" data-open-review-mapping="' + id + '">View details<span class="sr-only"> for ' + esc(row.subject_code) + '</span></button></td></tr>';
-        }).join('') + '</tbody></table>';
-    }
-    function checkRow(key, items) {
-        const open = expandedChecks.has(key) && items.length > 0;
-        return '<div class="mapping-check' + (open ? ' is-open' : '') + '"><h3><button type="button" class="mapping-check__head" data-review-issue="' + key + '" aria-expanded="' + open + '" aria-controls="reviewList-' + key + '"' + (items.length ? '' : ' aria-disabled="true"') + '><i class="fa-solid fa-chevron-right mapping-check__chev" aria-hidden="true"></i><span class="mapping-check__label">' + reviewLabels[key][0] + '<small>' + reviewLabels[key][1] + '</small></span><span class="mapping-check__count' + (items.length ? ' has-issues' : '') + '">' + items.length + '</span></button></h3>' +
-            '<div class="mapping-check__list" id="reviewList-' + key + '"' + (open ? '' : ' hidden') + '>' + (open ? reviewRows(key, items) : '') + '</div></div>';
-    }
+    const makeCheck = (key, rows) => ({ key, label: reviewLabels[key][0], hint: reviewLabels[key][1], rows, ...(key === 'outcomesNoSubject' ? { columns: outcomeColumns } : { columns: placementColumns, actions: viewDetails }) });
     function renderReviewCards() {
         if (!reviewIssues) return;
         const issues = reviewState(), matrix = state.matrix;
-        let html = '<div class="csms-term mapping-checks"><header><strong>Structural checks</strong><span class="csms-term__count">Selected version only</span></header>' + structuralKeys.map(key => checkRow(key, issues[key])).join('') + '</div>';
-        let shown = structuralKeys;
-        if (matrix && matrix.status === 'nocatalog') html += emptyBox('No outcome catalog for this program yet.', 'Graduate outcomes are loaded for BSIT only.');
-        else if (matrix && matrix.status === 'error') html += '<p class="mapping-state is-error">' + esc(matrix.message) + '</p>';
-        else if (!matrix || matrix.status === 'loading') html += '<p class="mapping-state">Loading outcome checks…</p>';
-        else if (!matrix.outcomes.length) html += emptyBox('No graduate outcomes are loaded for this program.');
-        else { html += '<div class="csms-term mapping-checks"><header><strong>Outcome coverage</strong><span class="csms-term__count">From recorded mappings</span></header>' + outcomeCheckKeys.map(key => checkRow(key, issues[key])).join('') + '</div>'; shown = shown.concat(outcomeCheckKeys); }
-        el('mappingReviewCards').innerHTML = html;
-        const total = shown.reduce((sum, key) => sum + issues[key].length, 0);
-        el('mappingReviewResults').innerHTML = total ? '' : '<div class="mapping-state mapping-review-success"><i class="fa-solid fa-circle-check" aria-hidden="true"></i><div><strong>No mapping issues detected.</strong><small>Checks cover stored labels, indicators and recorded mappings. Academic correctness or compliance is not evaluated.</small>' + (!state.allMappings.length ? '<p>This version currently has no mapped subjects.</p>' : '') + '</div></div>';
+        const sections = [{ title: 'Structural checks', note: 'Selected version only', checks: structuralKeys.map(key => makeCheck(key, issues[key])) }];
+        if (matrix && matrix.status === 'nocatalog') sections.push({ empty: emptyBox('No outcome catalog for this program yet.', 'Graduate outcomes are loaded for BSIT only.') });
+        else if (matrix && matrix.status === 'error') sections.push({ empty: '<p class="mapping-state is-error">' + esc(matrix.message) + '</p>' });
+        else if (!matrix || matrix.status === 'loading') sections.push({ empty: '<p class="mapping-state">Loading outcome checks…</p>' });
+        else if (!matrix.outcomes.length) sections.push({ empty: emptyBox('No graduate outcomes are loaded for this program.') });
+        else sections.push({ title: 'Outcome coverage', note: 'From recorded mappings', checks: outcomeCheckKeys.map(key => makeCheck(key, issues[key])) });
+        reviewUi.render(sections);
+        el('mappingReviewResults').innerHTML = reviewUi.total() ? '' : '<div class="mapping-state mapping-review-success"><i class="fa-solid fa-circle-check" aria-hidden="true"></i><div><strong>No mapping issues detected.</strong><small>Checks cover stored labels, indicators and recorded mappings. Academic correctness or compliance is not evaluated.</small>' + (!state.allMappings.length ? '<p>This version currently has no mapped subjects.</p>' : '') + '</div></div>';
     }
 
     function setTab(name, persist = true) {
@@ -743,16 +735,6 @@
     el('mappingTraceResults')?.addEventListener('click', event => {
         const row = event.target.closest('[data-open-trace-mapping]');
         if (row) openMappingDetails(state.mappings.get(Number(row.dataset.openTraceMapping)), true);
-    });
-    el('mappingReviewCards')?.addEventListener('click', event => {
-        const open = event.target.closest('[data-open-review-mapping]');
-        if (open) { openMappingDetails(state.mappings.get(Number(open.dataset.openReviewMapping))); return; }
-        const card = event.target.closest('[data-review-issue]');
-        if (!card || card.getAttribute('aria-disabled') === 'true') return;
-        const key = card.dataset.reviewIssue;
-        if (expandedChecks.has(key)) expandedChecks.delete(key); else expandedChecks.add(key);
-        renderReviewCards();
-        el('mappingReviewCards').querySelector('[data-review-issue="' + key + '"]')?.focus();
     });
     el('mappingSubjectSearch')?.addEventListener('input', ui.debounce(renderFilteredMap, 150));
     el('mappingYearFilter').addEventListener('change', () => { state.year = el('mappingYearFilter').value; renderFilteredMap(); });

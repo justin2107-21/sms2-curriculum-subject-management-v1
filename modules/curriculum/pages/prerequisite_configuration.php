@@ -139,10 +139,8 @@ require __DIR__ . '/../../../shared/sidebar.php';
 </div>
 </section>
     <section id="panel-review" class="csms-panel" role="tabpanel" aria-labelledby="tab-review" hidden>
-<div class="pr-review-grid" id="reviewCounts">
-</div>
-<div id="reviewIssues">
-</div>
+<div id="reviewChecks"></div>
+<div id="reviewResult"></div>
 </section>
   </main>
 
@@ -228,7 +226,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <button type="button" class="button-muted" id="appendRequired" hidden>+ Add another prerequisite</button>
 <div id="relationshipPreview">
 </div>
-<div id="sequenceWarning" class="form-error" role="alert" hidden></div><a id="editorMapping" href="subject_mapping.php" hidden>Review Subject Mapping</a>
+<div id="sequenceWarning" class="form-error" role="alert" hidden></div><a id="editorMapping" href="curriculum_builder.php" hidden>Open in Builder</a>
 </form>
 </div>
 <div class="modal-actions modal-actions-padded">
@@ -264,6 +262,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <div class="sidebar-overlay" id="sidebarOverlay">
 </div>
 <script src="../assets/curriculum-common.js?v=<?= $curriculumCommonVersion ?>"></script>
+<script src="../../../js/csms-review.js?v=<?= (int)filemtime(__DIR__ . '/../../../js/csms-review.js') ?>"></script>
 <script src="../assets/placement-groups.js?v=<?= (int)filemtime(__DIR__ . '/../assets/placement-groups.js') ?>"></script>
 <script src="../assets/prerequisite-configuration.js?v=<?= $prerequisiteScriptVersion ?>"></script>
 <script src="../assets/cimf-prerequisite.js?v=<?= $cimfScriptVersion ?>"></script>

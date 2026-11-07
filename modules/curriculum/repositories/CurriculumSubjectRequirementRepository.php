@@ -56,13 +56,14 @@ class CurriculumSubjectRequirementRepository
                 if (isset($bySubject[$row['subject_id']])) {
                     $row['subject_code'] = $bySubject[$row['subject_id']]['subject_code'];
                     $row['subject_title'] = $bySubject[$row['subject_id']]['subject_title'];
+                    $row['subject_status'] = $bySubject[$row['subject_id']]['subject_status'];
                 }
             }
             unset($row);
             return $current;
         }
         $stmt = RepositoryQuery::execute($this->db,
-            'SELECT p.*, s.subject_code, s.subject_title FROM curriculum_version_subjects p
+            'SELECT p.*, s.subject_code, s.subject_title, s.status AS subject_status FROM curriculum_version_subjects p
              INNER JOIN subjects s ON s.id = p.subject_id WHERE p.curriculum_version_id = ? ORDER BY s.subject_code', 'i', [$versionId]);
         $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();

@@ -27,6 +27,7 @@ const ui={...require('./search-ranking.cjs'),escapeHtml:v=>String(v??'').replace
 };
 const document={getElementById:el,querySelector:s=>el(s),querySelectorAll:s=>s==='[data-tab]'?tabs:[],addEventListener:(event,fn)=>{if(event==='click')docClick=fn;}};
 const win={CurriculumUI:ui};vm.runInNewContext(fs.readFileSync('modules/curriculum/assets/placement-groups.js','utf8'),{window:win,console});
+vm.runInNewContext(fs.readFileSync('js/csms-review.js','utf8'),{window:win,console});
 vm.runInNewContext(fs.readFileSync('modules/curriculum/assets/prerequisite-configuration.js','utf8'),{window:win,document,location:{search:''},URLSearchParams,FormData,requestAnimationFrame:fn=>fn(),setTimeout,console});
 const settle=()=>new Promise(resolve=>setImmediate(resolve));
 const click=async dataset=>{const b=new Element('button');b.dataset=dataset;await docClick({target:b});await settle();};
@@ -55,7 +56,7 @@ async function context(program=programs[0]){[program,curriculum,version].forEach
  await click({dir:'unlocks'});assert.equal((el('chainCanvas').innerHTML.match(/class="pr-chain-node/g)||[]).length,3,'Unlocks of CC1: full downstream chain CC1, CC3, CC4');assert.equal((el('chainCanvas').innerHTML.match(/marker-end=/g)||[]).length,2);
  const upX=[...el('chainCanvas').innerHTML.matchAll(/data-row="(\d+)"[^>]*style="left:(\d+)px/g)].reduce((m,x)=>({...m,[x[1]]:Number(x[2])}),{});assert(upX[1]<upX[3]&&upX[3]<upX[4],'Unlocks mode: focus leftmost, downstream columns to the right');assert.equal(el('chainCanvas').innerHTML.includes('data-row="3"'),true,'Node click uses the shared row handler (edit dialog, details when read-only)');
  await click({dir:'requires'});
- await click({tab:'review'});assert(el('reviewIssues').innerHTML.includes('No prerequisite conflicts detected.'));
+ await click({tab:'review'});assert(el('reviewResult').innerHTML.includes('No prerequisite conflicts detected.'));
  await el('addRequirementButton').emit('click');assert.equal(el('editorModal').hidden,false);
  autocomplete.targetSearch.setSelected(placements[3]);autocomplete.requiredSearch.setSelected(placements[0]);assert(el('relationshipPreview').innerHTML.includes('REQUIRED BEFORE'));
  await el('ruleForm').emit('submit');assert.equal(posts.at(-1).action,'create');assert.equal(posts.at(-1).subject_id,'4');assert.equal(posts.at(-1).required_subject_id,'1');
@@ -79,7 +80,17 @@ async function context(program=programs[0]){[program,curriculum,version].forEach
  await context(programs[1]);assert(el('yearFilter').innerHTML.includes('All Grades'));assert(el('yearFilter').innerHTML.includes('Grade 12'));
  await el('addRequirementButton').emit('click');autocomplete.targetSearch.setSelected(placements[0]);autocomplete.requiredSearch.setSelected(placements[1]);await settle();assert.equal(el('sequenceWarning').hidden,false);assert.equal(el('saveRule').disabled,true);
  autocomplete.requiredSearch.setSelected(placements[2]);assert.equal(el('editorMapping').hidden,false);
- review={cycles:[[1,2,1]],duplicates:[e(2,2,1)],sequencing:[e(3,1,2)],missing:[e(4,1,3)]};await context(programs[1]);assert(!el('reviewIssues').innerHTML.includes('No structural'));for(const label of ['Circular Dependencies','Duplicate Rules','Sequencing Conflicts','Missing Placement'])assert(el('reviewCounts').innerHTML.includes(label));assert(el('reviewIssues').innerHTML.includes('CC1 → CC2 → CC1'));assert(el('reviewIssues').innerHTML.includes('Fix Placement'));
+ review={cycles:[[1,2,1]],duplicates:[e(2,2,1)],sequencing:[{...e(3,1,2),message:'Same term.'}],missing:[e(4,1,3)]};await context(programs[1]);
+ const reviewHtml=()=>el('reviewChecks').innerHTML,toggleCheck=key=>el('reviewChecks').emit('click',{target:{closest:sel=>sel==='[data-review-issue]'?{dataset:{reviewIssue:key},getAttribute:()=>null}:null}});
+ assert(!el('reviewResult').innerHTML.includes('No prerequisite'));for(const label of ['Circular Dependencies','Duplicate Rules','Sequencing Conflicts','Missing Placement','Rule uses a non-active subject'])assert(reviewHtml().includes(label),label);
+ assert.equal((reviewHtml().match(/class="csms-check__count has-issues"/g)||[]).length,4,'Four checks have findings, the inactive-subject check is empty');
+ await toggleCheck('cycles');assert(reviewHtml().includes('CC1 \u2192 CC2 \u2192 CC1'));await toggleCheck('sequencing');assert(reviewHtml().includes('Same term.'));assert(reviewHtml().includes('Open in Builder'));assert(reviewHtml().includes('data-review-action="edit"'));
+ await toggleCheck('cycles');assert(!reviewHtml().includes('CC1 \u2192 CC2 \u2192 CC1'),'Second click collapses');
+ // Non-active subject check: any status other than active counts, and the row shows the real status.
+ placements=[p(1),p(2,{subject_status:'inactive'}),p(3,{subject_status:'archived'}),p(4,{subject_status:'active'})];edges=[e(1,3,1),e(2,2,1),e(3,4,1)];review={cycles:[],duplicates:[],sequencing:[],missing:[]};await context();
+ assert(/data-review-issue="inactive"[^>]*>.*?csms-check__count has-issues">2</.test(reviewHtml()),'Two rules touch a non-active subject');
+ await toggleCheck('inactive');assert(reviewHtml().includes('CC2 (inactive)')&&reviewHtml().includes('CC3 (archived)')&&!reviewHtml().includes('CC4 ('),'Rows show the actual status; active subjects are not listed');
+ assert(el('reviewResult').innerHTML==='','Findings hide the all-clear message');
  placements=[p(1,{subject_title:'<script>bad</script>'})];edges=[];review={};el('stateFilter').value='';await context();assert(el('ruleCards').innerHTML.includes('&lt;script>'));assert(!el('ruleCards').innerHTML.includes('<script>'));
  console.log('PASS: prerequisite UI scenarios: cascade scoping, 105 subjects, combined filters, grouped rules, capped search, details, branching chain, stored edges, dependents, fit/reset, add/edit/remove confirmation, SHS, warnings, review counts, escaping.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

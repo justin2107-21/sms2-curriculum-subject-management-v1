@@ -784,6 +784,26 @@ async function main() {
       }
     }
 
+    if (arg('probe', '') === 'review') {
+      // Review tabs (Pre-requisite Validation Review and Subject Mapping Mapping Review): every check with findings expanded.
+      report.review = {};
+      for (const width of widths) {
+        const result = {};
+        await setWidth(width);
+        await navigate(base + urls[0]);
+        await sleep(3500);
+        const tabId = await evaluate(`document.getElementById('tab-review') ? 'tab-review' : 'mappingTabReview'`);
+        await evaluate(`document.getElementById('${tabId}').click(); true`);
+        await sleep(800);
+        result.checks = await evaluate(`[...document.querySelectorAll('.csms-check__head')].map(b => b.querySelector('.csms-check__label').firstChild.textContent + ': ' + b.querySelector('.csms-check__count').textContent)`);
+        for (let i = 0; i < 6; i++) { await evaluate(`(() => { const b = [...document.querySelectorAll('.csms-check__head')].filter(x => x.getAttribute('aria-disabled') !== 'true' && x.getAttribute('aria-expanded') === 'false')[0]; if (b) b.click(); return true; })()`); await sleep(150); }
+        result.expanded = await evaluate(`document.querySelectorAll('.csms-check.is-open').length`);
+        await shotView(path.join(out, `${role}-review-${width}.png`));
+        result.overflow = await evaluate(`document.documentElement.scrollWidth > innerWidth`);
+        report.review[width] = result;
+      }
+    }
+
     if (arg('probe', '') === 'versions') {
       // Selector footers (+ New curriculum / + New version) and the More menu in the version header, for this role.
       // With --builderflow=1 also the create and rename flows in the browser.

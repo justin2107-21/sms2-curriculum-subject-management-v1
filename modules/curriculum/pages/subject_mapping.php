@@ -224,6 +224,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 </div>
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 <script src="../assets/curriculum-common.js?v=<?= $curriculumCommonVersion ?>"></script>
+<script src="../../../js/csms-review.js?v=<?= (int)filemtime(__DIR__ . '/../../../js/csms-review.js') ?>"></script>
 <script src="../assets/placement-groups.js?v=<?= (int)filemtime(__DIR__ . '/../assets/placement-groups.js') ?>"></script>
 <script src="../assets/subject-mapping-data.js?v=<?= (int)filemtime(__DIR__ . '/../assets/subject-mapping-data.js') ?>"></script>
 <script src="../assets/outcomes-presentation.js?v=<?= (int)filemtime(__DIR__ . '/../assets/outcomes-presentation.js') ?>"></script>
