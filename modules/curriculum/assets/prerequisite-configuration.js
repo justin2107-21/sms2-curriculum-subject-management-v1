@@ -2,7 +2,7 @@
     'use strict';
     const ui = window.CurriculumUI, $ = id => document.getElementById(id), esc = ui.escapeHtml;
     const root = $('prerequisiteWorkspace'), api = root.dataset.requirementApi, manage = root.dataset.canManageRequirements === '1';
-    const state = { placements: [], edges: [], review: {}, context: [null, null, null], request: 0, focus: null, target: null, draft: [], expected: [], editing: false, remove: null, loaded: false };
+    const state = { placements: [], edges: [], review: {}, context: [null, null, null], request: 0, focus: null, dir: 'requires', target: null, draft: [], expected: [], editing: false, remove: null, loaded: false };
     window.CSMSPageCIMFContext = () => ({academic_program_id:$('programId').value,curriculum_id:$('curriculumId').value,curriculum_version_id:$('versionId').value,subject_id:$('focusId').value});
     window.PrerequisiteCIMFContext = () => ({ versionId: $('versionId').value, revision: state.request, context: state.context, placements: state.placements, loaded: state.loaded });
     const row = id => state.placements.find(p => Number(p.subject_id) === Number(id));
@@ -36,7 +36,7 @@
         hint.textContent = !none ? '' : position(t) === null ? "This subject's year or semester is incomplete. Set it in the Curriculum Builder first." : 'No earlier-term subjects in this version.';
     }
     const subjectControl = (id, callback, search = findSubjects) => ui.createAutocomplete(controls(id, 'subject code or title', search, callback, { getId: p => p.subject_id, format: p => ({ label: p.subject_code + ' — ' + p.subject_title, code: p.subject_code, title: p.subject_title, meta: placement(p) }), onClear: () => { if (id === 'focus') { state.focus = null; renderChain(); } else preview(); } }));
-    const focus = subjectControl('focus', p => { state.focus = Number(p.subject_id); renderChain(); });
+    const focus = subjectControl('focus', p => { state.focus = Number(p.subject_id); $('focusSearch').title = p.subject_code + ' — ' + p.subject_title; renderChain(); });
     const target = manage ? subjectControl('target', () => { required.clear(false); updateHint(); preview(); }) : null, required = manage ? subjectControl('required', preview, findEarlier) : null;
     const dialogs = {}; ['details', 'editor', 'remove', 'warn'].forEach(name => dialogs[name] = ui.createModal($(name + 'Modal')));
     function options(id, values, label) { const old = $(id).value; $(id).innerHTML = '<option value="">' + label + '</option>' + values.map(v => '<option value="' + esc(v) + '">' + esc(v) + '</option>').join(''); if (values.includes(old)) $(id).value = old; }
@@ -122,7 +122,7 @@
     }
     function showTab(name) {
         document.querySelectorAll('[data-tab]').forEach(tab => { const active = tab.dataset.tab === name; tab.setAttribute('aria-selected', String(active)); tab.tabIndex = active ? 0 : -1; $('panel-' + tab.dataset.tab).hidden = !active; });
-        if (name === 'chain') fit();
+        if (name === 'chain') renderChain();
     }
     function details(id) {
         state.target = id; const edges = rules(id), deps = dependents(id);
@@ -193,24 +193,42 @@
         try { await post({ action: 'update_rule', curriculum_version_id: $('versionId').value, subject_id: pending.targetId }, [], rules(pending.targetId).map(e => e.id)); dialogs.remove.close(); await refreshKeepingFocus(); ui.showToast('Prerequisite rule removed.', 'updated'); }
         catch (e) { ui.showFormError($('removeModal'), e.message); } finally { $('confirmRemove').disabled = false; }
     });
+    // Chain layout: columns left to right; arrows always run from the required subject to the subject it is required before.
+    const CH_WIDE = { w: 200, h: 78, gapX: 110, gapY: 16, pad: 16 }, CH_NARROW = { w: 150, h: 78, gapX: 64, gapY: 14, pad: 10 };
     function renderChain() {
-        const id = state.focus, canvas = $('chainCanvas'); canvas.style.transform = ''; canvas.style.width = ''; canvas.style.height = '';
-        $('dependents').innerHTML = id ? '<h3 class="eyebrow">SUBJECTS THAT DEPEND ON ' + esc(row(id)?.subject_code || id) + '</h3>' + (dependents(id).map(subject).join('') || '<p class="pr-muted">No subjects currently depend on this subject.</p>') : '';
-        if (!id || !rules(id).length) { canvas.innerHTML = '<div class="pr-empty">' + (id ? 'No prerequisite chain configured for this subject.' : 'Select a subject to inspect its prerequisite chain.') + (id && manage ? '<p><button class="button-muted" data-add-focused>+ Add Prerequisite</button></p>' : '') + '</div>'; return; }
-        const ids = new Set(), levels = new Map(), visiting = new Set(); let cyclic = false;
-        function visit(node) { if (visiting.has(node)) { cyclic = true; return 0; } if (levels.has(node)) return levels.get(node); visiting.add(node); ids.add(node); const depths = rules(node).map(e => visit(Number(e.required_subject_id))); visiting.delete(node); const depth = depths.length ? Math.max(...depths) + 1 : 0; levels.set(node,depth); return depth; }
-        visit(id);
+        const id = state.focus, canvas = $('chainCanvas'), up = state.dir !== 'unlocks';
+        canvas.style.transform = ''; canvas.style.width = ''; canvas.style.height = '';
+        const narrow = ($('chainViewport')?.clientWidth || 1000) < 600, CH = narrow ? CH_NARROW : CH_WIDE;
+        document.querySelectorAll('[data-dir]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.dir === state.dir)));
+        const next = n => up ? rules(n).map(e => Number(e.required_subject_id)) : dependents(n);
+        const empty = (text, add) => { canvas.innerHTML = '<div class="csms-empty"><i class="fa-solid fa-diagram-project" aria-hidden="true"></i><strong>' + text + '</strong>' + (add && manage ? '<button type="button" class="secondary-action-button" data-add-focused>+ Add Prerequisite</button>' : '') + '</div>'; };
+        if (!id) return empty('Select a subject to inspect its chain.');
+        if (!next(id).length) return empty(up ? 'No prerequisite chain configured for this subject.' : 'No subjects depend on this subject.', up);
+        const level = new Map(), path = new Set(); let cyclic = false;
+        (function walk(node, depth) {
+            if (path.has(node)) { cyclic = true; return; }
+            if (level.has(node) && level.get(node) >= depth) return;
+            level.set(node, depth); path.add(node); next(node).forEach(n => walk(n, depth + 1)); path.delete(node);
+        })(id, 0);
         if (cyclic) { canvas.innerHTML = '<p class="pr-warning">A circular dependency affects this chain. Review the affected path in Validation Review.</p>'; return; }
-        const groups = []; ids.forEach(node => { const level = levels.get(node); (groups[level] ||= []).push(node); });
-        const width = Math.max(300,...groups.map(g => g.length * 260)), height = groups.length * 190, positions = new Map();
-        groups.forEach((group,level) => group.forEach((node,i) => positions.set(node,{ x: (width-group.length*260)/2+i*260+15, y:level*190+15 })));
-        let svg = '<svg aria-hidden="true" width="' + width + '" height="' + height + '"><defs><marker id="prArrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="#8294b6"/></marker></defs>';
-        state.edges.filter(e => ids.has(Number(e.subject_id)) && ids.has(Number(e.required_subject_id))).forEach(e => { const a = positions.get(Number(e.required_subject_id)), b = positions.get(Number(e.subject_id)); const x=a.x+115,y=a.y+108,tx=b.x+115,ty=b.y; svg += '<path d="M'+x+','+y+' C'+x+','+(y+40)+' '+tx+','+(ty-40)+' '+tx+','+ty+'" fill="none" stroke="#8294b6" stroke-width="1.5" marker-end="url(#prArrow)"/><text x="'+((x+tx)/2)+'" y="'+((y+ty)/2)+'" text-anchor="middle" fill="#64748b" font-size="9">REQUIRED BEFORE</text>'; });
-        canvas.innerHTML = svg + '</svg>' + [...positions].map(([node,p]) => '<button class="pr-chain-node '+(node===id?'is-selected':'')+'" data-details="'+node+'" style="left:'+p.x+'px;top:'+p.y+'px">'+subject(node)+'</button>').join('');
-        canvas.style.width=width+'px'; canvas.style.height=height+'px'; canvas.dataset.width=width; canvas.dataset.height=height;
+        const max = Math.max(...level.values()), columns = [];
+        level.forEach((depth, node) => (columns[up ? max - depth : depth] ||= []).push(node));
+        const tallest = Math.max(...columns.map(c => c.length)), colHeight = n => n * CH.h + (n - 1) * CH.gapY;
+        const width = CH.pad * 2 + columns.length * CH.w + (columns.length - 1) * CH.gapX, height = CH.pad * 2 + colHeight(tallest), positions = new Map();
+        columns.forEach((nodes, c) => nodes.forEach((node, i) => positions.set(node, { x: CH.pad + c * (CH.w + CH.gapX), y: CH.pad + (colHeight(tallest) - colHeight(nodes.length)) / 2 + i * (CH.h + CH.gapY) })));
+        let svg = '<svg aria-hidden="true" width="' + width + '" height="' + height + '"><defs><marker id="prArrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L9,4.5 L0,9 Z" fill="#6b7f9f"/></marker></defs>';
+        let chips = '';
+        state.edges.filter(e => level.has(Number(e.subject_id)) && level.has(Number(e.required_subject_id))).forEach(e => {
+            const from = positions.get(Number(e.required_subject_id)), to = positions.get(Number(e.subject_id));
+            const x1 = from.x + CH.w, y1 = from.y + CH.h / 2, x2 = to.x - 5, y2 = to.y + CH.h / 2, mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+            svg += '<path d="M' + x1 + ',' + y1 + ' C' + mx + ',' + y1 + ' ' + mx + ',' + y2 + ' ' + x2 + ',' + y2 + '" fill="none" stroke="#6b7f9f" stroke-width="1.5" marker-end="url(#prArrow)"/>';
+            chips += '<span class="pr-chain-chip" style="left:' + Math.round(mx) + 'px;top:' + Math.round(my - 18) + 'px">' + (narrow ? 'before' : 'required before') + '</span>';
+        });
+        canvas.innerHTML = svg + '</svg>' + chips + [...positions].map(([node, p]) => '<button type="button" class="pr-chain-node' + (node === id ? ' is-selected' : '') + '" data-row="' + node + '" title="' + esc((row(node)?.subject_code || '') + ' \u2014 ' + (row(node)?.subject_title || '')) + '" style="left:' + p.x + 'px;top:' + p.y + 'px">' + subject(node) + '</button>').join('');
+        canvas.style.width = width + 'px'; canvas.style.height = height + 'px'; canvas.dataset.width = width; canvas.dataset.height = height;
         requestAnimationFrame(fit);
     }
-    function fit() { const v=$('chainViewport'),c=$('chainCanvas'); if (!c.querySelector('svg')) return; const w=Number(c.dataset.width),h=Number(c.dataset.height),scale=Math.max(.8,Math.min(1,(v.clientWidth-24)/w,(v.clientHeight-24)/h)); c.style.transformOrigin='top left'; c.style.transform='translateX('+Math.max(0,(v.clientWidth-w*scale)/2)+'px) scale('+scale+')'; v.scrollLeft=0;v.scrollTop=0; }
+    function fit() { const v = $('chainViewport'), c = $('chainCanvas'); if (!c.querySelector('svg')) return; const w = Number(c.dataset.width), h = Number(c.dataset.height), scale = Math.max(.55, Math.min(1, (v.clientWidth - 8) / w, (v.clientHeight - 8) / h)); c.style.transformOrigin = 'top left'; c.style.transform = 'translate(' + Math.max(0, (v.clientWidth - w * scale) / 2) + 'px,' + 0 + 'px) scale(' + scale + ')'; v.scrollLeft = 0; v.scrollTop = 0; }
     const reviewLabels = { cycles:'Circular Dependencies', duplicates:'Duplicate Rules', sequencing:'Sequencing Conflicts', missing:'Missing Placement' };
     function renderReview() {
         $('reviewCounts').innerHTML = Object.entries(reviewLabels).map(([key,label]) => '<button class="pr-panel pr-review-count" data-review="'+key+'"><strong>'+ (state.review[key]?.length || 0) +'</strong><span>'+label+'</span></button>').join('');
@@ -222,7 +240,8 @@
         const menu = $('prRowMenu');
         if (menu && !menu.hidden && !event.target.closest('#prRowMenu') && !event.target.closest('[data-menu]')) closeMenu(false);
         const b=event.target.closest('button,[data-details],[data-row]'); if(!b)return;
-        if(b.dataset.menuAction)menuAction(b);
+        if(b.dataset.dir){state.dir=b.dataset.dir;renderChain();}
+        else if(b.dataset.menuAction)menuAction(b);
         else if(b.dataset.menu)openMenu(b);
         else if(b.dataset.warn)openWarn(Number(b.dataset.warn));
         else if(b.dataset.row)(manage?openEditor:details)(Number(b.dataset.row));
@@ -240,6 +259,7 @@
     $('prRowMenu')?.addEventListener('keydown',e=>{const items=[...$('prRowMenu').querySelectorAll('button')],i=items.indexOf(e.target);if(e.key==='Escape'){e.preventDefault();closeMenu(true);}else if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();items[(i+(e.key==='ArrowDown'?1:items.length-1))%items.length]?.focus();}else if(e.key==='Tab')closeMenu(false);});
     $('warnEdit')?.addEventListener('click',()=>{dialogs.warn.close();openEditor(state.target);});
     window.addEventListener?.('scroll',()=>closeMenu(false),true);
+    window.addEventListener?.('resize',ui.debounce(()=>{if(!$('panel-chain').hidden)renderChain();},200));
     document.querySelector('.csms-tabs').addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();const tabs=[...document.querySelectorAll('[data-tab]')],i=tabs.indexOf(e.target),next=e.key==='Home'?0:e.key==='End'?2:(i+(e.key==='ArrowRight'?1:2))%3;tabs[next].click();tabs[next].focus();});
     $('ruleSearch').addEventListener('keydown',e=>{if(e.key==='Escape'&&$('ruleSearch').value){$('ruleSearch').value='';renderRules();}});
     $('ruleSearch').addEventListener('input',ui.debounce(renderRules,150)); ['yearFilter','semesterFilter','stateFilter'].forEach(id=>$(id).addEventListener('change',renderRules));

@@ -760,6 +760,30 @@ async function main() {
       }
     }
 
+    if (arg('probe', '') === 'prereqchain') {
+      // Chain Viewer: both directions for the linked subject (subject_id in the URL); toolbar, canvas fit and overflow.
+      report.prereqChain = {};
+      for (const width of widths) {
+        const result = {};
+        await setWidth(width);
+        await navigate(base + urls[0]);
+        await sleep(3500);
+        await evaluate(`document.getElementById('tab-chain').click(); true`);
+        await sleep(900);
+        const measure = `(() => { const v = document.getElementById('chainViewport'), c = document.getElementById('chainCanvas'), r = v.getBoundingClientRect(), t = c.getBoundingClientRect(); const bar = document.querySelector('.pr-chain-toolbar').getBoundingClientRect(); const pick = document.getElementById('focusSearch'); return { nodes: c.querySelectorAll('.pr-chain-node').length, arrows: c.querySelectorAll('path[marker-end]').length, chips: c.querySelectorAll('.pr-chain-chip').length, viewport: [Math.round(r.width), Math.round(r.height), Math.round(r.bottom)], canvasFits: t.right <= r.right + 1 && t.bottom <= r.bottom + 1, scrollable: v.scrollWidth > v.clientWidth + 1 || v.scrollHeight > v.clientHeight + 1, toolbarH: Math.round(bar.height), pickerW: Math.round(pick.getBoundingClientRect().width), pickerClipped: pick.scrollWidth > pick.clientWidth + 1, pickerValue: pick.value, clears: document.querySelectorAll('#panel-chain .record-autocomplete-clear:not([hidden])').length, overflow: document.documentElement.scrollWidth > innerWidth, innerH: innerHeight }; })()`;
+        result.requires = await evaluate(measure);
+        await shotView(path.join(out, `${role}-chain-requires-${width}.png`));
+        await evaluate(`document.querySelector('[data-dir=unlocks]').click(); true`);
+        await sleep(500);
+        result.unlocks = await evaluate(measure);
+        await shotView(path.join(out, `${role}-chain-unlocks-${width}.png`));
+        await evaluate(`document.querySelector('#panel-chain .csms-info__btn').focus(); true`);
+        await sleep(300);
+        await shotView(path.join(out, `${role}-chain-tip-${width}.png`));
+        report.prereqChain[width] = result;
+      }
+    }
+
     if (arg('probe', '') === 'versions') {
       // Selector footers (+ New curriculum / + New version) and the More menu in the version header, for this role.
       // With --builderflow=1 also the create and rename flows in the browser.

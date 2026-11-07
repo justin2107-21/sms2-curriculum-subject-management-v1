@@ -113,35 +113,28 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <div id="prRowMenu" class="pr-menu" role="menu" aria-label="Row actions" hidden></div>
 </section>
     <section id="panel-chain" class="csms-panel" role="tabpanel" aria-labelledby="tab-chain" hidden>
-<p class="eyebrow">FOCUSED DEPENDENCY INSPECTION</p>
-<h2>Prerequisite Chain</h2>
-<p class="pr-muted">View the dependency path leading to one selected subject.</p>
-<div class="pr-chain-layout">
-<aside class="pr-panel">
-<label class="form-field"><span>Select Subject</span>
+<div class="csms-filter-row pr-chain-toolbar">
+<div class="pr-chain-picker"><label class="sr-only" for="focusSearch">Subject</label>
 <div class="record-autocomplete">
-<input type="search" id="focusSearch" placeholder="Search select subject" />
+<input type="search" id="focusSearch" placeholder="Search subject code or title" />
 <input type="hidden" id="focusId"/>
-<button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Select Subject" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+<button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear subject" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
 <div class="record-autocomplete-options" id="focusOptions" role="listbox" hidden>
 </div>
 </div>
-</label>
-<p class="pr-muted">Only stored prerequisite relationships are shown. No rules are inferred from subject codes.</p>
-</aside>
-<div class="pr-panel">
-<header class="pr-chain-header"><span class="eyebrow">PREREQUISITE CHAIN</span>
-<div>
-<button type="button" class="button-muted" id="fitChain">Fit to View</button>
-<button type="button" class="button-muted" id="resetChain">Reset</button>
 </div>
-</header>
+<div class="csms-segmented" role="group" aria-label="Chain direction">
+<button type="button" data-dir="requires" aria-pressed="true">Requires</button>
+<button type="button" data-dir="unlocks" aria-pressed="false">Unlocks</button>
+</div>
+<div class="pr-chain-actions">
+<button type="button" class="secondary-action-button" id="fitChain">Fit</button>
+<button type="button" class="secondary-action-button" id="resetChain">Reset</button>
+<span class="csms-info"><button type="button" class="csms-info__btn" aria-label="About the chain viewer" aria-describedby="chainInfoTip"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button><span class="csms-info__tip" role="tooltip" id="chainInfoTip">Only stored prerequisite relationships are shown. No rules are inferred from subject codes. A prerequisite must be placed in an earlier term (a system rule, not a CHED rule). Co-requisites and standing requirements are not handled here. SHS strand groups are not supported.</span></span>
+</div>
+</div>
 <div id="chainViewport" tabindex="0" aria-label="Prerequisite chain. Scroll to inspect branches.">
 <div id="chainCanvas">
-</div>
-</div>
-<div id="dependents">
-</div>
 </div>
 </div>
 </section>
