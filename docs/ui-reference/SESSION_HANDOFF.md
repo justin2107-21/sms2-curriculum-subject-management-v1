@@ -141,6 +141,12 @@ Drop `users.role`; faculty-subject link; switch the Faculty read scope to `appro
 - **Run B (Electives Validation Review) was already done** in `0d4b7fd` (slice 3), `171eab4` (slice 4) and `0879cdd` (slice 6); `electives-workspace.cjs` passes. Elective fixtures removed from `sms_db_uitest` (`elective-fixtures.php --remove`).
 - **NOT done:** Electives slice 5 (migration 028: elective type / required units, on hold for client answers); Offering History change log; the meaning of Strand assignment (still undecided); migration 028 itself. Equivalency and Offering History row menus/dialogs were checked only at 1440 as Super Admin (Equivalency dialog opened and measured; archive/edit flows and 390 px not re-run). HTTP tests that need the isolated Docker database were not run.
 
+## UI improvements later
+- **Select heights:** the assignment pages use 36px selects; the rest of the csms pages use 40px. Pick one height and apply it everywhere.
+- **Computed-style check:** Grade Weighting and the history-tab selects were not measured (the probe reported a 36px select on the assignment pages). Run `tools/uitest/run.ps1 -Probe runa` on them and compare with Subject Mapping.
+- **390px on a real phone:** the Run A pages were checked at 1440 only. Check them on a real phone, not just a narrowed desktop window.
+- **Remaining pages:** general refinement of the other module pages, one page at a time.
+
 ## Next tasks, in order
 0. **Subject Mapping redesign (in progress; plan in `Subject_Mapping_Plan.md`).** Slices 1-4 are built (see "Subject Mapping slices 1-3" below). Slice 4 is built. Next: slice 5 (Graduate Outcomes restyle, dead code cleanup, docs). **Next after slice 3 (not built, only if needed):** a per-subject mapping dialog: one dialog per subject, checkboxes for all outcomes, one shared rationale. Consider it if matrix entry proves too slow for BSIT (52 subjects x 13 outcomes = up to 676 cells); it is also a good panel demo.
 1. **Password reset for Admin and Super Admin:** `KENNETH123` still needs the reset the owner planned from the Users page as `csms_admin`. Review the reset flow and its audit entry before relying on it.
