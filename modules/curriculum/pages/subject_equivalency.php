@@ -74,95 +74,60 @@ require __DIR__ . '/../../../shared/sidebar.php';
         data-record-column-count="<?= $recordColumnCount ?>">
     <div class="page-title-bar curriculum-title-bar">
       <div>
-        <h1 class="page-title"><i class="fa-solid fa-right-left" aria-hidden="true"></i> <?= htmlspecialchars($viewLabel, ENT_QUOTES, 'UTF-8') ?></h1>
+        <h1 class="page-title"><i class="fa-solid fa-right-left" aria-hidden="true"></i> <?= htmlspecialchars($viewLabel, ENT_QUOTES, 'UTF-8') ?> <span class="csms-info"><button type="button" class="csms-info__btn" aria-label="About this page" aria-describedby="equivalencyInfoTip"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button><span class="csms-info__tip" role="tooltip" id="equivalencyInfoTip"><?= $isComparisonView ? 'Objective differences support review only. The system never automatically declares subjects equivalent.' : 'Human-reviewed records only. Subject pairs are treated as non-directional.' ?></span></span></h1>
         <p class="page-subtitle"><?= htmlspecialchars($viewDescription, ENT_QUOTES, 'UTF-8') ?></p>
         <?php $moduleViews = 'equivalency'; include __DIR__ . '/_module_views.php'; ?>
       </div>
       <?php if ($isComparisonView): ?><div class="equivalency-header-actions"><button type="button" class="button-muted" id="reviewWithCimf" disabled><i class="fa-solid fa-sparkles" aria-hidden="true"></i> Review with CIMF</button><?php if ($canManageEquivalencies): ?><button type="button" class="button-primary" id="headerRecordDecision" disabled><i class="fa-solid fa-plus" aria-hidden="true"></i> Record Decision</button><?php endif; ?></div><?php else: ?><span class="read-only-pill"><i class="fa-solid fa-user-check" aria-hidden="true"></i> Human authority required</span><?php endif; ?>
     </div>
 
-    <p class="curriculum-notice equivalency-authority-notice" role="note">
-      <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
-      <?php if ($isComparisonView): ?>Objective differences support review only. The system never automatically declares subjects equivalent.<?php else: ?>Human-reviewed records only. Subject pairs are treated as non-directional.<?php endif; ?>
-    </p>
 
     <?php if ($isComparisonView): ?>
     <section id="comparisonPanel" class="subject-equivalency-panel">
-      <section class="domain-card equivalency-selector-card" aria-labelledby="subjectSelectorTitle">
-        <div class="domain-card-header">
-          <div><p class="eyebrow">Read-only comparison</p><h2 id="subjectSelectorTitle">Select two Subject Master records</h2></div>
-          <button type="button" class="button-muted" id="clearSubjectComparison"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i> Clear Comparison</button>
-        </div>
+      <section class="equivalency-selector-card csms-page-bar" aria-label="Select two Subject Master records">
         <div class="equivalency-selector-grid">
-          <div class="equivalency-subject-selector">
-            <div class="mapping-filter-field">
-              <label for="subjectASearch">Subject A <strong>*</strong></label>
-              <div class="record-autocomplete">
-                <input type="search" id="subjectASearch" maxlength="100" placeholder="Search code or title" required/>
-                <input type="hidden" id="subjectASelect"/>
-                <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Subject A" title="Clear selection" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
-                <div class="record-autocomplete-options" id="subjectAOptions" role="listbox" aria-label="Subject A suggestions" hidden></div>
-              </div>
-            </div>
-          </div>
-          <div class="equivalency-subject-selector">
-            <div class="mapping-filter-field">
-              <label for="subjectBSearch">Subject B <strong>*</strong></label>
-              <div class="record-autocomplete">
-                <input type="search" id="subjectBSearch" maxlength="100" placeholder="Search code or title" required/>
-                <input type="hidden" id="subjectBSelect"/>
-                <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Subject B" title="Clear selection" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
-                <div class="record-autocomplete-options" id="subjectBOptions" role="listbox" aria-label="Subject B suggestions" hidden></div>
-              </div>
-            </div>
-          </div>
-          <div class="equivalency-compare-action">
-            <button type="button" class="button-primary" id="compareSubjectsButton" disabled><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i> Compare Subjects</button>
-          </div>
+          <div class="equivalency-subject-selector"><div class="mapping-filter-field"><label for="subjectASearch">Subject A <strong>*</strong></label><div class="record-autocomplete"><input type="search" id="subjectASearch" maxlength="100" placeholder="Search code or title" required/><input type="hidden" id="subjectASelect"/><button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Subject A" title="Clear selection" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button><div class="record-autocomplete-options" id="subjectAOptions" role="listbox" aria-label="Subject A suggestions" hidden></div></div></div></div>
+          <div class="equivalency-subject-selector"><div class="mapping-filter-field"><label for="subjectBSearch">Subject B <strong>*</strong></label><div class="record-autocomplete"><input type="search" id="subjectBSearch" maxlength="100" placeholder="Search code or title" required/><input type="hidden" id="subjectBSelect"/><button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear Subject B" title="Clear selection" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button><div class="record-autocomplete-options" id="subjectBOptions" role="listbox" aria-label="Subject B suggestions" hidden></div></div></div></div>
+          <div class="equivalency-compare-action"><button type="button" class="button-primary" id="compareSubjectsButton" disabled><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i> Compare Subjects</button><button type="button" class="button-muted" id="clearSubjectComparison">Clear</button></div>
         </div>
       </section>
 
       <section class="equivalency-summary-grid" id="equivalencySummary" hidden aria-label="Compared subject summaries">
-        <article class="domain-card equivalency-summary-card"><p class="eyebrow">Subject A</p><h2 id="summaryACode"></h2><p id="summaryATitle"></p><div><span id="summaryAUnits"></span><span id="summaryAStatus"></span></div></article>
-        <article class="domain-card equivalency-summary-card"><p class="eyebrow">Subject B</p><h2 id="summaryBCode"></h2><p id="summaryBTitle"></p><div><span id="summaryBUnits"></span><span id="summaryBStatus"></span></div></article>
+        <article class="equivalency-summary-card"><span class="csms-sub">Subject A</span><strong id="summaryACode" class="csms-ctable__code"></strong> <span id="summaryATitle"></span> <span class="csms-sub"><span id="summaryAUnits"></span> · <span id="summaryAStatus"></span></span></article>
+        <article class="equivalency-summary-card"><span class="csms-sub">Subject B</span><strong id="summaryBCode" class="csms-ctable__code"></strong> <span id="summaryBTitle"></span> <span class="csms-sub"><span id="summaryBUnits"></span> · <span id="summaryBStatus"></span></span></article>
       </section>
-      <section class="domain-card equivalency-comparison-card" aria-labelledby="comparisonResultsTitle">
-        <div class="domain-card-header">
-          <div><p class="eyebrow">Objective stored fields</p><h2 id="comparisonResultsTitle">Objective Comparison</h2><p class="mapping-context-message">Factual comparison from stored subject and placement records.</p><p class="mapping-context-message" id="comparisonMessage">Select two different subjects to compare their stored information.</p></div>
-        </div>
+      <section class="equivalency-comparison-card" aria-labelledby="comparisonResultsTitle">
+        <h2 class="sr-only" id="comparisonResultsTitle">Objective Comparison</h2>
+        <p class="mapping-context-message" id="comparisonMessage">Select two different subjects to compare their stored information.</p>
         <div class="equivalency-existing-record" id="existingPairMessage" hidden><span>An equivalency record already exists for this subject pair.</span><div><button type="button" class="row-action-button" id="viewExistingEquivalency">View Record</button><?php if ($canManageEquivalencies): ?><button type="button" class="row-action-button" id="editExistingEquivalency">Edit Decision</button><?php endif; ?></div></div>
-        <div class="table-scroll" tabindex="0" aria-label="Scrollable objective subject comparison">
-          <table class="domain-table equivalency-comparison-table">
+        <div class="csms-page-table table-scroll" tabindex="0" aria-label="Scrollable objective subject comparison">
+          <table class="csms-ctable equivalency-comparison-table">
             <thead><tr><th>Stored Field</th><th id="subjectAHeader">Subject A</th><th id="subjectBHeader">Subject B</th><th>Objective Result</th></tr></thead>
             <tbody id="comparisonRows"><tr><td colspan="4" class="empty-cell">No subjects selected for comparison.</td></tr></tbody>
           </table>
         </div>
+        <p class="mapping-context-message" id="comparisonHiddenNote" hidden></p>
       </section>
 
       <section class="equivalency-usage-grid" aria-label="Subject curriculum usage context">
-        <article class="domain-card equivalency-usage-card"><div class="domain-card-header"><div><p class="eyebrow">Context only</p><h2 id="subjectAUsageTitle">Subject A Usage</h2></div></div><div id="subjectAUsage" class="equivalency-usage-content"><p class="equivalency-empty-context">Compare subjects to view bounded curriculum usage.</p></div></article>
-        <article class="domain-card equivalency-usage-card"><div class="domain-card-header"><div><p class="eyebrow">Context only</p><h2 id="subjectBUsageTitle">Subject B Usage</h2></div></div><div id="subjectBUsage" class="equivalency-usage-content"><p class="equivalency-empty-context">Compare subjects to view bounded curriculum usage.</p></div></article>
+        <article class="equivalency-usage-card"><h3 id="subjectAUsageTitle" class="equivalency-usage-title">Subject A Usage</h3><div id="subjectAUsage" class="equivalency-usage-content"><p class="equivalency-empty-context">Compare subjects to view bounded curriculum usage.</p></div></article>
+        <article class="equivalency-usage-card"><h3 id="subjectBUsageTitle" class="equivalency-usage-title">Subject B Usage</h3><div id="subjectBUsage" class="equivalency-usage-content"><p class="equivalency-empty-context">Compare subjects to view bounded curriculum usage.</p></div></article>
       </section>
       <p class="equivalency-usage-disclaimer">Similar usage is supporting context only and is not proof of equivalency.</p>
     </section>
 
     <?php else: ?>
     <section id="recordsPanel" class="subject-equivalency-panel">
-      <section class="domain-card mapping-filter-card" aria-labelledby="equivalencyFiltersTitle">
-        <div class="domain-card-header"><div><p class="eyebrow">Explicit human decisions</p><h2 id="equivalencyFiltersTitle">Find equivalency records</h2></div><button type="button" class="button-muted" id="clearEquivalencyFilters"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i> Clear Filters</button></div>
-        <div class="mapping-filter-grid equivalency-filter-grid">
-          <label class="mapping-filter-field"><span>Subject Search</span><input type="search" id="equivalencySearch" maxlength="100" placeholder="Subject code or title"/></label>
-          <label class="mapping-filter-field"><span>Decision Status</span><select id="equivalencyStatus"><option value="">All Decisions</option><option value="equivalent">Equivalent</option><option value="not_equivalent">Not Equivalent</option><option value="needs_review">Needs Further Review</option></select></label>
-        </div>
-      </section>
-
-      <section class="domain-card mapping-results-card" aria-labelledby="equivalencyRecordsTitle">
-        <div class="domain-card-header"><div><p class="eyebrow">Stored review decisions</p><h2 id="equivalencyRecordsTitle">Recorded Decisions</h2><p class="mapping-context-message">Human-reviewed records only. Subject pairs are treated as non-directional.</p></div><span class="record-count" id="equivalencyCount">0 records</span></div>
-        <div class="table-scroll" tabindex="0" aria-label="Scrollable subject equivalency records">
-          <table class="domain-table equivalency-records-table"><thead><tr><th>Subject A</th><th>Subject B</th><th>Decision</th><th>Reviewed By</th><th>Reviewed At</th><th>Actions</th></tr></thead><tbody id="equivalencyRows"><tr><td colspan="<?= $recordColumnCount ?>" class="empty-cell">Loading equivalency records…</td></tr></tbody></table>
-        </div>
-        <div class="pagination-bar" id="equivalencyPagination"></div>
-      </section>
+      <div class="csms-filter-row csms-page-bar">
+        <label class="csms-search"><span class="sr-only">Search equivalency records</span><input type="search" id="equivalencySearch" maxlength="100" placeholder="Subject code or title"/></label>
+        <select class="csms-select" id="equivalencyStatus" aria-label="Decision status"><option value="">All decisions</option><option value="equivalent">Equivalent</option><option value="not_equivalent">Not equivalent</option><option value="needs_review">Needs further review</option></select>
+        <span class="csms-filter-row__summary" id="equivalencyCount" role="status">0 records</span>
+      </div>
+      <div class="csms-page-table table-scroll" tabindex="0" aria-label="Scrollable subject equivalency records">
+        <table class="csms-ctable equivalency-records-table"><thead><tr><th>Subject A</th><th>Subject B</th><th>Decision</th><th>Reviewed by</th><th>Reviewed at</th><th class="csms-ctable__action"><span class="sr-only">Actions</span></th></tr></thead><tbody id="equivalencyRows"><tr><td colspan="<?= $recordColumnCount ?>" class="empty-cell">Loading equivalency records…</td></tr></tbody></table>
+      </div>
+      <div class="pagination-bar" id="equivalencyPagination"></div>
+      <div id="equivalencyRowMenu" class="csms-menu" role="menu" aria-label="Row actions" hidden></div>
     </section>
     <?php endif; ?>
   </main>
@@ -189,12 +154,13 @@ require __DIR__ . '/../../../shared/sidebar.php';
 </div>
 <?php endif; ?>
 
-<div class="curriculum-modal" id="equivalencyDetailsModal" hidden><div class="modal-backdrop" data-modal-close></div><section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="equivalencyDetailsTitle"><div class="modal-header"><div><h2 id="equivalencyDetailsTitle">Equivalency Details</h2></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close details"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div><div class="equivalency-details" id="equivalencyDetails"></div><div class="modal-actions"><button type="button" class="button-muted" data-modal-close>Close</button></div></section></div>
+<div class="curriculum-modal" id="equivalencyDetailsModal" hidden><div class="modal-backdrop" data-modal-close></div><section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="equivalencyDetailsTitle"><div class="modal-header"><div><h2 id="equivalencyDetailsTitle">Equivalency Details</h2></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close details"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div><div class="confirmation-body"><dl class="csms-detail-list" id="equivalencyDetails"></dl></div><div class="modal-actions modal-actions-padded"><button type="button" class="button-muted" data-modal-close>Close</button></div></section></div>
 
-<?php if ($canManageEquivalencies): ?><div class="curriculum-modal" id="equivalencyArchiveModal" hidden><div class="modal-backdrop" data-modal-close></div><section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="equivalencyArchiveTitle"><div class="modal-header"><div><h2 id="equivalencyArchiveTitle">Archive Equivalency Record</h2></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close archive confirmation"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div><p class="equivalency-archive-copy">This record will no longer appear as active/current. Historical data will be retained.</p><div class="modal-actions"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="button" class="button-danger" id="confirmArchiveEquivalency">Archive Record</button></div></section></div><?php endif; ?>
+<?php if ($canManageEquivalencies): ?><div class="curriculum-modal" id="equivalencyArchiveModal" hidden><div class="modal-backdrop" data-modal-close></div><section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="equivalencyArchiveTitle"><div class="modal-header"><div><h2 id="equivalencyArchiveTitle">Archive Equivalency Record</h2></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close archive confirmation"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div><div class="confirmation-body"><p class="equivalency-archive-copy">This record will no longer appear as active/current. Historical data will be retained.</p></div><div class="modal-actions modal-actions-padded"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="button" class="button-danger" id="confirmArchiveEquivalency">Archive Record</button></div></section></div><?php endif; ?>
 
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 <script src="../assets/curriculum-common.js?v=<?= $curriculumCommonVersion ?>"></script>
+<script src="../../../js/csms-menu.js?v=<?= (int)filemtime(__DIR__ . '/../../../js/csms-menu.js') ?>"></script>
 <script src="../assets/subject-equivalency.js?v=<?= $equivalencyScriptVersion ?>"></script>
 </body>
 </html>

@@ -254,3 +254,15 @@
   .grade-weighting-header-actions { align-items: stretch; flex-direction: column; }
   .grade-weighting-header-actions button { width: 100%; }
 }
+
+/* Run A: the subject selector sits in the context row, about 420 px wide. */
+.grade-weighting-context-card .grade-weighting-context-grid { grid-template-columns: minmax(0, 1fr) 14px minmax(0, 1fr) 14px minmax(0, 1fr) 14px minmax(0, 420px); }
+.grade-weighting-context-card { padding: 13px 15px; }
+.grade-weighting-context-card .grade-weighting-selection-hint { margin: 8px 0 0; }
+@media (max-width: 1100px) {
+  .grade-weighting-context-card .grade-weighting-context-grid { grid-template-columns: 1fr; }
+  .grade-weighting-context-arrow { display: none; }
+}
+body .main .grade-weighting-context-card.csms-ctx-root { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 24px; margin-bottom: 16px; }
+body .main .grade-weighting-context-card .grade-weighting-subject-field { flex: 0 1 420px; width: 420px; max-width: 100%; }
+body .main .grade-weighting-context-card .grade-weighting-selection-hint { flex: 0 0 100%; }

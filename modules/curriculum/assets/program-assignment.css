@@ -73,3 +73,7 @@
 @media(max-width:900px){.assignment-context-row{grid-template-columns:minmax(250px,.8fr) minmax(0,1.2fr);gap:14px}.assignment-summary-card{padding:17px}.assignment-summary-metric{min-width:125px;padding-left:16px}}
 @media(max-width:700px){.assignment-context-row{grid-template-columns:1fr;margin:0 0 14px}.assignment-page-actions{justify-content:flex-start;margin:12px 0 0;width:100%}.assignment-summary-card{min-height:0}.assignment-filter-row{grid-template-columns:minmax(0,1fr) minmax(130px,160px);padding:0 14px 14px}.assignment-filter-row .assignment-search{grid-column:1/-1}.assignment-filter-row .record-count{justify-self:end}.program-assignment-content .mapping-results-toolbar{align-items:end}.program-assignment-content .card-header-actions{flex-wrap:wrap}}
 @media(max-width:440px){.assignment-summary-card{align-items:flex-start;flex-direction:column}.assignment-summary-metric{border-left:0;border-top:1px solid #e2e8f0;padding:12px 0 0;width:100%}.assignment-filter-row{grid-template-columns:1fr 1fr}.assignment-filter-row .compact-select{grid-column:1}.assignment-filter-row .record-count{grid-column:2}}
+
+/* Run A: shared filter row wins over the old grid. */
+.csms-filter-row.assignment-filter-row { display: flex; padding: 12px 0; }
+.csms-filter-row.assignment-filter-row[hidden] { display: none; }

@@ -116,6 +116,7 @@
         elements.subjectAHeader.textContent = 'Subject A';
         elements.subjectBHeader.textContent = 'Subject B';
         setTableMessage(elements.comparisonRows, 4, 'No subjects selected for comparison.', false);
+        const hiddenNote = document.getElementById('comparisonHiddenNote'); if (hiddenNote) hiddenNote.hidden = true;
         renderUsage(elements.subjectAUsage, null);
         renderUsage(elements.subjectBUsage, null);
         elements.subjectAUsageTitle.textContent = 'Subject A Usage';
@@ -182,21 +183,31 @@
         [['A', subjectA], ['B', subjectB]].forEach(function ([side, subject]) {
             document.getElementById('summary' + side + 'Code').textContent = subject.subject_code;
             document.getElementById('summary' + side + 'Title').textContent = subject.subject_title;
-            document.getElementById('summary' + side + 'Units').textContent = displayValue('units', subject.units) + ' Units';
+            document.getElementById('summary' + side + 'Units').textContent = displayValue('units', subject.units) + ' units';
             document.getElementById('summary' + side + 'Status').textContent = subject.status || 'Not Available';
         });
         elements.subjectAHeader.textContent = subjectA.subject_code;
         elements.subjectBHeader.textContent = subjectB.subject_code;
         elements.comparisonMessage.textContent = subjectLabel(subjectA) + ' compared with ' + subjectLabel(subjectB) + '.';
-        elements.comparisonRows.innerHTML = (payload.differences || []).map(function (difference) {
+        const allDifferences = payload.differences || [];
+        const shown = allDifferences.filter(difference => difference.result !== 'not_available');
+        const hiddenCount = allDifferences.length - shown.length;
+        elements.comparisonRows.innerHTML = shown.map(function (difference) {
             const wide = difference.field === 'description' ? ' equivalency-description-value' : '';
+            const identity = ['subject_code', 'subject_title'].includes(difference.field);
+            const codeClass = difference.field === 'subject_code' ? ' class="csms-ctable__code"' : '';
             return '<tr><td><span class="equivalency-field-label">' + ui.escapeHtml(difference.label) +
-                '</span></td><td><span class="equivalency-field-value' + wide + '">' +
+                '</span></td><td' + codeClass + '><span class="equivalency-field-value' + wide + '">' +
                 ui.escapeHtml(displayValue(difference.field, difference.subject_a)) +
-                '</span></td><td><span class="equivalency-field-value' + wide + '">' +
+                '</span></td><td' + codeClass + '><span class="equivalency-field-value' + wide + '">' +
                 ui.escapeHtml(displayValue(difference.field, difference.subject_b)) +
-                '</span></td><td>' + resultBadge(difference.result, difference.field) + '</td></tr>';
+                '</span></td><td>' + (identity ? '' : resultBadge(difference.result, difference.field)) + '</td></tr>';
         }).join('');
+        const note = document.getElementById('comparisonHiddenNote');
+        if (note) {
+            note.hidden = hiddenCount === 0;
+            note.textContent = hiddenCount + (hiddenCount === 1 ? ' field is' : ' fields are') + ' not recorded for either subject and ' + (hiddenCount === 1 ? 'is' : 'are') + ' not shown.';
+        }
         elements.subjectAUsageTitle.textContent = subjectA.subject_code + ' Usage';
         elements.subjectBUsageTitle.textContent = subjectB.subject_code + ' Usage';
         renderUsage(elements.subjectAUsage, payload.usage?.subject_a);
@@ -275,18 +286,19 @@
     }
 
     function subjectCell(code, title) {
-        return '<span class="equivalency-subject-label"><strong>' + ui.escapeHtml(code) +
+        return '<span class="equivalency-subject-label"><strong class="csms-ctable__code">' + ui.escapeHtml(code) +
             '</strong><span>' + ui.escapeHtml(title) + '</span></span>';
     }
 
     function recordRow(record) {
-        const action = '<td><div class="equivalency-action-group"><button type="button" class="row-action-button" data-view-equivalency="' + Number(record.id) + '">View</button>' +
-            (canManage ? '<button type="button" class="row-action-button" data-edit-equivalency="' + Number(record.id) + '">Edit Decision</button><button type="button" class="row-action-button danger" data-archive-equivalency="' + Number(record.id) + '">Archive</button>' : '') + '</div></td>';
-        return '<tr><td>' + subjectCell(record.subject_a_code, record.subject_a_title) +
+        const id = Number(record.id);
+        const menu = '<td class="csms-ctable__action"><button type="button" class="csms-rowmenu" data-menu="' + id + '" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for ' +
+            ui.escapeHtml(record.subject_a_code) + ' and ' + ui.escapeHtml(record.subject_b_code) + '"><i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i></button></td>';
+        return '<tr class="csms-row-click" tabindex="0" data-row="' + id + '" aria-haspopup="dialog" aria-label="View equivalency record for ' + ui.escapeHtml(record.subject_a_code) + ' and ' + ui.escapeHtml(record.subject_b_code) + '"><td>' + subjectCell(record.subject_a_code, record.subject_a_title) +
             '</td><td>' + subjectCell(record.subject_b_code, record.subject_b_title) +
             '</td><td>' + decisionBadge(record.decision_status) +
             '</td><td><span class="equivalency-reviewer">' + ui.escapeHtml(reviewerName(record)) +
-            '</span></td><td>' + ui.escapeHtml(dateTime(record.reviewed_at)) + action + '</tr>';
+            '</span></td><td>' + ui.escapeHtml(dateTime(record.reviewed_at)) + '</td>' + (canManage && !record.archived_at ? menu : '<td class="csms-ctable__action"></td>') + '</tr>';
     }
 
     async function loadRecords(page) {
@@ -390,8 +402,7 @@
             ['Reviewed At', dateTime(record.reviewed_at)],
             ['Last Updated', dateTime(record.updated_at)],
         ];
-        detail.innerHTML = pairs.map(([label, value]) => '<div><strong>' + ui.escapeHtml(label) +
-            '</strong><p>' + ui.escapeHtml(value) + '</p></div>').join('');
+        detail.innerHTML = pairs.map(([label, value]) => '<dt>' + ui.escapeHtml(label) + '</dt><dd' + (label.startsWith('Subject') ? ' class="csms-ctable__code"' : '') + '>' + ui.escapeHtml(value) + '</dd>').join('');
         detailsModal.open();
     }
 
@@ -429,13 +440,23 @@
         elements.recordStatus.value = '';
         loadRecords(1);
     });
+    const rowMenu = elements.recordRows && window.CsmsMenu ? window.CsmsMenu.create(document.getElementById('equivalencyRowMenu'), {
+        esc: ui.escapeHtml,
+        onSelect: function (action, data) {
+            const record = state.records.get(Number(data.record));
+            if (!record) return;
+            if (action === 'edit') openReview(record);
+            else if (action === 'archive') { archiveRecordId = Number(record.id); archiveModal.open(); }
+        }
+    }) : null;
     elements.recordRows?.addEventListener('click', function (event) {
-        const viewButton = event.target.closest('[data-view-equivalency]');
-        if (viewButton) return showDetails(state.records.get(Number(viewButton.dataset.viewEquivalency)));
-        const editButton = event.target.closest('[data-edit-equivalency]');
-        if (editButton) return openReview(state.records.get(Number(editButton.dataset.editEquivalency)));
-        const archiveButton = event.target.closest('[data-archive-equivalency]');
-        if (archiveButton) { archiveRecordId = Number(archiveButton.dataset.archiveEquivalency); archiveModal.open(); }
+        const menuButton = event.target.closest('[data-menu]');
+        if (menuButton) { rowMenu?.open(menuButton, [{ action: 'edit', label: 'Edit decision', data: { record: menuButton.dataset.menu } }, { action: 'archive', label: 'Archive', danger: true, data: { record: menuButton.dataset.menu } }]); return; }
+        const row = event.target.closest('[data-row]');
+        if (row) showDetails(state.records.get(Number(row.dataset.row)));
+    });
+    elements.recordRows?.addEventListener('keydown', function (event) {
+        if (event.target.matches?.('[data-row]') && ['Enter', ' '].includes(event.key)) { event.preventDefault(); showDetails(state.records.get(Number(event.target.dataset.row))); }
     });
     document.getElementById('confirmArchiveEquivalency')?.addEventListener('click', archiveSelected);
     document.getElementById('equivalencyDecision')?.addEventListener('change', setReviewRequirements);

@@ -113,3 +113,36 @@
   .equivalency-selector-grid { padding: 0 12px 14px; }
   .equivalency-compare-action .button-primary { width: 100%; }
 }
+
+/* Run A: compact selectors, summary and usage on the shared look. */
+.equivalency-selector-card { background: none; border: 0; box-shadow: none; padding: 0; margin: 0; }
+.equivalency-selector-grid { padding: 0; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: end; width: 100%; }
+.equivalency-compare-action { gap: 8px; align-items: end; }
+.equivalency-compare-action .button-primary { width: auto; white-space: nowrap; }
+.equivalency-summary-grid { gap: 12px; }
+.equivalency-summary-card { display: block; padding: 8px 14px; background: var(--csms-surface-muted, #f4f6fb); border-radius: 10px; font-size: 14px; }
+.equivalency-summary-card .csms-sub { display: inline-block; margin-right: 8px; color: var(--csms-text-secondary, #374151); font-size: 13px; }
+.equivalency-summary-card strong { font-size: 14px; }
+.equivalency-usage-grid { gap: 12px; }
+.equivalency-usage-card { padding: 10px 0 0; }
+.equivalency-usage-title { margin: 0 0 8px; font-size: 15px; font-weight: 600; }
+.equivalency-usage-content { padding: 0; }
+.equivalency-usage-summary div { padding: 4px 6px; }
+.equivalency-usage-summary strong { font-size: 14px; }
+.equivalency-comparison-table { min-width: 0; }
+.equivalency-field-label { font-size: 14px; font-weight: 600; min-width: 0; }
+.equivalency-field-value { font-size: 14px; color: inherit; min-width: 0; max-width: none; }
+.equivalency-description-value { min-width: 0; }
+.equivalency-records-table th:last-child, .equivalency-records-table td:last-child { min-width: 0; }
+.equivalency-records-table td { vertical-align: middle; }
+.equivalency-subject-label { min-width: 0; }
+.equivalency-subject-label strong { font-size: 14px; }
+.equivalency-subject-label span { font-size: 13px; }
+.equivalency-reviewer { font-size: 14px; }
+.equivalency-existing-record { margin: 8px 0; }
+.equivalency-comparison-card .mapping-context-message { margin: 8px 0; }
+#comparisonPanel:not([hidden]) { margin: 0; gap: 14px; }
+#recordsPanel { margin: 0; }
+@media (max-width: 800px) { .equivalency-selector-grid { grid-template-columns: 1fr; } .equivalency-summary-grid, .equivalency-usage-grid { grid-template-columns: 1fr; } }
+.equivalency-usage-disclaimer { font-size: 13px; color: var(--csms-text-secondary, #374151); margin: 0; }
+.equivalency-usage-title { font-family: inherit; }

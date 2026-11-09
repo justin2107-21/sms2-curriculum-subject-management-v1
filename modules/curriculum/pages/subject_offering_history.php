@@ -71,49 +71,39 @@ require __DIR__ . '/../../../shared/sidebar.php';
         data-cimf-api="../http/history_cimf_actions.php">
     <div class="page-title-bar curriculum-title-bar">
       <div>
-        <h1 class="page-title"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> <?= htmlspecialchars($viewLabel, ENT_QUOTES, 'UTF-8') ?></h1>
+        <h1 class="page-title"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> <?= htmlspecialchars($viewLabel, ENT_QUOTES, 'UTF-8') ?> <span class="csms-info"><button type="button" class="csms-info__btn" aria-label="About this page" aria-describedby="historyInfoTip"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button><span class="csms-info__tip" role="tooltip" id="historyInfoTip"><?= $isSubjectHistoryView ? 'History shows placements currently stored in curriculum versions. Removing a placement deletes its stored row, so previously removed placements cannot be reconstructed. ' : '' ?>System states and record dates are technical history only, not official institutional approval or offering dates.</span></span></h1>
         <p class="page-subtitle"><?= htmlspecialchars($viewDescription, ENT_QUOTES, 'UTF-8') ?></p>
         <?php $moduleViews = 'history'; include __DIR__ . '/_module_views.php'; ?>
       </div>
       <div class="history-title-actions">
         <button type="button" class="button-muted" id="historyCimfButton"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> <?= $isSubjectHistoryView ? 'Summarize History with CIMF' : 'Explain History with CIMF' ?></button>
-        <span class="read-only-pill">Read-only derived history</span>
+        <span class="csms-chip csms-chip--draft">Read-only derived history</span>
       </div>
     </div><?php if ($isSubjectHistoryView): ?>
     <section id="subjectHistoryPanel" class="subject-history-panel">
-      <section class="domain-card mapping-filter-card" aria-labelledby="subjectHistoryFiltersTitle">
-        <div class="history-filter-grid">
-          <label class="mapping-filter-field"><span>Subject Search</span>
-            <div class="record-autocomplete"><input type="search" id="historySubjectSearch" placeholder="Search subject code or title"/>
-              <input type="hidden" id="historySubjectId"/><button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear subject" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
-              <div class="record-autocomplete-options" id="historySubjectOptions" role="listbox" hidden></div></div>
-          </label>
-          <label class="mapping-filter-field"><span>Program</span><select id="historyProgram"><option value="">All Programs</option></select></label>
-          <label class="mapping-filter-field"><span>Curriculum</span><select id="historyCurriculum"><option value="">All Curricula</option></select></label>
-          <button type="button" class="button-muted" id="moreHistoryFilters" aria-expanded="false" aria-controls="historyMoreFilters">More Filters <i class="fa-solid fa-chevron-down" aria-hidden="true"></i></button>
-        </div>
-        <div class="history-more-filters" id="historyMoreFilters" hidden>
-          <label class="mapping-filter-field"><span>Curriculum Version</span><div class="record-autocomplete"><input type="search" id="historyVersionSearch" placeholder="Select a curriculum first" disabled/><input type="hidden" id="historyVersion"/><button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear curriculum version" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button><div class="record-autocomplete-options" id="historyVersionOptions" role="listbox" hidden></div></div></label>
-          <label class="mapping-filter-field"><span>Year Level</span><select id="historyYear"><option value="">All Year Levels</option></select></label>
-          <label class="mapping-filter-field"><span>Semester / Term</span><select id="historySemester"><option value="">All Semesters / Terms</option></select></label>
-          <label class="mapping-filter-field"><span>Version Status</span><select id="historyVersionStatus"><option value="">All Version Status</option></select></label>
-        </div>
-      </section>
-      <p class="curriculum-notice history-state-notice" role="note">History shows placements currently stored in curriculum versions. Removing a placement deletes its stored row, so previously removed placements cannot be reconstructed. System states and record dates are technical history only, not official institutional approval or offering dates.</p>
+      <div class="csms-filter-row csms-page-bar">
+        <div class="csms-search"><div class="record-autocomplete"><input type="search" id="historySubjectSearch" aria-label="Subject search" placeholder="Search subject code or title"/>
+          <input type="hidden" id="historySubjectId"/><button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear subject" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+          <div class="record-autocomplete-options" id="historySubjectOptions" role="listbox" hidden></div></div></div>
+        <select class="csms-select" id="historyProgram" aria-label="Program"><option value="">All Programs</option></select>
+        <select class="csms-select" id="historyCurriculum" aria-label="Curriculum"><option value="">All Curricula</option></select>
+        <button type="button" class="button-muted" id="moreHistoryFilters" aria-expanded="false" aria-controls="historyMoreFilters">More Filters <i class="fa-solid fa-chevron-down" aria-hidden="true"></i></button>
+        <span class="csms-filter-row__summary" id="subjectHistoryCount" role="status">0 records</span>
+      </div>
+      <div class="history-more-filters" id="historyMoreFilters" hidden>
+        <label class="mapping-filter-field"><span>Curriculum Version</span><div class="record-autocomplete"><input type="search" id="historyVersionSearch" placeholder="Select a curriculum first" disabled/><input type="hidden" id="historyVersion"/><button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear curriculum version" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button><div class="record-autocomplete-options" id="historyVersionOptions" role="listbox" hidden></div></div></label>
+        <label class="mapping-filter-field"><span>Year Level</span><select class="csms-select" id="historyYear"><option value="">All Year Levels</option></select></label>
+        <label class="mapping-filter-field"><span>Semester / Term</span><select class="csms-select" id="historySemester"><option value="">All Semesters / Terms</option></select></label>
+        <label class="mapping-filter-field"><span>Version Status</span><select class="csms-select" id="historyVersionStatus"><option value="">All Version Status</option></select></label>
+      </div>
       <p class="history-summary-line" id="historySummary">Search for a subject to view its stored history.</p>
 
-      <section class="domain-card mapping-results-card" aria-labelledby="subjectHistoryResultsTitle">
-        <div class="domain-card-header">
-          <div>
-            <h2 id="subjectHistoryResultsTitle">Stored Subject History</h2>
-            <p class="mapping-context-message">Record dates are available in View Details and are not official offering dates.</p>
-          </div>
-          <span class="record-count" id="subjectHistoryCount">0 records</span>
-        </div>
-        <div class="table-scroll" tabindex="0" aria-label="Scrollable subject history table">
-          <table class="domain-table subject-history-table">
-            <thead><tr><th>Subject</th><th>Program</th><th>Curriculum / Version</th><th>Year &amp; Semester</th><th>Status</th><th>Actions</th></tr></thead>
-            <tbody id="subjectHistoryRows"><tr><td colspan="6" class="empty-cell">Search for a subject to view its stored history.</td></tr></tbody>
+      <section aria-labelledby="subjectHistoryResultsTitle">
+        <h2 class="sr-only" id="subjectHistoryResultsTitle">Stored Subject History</h2>
+        <div class="csms-page-table table-scroll" tabindex="0" aria-label="Scrollable subject history table">
+          <table class="csms-ctable subject-history-table">
+            <thead><tr><th>Subject</th><th>Program</th><th>Curriculum / Version</th><th>Year &amp; Semester</th><th>Status</th></tr></thead>
+            <tbody id="subjectHistoryRows"><tr><td colspan="5" class="empty-cell">Search for a subject to view its stored history.</td></tr></tbody>
           </table>
         </div>
         <div class="pagination-bar" id="subjectHistoryPagination"></div>
@@ -122,7 +112,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 
     <?php else: ?>
     <section id="curriculumHistoryPanel" class="subject-history-panel">
-      <section class="domain-card mapping-filter-card" aria-label="Curriculum version comparison context">
+      <section class="csms-page-bar" aria-label="Curriculum version comparison context">
         <div class="mapping-filter-grid curriculum-history-filter-grid">
           <label class="mapping-filter-field"><span>Program / Strand <strong>*</strong></span>
             <div class="record-autocomplete"><input type="search" id="compareProgramSearch" placeholder="Search program or strand"/><input type="hidden" id="compareProgram"/><button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear program" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button><div class="record-autocomplete-options" id="compareProgramOptions" role="listbox" hidden></div></div>
@@ -140,23 +130,17 @@ require __DIR__ . '/../../../shared/sidebar.php';
         <p class="form-error" id="compareValidation" role="alert" hidden></p>
       </section>
 
-      <p class="curriculum-notice history-state-notice" role="note">System states and record dates are technical history only, not official institutional approval or offering dates.</p>
       <p class="history-summary-line comparison-summary-line" id="comparisonSummary">Select two stored curriculum versions to compare.</p>
       <section class="domain-card" id="comparisonEvidence" aria-label="Reference provenance and comparison coverage" hidden></section>
 
-      <section class="domain-card mapping-results-card" aria-labelledby="comparisonResultsTitle">
-        <div class="domain-card-header">
-          <div>
-            <h2 id="comparisonResultsTitle">Curriculum Changes</h2>
-            <p class="mapping-context-message">Change types are calculated from stored placement records.</p>
-          </div>
-          <span class="record-count" id="comparisonCount">0 records</span>
-        </div>
+      <section aria-labelledby="comparisonResultsTitle">
+        <h2 class="sr-only" id="comparisonResultsTitle">Curriculum Changes</h2>
+        <p class="csms-filter-row__summary"><span id="comparisonCount">0 records</span></p>
         <p class="mapping-context-message" id="comparisonEmpty">Select two curriculum versions to compare their subject placements.</p>
-        <div class="table-scroll" id="comparisonTableWrap" tabindex="0" aria-label="Scrollable curriculum version comparison table" hidden>
-          <table class="domain-table subject-history-comparison-table">
-            <thead><tr><th>Subject</th><th>Change</th><th id="versionAHeader">Version A</th><th id="versionBHeader">Version B</th><th>Actions</th></tr></thead>
-            <tbody id="comparisonRows"><tr><td colspan="5" class="empty-cell">Select two curriculum versions to compare their subject placements.</td></tr></tbody>
+        <div class="csms-page-table table-scroll" id="comparisonTableWrap" tabindex="0" aria-label="Scrollable curriculum version comparison table" hidden>
+          <table class="csms-ctable subject-history-comparison-table">
+            <thead><tr><th>Subject</th><th>Change</th><th id="versionAHeader">Version A</th><th id="versionBHeader">Version B</th></tr></thead>
+            <tbody id="comparisonRows"><tr><td colspan="4" class="empty-cell">Select two curriculum versions to compare their subject placements.</td></tr></tbody>
           </table>
         </div>
         <div class="pagination-bar" id="comparisonPagination" hidden></div>
@@ -171,8 +155,8 @@ require __DIR__ . '/../../../shared/sidebar.php';
   <div class="modal-backdrop" data-modal-close></div>
   <section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="historyDetailsTitle">
     <div class="modal-header"><div><h2 id="historyDetailsTitle">Subject History Details</h2><p class="modal-context" id="historyDetailsContext"></p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
-    <div class="confirmation-body"><dl class="history-details-grid" id="historyDetailsBody"></dl><div class="history-source"><strong>SOURCE</strong><p>Derived from stored Subject Mapping / Curriculum Version placement records.</p></div></div>
-    <div class="modal-actions modal-actions-padded"><button type="button" class="button-muted" data-modal-close>Close</button><a class="button-primary" id="historyMappingLink" href="subject_mapping.php" <?= $canViewSubjectMapping ? '' : 'hidden' ?>>View in Subject Mapping</a></div>
+    <div class="confirmation-body"><dl class="csms-detail-list" id="historyDetailsBody"></dl><p class="mapping-context-message">Derived from stored Subject Mapping / Curriculum Version placement records.</p></div>
+    <div class="modal-actions modal-actions-padded"><button type="button" class="button-muted" data-modal-close>Close</button><a class="button-muted" id="historyOutcomesLink" href="subject_mapping.php" hidden>Graduate Outcomes</a><a class="button-primary" id="historyMappingLink" href="subject_mapping.php" <?= $canViewSubjectMapping ? '' : 'hidden' ?>>View in Subject Mapping</a></div>
   </section>
 </div>
 

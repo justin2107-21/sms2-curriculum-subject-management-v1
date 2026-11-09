@@ -65,12 +65,10 @@ require __DIR__ . '/../../../shared/sidebar.php';
         <i class="fa-solid fa-chevron-right grade-weighting-context-arrow" aria-hidden="true"></i>
         <div class="mapping-filter-field"><label for="weightingVersionSearch">Curriculum Version</label><div class="record-autocomplete"><input type="search" id="weightingVersionSearch" placeholder="Select a curriculum first" disabled/><input type="hidden" id="weightingVersion"/><button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear curriculum version" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button><div class="record-autocomplete-options" id="weightingVersionOptions" role="listbox" aria-label="Version suggestions" hidden></div></div></div>
       </div>
-    </section>
-
-    <section class="domain-card mapping-filter-card grade-weighting-subject-card" aria-label="Subject selection">
-      <div class="mapping-filter-field"><label for="weightingPlacementSearch">Subject</label><div class="record-autocomplete"><input type="search" id="weightingPlacementSearch" placeholder="Select a curriculum version first" disabled/><input type="hidden" id="weightingPlacement"/><button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear subject" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button><div class="record-autocomplete-options" id="weightingPlacementOptions" role="listbox" aria-label="Mapped subject suggestions" hidden></div></div></div>
+        <div class="mapping-filter-field grade-weighting-subject-field"><label for="weightingPlacementSearch">Subject</label><div class="record-autocomplete"><input type="search" id="weightingPlacementSearch" placeholder="Select a curriculum version first" disabled/><input type="hidden" id="weightingPlacement"/><button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear subject" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button><div class="record-autocomplete-options" id="weightingPlacementOptions" role="listbox" aria-label="Mapped subject suggestions" hidden></div></div></div>
       <p class="grade-weighting-selection-hint" id="weightingSelectionHint">Select a curriculum version and subject to view its weighting configuration.</p>
     </section>
+
 
     <section class="domain-card mapping-results-card grade-weighting-component-card" id="weightingComponentsSection" aria-labelledby="weightingComponentsTitle" hidden>
       <div class="domain-card-header">
@@ -81,8 +79,8 @@ require __DIR__ . '/../../../shared/sidebar.php';
       <div class="grade-weighting-empty" id="weightingSchemeEmpty">
         <p>Select a curriculum version and subject to view its weighting configuration.</p>
       </div>
-      <div class="table-scroll grade-weighting-table-scroll" id="weightingTableWrap" hidden tabindex="0" aria-label="Scrollable assessment components">
-        <table class="domain-table grade-weighting-component-table">
+      <div class="csms-page-table table-scroll grade-weighting-table-scroll" id="weightingTableWrap" hidden tabindex="0" aria-label="Scrollable assessment components">
+        <table class="csms-ctable grade-weighting-component-table">
           <thead><tr><th>Component</th><th>Weight</th><?php if ($canManageWeighting): ?><th>Actions</th><?php endif; ?></tr></thead>
           <tbody id="weightingComponentRows"></tbody>
         </table>

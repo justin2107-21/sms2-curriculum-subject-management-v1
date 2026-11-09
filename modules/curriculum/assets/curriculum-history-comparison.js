@@ -11,9 +11,9 @@
     }
     function row(record,index) {
         const label = record.before?.details_available ? record.before : record.after;
-        return '<tr><td><strong>' + esc(label?.subject_code || 'Subject #' + record.subject_id) + '</strong><br>' + esc(label?.subject_title || 'Historical subject details unavailable') +
+        return '<tr class="csms-row-click" tabindex="0" data-change-details="' + index + '" aria-haspopup="dialog"><td><strong class="csms-ctable__code">' + esc(label?.subject_code || 'Subject #' + record.subject_id) + '</strong><br>' + esc(label?.subject_title || '') +
             (record.warning ? '<p class="curriculum-notice">' + esc(record.warning) + '</p>' : '') + '</td><td>' + record.categories.map(c => '<span class="history-change-badge">' + esc(c[0].toUpperCase()+c.slice(1)) + '</span>').join(' ') +
-            '</td><td>' + values(record.before) + '</td><td>' + values(record.after) + '</td><td><button type="button" class="row-action-button" data-change-details="' + index + '">View Details</button></td></tr>';
+            '</td><td>' + values(record.before) + '</td><td>' + values(record.after) + '</td></tr>';
     }
     function locator(value) {
         return /^https?:\/\//i.test(value || '') ? '<a target="_blank" rel="noopener noreferrer" href="' + esc(value) + '">' + esc(value) + '</a>' : esc(value || 'No locator recorded');

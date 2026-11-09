@@ -377,6 +377,55 @@ async function main() {
       }
     }
 
+    if (arg('probe', '') === 'runa') {
+      // Run A consistency: computed styles per page (compared with Subject Mapping by the caller), double-X check, console issues, one viewport screenshot.
+      report.runa = {};
+      for (const url of urls) {
+        for (const width of widths) {
+          await setWidth(width);
+          issues = [];
+          await navigate(base + url);
+          await sleep(2500);
+          const name = url.split('/').pop().split('?')[0];
+          report.runa[name + '@' + width] = await evaluate(`(() => {
+            const cs = (el, props) => el ? Object.fromEntries(props.map(p => [p, getComputedStyle(el)[p]])) : null;
+            const tab = document.querySelector('.module-views a.is-active, .csms-tabs [aria-selected="true"], .builder-tabs [aria-selected="true"]');
+            const sel = document.querySelector('.csms-select, #historyProgram, #weightingProgramSearch');
+            const th = document.querySelector('.csms-ctable thead th, .domain-table thead th');
+            const td = document.querySelector('.csms-ctable tbody td, .domain-table tbody td');
+            const code = document.querySelector('.csms-ctable__code, strong.csms-ctable__code');
+            const searches = [...document.querySelectorAll('input[type="search"]')].filter(i => i.offsetParent);
+            return {
+              title: (document.querySelector('h1') || {}).textContent.trim().slice(0, 50),
+              tab: cs(tab, ['fontSize', 'fontWeight', 'color', 'borderBottomColor', 'minHeight']),
+              select: cs(sel, ['height', 'paddingRight', 'backgroundPosition', 'fontSize', 'borderRadius']),
+              th: cs(th, ['fontSize', 'fontWeight', 'paddingTop', 'paddingLeft', 'backgroundColor']),
+              td: cs(td, ['fontSize', 'paddingTop', 'paddingLeft', 'color']),
+              code: cs(code, ['color']),
+              nativeCancelShown: searches.filter(i => getComputedStyle(i, '::-webkit-search-cancel-button').display !== 'none' && i.closest('.record-autocomplete')).length,
+              viewSwitcherDark: !!document.querySelector('.module-views a.is-active') && getComputedStyle(document.querySelector('.module-views a.is-active')).backgroundColor,
+              infoTips: document.querySelectorAll('.csms-info').length,
+              banners: document.querySelectorAll('.curriculum-notice, .history-state-notice, .equivalency-authority-notice').length,
+              overflow: document.documentElement.scrollWidth > innerWidth
+            };
+          })()`);
+          report.runa[name + '@' + width].issues = issues.slice();
+          await shotView(path.join(out, `${role}-runa-${name.replace(/[^a-z0-9]+/gi, '_')}-${width}.png`));
+          // Row-click dialog check (Equivalency records): open the first row, report horizontal overflow, capture it.
+          if (name === 'equivalency_records.php') {
+            await evaluate(`document.querySelector('#equivalencyRows [data-row]')?.click()`); await sleep(500);
+            report.runa[name + '@' + width].dialog = await evaluate(`(() => { const d = document.querySelector('#equivalencyDetailsModal .modal-dialog'); const b = document.querySelector('#equivalencyDetailsModal .confirmation-body'); return d ? { open: !document.getElementById('equivalencyDetailsModal').hidden, hScroll: d.scrollWidth > d.clientWidth || b.scrollWidth > b.clientWidth, bodyPadding: getComputedStyle(b).paddingLeft, rows: document.querySelectorAll('#equivalencyDetails dt').length } : null; })()`);
+            await shotView(path.join(out, `${role}-runa-dialog-equivalency.png`));
+            await evaluate(`document.querySelector('#equivalencyDetailsModal [data-modal-close]')?.click()`); await sleep(300);
+          }
+          // Double-X check: fill the first visible autocomplete, show its clear button, capture the field.
+          const box = await evaluate(`(() => { const i = [...document.querySelectorAll('.record-autocomplete input[type=search]')].find(e => e.offsetParent && !e.disabled); if (!i) return null; i.value = 'ab'; i.dispatchEvent(new Event('input', { bubbles: true })); const b = i.parentElement.querySelector('[data-autocomplete-clear]'); if (b) b.hidden = false; i.scrollIntoView({ block: 'center' }); const r = i.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; })()`);
+          if (box) { await sleep(300); const r = await send('Page.captureScreenshot', { format: 'png', clip: { x: Math.max(0, box.x + box.w - 160), y: Math.max(0, box.y - 6), width: 170, height: box.h + 12, scale: 3 } }); fs.writeFileSync(path.join(out, `${role}-runa-x-${name.replace(/[^a-z0-9]+/gi, '_')}.png`), Buffer.from(r.data, 'base64')); }
+
+        }
+      }
+    }
+
     if (arg('probe', '') === 'sidebar') {
       // Sidebar measurements (D7): headings and their contrast, every label (lines, mid-word breaks), indents, active style.
       const collect = () => {

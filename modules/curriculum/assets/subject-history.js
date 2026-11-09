@@ -95,21 +95,19 @@
     }
     function historyRow(row, index) {
         state.historyRows.set(String(index), row);
-        const historicalSubject = Number(row.snapshot_complete) === 1
-            ? '<strong>' + esc(row.subject_code) + '</strong><span>' + esc(row.subject_title) + '</span><small>Captured snapshot · ' + esc(row.snapshot_captured_at || 'capture date unavailable') + '</small>'
-            : '<strong>Historical subject details unavailable</strong><span>Current Subject Master: ' + esc(row.current_subject_code || '') + ' · ' + esc(row.current_subject_title || '') + '</span>';
-        return '<tr><td><span class="history-subject-context">' + historicalSubject + '</span></td>' +
-            '<td><span class="history-code">' + esc(row.program_code) + '</span></td>' +
+        const complete = Number(row.snapshot_complete) === 1;
+        const code = complete ? row.subject_code : row.current_subject_code, title = complete ? row.subject_title : row.current_subject_title;
+        return '<tr class="csms-row-click" tabindex="0" data-history-details="' + index + '" aria-haspopup="dialog" aria-label="View history details for ' + esc(code || 'subject') + '">' +
+            '<td><span class="history-subject-context"><strong class="csms-ctable__code">' + esc(code || '—') + '</strong><span>' + esc(title || '') + '</span></span></td>' +
+            '<td>' + esc(row.program_code) + '</td>' +
             '<td><span class="history-curriculum-context"><strong>' + esc(row.curriculum_code) + '</strong><span>' + esc(row.version_label) + '</span></span></td>' +
-            '<td>' + esc([row.year_level, row.semester].filter(Boolean).join(' · ') || '—') + '</td><td>' + ui.statusBadge(row.version_status) + '</td>' +
-            '<td><button type="button" class="row-action-button history-link" data-history-details="' + index + '">View Details</button>' +
-            (String(row.program_code).toUpperCase()==='BSIT' ? '<a class="row-action-button history-link" href="subject_mapping.php?program_id=' + Number(row.academic_program_id) + '&curriculum_id=' + Number(row.curriculum_id) + '&version_id=' + Number(row.curriculum_version_id) + '&outcomes=1">Graduate Outcomes</a>' : '') + '</td></tr>';
+            '<td>' + esc([row.year_level, row.semester].filter(Boolean).join(' · ') || '—') + '</td><td>' + ui.statusBadge(row.version_status) + '</td></tr>';
     }
     async function loadHistory(page) {
         if (!subjectId.value) { clearHistory(); return; }
         const request = ++state.historyRequest;
         $('historyCimfButton').disabled = true;
-        setState($('subjectHistoryRows'), 6, 'Loading stored subject history…');
+        setState($('subjectHistoryRows'), 5, 'Loading stored subject history…');
         try {
             const payload = await ui.fetchJson(api, historyQuery(page));
             if (request !== state.historyRequest) return;
@@ -117,17 +115,17 @@
             ui.setCount($('subjectHistoryCount'), Number(payload.pagination.total_records)); updateHistorySummary(payload.summary);
             updateFilterOptions(payload.filter_values);
             if (payload.history.length) $('subjectHistoryRows').innerHTML = payload.history.map(historyRow).join('');
-            else setState($('subjectHistoryRows'), 6, ( $('historyProgram').value || $('historyCurriculum').value || versionId.value || $('historyYear').value || $('historySemester').value || $('historyVersionStatus').value)
+            else setState($('subjectHistoryRows'), 5, ( $('historyProgram').value || $('historyCurriculum').value || versionId.value || $('historyYear').value || $('historySemester').value || $('historyVersionStatus').value)
                 ? 'No stored history matches the selected filters.' : 'No stored history found for this subject.');
             ui.renderPagination($('subjectHistoryPagination'), payload.pagination, loadHistory);
             $('historyCimfButton').disabled = payload.history.length === 0;
-        } catch (error) { if (request === state.historyRequest) setState($('subjectHistoryRows'), 6, error.message || 'Stored subject history could not be loaded.', true); }
+        } catch (error) { if (request === state.historyRequest) setState($('subjectHistoryRows'), 5, error.message || 'Stored subject history could not be loaded.', true); }
     }
     function clearHistory() {
         state.historyRequest++;
         state.historyRows.clear(); $('historySummary').textContent = subjectId.value ? 'No stored history found for this subject.' : 'Search for a subject to view its stored history.';
         ui.setCount($('subjectHistoryCount'), 0); $('subjectHistoryPagination').innerHTML = '';
-        setState($('subjectHistoryRows'), 6, subjectId.value ? 'No stored history found for this subject.' : 'Search for a subject to view its stored history.');
+        setState($('subjectHistoryRows'), 5, subjectId.value ? 'No stored history found for this subject.' : 'Search for a subject to view its stored history.');
         $('historyCimfButton').disabled = true;
     }
     function updateFilterOptions(values) {
@@ -217,10 +215,12 @@
         const row = state.historyRows.get(String(index)); if (!row) return;
         try {
             const { record: r } = await ui.fetchJson(api, { action: 'details', placement_id: row.placement_id });
-            const subjectLabel = Number(r.snapshot_complete) === 1 ? r.subject_code + ' · ' + r.subject_title : 'Historical subject details unavailable';
+            const subjectLabel = Number(r.snapshot_complete) === 1 ? r.subject_code + ' · ' + r.subject_title : (r.current_subject_code || '—') + ' · ' + (r.current_subject_title || '');
             $('historyDetailsContext').textContent = subjectLabel;
             const entries = [['Historical subject', subjectLabel], ['Current Subject Master (present-day context)', (r.current_subject_code || '—') + ' — ' + (r.current_subject_title || '—')], ['Snapshot captured', Number(r.snapshot_complete) === 1 ? ui.formatDate(r.snapshot_captured_at) + ' · ' + (r.capture_method || '') : 'Unavailable'], ['Program / Strand', r.program_code + ' — ' + r.program_name], ['Curriculum', r.curriculum_code + ' — ' + r.curriculum_name], ['Curriculum Version', r.version_label + ' · ' + r.version_status], ['Year Level', r.year_level || '—'], ['Semester / Term', r.semester || '—'], ['Sequence', r.sequence_order ?? '—'], ['Placement Type', Number(r.is_required) === 1 ? 'Required' : 'Optional'], ['Stored Date', ui.formatDate(r.placement_created_at)], ['Captured units', Number(r.snapshot_complete) === 1 ? ui.formatUnits(r.units) : 'Unavailable'], ['Lecture units', Number(r.snapshot_complete) === 1 ? ui.formatUnits(r.lecture_units) : 'Unavailable'], ['Laboratory units', Number(r.snapshot_complete) === 1 ? ui.formatUnits(r.laboratory_units) : 'Unavailable'], ['Description', Number(r.snapshot_complete) === 1 ? (r.description || '—') : 'Unavailable'], ['Last Updated Date', ui.formatDate(r.placement_updated_at)], ['Program Type', r.program_type || '—']];
-            $('historyDetailsBody').innerHTML = entries.map(([k,v]) => '<div><dt class="eyebrow">' + esc(k) + '</dt><dd>' + esc(v) + '</dd></div>').join('');
+            $('historyDetailsBody').innerHTML = entries.filter(([k,v]) => v !== 'Unavailable' && v !== '—' && v !== '— — —' && v !== ' — ').map(([k,v]) => '<dt>' + esc(k) + '</dt><dd' + (k === 'Historical subject' ? ' class="csms-ctable__code"' : '') + '>' + esc(v) + '</dd>').join('');
+            const outcomes = $('historyOutcomesLink');
+            if (outcomes) { const bsit = String(r.program_code).toUpperCase() === 'BSIT'; outcomes.hidden = !bsit; if (bsit) outcomes.href = 'subject_mapping.php?program_id=' + Number(row.academic_program_id) + '&curriculum_id=' + Number(row.curriculum_id) + '&version_id=' + Number(row.curriculum_version_id) + '&outcomes=1'; }
             $('historyMappingLink').href = 'subject_mapping.php?version_id=' + Number(r.curriculum_version_id) + '&subject_id=' + Number(r.subject_id);
             detailsModal.open();
         } catch (error) { ui.showToast(error.message || 'History details could not be loaded.', 'error'); }
@@ -247,6 +247,10 @@
     $('clearSubjectHistoryFilters')?.addEventListener('click', async () => { subjectPicker.clear(false); $('historyProgram').value = ''; await loadCurricula($('historyProgram'), $('historyCurriculum'), false); $('historyYear').value = ''; $('historySemester').value = ''; $('historyVersionStatus').value = ''; $('historyMoreFilters').hidden = true; $('moreHistoryFilters').setAttribute('aria-expanded','false'); historyVersionPicker.clear(false); clearHistory(); });
     $('subjectHistoryRows')?.addEventListener('click', e => { const b = e.target.closest('[data-history-details]'); if (b) showHistoryDetails(b.dataset.historyDetails); });
     $('comparisonRows')?.addEventListener('click', e => { const b = e.target.closest('[data-change-details]'); if (b) showChangeDetails(b.dataset.changeDetails); });
+    ['subjectHistoryRows', 'comparisonRows'].forEach(id => $(id)?.addEventListener('keydown', e => {
+        if (!['Enter', ' '].includes(e.key) || !e.target.matches?.('tr[data-history-details], tr[data-change-details]')) return;
+        e.preventDefault(); e.target.click();
+    }));
     $('historyCimfButton').addEventListener('click', () => window.CSMSCIMF?.open(subjectView ? 'summarize' : 'explain'));
     async function initialize() {
         if ($('historyCimfButton')) $('historyCimfButton').disabled = true;
