@@ -81,7 +81,7 @@
         status.className = 'csms-chip csms-chip--' + (r.status === 'active' ? 'active' : 'inactive');
         status.textContent = r.status === 'active' ? 'Active' : 'Inactive';
         const placed = hasVersion();
-        $('coverageScope').textContent = placed ? 'Placed counts use the selected curriculum version.' : 'No curriculum version selected: Placed counts are not shown.';
+        $('coverageScope').textContent = placed ? '' : 'No curriculum version selected: Placed counts are not shown.';
         $('countAssigned').textContent = r.assigned_count;
         $('countPlaced').textContent = placed ? r.placed_count : '—';
         $('countPna').textContent = placed ? r.placed_not_assigned : '—';
@@ -253,7 +253,7 @@
         if (!window.CSMSCIMF) { ui.showToast('CIMF review is not available on this page.', 'error'); return; }
         window.CSMSCIMF.open('review', assignmentId ? { assignment_id: assignmentId } : {});
     }
-    window.CSMSPageCIMFContext = () => ({ view: 'program', academic_program_id: programId() });
+    window.CSMSPageCIMFContext = () => ({ view: 'program', academic_program_id: programId(), curriculum_id: cascade.get(1).getSelectedId(), curriculum_version_id: versionId() });
 
     // ---- Row menu (shared js/csms-menu.js) and events ----
     const rowById = id => state.records.find(r => Number(r.subject_id) === Number(id));

@@ -48,13 +48,13 @@ $cimfStatus = CIMFConfig::status(CIMFConfig::load());
 </section>
 <section class="domain-card assignment-coverage" id="assignmentCoverage" aria-label="Coverage" hidden>
  <div class="assignment-coverage__program"><span class="assignment-coverage__meta">Program type: <strong id="coverageType"></strong> <span class="csms-chip" id="coverageStatus"></span></span>
- <span class="assignment-coverage__meta" id="coverageScope"></span></div>
+ <span class="assignment-coverage__meta" id="coverageScope"></span>
+ <?php if ($canManageAssignments): ?><span class="assignment-reconcile"><button type="button" class="button-muted" id="reconcileButton" disabled>Assign placed subjects</button>
+ <span class="csms-info" id="reconcileReason"><button type="button" class="csms-info__btn" aria-label="Why Assign placed subjects is unavailable" aria-describedby="reconcileReasonTip"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button><span class="csms-info__tip" role="tooltip" id="reconcileReasonTip"></span></span></span><?php endif; ?></div>
  <div class="assignment-coverage__counts" role="group" aria-label="Filter the table by count">
   <button type="button" class="assignment-count" data-filter="assigned"><strong id="countAssigned">0</strong><span>Assigned</span></button>
   <button type="button" class="assignment-count" data-filter="placed"><strong id="countPlaced">0</strong><span>Placed in curriculum</span></button>
-  <div class="assignment-count-group"><button type="button" class="assignment-count" data-filter="placed_not_assigned"><strong id="countPna">0</strong><span>Placed, not assigned</span></button>
-  <?php if ($canManageAssignments): ?><span class="assignment-reconcile"><button type="button" class="button-muted" id="reconcileButton" disabled>Assign placed subjects</button>
-  <span class="csms-info" id="reconcileReason"><button type="button" class="csms-info__btn" aria-label="Why Assign placed subjects is unavailable" aria-describedby="reconcileReasonTip"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button><span class="csms-info__tip" role="tooltip" id="reconcileReasonTip"></span></span></span><?php endif; ?></div>
+  <button type="button" class="assignment-count" data-filter="placed_not_assigned"><strong id="countPna">0</strong><span>Placed, not assigned</span></button>
   <button type="button" class="assignment-count" data-filter="assigned_not_placed"><strong id="countAnp">0</strong><span>Assigned, not placed</span></button>
  </div>
 </section>
