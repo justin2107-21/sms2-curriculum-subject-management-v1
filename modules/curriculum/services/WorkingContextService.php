@@ -22,6 +22,7 @@ class WorkingContextService
         'builder' => 'curriculum.view',
         'prerequisite' => 'prerequisite.view',
         'electives' => 'elective.view',
+        'assignment' => 'program_assignment.view',
         'export' => 'curriculum_export.view',
         'grade_weighting' => 'grade_weighting.view',
     ];

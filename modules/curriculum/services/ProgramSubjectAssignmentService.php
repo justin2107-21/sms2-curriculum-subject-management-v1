@@ -14,17 +14,26 @@ class ProgramSubjectAssignmentService
         if ($contextType !== '' && (!in_array($contextType, ['program','subject'], true) || $contextId < 1)) throw new DomainValidationException('Invalid assignment context.');
         return $this->repository->search($type, $query, $contextType, $contextId, $availableOnly);
     }
-    public function context(string $type, int $id): array
+    /** The selected curriculum version (0 = none). It only scopes the Placed columns; it must belong to the program. */
+    private function selectedVersion(int $programId, mixed $value): int
+    {
+        if ($value === null || $value === '') return 0;
+        $id = filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($id === false) throw new DomainValidationException('Curriculum version is invalid.');
+        if (!$this->repository->versionBelongsToProgram($programId, (int)$id)) throw new DomainValidationException('Select a curriculum version belonging to the selected program.');
+        return (int)$id;
+    }
+    public function context(string $type, int $id, mixed $versionId = null): array
     {
         if (!in_array($type, ['program', 'subject'], true)) throw new DomainValidationException('Invalid assignment view.');
         $record = $this->repository->record($type, $id);
         if (!$record) throw new DomainNotFoundException(ucfirst($type) . ' not found.');
-        return $this->repository->summary($type, $id, $record);
+        return $this->repository->summary($type, $id, $record, $type === 'program' ? $this->selectedVersion($id, $versionId) : 0);
     }
     public function list(int $id, string $type, array $query): array
     {
         $this->context($type, $id);
-        if ($type === 'program') return $this->repository->listCoverage($id, $query, is_string($query['filter'] ?? null) ? $query['filter'] : '');
+        if ($type === 'program') return $this->repository->listCoverage($id, $query, is_string($query['filter'] ?? null) ? $query['filter'] : '', $this->selectedVersion($id, $query['version_id'] ?? null));
         return $this->repository->list($type, $id, $query);
     }
     /** Where a subject is used: its assignments and its curriculum placements. */

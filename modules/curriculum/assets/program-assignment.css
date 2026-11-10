@@ -3,21 +3,13 @@
 .program-assignment-content{min-width:0}
 .program-assignment-content [hidden]{display:none!important}
 .assignment-page-actions{align-items:center;display:flex;flex-wrap:wrap;gap:10px;margin-left:auto;flex-shrink:0}
-.program-assignment-content>.domain-card{box-sizing:border-box;margin:0 30px 18px;width:calc(100% - 60px)}
-
-/* Program picker */
-.assignment-selector-card{overflow:visible;position:relative;z-index:5}
-.program-assignment-context{box-sizing:border-box;padding:16px 18px;max-width:560px}
-.program-assignment-context .form-field{margin:0}
-.program-assignment-content .record-autocomplete-options{max-height:194px;overflow-y:auto}
-.program-assignment-content .record-autocomplete-option{min-height:58px}
+/* The context bar, coverage strip and table sit in the shared .mapping-workspace-shell (same gutters as Electives Manager). */
+.program-assignment-content .mapping-workspace-shell>.domain-card{box-sizing:border-box;margin:12px 0 0}
 
 /* Coverage strip: the program, then four counts that filter the table */
 .assignment-coverage{align-items:center;display:flex;flex-wrap:wrap;gap:12px 28px;justify-content:space-between;padding:14px 18px}
 .assignment-coverage__program{display:flex;flex-direction:column;gap:2px;min-width:0}
-.assignment-coverage__code{color:var(--csms-code-blue,#2163c5);font-size:1rem}
-.assignment-coverage__name{color:var(--csms-text,#1f2937);overflow-wrap:anywhere}
-.assignment-coverage__meta{align-items:center;color:var(--csms-text-secondary,#374151);display:flex;font-size:var(--csms-text-xs,.75rem);gap:8px}
+.assignment-coverage__meta{align-items:center;color:var(--csms-text-secondary,#374151);display:flex;font-size:var(--csms-text-sm,.875rem);gap:8px}
 .assignment-coverage__counts{display:flex;flex-wrap:wrap;gap:8px}
 .assignment-count{background:#fff;border:1px solid var(--csms-border,#dfe4ee);border-radius:8px;color:var(--csms-text-secondary,#374151);cursor:pointer;display:flex;flex-direction:column;font:inherit;gap:2px;min-width:8.5rem;padding:8px 14px;text-align:left}
 .assignment-count strong{color:var(--csms-text,#1f2937);font-size:1.35rem;font-variant-numeric:tabular-nums;line-height:1.1}
@@ -27,7 +19,7 @@
 .assignment-count.is-active{background:var(--csms-surface-muted,#f4f6fb);border-color:var(--csms-navy,#1a3a8c)}
 
 /* Results card */
-.program-assignment-content>.mapping-results-card{padding:16px 18px}
+.program-assignment-content .mapping-results-card{padding:16px 18px}
 .program-assignment-content #assignmentPagination{align-items:center;display:flex;gap:12px;justify-content:center;padding:12px}
 
 /* Dialogs */
@@ -43,7 +35,6 @@
 
 @media(max-width:700px){
   .assignment-page-actions{justify-content:flex-start;margin:12px 0 0;width:100%}
-  .program-assignment-content>.domain-card{margin:0 14px 14px;width:calc(100% - 28px)}
   .assignment-coverage__counts{display:grid;gap:8px;grid-template-columns:1fr 1fr;width:100%}
   .assignment-count{min-width:0}
 }

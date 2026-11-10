@@ -18,7 +18,7 @@ try {
             curriculum_require_read('program_assignment.view');
             $type = is_string($_GET['type'] ?? null) ? $_GET['type'] : '';
             $id = DomainValidator::positiveId($_GET['id'] ?? null, ucfirst($type));
-            json_response(true, 'Assignment context loaded.', ['record' => $service->context($type, $id)]);
+            json_response(true, 'Assignment context loaded.', ['record' => $service->context($type, $id, $_GET['version_id'] ?? null)]);
         case 'list':
             curriculum_require_read('program_assignment.view');
             $type = is_string($_GET['type'] ?? null) ? $_GET['type'] : '';
@@ -28,6 +28,10 @@ try {
             curriculum_require_read('program_assignment.view');
             $id = DomainValidator::positiveId($_GET['id'] ?? null, 'Subject assignment');
             json_response(true, 'Assignment details loaded.', ['assignment' => $service->details($id)]);
+        case 'context_options': // the shared Program / Curriculum / Version bar (same lookup as Electives Manager)
+            curriculum_require_read('program_assignment.view');
+            require_once __DIR__ . '/../services/ElectivesWorkspaceService.php';
+            json_response(true, 'Context options loaded.', (new ElectivesWorkspaceService($conn))->contextOptions($_GET));
         case 'usage':
             curriculum_require_read('program_assignment.view');
             $id = DomainValidator::positiveId($_GET['subject_id'] ?? null, 'Subject');

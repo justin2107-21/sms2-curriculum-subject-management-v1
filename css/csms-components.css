@@ -616,6 +616,9 @@ body .main .module-views a:focus-visible { outline: 3px solid var(--csms-focus, 
 .csms-menu button { display: block; width: 100%; padding: 8px 12px; background: none; border: 0; border-radius: 6px; font: inherit; font-size: 14px; text-align: left; cursor: pointer; color: var(--csms-text, #1f2937); }
 .csms-menu button:hover { background: var(--csms-surface-muted, #f4f6fb); }
 .csms-menu .is-danger { color: #b74f50; }
+.csms-menu button[aria-disabled="true"] { color: var(--csms-text-secondary, #374151); cursor: not-allowed; }
+.csms-menu button[aria-disabled="true"]:hover { background: none; }
+.csms-menu__hint { display: block; max-width: 15rem; margin-top: 2px; font-size: 12px; line-height: 1.35; color: var(--csms-text-secondary, #374151); white-space: normal; }
 @media (max-width: 600px), (pointer: coarse) { .csms-warn, .csms-rowmenu { width: 44px; height: 44px; } .csms-menu button { padding: 12px 14px; } }
 .csms-chip--inactive { background: #e5e7eb; color: #374151; }
 /* Type chip: neutral blue-grey, same shape as the status chips. */

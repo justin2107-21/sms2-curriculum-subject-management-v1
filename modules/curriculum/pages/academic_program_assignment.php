@@ -19,7 +19,7 @@ $cimfStatus = CIMFConfig::status(CIMFConfig::load());
 <title>Academic Strand/Course Assignment - BCP Student Management System</title>
 <link rel="stylesheet" href="../../../css/dashboard.css"/><link rel="stylesheet" href="../assets/curriculum.css"/>
 <link rel="stylesheet" href="../assets/subject-mapping.css"/><link rel="stylesheet" href="../assets/program-assignment.css?v=<?= $assignmentCssVersion ?>"/>
-<link rel="stylesheet" href="../../../css/csms-typography.css"/><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+<link rel="stylesheet" href="../../../css/csms-typography.css"/><link rel="stylesheet" href="../assets/subject-mapping-final.css?v=<?= (int)filemtime(__DIR__ . '/../assets/subject-mapping-final.css') ?>"/><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
 </head><body>
 <?php $APP_ROOT = '../../../'; $ACTIVE_NAV = $activeNav; require __DIR__ . '/../../../shared/sidebar.php'; ?>
 <div class="main"><?php require __DIR__ . '/../../../shared/topbar.php'; ?>
@@ -34,15 +34,21 @@ $cimfStatus = CIMFConfig::status(CIMFConfig::load());
 <?php if ($canManageAssignments): ?><button type="button" class="primary-action-button" id="assignButton" disabled><i class="fa-solid fa-plus" aria-hidden="true"></i> Assign Subjects</button>
 <span class="csms-info" id="assignReason"><button type="button" class="csms-info__btn" aria-label="Why Assign is unavailable" aria-describedby="assignReasonTip"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button><span class="csms-info__tip" role="tooltip" id="assignReasonTip"></span></span><?php endif; ?>
 </div></div>
-<section class="domain-card mapping-filter-card assignment-selector-card" aria-label="Program / Strand">
- <div class="program-assignment-context"><label class="form-field"><span>Program / Strand</span><div class="record-autocomplete">
- <input type="search" id="contextSearch" placeholder="Search program code or name"/><input type="hidden" id="contextId"/>
- <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear selection" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button><div class="record-autocomplete-options" id="contextOptions" role="listbox" hidden></div></div></label>
- </div>
+<section class="mapping-workspace-shell">
+<section class="mapping-context-bar" aria-label="Curriculum context">
+<?php foreach (['program'=>'Program / Strand','curriculum'=>'Curriculum','version'=>'Curriculum Version'] as $key=>$label): ?>
+<div class="mapping-context-field"><label for="<?= $key ?>Search"><?= $label ?></label><div class="record-autocomplete">
+<input type="search" id="<?= $key ?>Search" placeholder="<?= $key === 'program' ? 'Search program code or name' : ($key === 'curriculum' ? 'Choose program first' : 'Choose curriculum first') ?>" <?= $key !== 'program' ? 'disabled' : '' ?> autocomplete="off"/>
+<input type="hidden" id="<?= $key ?>Id"/>
+<button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear <?= $label ?>" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+<div class="record-autocomplete-options" id="<?= $key ?>Options" role="listbox" aria-label="<?= $label ?> suggestions" hidden></div>
+</div></div>
+<?php if ($key !== 'version'): ?><span class="mapping-context-separator" aria-hidden="true"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span><?php endif; ?>
+<?php endforeach; ?>
 </section>
 <section class="domain-card assignment-coverage" id="assignmentCoverage" aria-label="Coverage" hidden>
- <div class="assignment-coverage__program"><strong class="assignment-coverage__code" id="coverageCode"></strong><span class="assignment-coverage__name" id="coverageName"></span>
- <span class="assignment-coverage__meta"><span id="coverageType"></span> <span class="csms-chip" id="coverageStatus"></span></span></div>
+ <div class="assignment-coverage__program"><span class="assignment-coverage__meta">Program type: <strong id="coverageType"></strong> <span class="csms-chip" id="coverageStatus"></span></span>
+ <span class="assignment-coverage__meta" id="coverageScope"></span></div>
  <div class="assignment-coverage__counts" role="group" aria-label="Filter the table by count">
   <button type="button" class="assignment-count" data-filter="assigned"><strong id="countAssigned">0</strong><span>Assigned</span></button>
   <button type="button" class="assignment-count" data-filter="placed"><strong id="countPlaced">0</strong><span>Placed in curriculum</span></button>
@@ -51,7 +57,9 @@ $cimfStatus = CIMFConfig::status(CIMFConfig::load());
  </div>
 </section>
 <section class="domain-card mapping-results-card" aria-label="Subjects of the selected program">
-<div class="csms-empty" id="assignEmpty" role="status"><i class="fa-solid fa-bullseye" aria-hidden="true"></i><strong>Select a Program / Strand</strong><span>Choose a program to see its assigned and placed subjects.</span></div>
+<div class="csms-empty" id="assignLoading" role="status"><i class="fa-solid fa-spinner" aria-hidden="true"></i><strong>Loading your working context…</strong></div>
+<div class="csms-empty" id="assignEmpty" role="status" hidden><i class="fa-solid fa-bullseye" aria-hidden="true"></i><strong>Choose a Program / Strand</strong><span>Use the context bar above to pick a program.</span></div>
+<div class="csms-empty" id="assignNoPrograms" role="status" hidden><i class="fa-solid fa-folder-open" aria-hidden="true"></i><strong>No programs exist yet</strong><span>Add a Program / Strand in Academic Programs first.</span></div>
 <div class="csms-empty" id="assignNoSubjects" role="status" hidden><i class="fa-solid fa-book-open" aria-hidden="true"></i><strong>No subjects yet</strong><span>This program has no assigned or placed subjects.</span></div>
 <div id="assignmentList" hidden>
 <div class="csms-filter-row csms-page-bar" id="assignmentFilters">
@@ -59,11 +67,12 @@ $cimfStatus = CIMFConfig::status(CIMFConfig::load());
 <select class="csms-select" id="coverageFilter" aria-label="Show"><option value="">All subjects</option><option value="assigned">Assigned</option><option value="placed">Placed in curriculum</option><option value="placed_not_assigned">Placed, not assigned</option><option value="assigned_not_placed">Assigned, not placed</option></select>
 <select class="csms-select" id="perPage" aria-label="Rows per page"><option value="10">10 rows</option><option value="20" selected>20 rows</option><option value="50">50 rows</option></select>
 <span class="csms-filter-row__summary" id="assignmentCount" role="status">0 records</span></div>
-<div class="csms-page-table table-scroll"><table class="csms-ctable"><thead><tr><th class="csms-ctable__code">Code</th><th>Title</th><th class="csms-ctable__num">Units</th><th>Assignment</th><th>Placed in</th><th class="csms-ctable__action"><span class="sr-only">Actions</span></th></tr></thead><tbody id="assignmentRows"></tbody></table></div>
+<div class="csms-page-table table-scroll"><table class="csms-ctable"><thead><tr><th class="csms-ctable__code">Code</th><th>Title</th><th class="csms-ctable__num">Units</th><th>Assignment <span class="csms-info"><button type="button" class="csms-info__btn" aria-label="About the Assignment column" aria-describedby="assignmentInfoTip"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button><span class="csms-info__tip" role="tooltip" id="assignmentInfoTip">Assignment applies to the whole program. Curriculum and version filter the Placed columns only.</span></span></th><th>Placed in</th><th class="csms-ctable__action"><span class="sr-only">Actions</span></th></tr></thead><tbody id="assignmentRows"></tbody></table></div>
 <div class="csms-empty" id="assignNoMatch" role="status" hidden><i class="fa-solid fa-filter" aria-hidden="true"></i><strong>No subjects match</strong><span>Change the search or the filter.</span></div>
 <div id="assignmentRowMenu" class="csms-menu" role="menu" aria-label="Row actions" hidden></div>
 <div class="pagination-bar" id="assignmentPagination" hidden></div>
 </div></section>
+</section>
 </main><div class="footer">Bestlink College of the Philippines &middot; CSMS-SMS2 &copy; 2026</div></div>
 
 <?php if ($canManageAssignments): ?><div class="curriculum-modal" id="assignModal" hidden><div class="modal-backdrop" data-modal-close></div><section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="assignModalTitle">

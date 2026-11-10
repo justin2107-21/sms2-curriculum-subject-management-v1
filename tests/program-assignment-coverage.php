@@ -33,29 +33,46 @@ $service = new ProgramSubjectAssignmentService($conn);
 $codes = fn(array $page) => array_column($page['assignments'], 'subject_code');
 $thrown = function (callable $fn): ?string { try { $fn(); return null; } catch (Throwable $e) { return get_class($e); } };
 
-// Counts for P1: assigned {1,2}, placed {1,3,4}, placed-not-assigned {3,4}, assigned-not-placed {2}.
-$c = $service->context('program', 1);
-check($c['assigned_count'] === 2 && $c['placed_count'] === 3 && $c['placed_not_assigned'] === 2 && $c['assigned_not_placed'] === 1, 'P1 coverage counts: ' . json_encode($c));
-$c2 = $service->context('program', 2);
-check($c2['assigned_count'] === 1 && $c2['placed_count'] === 2 && $c2['placed_not_assigned'] === 1 && $c2['assigned_not_placed'] === 0, 'P2 coverage counts (archived assignment ignored): ' . json_encode($c2));
+// Counts depend on the SELECTED version; assignment is program-level and never depends on it.
+// P1 / v1: assigned {1,2}; placed in v1 {1,3,4}; placed-not-assigned {3,4}; assigned-not-placed {2}.
+$cov = fn($p, $v = null) => array_values(array_intersect_key($service->context('program', $p, $v), array_flip(['assigned_count', 'placed_count', 'placed_not_assigned', 'assigned_not_placed'])));
+check($cov(1, 1) === [2, 3, 2, 1], 'P1 v1 coverage: ' . json_encode($cov(1, 1)));
+// P1 / v2: only S4 is placed in v2, so S1 becomes assigned-not-placed and S3 drops out of the table.
+check($cov(1, 2) === [2, 1, 1, 2], 'P1 v2 coverage: ' . json_encode($cov(1, 2)));
+// P1 / no version: assignment counts are unchanged, nothing is placed.
+check($cov(1) === [2, 0, 0, 2], 'P1 without a version: ' . json_encode($cov(1)));
+check($cov(2, 3) === [1, 2, 1, 0], 'P2 v3 coverage (archived assignment ignored): ' . json_encode($cov(2, 3)));
+check($thrown(fn() => $service->context('program', 1, 3)) === 'DomainValidationException', 'a version of another program is rejected');
+check($thrown(fn() => $service->context('program', 1, 'x')) === 'DomainValidationException', 'a malformed version is rejected');
+check($service->context('program', 1, 2)['version_id'] === 2 && $service->context('program', 1)['version_id'] === null, 'context reports the selected version');
 
-// Union listing and filters. S5 (neither) and S6 (archived, not placed in P1) never appear.
-$all = $service->list(1, 'program', []);
+// Union listing and filters (P1 / v1). S5 (neither) and S6 (archived, not in P1) never appear.
+$q = ['version_id' => 1];
+$all = $service->list(1, 'program', $q);
 check($codes($all) === ['S1', 'S2', 'S3', 'S4'] && $all['pagination']['total_records'] === 4, 'union lists assigned and placed subjects only: ' . json_encode($codes($all)));
-check($codes($service->list(1, 'program', ['filter' => 'assigned'])) === ['S1', 'S2'], 'filter assigned');
-check($codes($service->list(1, 'program', ['filter' => 'placed'])) === ['S1', 'S3', 'S4'], 'filter placed');
-check($codes($service->list(1, 'program', ['filter' => 'placed_not_assigned'])) === ['S3', 'S4'], 'filter placed not assigned');
-check($codes($service->list(1, 'program', ['filter' => 'assigned_not_placed'])) === ['S2'], 'filter assigned not placed');
-check($codes($service->list(1, 'program', ['search' => 'subject 3'])) === ['S3'], 'search by title');
-check($thrown(fn() => $service->list(1, 'program', ['filter' => 'nonsense'])) === 'DomainValidationException', 'unknown filter rejected');
+check($codes($service->list(1, 'program', $q + ['filter' => 'assigned'])) === ['S1', 'S2'], 'filter assigned');
+check($codes($service->list(1, 'program', $q + ['filter' => 'placed'])) === ['S1', 'S3', 'S4'], 'filter placed');
+check($codes($service->list(1, 'program', $q + ['filter' => 'placed_not_assigned'])) === ['S3', 'S4'], 'filter placed not assigned');
+check($codes($service->list(1, 'program', $q + ['filter' => 'assigned_not_placed'])) === ['S2'], 'filter assigned not placed');
+check($codes($service->list(1, 'program', $q + ['search' => 'subject 3'])) === ['S3'], 'search by title');
+check($thrown(fn() => $service->list(1, 'program', $q + ['filter' => 'nonsense'])) === 'DomainValidationException', 'unknown filter rejected');
 $byCode = array_column($all['assignments'], null, 'subject_code');
 check($byCode['S1']['assigned'] && $byCode['S1']['placed'] && $byCode['S1']['assignment_id'] === 1, 'S1 assigned and placed');
 check($byCode['S2']['assigned'] && !$byCode['S2']['placed'] && $byCode['S2']['placements'] === [], 'S2 assigned only, no placements');
 check(!$byCode['S3']['assigned'] && $byCode['S3']['placed'] && $byCode['S3']['assignment_id'] === null, 'S3 placed only');
-check(count($byCode['S4']['placements']) === 2 && $byCode['S4']['placements'][0]['curriculum_code'] === 'C1' && $byCode['S4']['placements'][0]['version_label'] === 'v1', 'S4 has two placements, first is C1 v1');
-$p = $service->list(1, 'program', ['per_page' => 10, 'page' => 1]);
+check(count($byCode['S4']['placements']) === 1 && $byCode['S4']['placements'][0]['year_level'] === '2nd Year' && $byCode['S4']['placements'][0]['semester'] === '1st Semester', 'S4 shows its term in v1 only');
+// Same program, version 2: the Placed column follows the version while Assignment stays program-level.
+$v2 = $service->list(1, 'program', ['version_id' => 2]);
+$v2By = array_column($v2['assignments'], null, 'subject_code');
+check($codes($v2) === ['S1', 'S2', 'S4'], 'v2 rows: assigned plus placed in v2: ' . json_encode($codes($v2)));
+check($v2By['S1']['assigned'] && !$v2By['S1']['placed'] && $v2By['S4']['placed'] && $v2By['S4']['placements'][0]['semester'] === '2nd Semester', 'v2: S1 not placed, S4 term from v2');
+check($codes($service->list(1, 'program', ['version_id' => 2, 'filter' => 'placed_not_assigned'])) === ['S4'], 'v2 placed not assigned');
+// No version: only assigned subjects are listed.
+check($codes($service->list(1, 'program', [])) === ['S1', 'S2'], 'no version: assigned subjects only');
+check($thrown(fn() => $service->list(1, 'program', ['version_id' => 3])) === 'DomainValidationException', 'list rejects a version of another program');
+$p = $service->list(1, 'program', $q + ['per_page' => 10, 'page' => 1]);
 check($p['pagination']['per_page'] === 10 && $p['pagination']['total_pages'] === 1, 'paging metadata');
-check($service->list(1, 'program', ['per_page' => 10, 'page' => 2])['assignments'] === [], 'page past the end is empty');
+check($service->list(1, 'program', $q + ['per_page' => 10, 'page' => 2])['assignments'] === [], 'page past the end is empty');
 
 // Where used.
 $u = $service->usage(1);

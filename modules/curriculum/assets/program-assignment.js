@@ -1,20 +1,34 @@
 (function () {
     'use strict';
-    // Academic Strand/Course Assignment: one program-first page. Pick a Program / Strand, see every subject that is
-    // assigned to it or placed in one of its curricula, and assign or unassign from the table.
+    // Academic Strand/Course Assignment: one program-first page under the shared Program / Curriculum / Version context bar.
+    // Assign / Unassign are PROGRAM-level. The selected curriculum version only scopes the Placed column and the Placed counts.
     const ui = window.CurriculumUI, root = document.getElementById('programAssignmentWorkspace');
     if (!ui || !root) return;
     const $ = id => document.getElementById(id), esc = ui.escapeHtml;
     const api = root.dataset.assignmentApi, builderPage = root.dataset.builderPage, manage = root.dataset.canManage === '1';
     const FILTERS = ['assigned', 'placed', 'placed_not_assigned', 'assigned_not_placed'];
-    const state = { context: null, records: [], page: 1, pages: 1, total: 0, filter: '', selected: [], pendingRemove: null };
+    const state = { context: null, records: [], page: 1, pages: 1, total: 0, filter: '', selected: [], pendingRemove: null, request: 0, timer: null, panelLocked: false };
     const dialogs = { assign: manage ? ui.createModal($('assignModal')) : null, remove: manage ? ui.createModal($('removeModal')) : null, details: ui.createModal($('detailsModal')) };
-    window.CSMSPageCIMFContext = () => ({ view: 'program', academic_program_id: $('contextId').value });
 
     const inactiveTag = r => r.status && r.status !== 'active' ? ' · Inactive' : '';
     const programLabel = r => `${r.program_code} — ${r.program_name}`;
     const subjectLabel = r => `${r.subject_code} — ${r.subject_title}`;
     const termText = p => [p.year_level, p.semester].filter(Boolean).join(' · ') || 'Term not specified';
+
+    // ---- Shared context bar (same engine and lookups as Electives Manager; the selection is shared through js/curriculum-context.js) ----
+    const cascade = ui.createCascadingAutocomplete({ levels: ['program', 'curriculum', 'version'].map((key, index) => ({
+        input: $(key + 'Search'), valueInput: $(key + 'Id'), list: $(key + 'Options'), minimumLength: 0, showSuggestionsOnFocus: true, showSuggestionsOnEnable: true,
+        placeholder: index === 0 ? 'Search program code or name' : 'Search ' + key, disabledPlaceholder: index === 1 ? 'Choose program first' : 'Choose curriculum first',
+        search: async query => (await ui.fetchJson(api, { action: 'context_options', level: key, ...ctx(), search: query })).options,
+        format: item => ({ label: [item.code, item.title].filter(Boolean).join(' — '), code: item.code, title: item.title || '' })
+    })), onChange: () => scheduleLoad() });
+    function ctx() {
+        const out = {};
+        [['program_id', 0], ['curriculum_id', 1]].forEach(([key, i]) => { const id = cascade?.get(i)?.getSelectedId?.(); if (id) out[key] = id; });
+        return out;
+    }
+    const programId = () => cascade.get(0).getSelectedId() || '';
+    const versionId = () => cascade.get(2).getSelectedId() || '';
 
     // ---- Why an action is blocked: shown beside the button and as a toast when the action is still attempted ----
     const assignBlockReason = () => {
@@ -31,58 +45,55 @@
         if (info) { info.hidden = reason === ''; $('assignReasonTip').textContent = reason; }
     }
 
-    // ---- Program picker (selection is kept in the address: ?program_id=) ----
-    const contextPicker = ui.createAutocomplete({ input: $('contextSearch'), valueInput: $('contextId'), list: $('contextOptions'), minimumLength: 0, maxSuggestions: 3, showSuggestionsOnFocus: true,
-        search: async q => (await ui.fetchJson(api, { action: 'search', type: 'program', search: q })).records, getId: r => r.id,
-        format: r => ({ label: programLabel(r), code: r.program_code, title: r.program_name, meta: (r.program_type || '') + inactiveTag(r) }),
-        onSelect: record => { state.filter = ''; $('assignmentSearch').value = ''; syncCountButtons(); loadContext(record.id); }, onClear: clearContext, errorText: 'Programs could not be searched.' });
     let assignPicker = null;
     if (manage) {
         assignPicker = ui.createAutocomplete({ input: $('assignSearch'), valueInput: $('assignId'), list: $('assignOptions'), minimumLength: 0, maxSuggestions: 3, showSuggestionsOnFocus: true,
             // available=1: the server returns only active subjects that are not yet assigned to this program.
-            search: async q => (await ui.fetchJson(api, { action: 'search', type: 'subject', search: q, context_type: 'program', context_id: $('contextId').value, available: '1' })).records.filter(r => !state.selected.some(x => Number(x.id) === Number(r.id))),
+            search: async q => (await ui.fetchJson(api, { action: 'search', type: 'subject', search: q, context_type: 'program', context_id: programId(), available: '1' })).records.filter(r => !state.selected.some(x => Number(x.id) === Number(r.id))),
             getId: r => r.id, format: r => ({ label: subjectLabel(r), code: r.subject_code, title: r.subject_title, meta: `${r.units} units` }),
             onSelect: r => { if (!state.selected.some(x => Number(x.id) === Number(r.id))) state.selected.push(r); renderSelected(); assignPicker.clear(false); $('assignSearch').focus(); },
             onClear: () => {}, errorText: 'Matching subjects could not be loaded.' });
     }
 
+    // Only the filter lives in the address here; program_id, curriculum_id and version_id are kept by the shared context script.
     function syncUrl() {
-        const url = new URL(window.location.href), id = $('contextId').value;
-        if (id) url.searchParams.set('program_id', id); else url.searchParams.delete('program_id');
+        const url = new URL(window.location.href);
         if (state.filter) url.searchParams.set('filter', state.filter); else url.searchParams.delete('filter');
-        window.history.replaceState(null, '', url);
+        window.history.replaceState(window.history.state, '', url);
     }
 
     // ---- Rendering ----
     const chip = (kind, text) => `<span class="csms-chip csms-chip--${kind}">${esc(text)}</span>`;
-    function showPanel(panel) { // 'none' | 'empty' | 'list'
+    function showPanel(panel) { // 'loading' | 'empty' | 'noPrograms' | 'none' | 'list'
+        $('assignLoading').hidden = panel !== 'loading';
         $('assignEmpty').hidden = panel !== 'empty';
+        $('assignNoPrograms').hidden = panel !== 'noPrograms';
         $('assignNoSubjects').hidden = panel !== 'none';
         $('assignmentList').hidden = panel !== 'list';
     }
+    const hasVersion = () => Boolean(state.context && state.context.version_id);
     function renderCoverage() {
         const r = state.context, box = $('assignmentCoverage');
         box.hidden = !r;
         if (!r) return;
-        $('coverageCode').textContent = r.program_code;
-        $('coverageName').textContent = r.program_name;
         $('coverageType').textContent = r.program_type || '—';
         const status = $('coverageStatus');
         status.className = 'csms-chip csms-chip--' + (r.status === 'active' ? 'active' : 'inactive');
         status.textContent = r.status === 'active' ? 'Active' : 'Inactive';
-        $('countAssigned').textContent = r.assigned_count; $('countPlaced').textContent = r.placed_count;
-        $('countPna').textContent = r.placed_not_assigned; $('countAnp').textContent = r.assigned_not_placed;
+        const placed = hasVersion();
+        $('coverageScope').textContent = placed ? 'Placed counts use the selected curriculum version.' : 'No curriculum version selected: Placed counts are not shown.';
+        $('countAssigned').textContent = r.assigned_count;
+        $('countPlaced').textContent = placed ? r.placed_count : '—';
+        $('countPna').textContent = placed ? r.placed_not_assigned : '—';
+        $('countAnp').textContent = placed ? r.assigned_not_placed : '—';
         syncCountButtons();
     }
     function syncCountButtons() {
         root.querySelectorAll('.assignment-count').forEach(b => { const on = b.dataset.filter === state.filter; b.classList.toggle('is-active', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
         $('coverageFilter').value = state.filter;
     }
-    function placedIn(r) {
-        if (!r.placements.length) return '';
-        const first = r.placements[0], more = r.placements.length - 1;
-        return `${esc(first.curriculum_code)} · ${esc(termText(first))}` + (more ? ` <span class="csms-ctable__muted">+${more}</span>` : '');
-    }
+    // Year and semester in the selected version (a subject is placed once per version).
+    const placedIn = r => r.placements.length ? esc(termText(r.placements[0])) : '';
     function renderRows() {
         const rows = state.records;
         $('assignmentRows').innerHTML = rows.map(r => `<tr class="csms-row-click" tabindex="0" data-row="${r.subject_id}" aria-haspopup="dialog">`
@@ -97,38 +108,39 @@
     }
     const hasSubjects = () => state.context && (state.context.assigned_count + state.context.placed_not_assigned) > 0;
 
-    // ---- Loading ----
-    async function loadContext(id) {
-        state.page = 1; state.context = null; state.records = [];
-        renderCoverage(); syncAssignState(); $('cimfReviewButton').disabled = true; syncUrl();
+    // ---- Loading: the context bar changes in bursts (program, curriculum, version), so wait for it to settle ----
+    function scheduleLoad() {
+        clearTimeout(state.timer);
+        state.timer = setTimeout(() => { state.page = 1; loadContext(); }, 250);
+    }
+    async function loadContext() {
+        const ticket = ++state.request, id = programId(), version = versionId();
+        if (!id) {
+            state.context = null; state.records = []; renderCoverage(); syncAssignState(); $('cimfReviewButton').disabled = true; showPanel('empty'); return;
+        }
         try {
-            state.context = (await ui.fetchJson(api, { action: 'context', type: 'program', id })).record;
-            renderCoverage(); syncAssignState(); $('cimfReviewButton').disabled = false;
-            await loadRows();
+            const record = (await ui.fetchJson(api, { action: 'context', type: 'program', id, ...(version ? { version_id: version } : {}) })).record;
+            if (ticket !== state.request) return;
+            state.context = record; renderCoverage(); syncAssignState(); $('cimfReviewButton').disabled = false;
+            await loadRows(ticket);
         } catch (error) {
+            if (ticket !== state.request) return;
             state.context = null; renderCoverage(); syncAssignState(); showPanel('empty');
             ui.showToast(error.message || 'The selected program could not be loaded.', 'error');
         }
     }
-    function clearContext() {
-        state.context = null; state.records = []; state.page = 1; state.filter = '';
-        $('assignmentSearch').value = ''; renderCoverage(); syncAssignState(); $('cimfReviewButton').disabled = true; showPanel('empty'); syncUrl();
-    }
-    async function loadRows() {
+    async function loadRows(ticket = state.request) {
         if (!state.context) return;
         if (!hasSubjects()) { showPanel('none'); return; }
         showPanel('list');
         try {
-            const payload = await ui.fetchJson(api, { action: 'list', type: 'program', id: $('contextId').value, filter: state.filter, search: $('assignmentSearch').value.trim(), page: state.page, per_page: $('perPage').value });
+            const payload = await ui.fetchJson(api, { action: 'list', type: 'program', id: programId(), ...(versionId() ? { version_id: versionId() } : {}), filter: state.filter, search: $('assignmentSearch').value.trim(), page: state.page, per_page: $('perPage').value });
+            if (ticket !== state.request) return;
             state.records = payload.assignments; state.page = payload.pagination.page; state.pages = payload.pagination.total_pages; state.total = payload.pagination.total_records;
             renderRows();
-        } catch (error) { ui.showToast(error.message || 'Subjects could not be loaded.', 'error'); }
+        } catch (error) { if (ticket === state.request) ui.showToast(error.message || 'Subjects could not be loaded.', 'error'); }
     }
-    async function refresh() {
-        if (!state.context) return;
-        state.context = (await ui.fetchJson(api, { action: 'context', type: 'program', id: $('contextId').value })).record;
-        renderCoverage(); syncAssignState(); await loadRows();
-    }
+    async function refresh() { await loadContext(); }
     function setFilter(value) {
         state.filter = FILTERS.includes(value) ? value : '';
         state.page = 1; syncCountButtons(); syncUrl(); loadRows();
@@ -149,27 +161,29 @@
     }
     async function postAssign(ids) {
         const data = new FormData();
-        data.set('action', 'assign'); data.set('view', 'program'); data.set('context_id', $('contextId').value); data.set('record_ids', JSON.stringify(ids));
+        data.set('action', 'assign'); data.set('view', 'program'); data.set('context_id', programId()); data.set('record_ids', JSON.stringify(ids));
         return ui.postForm(api, data);
     }
+    // Reason an Assign is unavailable for one row (shown in the menu, and as a toast if it is still attempted).
+    const rowAssignBlock = row => assignBlockReason() || (row.subject_status !== 'active' ? 'Inactive subjects cannot be newly assigned.' : '');
     async function assignOne(row) {
-        const blocked = assignBlockReason() || (row.subject_status !== 'active' ? 'Inactive subjects cannot be newly assigned.' : '');
+        const blocked = rowAssignBlock(row);
         if (blocked) { ui.showToast(blocked, 'error'); return; }
         try { const result = await postAssign([row.subject_id]); ui.showToast(result.message, 'success'); await refresh(); }
         catch (error) { ui.showToast(error.message || 'The subject could not be assigned.', 'error'); }
     }
 
-    // ---- Unassign: the server refuses while the subject is placed; the page says so before asking ----
+    // ---- Unassign: the server refuses while the subject is placed in any version of the program ----
     function openRemove(row) {
         if (!manage) { ui.showToast('You do not have permission to unassign subjects.', 'error'); return; }
         if (!row.assignment_id) { ui.showToast('This subject is not assigned to the program.', 'error'); return; }
-        if (row.placed) { ui.showToast(`${row.subject_code} is placed in a curriculum of this program, so it cannot be unassigned. Remove it from the curriculum plan in the Curriculum Builder first.`, 'error'); return; }
+        if (row.placed) { ui.showToast(`${row.subject_code} is placed in the selected curriculum version, so it cannot be unassigned. Remove it from the curriculum plan in the Curriculum Builder first.`, 'error'); return; }
         state.pendingRemove = row.assignment_id; ui.clearFormError($('removeModal'));
         $('removeMessage').textContent = `Unassign ${subjectLabel(row)} from ${programLabel(state.context)}?`;
         dialogs.remove.open();
     }
 
-    // ---- Where used (replaces the old subject-centric tab) ----
+    // ---- Where used: every program and every curriculum version, whatever is selected in the bar ----
     function usageMarkup(u) {
         const assigned = u.assigned.length ? u.assigned.map(a => `<li><strong>${esc(a.program_code)}</strong> — ${esc(a.program_name)}${a.program_status !== 'active' ? ' ' + chip('inactive', 'Inactive') : ''}</li>`).join('') : '<li class="subtle-text">Not assigned to any program or strand.</li>';
         const placed = u.placements.length ? u.placements.map(p => `<li><strong>${esc(p.program_code)}</strong> · ${esc(p.curriculum_code)} / ${esc(p.version_label)}<br><span class="subtle-text">${esc(termText(p))}</span></li>`).join('') : '<li class="subtle-text">Not placed in any curriculum.</li>';
@@ -182,9 +196,9 @@
             $('detailsBody').innerHTML = usageMarkup(p.usage); dialogs.details.open();
         } catch (error) { ui.showToast(error.message || 'Where used could not be loaded.', 'error'); }
     }
-    function openBuilder(row) {
-        const first = row.placements[0], q = new URLSearchParams({ program_id: $('contextId').value });
-        if (first) { q.set('curriculum_id', first.curriculum_id); q.set('version_id', first.version_id); }
+    function openBuilder() {
+        const q = new URLSearchParams(ctx());
+        if (versionId()) q.set('version_id', versionId());
         window.location.assign(`${builderPage}?${q}`);
     }
     function showCimfReview(assignmentId) {
@@ -192,18 +206,22 @@
         if (!window.CSMSCIMF) { ui.showToast('CIMF review is not available on this page.', 'error'); return; }
         window.CSMSCIMF.open('review', assignmentId ? { assignment_id: assignmentId } : {});
     }
+    window.CSMSPageCIMFContext = () => ({ view: 'program', academic_program_id: programId() });
 
-    // ---- Row menu and events ----
+    // ---- Row menu (shared js/csms-menu.js) and events ----
     const rowById = id => state.records.find(r => Number(r.subject_id) === Number(id));
     const rowMenu = window.CsmsMenu ? window.CsmsMenu.create($('assignmentRowMenu'), { esc, onSelect: (action, data) => {
         const row = rowById(data.subject); if (!row) { ui.showToast('That subject is no longer in the list. Reload the page.', 'error'); return; }
         if (action === 'assign') assignOne(row); else if (action === 'unassign') openRemove(row);
-        else if (action === 'usage') openUsage(row.subject_id); else if (action === 'builder') openBuilder(row);
+        else if (action === 'usage') openUsage(row.subject_id); else if (action === 'builder') openBuilder();
         else if (action === 'review') showCimfReview(row.assignment_id);
     } }) : null;
     function menuItems(row) {
         const data = { subject: row.subject_id }, items = [];
-        if (manage) items.push(row.assigned ? { action: 'unassign', label: 'Unassign', danger: true, data } : { action: 'assign', label: 'Assign', data });
+        if (manage) {
+            if (row.assigned) items.push({ action: 'unassign', label: 'Unassign', danger: true, data });
+            else { const blocked = rowAssignBlock(row); items.push({ action: 'assign', label: 'Assign', data, ...(blocked ? { disabled: true, hint: blocked } : {}) }); }
+        }
         items.push({ action: 'usage', label: 'Where used', data }, { action: 'builder', label: 'Open in Curriculum Builder', data });
         if (row.assigned) items.push({ action: 'review', label: 'CIMF review', data });
         return items;
@@ -239,18 +257,17 @@
         });
     }
 
-    // ---- Start: restore the program and filter from the address ----
+    // ---- Start: the shared context script restores the saved or default selection and drives the bar; we follow it ----
     async function start() {
-        showPanel('empty'); renderCoverage(); syncAssignState();
-        const params = new URLSearchParams(window.location.search), id = params.get('program_id');
-        if (FILTERS.includes(params.get('filter') || '')) state.filter = params.get('filter');
+        showPanel('loading'); renderCoverage(); syncAssignState();
+        const wanted = new URLSearchParams(window.location.search).get('filter') || '';
+        if (FILTERS.includes(wanted)) state.filter = wanted;
         syncCountButtons();
-        if (!/^[1-9][0-9]*$/.test(id || '')) return;
         try {
-            const record = (await ui.fetchJson(api, { action: 'context', type: 'program', id })).record;
-            contextPicker.setSelected(record, false);
-            await loadContext(record.id);
-        } catch (error) { state.filter = ''; syncUrl(); ui.showToast(error.message || 'The program in the address could not be loaded.', 'error'); }
+            if (!(await ui.fetchJson(api, { action: 'context_options', level: 'program', search: '' })).options.length) { state.panelLocked = true; showPanel('noPrograms'); return; }
+        } catch (error) { ui.showToast(error.message || 'Programs could not be loaded.', 'error'); }
+        // Nothing saved and nothing to default to (no version the user may open): leave the bar to the user.
+        setTimeout(() => { if (!state.panelLocked && !programId() && !state.context) showPanel('empty'); }, 4000);
     }
     start();
 }());

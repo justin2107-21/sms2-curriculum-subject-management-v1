@@ -45,10 +45,10 @@ class ProgramSubjectAssignmentRepository
         return $row ?: null;
     }
 
-    public function summary(string $type, int $id, array $record): array
+    public function summary(string $type, int $id, array $record, int $versionId = 0): array
     {
         if ($type === 'program') {
-            $record = array_merge($record, $this->coverage($id));
+            $record = array_merge($record, $this->coverage($id, $versionId), ['version_id' => $versionId ?: null]);
         } else {
             $stmt = $this->db->prepare("SELECT COUNT(*) assigned_count FROM program_subject_assignments WHERE subject_id=? AND status='active'");
             $stmt->bind_param('i',$id);$stmt->execute();$record['assigned_count']=(int)$stmt->get_result()->fetch_assoc()['assigned_count'];$stmt->close();
@@ -86,14 +86,22 @@ class ProgramSubjectAssignmentRepository
         return ['assignments'=>$rows,'pagination'=>['page'=>$page,'per_page'=>$perPage,'total_records'=>$total,'total_pages'=>max(1,(int)ceil($total/$perPage))]];
     }
 
-    /** Placed-in-curriculum test for subject alias s: constant SQL plus one program-id parameter. Faculty see only versions inside their read scope. */
+    /** Placed in the SELECTED version: constant SQL plus two parameters (program id, version id; 0 matches nothing). Read scope still applies. */
     private function placedSql(): string
     {
         $scope = CurriculumReadScope::sql('v');
-        return 'EXISTS (SELECT 1 FROM curriculum_version_subjects cvs JOIN curriculum_versions v ON v.id=cvs.curriculum_version_id JOIN curricula c ON c.id=v.curriculum_id WHERE cvs.subject_id=s.id AND c.academic_program_id=?' . ($scope !== '' ? " AND $scope" : '') . ')';
+        return 'EXISTS (SELECT 1 FROM curriculum_version_subjects cvs JOIN curriculum_versions v ON v.id=cvs.curriculum_version_id JOIN curricula c ON c.id=v.curriculum_id WHERE cvs.subject_id=s.id AND c.academic_program_id=? AND v.id=?' . ($scope !== '' ? " AND $scope" : '') . ')';
     }
 
-    /** One row per subject with its assigned and placed flags for the program. Parameters: program id twice. */
+    /** True when the version exists under the program (assignment itself never depends on a version). */
+    public function versionBelongsToProgram(int $programId, int $versionId): bool
+    {
+        $stmt = $this->db->prepare('SELECT 1 FROM curriculum_versions v JOIN curricula c ON c.id=v.curriculum_id WHERE v.id=? AND c.academic_program_id=? LIMIT 1');
+        $stmt->bind_param('ii', $versionId, $programId); $stmt->execute(); $found = (bool)$stmt->get_result()->fetch_row(); $stmt->close();
+        return $found;
+    }
+
+    /** One row per subject with its assigned (program-level) and placed (selected version) flags. Parameters in SQL order: program id and version id (placed), then program id (assigned join). */
     private function unionSql(): string
     {
         return "SELECT s.id subject_id, s.subject_code, s.subject_title, s.units, s.status subject_status, a.id assignment_id,
@@ -101,12 +109,12 @@ class ProgramSubjectAssignmentRepository
                 FROM subjects s LEFT JOIN program_subject_assignments a ON a.subject_id=s.id AND a.academic_program_id=? AND a.status='active'";
     }
 
-    public function coverage(int $programId): array
+    public function coverage(int $programId, int $versionId = 0): array
     {
         $sql = 'SELECT COALESCE(SUM(assigned),0) assigned_count, COALESCE(SUM(placed),0) placed_count,
                        COALESCE(SUM(placed AND NOT assigned),0) placed_not_assigned, COALESCE(SUM(assigned AND NOT placed),0) assigned_not_placed
                 FROM (' . $this->unionSql() . ') t WHERE assigned=1 OR placed=1';
-        $stmt = $this->db->prepare($sql); $stmt->bind_param('ii', $programId, $programId); $stmt->execute();
+        $stmt = $this->db->prepare($sql); $stmt->bind_param('iii', $programId, $versionId, $programId); $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc(); $stmt->close();
         return array_map('intval', $row);
     }
@@ -120,7 +128,7 @@ class ProgramSubjectAssignmentRepository
     ];
 
     /** The program's subjects: the union of assigned and placed, filtered, searched and paged on the server. */
-    public function listCoverage(int $programId, array $query, string $filter): array
+    public function listCoverage(int $programId, array $query, string $filter, int $versionId = 0): array
     {
         $query = DomainValidator::listQuery($query);
         if (!array_key_exists($filter, self::COVERAGE_FILTERS)) throw new DomainValidationException('Invalid filter.');
@@ -131,13 +139,13 @@ class ProgramSubjectAssignmentRepository
         $where = "(assigned=1 OR placed=1) AND (? = '' OR LOWER(subject_code) LIKE ? ESCAPE '=' OR LOWER(subject_title) LIKE ? ESCAPE '=') AND (" . self::COVERAGE_FILTERS[$filter] . ')';
         $base = ' FROM (' . $this->unionSql() . ') t WHERE ' . $where;
         $stmt = $this->db->prepare('SELECT COUNT(*) total' . $base);
-        $stmt->bind_param('iisss', $programId, $programId, $search, $pattern, $pattern); $stmt->execute();
+        $stmt->bind_param('iiisss', $programId, $versionId, $programId, $search, $pattern, $pattern); $stmt->execute();
         $total = (int)$stmt->get_result()->fetch_assoc()['total']; $stmt->close();
         $offset = ($page - 1) * $perPage;
         $stmt = $this->db->prepare('SELECT subject_id, subject_code, subject_title, units, subject_status, assignment_id, assigned, placed' . $base . ' ORDER BY subject_code, subject_id LIMIT ? OFFSET ?');
-        $stmt->bind_param('iisssii', $programId, $programId, $search, $pattern, $pattern, $perPage, $offset); $stmt->execute();
+        $stmt->bind_param('iiisssii', $programId, $versionId, $programId, $search, $pattern, $pattern, $perPage, $offset); $stmt->execute();
         $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
-        $byId = $this->placementsForSubjects($programId, array_column($rows, 'subject_id'));
+        $byId = $this->placementsForSubjects($programId, $versionId, array_column($rows, 'subject_id'));
         foreach ($rows as &$row) {
             $row['subject_id'] = (int)$row['subject_id']; $row['assignment_id'] = $row['assignment_id'] === null ? null : (int)$row['assignment_id'];
             $row['assigned'] = (bool)$row['assigned']; $row['placed'] = (bool)$row['placed'];
@@ -147,17 +155,17 @@ class ProgramSubjectAssignmentRepository
         return ['assignments' => $rows, 'pagination' => ['page' => $page, 'per_page' => $perPage, 'total_records' => $total, 'total_pages' => max(1, (int)ceil($total / $perPage))]];
     }
 
-    /** Placements of the given subjects inside one program, in read scope, keyed by subject id. */
-    public function placementsForSubjects(int $programId, array $subjectIds): array
+    /** Placements of the given subjects in the selected version (year and semester), in read scope, keyed by subject id. */
+    public function placementsForSubjects(int $programId, int $versionId, array $subjectIds): array
     {
         $ids = array_values(array_unique(array_map('intval', $subjectIds)));
         if (!$ids) return [];
         $scope = CurriculumReadScope::sql('v');
         $sql = 'SELECT cvs.subject_id, c.id curriculum_id, c.curriculum_code, v.id version_id, v.version_label, cvs.year_level, cvs.semester
                 FROM curriculum_version_subjects cvs JOIN curriculum_versions v ON v.id=cvs.curriculum_version_id JOIN curricula c ON c.id=v.curriculum_id
-                WHERE c.academic_program_id=? AND cvs.subject_id IN (' . implode(',', $ids) . ')' . ($scope !== '' ? " AND $scope" : '') . '
+                WHERE c.academic_program_id=? AND v.id=? AND cvs.subject_id IN (' . implode(',', $ids) . ')' . ($scope !== '' ? " AND $scope" : '') . '
                 ORDER BY c.curriculum_code, v.version_label, cvs.year_level, cvs.semester, cvs.id';
-        $stmt = $this->db->prepare($sql); $stmt->bind_param('i', $programId); $stmt->execute();
+        $stmt = $this->db->prepare($sql); $stmt->bind_param('ii', $programId, $versionId); $stmt->execute();
         $out = [];
         foreach ($stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row) $out[(int)$row['subject_id']][] = $row;
         $stmt->close();
