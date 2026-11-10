@@ -8,7 +8,7 @@
     const api = root.dataset.assignmentApi, builderPage = root.dataset.builderPage, manage = root.dataset.canManage === '1';
     const FILTERS = ['assigned', 'placed', 'placed_not_assigned', 'assigned_not_placed'];
     const state = { context: null, records: [], page: 1, pages: 1, total: 0, filter: '', selected: [], pendingRemove: null, request: 0, timer: null, panelLocked: false };
-    const dialogs = { assign: manage ? ui.createModal($('assignModal')) : null, remove: manage ? ui.createModal($('removeModal')) : null, details: ui.createModal($('detailsModal')) };
+    const dialogs = { reconcile: manage ? ui.createModal($('reconcileModal')) : null, assign: manage ? ui.createModal($('assignModal')) : null, remove: manage ? ui.createModal($('removeModal')) : null, details: ui.createModal($('detailsModal')) };
 
     const inactiveTag = r => r.status && r.status !== 'active' ? ' · Inactive' : '';
     const programLabel = r => `${r.program_code} — ${r.program_name}`;
@@ -86,7 +86,24 @@
         $('countPlaced').textContent = placed ? r.placed_count : '—';
         $('countPna').textContent = placed ? r.placed_not_assigned : '—';
         $('countAnp').textContent = placed ? r.assigned_not_placed : '—';
-        syncCountButtons();
+        syncCountButtons(); syncReconcileState();
+    }
+    // "Assign placed subjects": the label carries how many active subjects it would assign; a disabled button says why.
+    const reconcileBlockReason = () => {
+        const r = state.context;
+        if (!manage) return 'You do not have permission to assign.';
+        if (!r) return 'Select a program first.';
+        if (!r.version_id) return 'Select a curriculum version to see the subjects placed in it.';
+        if (r.status !== 'active') return 'Inactive programs cannot receive new assignments.';
+        if (r.assignable_count === 0) return r.placed_not_assigned > 0 ? 'The placed subjects that are not assigned are all inactive, and inactive subjects are never assigned.' : 'Every subject placed in this version is already assigned.';
+        return '';
+    };
+    function syncReconcileState() {
+        const button = $('reconcileButton'); if (!button) return;
+        const reason = reconcileBlockReason(), n = state.context?.version_id ? state.context.assignable_count : 0;
+        button.textContent = n ? `Assign ${n} placed subject${n === 1 ? '' : 's'}` : 'Assign placed subjects';
+        button.disabled = reason !== '';
+        $('reconcileReason').hidden = reason === ''; $('reconcileReasonTip').textContent = reason;
     }
     function syncCountButtons() {
         root.querySelectorAll('.assignment-count').forEach(b => { const on = b.dataset.filter === state.filter; b.classList.toggle('is-active', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
@@ -173,11 +190,41 @@
         catch (error) { ui.showToast(error.message || 'The subject could not be assigned.', 'error'); }
     }
 
-    // ---- Unassign: the server refuses while the subject is placed in any version of the program ----
+    // ---- Assign all placed: preview, then one server action (single transaction, idempotent, program-level only) ----
+    const reconcileIds = () => ({ program_id: programId(), curriculum_id: cascade.get(1).getSelectedId(), version_id: versionId() });
+    const reviewUi = manage && window.CsmsReview ? window.CsmsReview.create($('reconcileChecks'), { esc, onAction: () => {} }) : null;
+    let preview = null;
+    async function openReconcile() {
+        const blocked = reconcileBlockReason();
+        if (blocked) { ui.showToast(blocked, 'error'); return; }
+        try {
+            preview = (await ui.fetchJson(api, { action: 'reconcile_preview', ...reconcileIds() })).preview;
+        } catch (error) { ui.showToast(error.message || 'The preview could not be loaded.', 'error'); return; }
+        ui.clearFormError($('reconcileModal'));
+        $('reconcileContext').textContent = `${programLabel(state.context)} · ${cascade.get(2).getSelectedLabel() || 'selected version'}`;
+        const columns = [{ header: 'Code', code: true, cell: r => esc(r.subject_code) }, { header: 'Title', cell: r => esc(r.subject_title) }, { header: 'Units', cell: r => esc(r.units) }, { header: 'Year / Semester', cell: r => esc([r.year_level, r.semester].filter(Boolean).join(' · ') || '—') }];
+        reviewUi.reset();
+        reviewUi.render([{ title: 'Placed in the selected version, not yet assigned', note: '', checks: [
+            { key: 'reconcile-assign', label: 'Will be assigned', hint: 'Active subjects only.', rows: preview.assignable, columns },
+            { key: 'reconcile-skip', label: 'Skipped, inactive', hint: 'Inactive subjects are never assigned.', severity: 'warning', rows: preview.skipped_inactive, columns } ] }]);
+        // Open the lists so the whole preview is visible without extra clicks.
+        $('reconcileChecks').querySelectorAll('[data-review-issue]').forEach(head => { if (!head.closest('.csms-check').classList.contains('is-open')) head.click(); });
+        const n = preview.assignable.length;
+        $('confirmReconcile').textContent = n ? `Assign ${n} subject${n === 1 ? '' : 's'}` : 'Nothing to assign';
+        $('confirmReconcile').disabled = n === 0 || preview.program_status !== 'active';
+        dialogs.reconcile.open();
+    }
+    async function confirmReconcile() {
+        const button = $('confirmReconcile'); button.disabled = true;
+        const data = new FormData(); data.set('action', 'reconcile'); Object.entries(reconcileIds()).forEach(([k, v]) => data.set(k, v));
+        try { const result = await ui.postForm(api, data); dialogs.reconcile.close(); ui.showToast(result.message, 'success'); await refresh(); }
+        catch (error) { ui.showFormError($('reconcileModal'), error.message || 'The subjects could not be assigned. Nothing was changed.'); button.disabled = false; }
+    }
+
+    // ---- Unassign: the server decides and names the curricula and versions that block it ----
     function openRemove(row) {
         if (!manage) { ui.showToast('You do not have permission to unassign subjects.', 'error'); return; }
         if (!row.assignment_id) { ui.showToast('This subject is not assigned to the program.', 'error'); return; }
-        if (row.placed) { ui.showToast(`${row.subject_code} is placed in the selected curriculum version, so it cannot be unassigned. Remove it from the curriculum plan in the Curriculum Builder first.`, 'error'); return; }
         state.pendingRemove = row.assignment_id; ui.clearFormError($('removeModal'));
         $('removeMessage').textContent = `Unassign ${subjectLabel(row)} from ${programLabel(state.context)}?`;
         dialogs.remove.open();
@@ -240,6 +287,8 @@
     $('cimfReviewButton').addEventListener('click', () => showCimfReview());
     if (manage) {
         $('assignButton').addEventListener('click', openAssign);
+        $('reconcileButton').addEventListener('click', openReconcile);
+        $('confirmReconcile').addEventListener('click', confirmReconcile);
         $('selectedRecords').addEventListener('click', e => { const b = e.target.closest('[data-remove-selected]'); if (b) { state.selected.splice(Number(b.dataset.removeSelected), 1); renderSelected(); } });
         $('assignForm').addEventListener('submit', async e => {
             e.preventDefault(); if (!state.selected.length) return;

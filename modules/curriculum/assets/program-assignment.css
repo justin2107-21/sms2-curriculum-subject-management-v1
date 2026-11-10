@@ -11,6 +11,8 @@
 .assignment-coverage__program{display:flex;flex-direction:column;gap:2px;min-width:0}
 .assignment-coverage__meta{align-items:center;color:var(--csms-text-secondary,#374151);display:flex;font-size:var(--csms-text-sm,.875rem);gap:8px}
 .assignment-coverage__counts{display:flex;flex-wrap:wrap;gap:8px}
+.assignment-count-group{display:flex;flex-direction:column;gap:6px}
+.assignment-reconcile{align-items:center;display:flex;gap:4px}
 .assignment-count{background:#fff;border:1px solid var(--csms-border,#dfe4ee);border-radius:8px;color:var(--csms-text-secondary,#374151);cursor:pointer;display:flex;flex-direction:column;font:inherit;gap:2px;min-width:8.5rem;padding:8px 14px;text-align:left}
 .assignment-count strong{color:var(--csms-text,#1f2937);font-size:1.35rem;font-variant-numeric:tabular-nums;line-height:1.1}
 .assignment-count span{font-size:var(--csms-text-xs,.75rem)}

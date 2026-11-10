@@ -32,6 +32,15 @@ try {
             curriculum_require_read('program_assignment.view');
             require_once __DIR__ . '/../services/ElectivesWorkspaceService.php';
             json_response(true, 'Context options loaded.', (new ElectivesWorkspaceService($conn))->contextOptions($_GET));
+        case 'reconcile_preview':
+            curriculum_require_read('program_assignment.manage');
+            $p = DomainValidator::positiveId($_GET['program_id'] ?? null, 'Program'); $c = DomainValidator::positiveId($_GET['curriculum_id'] ?? null, 'Curriculum'); $v = DomainValidator::positiveId($_GET['version_id'] ?? null, 'Curriculum version');
+            json_response(true, 'Preview loaded.', ['preview' => $service->reconcilePreview($p, $c, $v)]);
+        case 'reconcile':
+            curriculum_require_mutation('program_assignment.manage');
+            $p = DomainValidator::positiveId($_POST['program_id'] ?? null, 'Program'); $c = DomainValidator::positiveId($_POST['curriculum_id'] ?? null, 'Curriculum'); $v = DomainValidator::positiveId($_POST['version_id'] ?? null, 'Curriculum version');
+            $result = $service->reconcile($p, $c, $v, curriculum_actor_id());
+            json_response(true, 'Assigned ' . $result['assigned'] . '. Skipped ' . $result['skipped_inactive'] . ' inactive.', $result, $result['assigned'] > 0 ? 201 : 200);
         case 'usage':
             curriculum_require_read('program_assignment.view');
             $id = DomainValidator::positiveId($_GET['subject_id'] ?? null, 'Subject');

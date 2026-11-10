@@ -109,10 +109,40 @@ class ProgramSubjectAssignmentRepository
                 FROM subjects s LEFT JOIN program_subject_assignments a ON a.subject_id=s.id AND a.academic_program_id=? AND a.status='active'";
     }
 
+    /** True when the curriculum belongs to the program and the version belongs to that curriculum. */
+    public function chainValid(int $programId, int $curriculumId, int $versionId): bool
+    {
+        $stmt = $this->db->prepare('SELECT 1 FROM curriculum_versions v JOIN curricula c ON c.id=v.curriculum_id WHERE v.id=? AND c.id=? AND c.academic_program_id=? LIMIT 1');
+        $stmt->bind_param('iii', $versionId, $curriculumId, $programId); $stmt->execute(); $found = (bool)$stmt->get_result()->fetch_row(); $stmt->close();
+        return $found;
+    }
+
+    /** Serializes reconcile runs for one program inside a transaction. */
+    public function lockProgram(int $programId): void
+    {
+        $stmt = $this->db->prepare('SELECT id FROM academic_programs WHERE id=? FOR UPDATE'); $stmt->bind_param('i', $programId); $stmt->execute(); $stmt->get_result()->fetch_row(); $stmt->close();
+    }
+
+    /** Subjects placed in the version that have no active assignment to the program (read only; any version status). */
+    public function placedNotAssigned(int $programId, int $versionId): array
+    {
+        $scope = CurriculumReadScope::sql('v');
+        $sql = "SELECT s.id subject_id, s.subject_code, s.subject_title, s.units, s.status subject_status, cvs.year_level, cvs.semester
+                FROM curriculum_version_subjects cvs JOIN curriculum_versions v ON v.id=cvs.curriculum_version_id JOIN curricula c ON c.id=v.curriculum_id JOIN subjects s ON s.id=cvs.subject_id
+                WHERE c.academic_program_id=? AND v.id=?" . ($scope !== '' ? " AND $scope" : '') . "
+                  AND NOT EXISTS (SELECT 1 FROM program_subject_assignments a WHERE a.academic_program_id=c.academic_program_id AND a.subject_id=s.id AND a.status='active')
+                ORDER BY cvs.year_level, cvs.semester, s.subject_code, s.id";
+        $stmt = $this->db->prepare($sql); $stmt->bind_param('ii', $programId, $versionId); $stmt->execute();
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
+        foreach ($rows as &$row) $row['subject_id'] = (int)$row['subject_id'];
+        return $rows;
+    }
+
     public function coverage(int $programId, int $versionId = 0): array
     {
         $sql = 'SELECT COALESCE(SUM(assigned),0) assigned_count, COALESCE(SUM(placed),0) placed_count,
-                       COALESCE(SUM(placed AND NOT assigned),0) placed_not_assigned, COALESCE(SUM(assigned AND NOT placed),0) assigned_not_placed
+                       COALESCE(SUM(placed AND NOT assigned),0) placed_not_assigned, COALESCE(SUM(assigned AND NOT placed),0) assigned_not_placed,
+                       COALESCE(SUM(placed AND NOT assigned AND subject_status = \'active\'),0) assignable_count
                 FROM (' . $this->unionSql() . ') t WHERE assigned=1 OR placed=1';
         $stmt = $this->db->prepare($sql); $stmt->bind_param('iii', $programId, $versionId, $programId); $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc(); $stmt->close();

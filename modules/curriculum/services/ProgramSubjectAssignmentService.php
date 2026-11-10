@@ -94,6 +94,61 @@ class ProgramSubjectAssignmentService
         }
         return ['count' => count($resolved), 'context' => $context];
     }
+    /** The curricula and versions that block an unassign, in words: "Placed in C / v1, 4th Year 2nd Semester; ..." (first five). */
+    public static function placementBlockMessage(string $subjectCode, array $placements): string
+    {
+        $lines = array_map(static fn(array $p): string => trim($p['curriculum_code'] . ' / ' . $p['version_label'] . ', ' . trim(($p['year_level'] ?? '') . ' ' . ($p['semester'] ?? '')), ' ,'), array_slice($placements, 0, 5));
+        $more = count($placements) - count($lines);
+        return $subjectCode . ' cannot be unassigned. Placed in ' . implode('; ', $lines) . ($more > 0 ? " and $more more" : '') . '. Remove it from those curriculum plans first.';
+    }
+    /** Program, curriculum and version must belong together; returns the program. */
+    private function reconcileProgram(int $programId, int $curriculumId, int $versionId): array
+    {
+        $program = $this->repository->record('program', $programId);
+        if (!$program) throw new DomainNotFoundException('Program not found.');
+        if (!$this->repository->chainValid($programId, $curriculumId, $versionId)) throw new DomainValidationException('Select a curriculum version belonging to the selected program and curriculum.');
+        return $program;
+    }
+    private static function splitActive(array $rows): array
+    {
+        $active = []; $inactive = [];
+        foreach ($rows as $row) { if ($row['subject_status'] === 'active') $active[] = $row; else $inactive[] = $row; }
+        return [$active, $inactive];
+    }
+    /** Read-only preview: what "Assign all placed" would assign, and which inactive subjects it would skip. */
+    public function reconcilePreview(int $programId, int $curriculumId, int $versionId): array
+    {
+        $program = $this->reconcileProgram($programId, $curriculumId, $versionId);
+        [$active, $inactive] = self::splitActive($this->repository->placedNotAssigned($programId, $versionId));
+        return ['program_status' => $program['status'], 'assignable' => $active, 'skipped_inactive' => $inactive];
+    }
+    /**
+     * Assigns every active subject that is placed in the version and not yet assigned, at program level, in one transaction.
+     * Never writes to curriculum_version_subjects or any curriculum version. Idempotent: a second run finds nothing.
+     */
+    public function reconcile(int $programId, int $curriculumId, int $versionId, int $actorId): array
+    {
+        $program = $this->reconcileProgram($programId, $curriculumId, $versionId);
+        if ($program['status'] !== 'active') throw new DomainValidationException('Inactive or archived program records cannot receive new assignments.');
+        $this->db->begin_transaction();
+        try {
+            $this->repository->lockProgram($programId);
+            // Read again inside the lock so a concurrent run or manual assign is never repeated.
+            [$active, $inactive] = self::splitActive($this->repository->placedNotAssigned($programId, $versionId));
+            foreach ($active as $row) {
+                $assignmentId = $this->repository->activateOrCreate($programId, $row['subject_id'], $actorId);
+                audit_log_required('PROGRAM_SUBJECT_ASSIGN', 'program_subject_assignment', $assignmentId,
+                    'Subject associated with academic program (assign all placed).',
+                    ['academic_program_id' => $programId, 'subject_id' => $row['subject_id'], 'source' => 'reconcile', 'curriculum_version_id' => $versionId]);
+            }
+            if ($active) {
+                audit_log_required('PROGRAM_SUBJECT_RECONCILE', 'academic_program', $programId, 'Assigned all active placed subjects of a curriculum version to the program.',
+                    ['academic_program_id' => $programId, 'curriculum_id' => $curriculumId, 'curriculum_version_id' => $versionId, 'assigned' => count($active), 'skipped_inactive' => count($inactive)]);
+            }
+            $this->db->commit();
+        } catch (Throwable $error) { $this->db->rollback(); throw $error; }
+        return ['assigned' => count($active), 'skipped_inactive' => count($inactive)];
+    }
     public function remove(int $id): void
     {
         $assignment = $this->details($id);
@@ -101,8 +156,8 @@ class ProgramSubjectAssignmentService
         try {
             // The subject row lock serializes this check against concurrent FK-backed mapping inserts.
             $this->repository->lockSubject((int)$assignment['subject_id']);
-            if ($this->repository->placements((int)$assignment['academic_program_id'], (int)$assignment['subject_id']))
-                throw new DomainConflictException('This assignment is referenced by curriculum placements. Handle the placements in Subject Mapping before removing it.');
+            if ($blocking = $this->repository->placements((int)$assignment['academic_program_id'], (int)$assignment['subject_id']))
+                throw new DomainConflictException(self::placementBlockMessage((string)$assignment['subject_code'], $blocking));
             if (!$this->repository->archive($id)) throw new DomainNotFoundException('Subject assignment not found.');
             audit_log_required('PROGRAM_SUBJECT_ASSIGNMENT_ARCHIVE', 'program_subject_assignment', $id,
                 'Program and subject assignment archived.', ['academic_program_id' => (int)$assignment['academic_program_id'], 'subject_id' => (int)$assignment['subject_id']]);
