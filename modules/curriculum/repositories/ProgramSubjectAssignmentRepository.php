@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/RepositoryQuery.php';
 require_once __DIR__ . '/../validators/DomainValidator.php';
+require_once __DIR__ . '/../services/CurriculumReadScope.php';
 
 class ProgramSubjectAssignmentRepository
 {
@@ -47,8 +48,7 @@ class ProgramSubjectAssignmentRepository
     public function summary(string $type, int $id, array $record): array
     {
         if ($type === 'program') {
-            $stmt = $this->db->prepare("SELECT COUNT(*) assigned_count FROM program_subject_assignments WHERE academic_program_id=? AND status='active'");
-            $stmt->bind_param('i',$id);$stmt->execute();$record['assigned_count']=(int)$stmt->get_result()->fetch_assoc()['assigned_count'];$stmt->close();
+            $record = array_merge($record, $this->coverage($id));
         } else {
             $stmt = $this->db->prepare("SELECT COUNT(*) assigned_count FROM program_subject_assignments WHERE subject_id=? AND status='active'");
             $stmt->bind_param('i',$id);$stmt->execute();$record['assigned_count']=(int)$stmt->get_result()->fetch_assoc()['assigned_count'];$stmt->close();
@@ -84,6 +84,97 @@ class ProgramSubjectAssignmentRepository
         $stmt->execute(); $rows=$stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
         foreach ($rows as &$row) $row['placements'] = $this->placements((int)$row['academic_program_id'], (int)$row['subject_id']); unset($row);
         return ['assignments'=>$rows,'pagination'=>['page'=>$page,'per_page'=>$perPage,'total_records'=>$total,'total_pages'=>max(1,(int)ceil($total/$perPage))]];
+    }
+
+    /** Placed-in-curriculum test for subject alias s: constant SQL plus one program-id parameter. Faculty see only versions inside their read scope. */
+    private function placedSql(): string
+    {
+        $scope = CurriculumReadScope::sql('v');
+        return 'EXISTS (SELECT 1 FROM curriculum_version_subjects cvs JOIN curriculum_versions v ON v.id=cvs.curriculum_version_id JOIN curricula c ON c.id=v.curriculum_id WHERE cvs.subject_id=s.id AND c.academic_program_id=?' . ($scope !== '' ? " AND $scope" : '') . ')';
+    }
+
+    /** One row per subject with its assigned and placed flags for the program. Parameters: program id twice. */
+    private function unionSql(): string
+    {
+        return "SELECT s.id subject_id, s.subject_code, s.subject_title, s.units, s.status subject_status, a.id assignment_id,
+                       (a.id IS NOT NULL) assigned, " . $this->placedSql() . " placed
+                FROM subjects s LEFT JOIN program_subject_assignments a ON a.subject_id=s.id AND a.academic_program_id=? AND a.status='active'";
+    }
+
+    public function coverage(int $programId): array
+    {
+        $sql = 'SELECT COALESCE(SUM(assigned),0) assigned_count, COALESCE(SUM(placed),0) placed_count,
+                       COALESCE(SUM(placed AND NOT assigned),0) placed_not_assigned, COALESCE(SUM(assigned AND NOT placed),0) assigned_not_placed
+                FROM (' . $this->unionSql() . ') t WHERE assigned=1 OR placed=1';
+        $stmt = $this->db->prepare($sql); $stmt->bind_param('ii', $programId, $programId); $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc(); $stmt->close();
+        return array_map('intval', $row);
+    }
+
+    public const COVERAGE_FILTERS = [
+        '' => '1=1',
+        'assigned' => 'assigned=1',
+        'placed' => 'placed=1',
+        'placed_not_assigned' => 'placed=1 AND assigned=0',
+        'assigned_not_placed' => 'assigned=1 AND placed=0',
+    ];
+
+    /** The program's subjects: the union of assigned and placed, filtered, searched and paged on the server. */
+    public function listCoverage(int $programId, array $query, string $filter): array
+    {
+        $query = DomainValidator::listQuery($query);
+        if (!array_key_exists($filter, self::COVERAGE_FILTERS)) throw new DomainValidationException('Invalid filter.');
+        $search = $query['search'] ?? '';
+        $perPage = $query['per_page'];
+        $page = min(100000, $query['page']);
+        $pattern = '%' . str_replace(['=', '%', '_'], ['==', '=%', '=_'], mb_strtolower($search, 'UTF-8')) . '%';
+        $where = "(assigned=1 OR placed=1) AND (? = '' OR LOWER(subject_code) LIKE ? ESCAPE '=' OR LOWER(subject_title) LIKE ? ESCAPE '=') AND (" . self::COVERAGE_FILTERS[$filter] . ')';
+        $base = ' FROM (' . $this->unionSql() . ') t WHERE ' . $where;
+        $stmt = $this->db->prepare('SELECT COUNT(*) total' . $base);
+        $stmt->bind_param('iisss', $programId, $programId, $search, $pattern, $pattern); $stmt->execute();
+        $total = (int)$stmt->get_result()->fetch_assoc()['total']; $stmt->close();
+        $offset = ($page - 1) * $perPage;
+        $stmt = $this->db->prepare('SELECT subject_id, subject_code, subject_title, units, subject_status, assignment_id, assigned, placed' . $base . ' ORDER BY subject_code, subject_id LIMIT ? OFFSET ?');
+        $stmt->bind_param('iisssii', $programId, $programId, $search, $pattern, $pattern, $perPage, $offset); $stmt->execute();
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
+        $byId = $this->placementsForSubjects($programId, array_column($rows, 'subject_id'));
+        foreach ($rows as &$row) {
+            $row['subject_id'] = (int)$row['subject_id']; $row['assignment_id'] = $row['assignment_id'] === null ? null : (int)$row['assignment_id'];
+            $row['assigned'] = (bool)$row['assigned']; $row['placed'] = (bool)$row['placed'];
+            $row['placements'] = $byId[$row['subject_id']] ?? [];
+        }
+        unset($row);
+        return ['assignments' => $rows, 'pagination' => ['page' => $page, 'per_page' => $perPage, 'total_records' => $total, 'total_pages' => max(1, (int)ceil($total / $perPage))]];
+    }
+
+    /** Placements of the given subjects inside one program, in read scope, keyed by subject id. */
+    public function placementsForSubjects(int $programId, array $subjectIds): array
+    {
+        $ids = array_values(array_unique(array_map('intval', $subjectIds)));
+        if (!$ids) return [];
+        $scope = CurriculumReadScope::sql('v');
+        $sql = 'SELECT cvs.subject_id, c.id curriculum_id, c.curriculum_code, v.id version_id, v.version_label, cvs.year_level, cvs.semester
+                FROM curriculum_version_subjects cvs JOIN curriculum_versions v ON v.id=cvs.curriculum_version_id JOIN curricula c ON c.id=v.curriculum_id
+                WHERE c.academic_program_id=? AND cvs.subject_id IN (' . implode(',', $ids) . ')' . ($scope !== '' ? " AND $scope" : '') . '
+                ORDER BY c.curriculum_code, v.version_label, cvs.year_level, cvs.semester, cvs.id';
+        $stmt = $this->db->prepare($sql); $stmt->bind_param('i', $programId); $stmt->execute();
+        $out = [];
+        foreach ($stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row) $out[(int)$row['subject_id']][] = $row;
+        $stmt->close();
+        return $out;
+    }
+
+    /** Where one subject is used: every program it is assigned to, and every curriculum term it is placed in (in read scope). */
+    public function usage(int $subjectId): array
+    {
+        $stmt = $this->db->prepare("SELECT a.id assignment_id, p.id academic_program_id, p.program_code, p.program_name, p.status program_status FROM program_subject_assignments a JOIN academic_programs p ON p.id=a.academic_program_id WHERE a.subject_id=? AND a.status='active' ORDER BY p.program_code");
+        $stmt->bind_param('i', $subjectId); $stmt->execute(); $assigned = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
+        $scope = CurriculumReadScope::sql('v');
+        $sql = 'SELECT p.id academic_program_id, p.program_code, c.id curriculum_id, c.curriculum_code, v.id version_id, v.version_label, v.status version_status, cvs.year_level, cvs.semester
+                FROM curriculum_version_subjects cvs JOIN curriculum_versions v ON v.id=cvs.curriculum_version_id JOIN curricula c ON c.id=v.curriculum_id JOIN academic_programs p ON p.id=c.academic_program_id
+                WHERE cvs.subject_id=?' . ($scope !== '' ? " AND $scope" : '') . ' ORDER BY p.program_code, c.curriculum_code, v.version_label, cvs.year_level, cvs.semester, cvs.id';
+        $stmt = $this->db->prepare($sql); $stmt->bind_param('i', $subjectId); $stmt->execute(); $placed = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
+        return ['assigned' => $assigned, 'placements' => $placed];
     }
 
     public function reviewFacts(string $view, int $id): array

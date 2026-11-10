@@ -28,6 +28,10 @@ try {
             curriculum_require_read('program_assignment.view');
             $id = DomainValidator::positiveId($_GET['id'] ?? null, 'Subject assignment');
             json_response(true, 'Assignment details loaded.', ['assignment' => $service->details($id)]);
+        case 'usage':
+            curriculum_require_read('program_assignment.view');
+            $id = DomainValidator::positiveId($_GET['subject_id'] ?? null, 'Subject');
+            json_response(true, 'Subject usage loaded.', ['usage' => $service->usage($id)]);
         case 'review':
             curriculum_require_read('program_assignment.view');
             $type = is_string($_GET['type'] ?? null) ? $_GET['type'] : '';

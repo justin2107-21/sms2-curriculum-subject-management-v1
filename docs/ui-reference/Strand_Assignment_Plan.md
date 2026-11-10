@@ -1,5 +1,19 @@
 # Academic Strand/Course Assignment — Plan (Slice 0, read-only)
 
+## Status (updated 2026-11-10)
+
+| Slice | State |
+|---|---|
+| 0 Findings | Done (commit 232d4ca). |
+| 1 Fix the dead Assign | Done (commit b1fda9c). Disabled or blocked Assign explains why (csms-info tooltip beside the button, toast when attempted); inactive records are tagged in the program picker; the assign picker already excluded inactive and assigned subjects (server `available=1`), now covered by a test. Select height: the generic form-field rule in csms-components.css (specificity 0,2,1) beat `.csms-filter-row .csms-select` (0,2,0), so selects were 36px while inputs were 40px; the filter-row rule now uses `select.csms-select` and wins. |
+| 2 Program-first page | Done in this slice, covering what section 3 called slices 2 and 3: no tabs, program picker kept in `?program_id=`, one coverage strip, union listing with server-side paging, "Placed in" column, "Where used" dialog replacing the Subject-centric tab, row menu, bulk assign dialog, read-only role. No schema change. |
+| 3 Drawer | Not built. Where used is the existing details dialog (a shared csms drawer does not exist). Revisit only if the dialog proves too small. |
+| 4 Backfill / consistency | Open. Needs a product decision (see risks). Nothing was backfilled. |
+
+Facts recorded while building slice 2: the Acad Faculty role has no `program_assignment.view`, so it gets 403 on this page; Staff and Acad Office see it read-only; placements shown to any user without `curriculum.view_unapproved` are limited by `CurriculumReadScope`, while the unassign block still checks all placements.
+
+---
+
 Scope of this slice: investigation only. No code and no database changed. Counts come from `sms_db_uitest` (SELECT only). `sms_db` was not touched.
 
 ## 1. Findings

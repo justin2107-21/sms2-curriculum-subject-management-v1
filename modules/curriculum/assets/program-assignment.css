@@ -1,79 +1,49 @@
+/* Academic Strand/Course Assignment. Filter row, select, table, chips, empty state, tooltip and row menu come from css/csms-components.css;
+   only the layout below (page actions, picker card, coverage strip, dialog lists) is specific to this page. */
 .program-assignment-content{min-width:0}
-.program-assignment-content #assignmentRows .state-cell{line-height:1.4;padding:10px 14px!important}
-.program-assignment-content #assignmentPagination[hidden]{display:none!important}
-.assignment-page-actions{margin-left:auto;flex-shrink:0}
-.assignment-context-row{display:grid;grid-template-columns:minmax(290px,.78fr) minmax(0,1.45fr);gap:18px;margin:0 0 18px;align-items:stretch}
-.program-assignment-content>.mapping-results-card{box-sizing:border-box;margin:0 30px 18px;width:calc(100% - 60px)}
-.program-assignment-content>.mapping-results-card.assignment-context-empty{
-  align-items:center;
-  box-sizing:border-box;
-  display:flex;
-  justify-content:center;
-  min-height:88px;
-  padding:10px 14px;
-  max-width:550px!important;
-  width:min(550px,100%)!important;
-  margin:18px auto 0!important;
-}
-.program-assignment-content>.mapping-results-card.assignment-context-empty .table-scroll{min-width:0;width:100%}
-.program-assignment-content>.mapping-results-card.assignment-context-empty .domain-table{min-width:0;width:100%;table-layout:fixed}
-.program-assignment-content>.mapping-results-card.assignment-context-empty #assignmentRows .state-cell{padding:10px 8px!important;text-align:center;white-space:normal;overflow-wrap:anywhere}
-.assignment-context-row .mapping-filter-card{margin:0}
+.program-assignment-content [hidden]{display:none!important}
+.assignment-page-actions{align-items:center;display:flex;flex-wrap:wrap;gap:10px;margin-left:auto;flex-shrink:0}
+.program-assignment-content>.domain-card{box-sizing:border-box;margin:0 30px 18px;width:calc(100% - 60px)}
+
+/* Program picker */
 .assignment-selector-card{overflow:visible;position:relative;z-index:5}
-.assignment-selector-card{min-height:142px}
-.program-assignment-context{box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;min-height:142px;padding:20px 18px}
+.program-assignment-context{box-sizing:border-box;padding:16px 18px;max-width:560px}
 .program-assignment-context .form-field{margin:0}
-.program-assignment-context .subtle-text{font-size:.76rem;margin:8px 0 0}
-.assignment-summary-card{display:flex;align-items:center;justify-content:space-between;gap:22px;padding:20px 22px;min-height:142px}
-.assignment-summary-card[hidden]{display:none}
-.assignment-summary-placeholder{display:flex;flex-direction:column;gap:6px}
-.assignment-summary-placeholder strong{color:#1e293b;font-size:.9rem}
-.assignment-summary-placeholder span{color:var(--csms-text-muted, #4b5563);font-size:.76rem}
-.assignment-summary-main{display:flex;flex-direction:column;gap:5px;min-width:0}
-.assignment-summary-code{color:#155ac4;font-size:1rem;font-weight:800}
-.assignment-summary-name{color:#1e293b;font-size:.92rem;line-height:1.4;overflow-wrap:anywhere}
-.assignment-summary-meta{color:var(--csms-text-muted, #4b5563);font-size:.75rem;line-height:1.5}
-.assignment-summary-metric{align-items:flex-start;border-left:1px solid #e2e8f0;display:flex;flex:0 0 auto;flex-direction:column;gap:3px;min-width:150px;padding-left:22px}
-.assignment-summary-metric>strong{color:#155ac4;font-size:1.65rem;line-height:1.1}
-.assignment-summary-metric>span,.assignment-summary-metric>small{color:var(--csms-text-muted, #4b5563);font-size:var(--csms-text-xs, .75rem)}
-.assignment-summary-metric .status-badge{margin-top:5px}
-.assignment-filter-row{align-items:end;display:grid;gap:14px;grid-template-columns:minmax(280px,1fr) minmax(150px,190px) auto auto;padding:20px 28px 18px}
-.assignment-filter-row[hidden]{display:none}
-.assignment-filter-row .mapping-filter-field{margin:0}
-.assignment-filter-row .assignment-search{min-width:0}
-.assignment-filter-row .compact-select{margin:0}
-.assignment-filter-row .record-count{align-self:center;white-space:nowrap}
 .program-assignment-content .record-autocomplete-options{max-height:194px;overflow-y:auto}
 .program-assignment-content .record-autocomplete-option{min-height:58px}
-.program-assignment-content .domain-table{min-width:760px}
-.program-assignment-content .domain-table td{vertical-align:middle}
-.program-assignment-content .domain-table .status-badge{white-space:nowrap}
-.assignment-actions{white-space:nowrap}
-.assignment-actions button{margin-right:5px}
-.assignment-ai-action{color:#155ac4!important}
-.program-assignment-empty{color:#64748b;padding:26px 14px;text-align:center}
-.program-assignment-empty p{margin:0 0 12px}
+
+/* Coverage strip: the program, then four counts that filter the table */
+.assignment-coverage{align-items:center;display:flex;flex-wrap:wrap;gap:12px 28px;justify-content:space-between;padding:14px 18px}
+.assignment-coverage__program{display:flex;flex-direction:column;gap:2px;min-width:0}
+.assignment-coverage__code{color:var(--csms-code-blue,#2163c5);font-size:1rem}
+.assignment-coverage__name{color:var(--csms-text,#1f2937);overflow-wrap:anywhere}
+.assignment-coverage__meta{align-items:center;color:var(--csms-text-secondary,#374151);display:flex;font-size:var(--csms-text-xs,.75rem);gap:8px}
+.assignment-coverage__counts{display:flex;flex-wrap:wrap;gap:8px}
+.assignment-count{background:#fff;border:1px solid var(--csms-border,#dfe4ee);border-radius:8px;color:var(--csms-text-secondary,#374151);cursor:pointer;display:flex;flex-direction:column;font:inherit;gap:2px;min-width:8.5rem;padding:8px 14px;text-align:left}
+.assignment-count strong{color:var(--csms-text,#1f2937);font-size:1.35rem;font-variant-numeric:tabular-nums;line-height:1.1}
+.assignment-count span{font-size:var(--csms-text-xs,.75rem)}
+.assignment-count:hover{background:var(--csms-surface-muted,#f4f6fb)}
+.assignment-count:focus-visible{outline:3px solid var(--csms-focus,#2563eb);outline-offset:1px}
+.assignment-count.is-active{background:var(--csms-surface-muted,#f4f6fb);border-color:var(--csms-navy,#1a3a8c)}
+
+/* Results card */
+.program-assignment-content>.mapping-results-card{padding:16px 18px}
+.program-assignment-content #assignmentPagination{align-items:center;display:flex;gap:12px;justify-content:center;padding:12px}
+
+/* Dialogs */
 .selected-assignment{border-top:1px solid #e2e8f0;margin-top:17px;padding-top:13px}
 .selected-assignment h3{font-size:.88rem;margin:0 0 8px}
 .selected-assignment ul,.placement-list{margin:0;padding-left:20px}
 .selected-assignment li{align-items:center;border-bottom:1px solid #edf1f5;display:flex;gap:12px;justify-content:space-between;padding:7px 0}
-.assignment-detail{padding:7px 0}
-.assignment-detail span{color:#64748b;display:block;font-size:var(--csms-text-xs, .75rem);margin-bottom:4px}
-.assignment-detail strong{color:#1e293b;display:block;font-size:.84rem;overflow-wrap:anywhere}
-.assignment-detail h3,.confirmation-body h3{font-size:.9rem;margin:16px 0 8px}
 .placement-list li{padding:5px 0}
-.assignment-review-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;margin:10px 0;padding:11px 13px}
-.assignment-review-card p{margin:6px 0}
-.assignment-review-card .subtle-text{font-size:.76rem}
-.assignment-review-card .status-badge{display:inline-flex;margin:5px 0}
+.confirmation-body h3{font-size:.9rem;margin:16px 0 8px}
 .program-assignment-content .form-field small{color:#64748b;display:block;margin-top:6px}
 .program-assignment-content .modal-context{margin-top:4px}
 .program-assignment-content .curriculum-modal .form-field{display:block}
-.program-assignment-content #assignmentPagination{align-items:center;display:flex;gap:12px;justify-content:center;padding:12px}
-@media(max-width:900px){.assignment-context-row{grid-template-columns:minmax(250px,.8fr) minmax(0,1.2fr);gap:14px}.assignment-summary-card{padding:17px}.assignment-summary-metric{min-width:125px;padding-left:16px}}
-@media(max-width:700px){.assignment-context-row{grid-template-columns:1fr;margin:0 0 14px}.assignment-page-actions{justify-content:flex-start;margin:12px 0 0;width:100%}.assignment-summary-card{min-height:0}.assignment-filter-row{grid-template-columns:minmax(0,1fr) minmax(130px,160px);padding:0 14px 14px}.assignment-filter-row .assignment-search{grid-column:1/-1}.assignment-filter-row .record-count{justify-self:end}.program-assignment-content .mapping-results-toolbar{align-items:end}.program-assignment-content .card-header-actions{flex-wrap:wrap}}
-@media(max-width:440px){.assignment-summary-card{align-items:flex-start;flex-direction:column}.assignment-summary-metric{border-left:0;border-top:1px solid #e2e8f0;padding:12px 0 0;width:100%}.assignment-filter-row{grid-template-columns:1fr 1fr}.assignment-filter-row .compact-select{grid-column:1}.assignment-filter-row .record-count{grid-column:2}}
 
-/* Run A: shared filter row wins over the old grid. */
-.csms-filter-row.assignment-filter-row { display: flex; padding: 12px 0; }
-.csms-filter-row.assignment-filter-row[hidden] { display: none; }
+@media(max-width:700px){
+  .assignment-page-actions{justify-content:flex-start;margin:12px 0 0;width:100%}
+  .program-assignment-content>.domain-card{margin:0 14px 14px;width:calc(100% - 28px)}
+  .assignment-coverage__counts{display:grid;gap:8px;grid-template-columns:1fr 1fr;width:100%}
+  .assignment-count{min-width:0}
+}

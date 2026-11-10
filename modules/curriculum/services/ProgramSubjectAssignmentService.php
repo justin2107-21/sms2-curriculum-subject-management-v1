@@ -24,7 +24,16 @@ class ProgramSubjectAssignmentService
     public function list(int $id, string $type, array $query): array
     {
         $this->context($type, $id);
+        if ($type === 'program') return $this->repository->listCoverage($id, $query, is_string($query['filter'] ?? null) ? $query['filter'] : '');
         return $this->repository->list($type, $id, $query);
+    }
+    /** Where a subject is used: its assignments and its curriculum placements. */
+    public function usage(int $subjectId): array
+    {
+        $subject = $this->repository->record('subject', $subjectId);
+        if (!$subject) throw new DomainNotFoundException('Subject not found.');
+        return ['subject' => ['id' => (int)$subject['id'], 'subject_code' => $subject['subject_code'], 'subject_title' => $subject['subject_title'], 'units' => $subject['units'], 'status' => $subject['status']]]
+            + $this->repository->usage($subjectId);
     }
     public function details(int $assignmentId): array
     {
