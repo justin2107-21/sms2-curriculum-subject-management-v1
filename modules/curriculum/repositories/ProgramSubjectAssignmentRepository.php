@@ -138,6 +138,30 @@ class ProgramSubjectAssignmentRepository
         return $rows;
     }
 
+    /** Name, curriculum and status of a version (read only; used to label review findings). */
+    public function versionInfo(int $versionId): ?array
+    {
+        $stmt = $this->db->prepare('SELECT v.id, v.version_label, v.status, c.curriculum_code FROM curriculum_versions v JOIN curricula c ON c.id=v.curriculum_id WHERE v.id=?');
+        $stmt->bind_param('i', $versionId); $stmt->execute(); $row = $stmt->get_result()->fetch_assoc(); $stmt->close();
+        return $row ?: null;
+    }
+
+    /** Every subject that is assigned to the program or placed in the selected version, with whether it is placed in ANY version of the program. */
+    public function reviewRows(int $programId, int $versionId): array
+    {
+        $scope = CurriculumReadScope::sql('v');
+        $any = 'EXISTS (SELECT 1 FROM curriculum_version_subjects cvs JOIN curriculum_versions v ON v.id=cvs.curriculum_version_id JOIN curricula c ON c.id=v.curriculum_id WHERE cvs.subject_id=s.id AND c.academic_program_id=?' . ($scope !== '' ? " AND $scope" : '') . ')';
+        $sql = "SELECT subject_id, subject_code, subject_title, subject_status, assigned, placed, placed_any FROM (
+                  SELECT s.id subject_id, s.subject_code, s.subject_title, s.status subject_status, (a.id IS NOT NULL) assigned, " . $this->placedSql() . " placed, $any placed_any
+                  FROM subjects s LEFT JOIN program_subject_assignments a ON a.subject_id=s.id AND a.academic_program_id=? AND a.status='active') t
+                WHERE assigned=1 OR placed=1 ORDER BY subject_code, subject_id";
+        // Placeholders in text order: placed (program, version), placed-anywhere (program), assignment join (program).
+        $stmt = $this->db->prepare($sql); $stmt->bind_param('iiii', $programId, $versionId, $programId, $programId); $stmt->execute();
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
+        foreach ($rows as &$row) { $row['assigned'] = (bool)$row['assigned']; $row['placed'] = (bool)$row['placed']; $row['placed_any'] = (bool)$row['placed_any']; }
+        return $rows;
+    }
+
     public function coverage(int $programId, int $versionId = 0): array
     {
         $sql = 'SELECT COALESCE(SUM(assigned),0) assigned_count, COALESCE(SUM(placed),0) placed_count,

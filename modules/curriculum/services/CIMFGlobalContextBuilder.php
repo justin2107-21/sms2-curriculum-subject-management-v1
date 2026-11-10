@@ -56,6 +56,7 @@ final class CIMFGlobalContextBuilder
         $subjects = [];
         $allowed = [];
         $versionId = null;
+        $deterministic = null;
         if (empty($input['curriculum_version_id'])) {
             if (!empty($input['academic_program_id']) && !$this->rows('SELECT id FROM academic_programs WHERE id=?', 'i', [(int)$input['academic_program_id']]))
                 throw new InvalidArgumentException('Academic program not found.');
@@ -124,11 +125,26 @@ final class CIMFGlobalContextBuilder
                 $view = ($input['view'] ?? 'program') === 'subject' ? 'subject' : 'program';
                 $contextId = (int)($input[$view === 'subject' ? 'subject_id' : 'academic_program_id'] ?? 0);
                 if (!$contextId) throw new InvalidArgumentException('Select a Program / Strand or subject.');
+                if ($view === 'program') {
+                    // Counts and lists come from the server (read only). The AI only explains and prioritizes them, from a compact payload.
+                    if (!empty($input['curriculum_version_id'])) $header = $this->header($input);
+                    $deterministic = $service->reviewFindings($contextId, $input['curriculum_version_id'] ?? null);
+                    $facts['program'] = $deterministic['program']; $facts['version'] = $deterministic['version']; $facts['totals'] = $deterministic['totals'];
+                    $facts['notice'] = $deterministic['notice'];
+                    $budget = 30; $facts['findings'] = [];
+                    foreach ($deterministic['findings'] as $f) {
+                        $take = min(8, $budget, count($f['subjects'])); $budget -= $take;
+                        $facts['findings'][] = ['label' => $f['label'], 'count' => $f['count'], 'examples' => array_map(fn($s) => ['code' => $s['code'], 'title' => $s['title']], array_slice($f['subjects'], 0, $take))];
+                        foreach (array_slice($f['subjects'], 0, $take) as $s) $subjects[] = ['subject_id' => $s['id'], 'subject_code' => $s['code'], 'subject_title' => $s['title'], 'units' => null];
+                    }
+                    $facts['authority'] = 'Counts and subject lists are calculated by PHP from stored records and are authoritative. Explain them in plain words and say which to look at first. Suggest only human actions, such as reviewing a subject in Subjects or using "Assign placed subjects" after review. Never say anything was assigned, unassigned or changed.';
+                } else {
                 $facts['selected_record'] = self::pick($service->context($view, $contextId), ['id', 'subject_code', 'subject_title', 'program_code', 'program_name', 'units', 'status']);
                 $result = $service->list($contextId, $view, ['status' => 'active', 'per_page' => 50]);
                 $facts['assignments'] = array_map(fn($r) => self::pick($r, ['subject_id', 'subject_code', 'subject_title', 'units', 'program_code', 'program_name', 'assignment_status', 'placements']), $result['assignments']);
                 $facts['visible_page'] = $result['pagination'];
                 $subjects = $result['assignments'];
+                }
             }
         } elseif ($id === 'subject_history') {
             if (empty($input['subject_id'])) throw new InvalidArgumentException('Select a subject to review stored history.');
@@ -249,7 +265,7 @@ final class CIMFGlobalContextBuilder
         // Context limits fail visibly rather than silently sending a partial academic dataset.
         $encoded = json_encode($facts, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
         if (strlen((string)$encoded) > 90000) throw new InvalidArgumentException('This context is too large. Select a narrower scope or record.');
-        return ['facts' => $facts, 'allowed' => $allowed, 'version_id' => $versionId,
+        return ['facts' => $facts, 'allowed' => $allowed, 'version_id' => $versionId, 'deterministic' => $deterministic,
             'display' => ['module' => $profile['title'], 'academic_context' => $header,
                 'selected_subjects' => array_map(fn($s) => ['id' => (int)$s['subject_id'], 'code' => $s['subject_code'], 'title' => $s['subject_title']], array_values($allowed))]];
     }

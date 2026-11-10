@@ -78,6 +78,10 @@
   }
   const section = (title, text) => text ? '<section class="cimf-result-section"><h3>' + esc(title) + '</h3><p>' + esc(text) + '</p></section>' : '';
   const list = (title, items) => items?.length ? '<section class="cimf-result-section"><h3>' + esc(title) + '</h3><ul>' + items.map(item => '<li>' + esc(item) + '</li>').join('') + '</ul></section>' : '';
+  // Findings the server calculated from stored records (shown with or without the AI explanation).
+  const findingsBlock = d => !d ? '' : '<section class="cimf-result-section"><h3>Findings from CSMS data</h3>' + (d.notice ? '<p>' + esc(d.notice) + '</p>' : '')
+    + d.findings.map(f => '<p><strong>' + esc(f.label) + '</strong> <span class="read-only-pill">' + Number(f.count) + '</span>'
+      + (f.count ? '<br>' + esc(f.subjects.slice(0, 20).map(s => s.code).join(', ')) + (f.count > 20 ? ' +' + (f.count - 20) + ' more' : '') + '<br><em>' + esc(f.hint) + '</em>' : '') + '</p>').join('') + '</section>';
   async function analyze(action, data = context(), question = '') {
     if (busy) return;
     busy = true;
@@ -89,14 +93,16 @@
       const payload = await request(action, 'analyze', data, question);
       if (fingerprint !== original) return;
       if (payload.guidance) resultHtml = section('Interface guidance', payload.guidance);
+      else if (!payload.analysis && payload.deterministic) resultHtml = '<p class="eyebrow">CSMS findings · ' + esc(actions[action]) + '</p>' + section('AI explanation unavailable', payload.notice) + findingsBlock(payload.deterministic);
       else {
         const a = payload.analysis;
         resultHtml = '<p class="eyebrow">AI advisory · ' + esc(actions[action]) + '</p><span class="read-only-pill">' + esc(a.status) + '</span>' + section('Summary', a.summary)
           + (a.findings?.length ? '<section class="cimf-result-section"><h3>Findings</h3><ul>' + a.findings.map(item => '<li>' + (item.subject ? '<strong>' + esc(item.subject.code) + '</strong> — ' : '') + esc(item.observation) + '</li>').join('') + '</ul></section>' : '')
           + list('Similarities', a.similarities) + list('Differences', a.differences) + section('Why It Matters', a.why_it_matters)
           + list('Suggested Review', a.suggested_review) + section('Limitations', a.limitations);
+        resultHtml += findingsBlock(payload.deterministic);
       }
-      previousView = restore === 'result' ? 'home' : restore; show('result'); $('csmsCimfStatus').textContent = 'Advisory ready. Human review required.';
+      previousView = restore === 'result' ? 'home' : restore; show('result'); $('csmsCimfStatus').textContent = payload.analysis ? 'Advisory ready. Human review required.' : 'AI explanation unavailable. Showing CSMS findings only.';
     } catch (error) { if (error.name !== 'AbortError') $('csmsCimfStatus').textContent = error.message; }
     finally { busy = false; $('csmsCimfActions').querySelectorAll('button').forEach(button => button.disabled = false); $('csmsCimfAsk').querySelector('button[type="submit"]').disabled = false; }
   }

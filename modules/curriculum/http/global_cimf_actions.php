@@ -32,6 +32,9 @@ try {
     if ($string('action') === 'ask' && preg_match('/^(?:hello|hi|hey|good (?:morning|afternoon|evening))[!.\s]*$/i', $question))
         json_response(true, 'Interface guidance.', ['guidance' => 'Ask about the current ' . $profile['title'] . ' page or choose one of its review actions.', 'source' => 'Interface guidance']);
     $config = CIMFConfig::load(); $status = CIMFConfig::status($config);
+    $report = $context['deterministic'] ?? null;
+    $findingsOnly = static fn(string $s) => json_response(true, 'CSMS findings ready. The AI explanation is unavailable.', ['deterministic' => $report, 'notice' => CIMFConfig::message($s), 'display' => $context['display'], 'source' => 'CSMS findings']);
+    if ($status !== 'SUCCESS' && $report) $findingsOnly($status);
     if ($status !== 'SUCCESS') {
         error_log('[CIMF] profile=' . $profile['id'] . ' status=' . $status . ' category=CONFIGURATION');
         json_response(false, CIMFConfig::message($status), ['status' => $status], 503);
@@ -52,12 +55,13 @@ try {
         $stmt->bind_param('iissiiii', $actor, $version, $logAction, $status, $http, $in, $out, $total);
         $stmt->execute(); $stmt->close();
     } catch (Throwable $ignored) { error_log('[CIMF] category=USAGE_LOG_UNAVAILABLE'); }
+    if ($status !== 'SUCCESS' && $report) $findingsOnly($status);
     if ($status !== 'SUCCESS') {
         $category = preg_replace('/[^A-Z0-9_]/', '', (string)($result['diagnostic']['category'] ?? $status));
         error_log('[CIMF] profile=' . $profile['id'] . ' status=' . $status . ' category=' . $category . ' http=' . (int)($result['http_status'] ?? 0));
         json_response(false, CIMFConfig::message($status), ['status' => $status], 503);
     }
-    json_response(true, 'CIMF advisory ready.', ['analysis' => $result['analysis'], 'display' => $context['display'], 'source' => 'AI advisory']);
+    json_response(true, 'CIMF advisory ready.', ['analysis' => $result['analysis'], 'display' => $context['display'], 'source' => 'AI advisory', 'deterministic' => $report]);
 } catch (InvalidArgumentException | DomainValidationException $error) {
     json_response(false, $error->getMessage(), [], 422);
 } catch (DomainNotFoundException $error) {

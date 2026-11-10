@@ -101,6 +101,38 @@ class ProgramSubjectAssignmentService
         $more = count($placements) - count($lines);
         return $subjectCode . ' cannot be unassigned. Placed in ' . implode('; ', $lines) . ($more > 0 ? " and $more more" : '') . '. Remove it from those curriculum plans first.';
     }
+    /**
+     * The facts behind CIMF Assignment Review, computed from stored records only. Read only; the AI never produces or changes them.
+     * Placed findings need a selected version; "assigned but placed nowhere" does not.
+     */
+    public function reviewFindings(int $programId, mixed $versionId = null): array
+    {
+        $program = $this->repository->record('program', $programId);
+        if (!$program) throw new DomainNotFoundException('Program not found.');
+        $version = $this->selectedVersion($programId, $versionId);
+        $rows = $this->repository->reviewRows($programId, $version);
+        $active = static fn(array $r): bool => $r['subject_status'] === 'active';
+        $defs = [
+            ['placed_not_assigned_active', 'Placed in this version, not assigned (active)', 'Review, then use "Assign placed subjects".', fn($r) => $version && $r['placed'] && !$r['assigned'] && $active($r)],
+            ['placed_not_assigned_inactive', 'Placed in this version, not assigned (inactive)', 'Inactive subjects are never assigned automatically. Review them in Subjects.', fn($r) => $version && $r['placed'] && !$r['assigned'] && !$active($r)],
+            ['assigned_not_placed', 'Assigned to the program, not placed in this version', 'May be intentional if another version places them.', fn($r) => $version && $r['assigned'] && !$r['placed']],
+            ['inactive_placed', 'Inactive subjects placed in this version', 'Review the subject status in Subjects or the plan in the Curriculum Builder.', fn($r) => $version && $r['placed'] && !$active($r)],
+            ['assigned_placed_nowhere', 'Assigned, but placed in no version of this program', 'Confirm the assignment is still wanted.', fn($r) => $r['assigned'] && !$r['placed_any']],
+        ];
+        $findings = [];
+        foreach ($defs as [$key, $label, $hint, $test]) {
+            $subjects = array_values(array_filter($rows, $test));
+            $findings[] = ['key' => $key, 'label' => $label, 'hint' => $hint, 'count' => count($subjects),
+                'subjects' => array_map(static fn($r) => ['id' => (int)$r['subject_id'], 'code' => $r['subject_code'], 'title' => $r['subject_title']], array_slice($subjects, 0, 100))];
+        }
+        $info = $version ? $this->repository->versionInfo($version) : null;
+        return ['program' => ['code' => $program['program_code'], 'name' => $program['program_name'], 'type' => $program['program_type'] ?? null, 'status' => $program['status']],
+            'version' => $info ? ['label' => $info['version_label'], 'curriculum' => $info['curriculum_code'], 'status' => $info['status']] : null,
+            'totals' => ['assigned' => count(array_filter($rows, fn($r) => $r['assigned'])), 'placed_in_version' => count(array_filter($rows, fn($r) => $r['placed']))],
+            'findings' => $findings,
+            'notice' => $version ? null : 'No curriculum version is selected, so only assignments can be reviewed. Choose a version to compare with its placements.'];
+    }
+
     /** Program, curriculum and version must belong together; returns the program. */
     private function reconcileProgram(int $programId, int $curriculumId, int $versionId): array
     {

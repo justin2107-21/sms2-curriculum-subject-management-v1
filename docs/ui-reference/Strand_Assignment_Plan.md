@@ -1,6 +1,8 @@
 # Academic Strand/Course Assignment — Plan (Slice 0, read-only)
 
-## Status (updated 2026-11-10)
+## Status: MODULE COMPLETE (updated 2026-11-10)
+
+Slices 0 to 4 are done. What remains is data cleanup and the manual browser checks listed in `SESSION_HANDOFF.md`; no further code is planned. Open product decision carried over from slice 0: whether placement should require or create an assignment (not built; "Assign placed subjects" is the manual reconcile).
 
 | Slice | State |
 |---|---|
@@ -9,6 +11,7 @@
 | 2 Program-first page | Done in this slice, covering what section 3 called slices 2 and 3: no tabs, program picker kept in `?program_id=`, one coverage strip, union listing with server-side paging, "Placed in" column, "Where used" dialog replacing the Subject-centric tab, row menu, bulk assign dialog, read-only role. No schema change. |
 | 2b Shared context bar | Done. The Program / Strand picker card is replaced by the shared Program / Curriculum / Version context bar (same markup, cascade engine and `js/curriculum-context.js` store as Electives Manager; new working-context module key `assignment`, permission `program_assignment.view`). The selection is shared both ways with Subject Mapping, Pre-requisite and Electives; a fresh load uses the saved selection, else the same default (last edited, then newest active version). Assign/Unassign stay program-level. The version scopes only the Placed column and the Placed counts: rows = assigned to the program UNION placed in the selected version; with no version selected nothing counts as placed. Row menu fixed in the shared `csms-menu.js` (menu moved to `<body>`, clamped to the viewport), disabled items show their reason. No schema change. |
 | 3 Rules and reconcile | Done (2026-11-10). "Assign N placed subjects" in the coverage strip (manage only; disabled with a reason when no version, count 0, inactive program, or only inactive subjects remain). Preview dialog (shared `csms-review.js` lists: "Will be assigned", "Skipped, inactive"), then one server action in a single transaction, idempotent, program-level only: it never writes to `curriculum_version_subjects` or any version. Audit: one `PROGRAM_SUBJECT_ASSIGN` per assignment (`source: reconcile`) plus one `PROGRAM_SUBJECT_RECONCILE` summary (none when nothing was assigned). Unassign keeps its server rule; the error now names the blocking curricula, versions and terms and the client pre-check is gone. |
+| 4 Polish and CIMF review | Done. Four equal-height count tiles, the reconcile button under the program type text, one scope sentence only (the Assignment tooltip), and the cut-off info tooltip fixed (a `white-space: nowrap` header leaked into the shared `csms-info__tip`; the shared rule now wraps, and the table keeps room for the tip). CIMF Assignment Review is deterministic first: the server computes five findings from stored records (placed not assigned active / inactive, assigned not placed in the selected version, inactive placed in the version, assigned but placed in no version) with counts and codes; the AI only explains and prioritizes a compact payload (exact counts, at most 30 example subjects). With the AI off or failing, the panel shows the findings alone with a notice. Read only. |
 | 3 Drawer | Not built. Where used is the existing details dialog (a shared csms drawer does not exist). Revisit only if the dialog proves too small. |
 | 4 Backfill / consistency | Open. Needs a product decision (see risks). Nothing was backfilled. |
 
