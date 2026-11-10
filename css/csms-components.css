@@ -550,7 +550,7 @@ body .main .module-views a:focus-visible { outline: 3px solid var(--csms-focus, 
 .csms-ctable tr.csms-row-click { cursor: pointer; }
 .csms-ctable tr.csms-row-click:hover td { background: var(--csms-surface-muted, #f4f6fb); }
 .csms-ctable tr.csms-row-click:focus-visible { outline: 3px solid var(--csms-focus, #2563eb); outline-offset: -3px; }
-.csms-filter-row .csms-select { height: 40px; min-height: 40px; padding-top: 0; padding-bottom: 0; }
+.csms-filter-row .csms-select, .csms-filter-row select.csms-select { height: 40px; min-height: 40px; padding-top: 0; padding-bottom: 0; }
 .csms-tabs { overflow: visible; }
 /* Select arrow ~14px from the right edge (shared by every filter select), summary and info tooltip. */
 .csms-select { -webkit-appearance: none; appearance: none; padding-right: 40px; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23475569' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 14px center / 12px 8px; }

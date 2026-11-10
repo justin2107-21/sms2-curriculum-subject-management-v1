@@ -12,9 +12,23 @@
     const contextType = view === 'program' ? 'program' : 'subject';
     const otherType = view === 'program' ? 'subject' : 'program';
     const label = (type, r) => type === 'program' ? `${r.program_code} — ${r.program_name}` : `${r.subject_code} — ${r.subject_title}`;
+    const inactiveTag = r => r.status && r.status !== 'active' ? ' · Inactive' : '';
     const fmt = (type, r) => type === 'program'
-        ? ({label:label(type,r),code:r.program_code,title:r.program_name,meta:r.program_type || ''})
-        : ({label:label(type,r),code:r.subject_code,title:r.subject_title,meta:`${r.units} units`});
+        ? ({label:label(type,r),code:r.program_code,title:r.program_name,meta:(r.program_type || '') + inactiveTag(r)})
+        : ({label:label(type,r),code:r.subject_code,title:r.subject_title,meta:`${r.units} units` + inactiveTag(r)});
+    // Every blocked Assign shows its reason: a tooltip beside the button, and a toast if the action is still attempted.
+    const assignBlockReason = () => {
+        if (!manage) return 'You do not have permission to assign.';
+        if (!state.context) return view === 'program' ? 'Select a program first.' : 'Select a subject first.';
+        if (state.context.status !== 'active') return view === 'program' ? 'Inactive programs cannot receive new assignments.' : 'Inactive subjects cannot be newly assigned.';
+        return '';
+    };
+    function syncAssignState() {
+        const reason = assignBlockReason();
+        $('assignButton').disabled = reason !== '';
+        const info = $('assignReason');
+        if (info) { info.hidden = !manage || reason === ''; $('assignReasonTip').textContent = reason; }
+    }
     const contextPicker = ui.createAutocomplete({input:$('contextSearch'),valueInput:$('contextId'),list:$('contextOptions'),minimumLength:0,maxSuggestions:3,showSuggestionsOnFocus:true,
         search:async q=>(await ui.fetchJson(api,paramsForSearch(contextType,q))).records,getId:r=>r.id,format:r=>fmt(contextType,r),
         onSelect:loadContext,onClear:clearContext,errorText:'Records could not be searched.'});
@@ -26,7 +40,13 @@
             getId:r=>r.id,format:r=>fmt(otherType,r),onSelect:r=>{if(!state.selected.some(x=>Number(x.id)===Number(r.id)))state.selected.push(r);renderSelected();assignPicker.clear(false);$('assignSearch').focus();},
             onClear:()=>{},errorText:'Matching records could not be loaded.'});
     }
-    function empty(message, action=false) { return `<div class="program-assignment-empty"><p>${esc(message)}</p>${action&&manage?'<button type="button" class="primary-action-button" id="emptyAssignButton">+ Assign</button>':''}</div>`; }
+    function empty(message, action=false) {
+        const reason = assignBlockReason();
+        const button = !(action && manage) ? '' : reason
+            ? `<button type="button" class="primary-action-button" disabled>+ Assign</button> <span class="csms-info"><button type="button" class="csms-info__btn" aria-label="Why Assign is unavailable" aria-describedby="emptyAssignTip"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button><span class="csms-info__tip" role="tooltip" id="emptyAssignTip">${esc(reason)}</span></span>`
+            : '<button type="button" class="primary-action-button" id="emptyAssignButton">+ Assign</button>';
+        return `<div class="program-assignment-empty"><p>${esc(message)}</p>${button}</div>`;
+    }
     function statusBadge(status) { return `<span class="status-badge ${status==='active'?'status-active':'status-archived'}">${esc(status)}</span>`; }
     function usageText(r) { const n=Number(r.curriculum_usage_count||0); return n ? `Used in ${n} Curriculum${n===1?'':'a'}` : 'Not Yet Mapped'; }
     function setFiltersVisible(visible) {
@@ -46,19 +66,19 @@
         root.querySelector('.mapping-results-card')?.classList.remove('assignment-context-empty');
         state.page=1;
         state.context=null;state.records=[];renderSummary();setFiltersVisible(false);
-        $('assignButton').disabled=true;$('cimfReviewButton').disabled=true;
+        $('cimfReviewButton').disabled=true;syncAssignState();
         $('assignmentRows').innerHTML='<tr><td colspan="5" class="state-cell">Loading assignment context…</td></tr>';
         try { state.context=(await ui.fetchJson(api,{action:'context',type:view,id:record.id})).record;renderSummary();
-            $('assignButton').disabled=!manage||state.context.status!=='active';$('cimfReviewButton').disabled=false;
+            syncAssignState();$('cimfReviewButton').disabled=false;
             $('contextStatus').textContent=view==='program'?`Showing subjects assigned to ${state.context.program_code}.`:`Showing Program / Strand assignments for ${state.context.subject_code}.`;
             setFiltersVisible(true);await loadRows();
-        } catch(error) { state.context=null;renderSummary();$('assignButton').disabled=true;$('cimfReviewButton').disabled=true;setFiltersVisible(false);
+        } catch(error) { state.context=null;renderSummary();syncAssignState();$('cimfReviewButton').disabled=true;setFiltersVisible(false);
             $('contextStatus').textContent='The selected record could not be loaded. Choose it again to retry.';
             $('assignmentHead').innerHTML='';$('assignmentRows').innerHTML=`<tr><td class="state-cell">${esc(view==='program'?'Select a Program / Strand to view its assigned subjects.':'Select a subject to view its Program / Strand assignments.')}</td></tr>`;$('assignmentPagination').hidden=true;ui.showToast(error.message||'Selected record could not be loaded.','error'); }
     }
     function clearContext() {
         root.querySelector('.mapping-results-card')?.classList.add('assignment-context-empty');
-        state.context=null;state.records=[];state.page=1;renderSummary();$('assignButton').disabled=true;$('cimfReviewButton').disabled=true;
+        state.context=null;state.records=[];state.page=1;renderSummary();syncAssignState();$('cimfReviewButton').disabled=true;
         setFiltersVisible(false);$('assignmentSearch').value='';$('statusFilter').value='';
         $('contextStatus').textContent=view==='program'?'Select a Program / Strand to view its assigned subjects.':'Select a subject to view its Program / Strand assignments.';
         $('assignmentRows').innerHTML=`<tr><td class="state-cell">${esc(view==='program'?'Select a Program / Strand to view its assigned subjects.':'Select a subject to view its Program / Strand assignments.')}</td></tr>`;
@@ -89,7 +109,7 @@
         const p=await ui.fetchJson(api,{action:'context',type:view,id:$('contextId').value});state.context=p.record;renderSummary();
     }
     async function openAssign() {
-        if(!manage||!state.context||state.context.status!=='active')return;
+        const blocked=assignBlockReason();if(blocked){ui.showToast(blocked,'error');return;}
         state.selected=[];renderSelected();ui.clearFormError($('assignForm'));
         $('assignModalContext').textContent=view==='program'?label('program',state.context):label('subject',state.context);
         $('assignSearch').value='';$('assignId').value='';dialogs.assign.open();$('assignSearch').focus();
@@ -107,12 +127,12 @@
     }
     async function openDetails(id) { try { const p=await ui.fetchJson(api,{action:'details',id});$('detailsBody').innerHTML=detailsMarkup(p.assignment);dialogs.details.open(); } catch(e){ui.showToast(e.message||'Assignment details could not be loaded.','error');} }
     function openRemove(id) {
-        const r=state.records.find(x=>Number(x.id)===Number(id));if(!r||!manage)return;
+        if(!manage){ui.showToast('You do not have permission to remove assignments.','error');return;}const r=state.records.find(x=>Number(x.id)===Number(id));if(!r){ui.showToast('That assignment is no longer in the list. Reload the page.','error');return;}
         state.pendingRemove=id;ui.clearFormError($('removeModal'));
         $('removeMessage').textContent=`Remove ${r.subject_code} — ${r.subject_title} from ${r.program_code} — ${r.program_name}?`;
         dialogs.remove.open();
     }
-    function showCimfReview(id) { if(state.context) window.CSMSCIMF?.open('review',id ? {assignment_id:id} : {}); }
+    function showCimfReview(id) { if(!state.context){ui.showToast(view==='program'?'Select a program first.':'Select a subject first.','error');return;} if(!window.CSMSCIMF){ui.showToast('CIMF review is not available on this page.','error');return;} window.CSMSCIMF.open('review',id ? {assignment_id:id} : {}); }
     const rowMenu=window.CsmsMenu?window.CsmsMenu.create($('assignmentRowMenu'),{esc,onSelect:(action,data)=>{if(action==='remove')openRemove(data.record);}}):null;
     $('assignmentRows').addEventListener('click',e=>{const review=e.target.closest('[data-review]');if(review){showCimfReview(review.dataset.review);return;}const m=e.target.closest('[data-menu]');if(m){rowMenu?.open(m,[{action:'remove',label:'Remove assignment',danger:true,data:{record:m.dataset.menu}}]);return;}const row=e.target.closest('[data-row]');if(row)openDetails(row.dataset.row);});
     $('assignmentRows').addEventListener('keydown',e=>{if(e.target.matches?.('[data-row]')&&['Enter',' '].includes(e.key)){e.preventDefault();openDetails(e.target.dataset.row);}});
