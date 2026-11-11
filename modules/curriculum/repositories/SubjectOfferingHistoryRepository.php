@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/RepositoryQuery.php';
+require_once __DIR__ . '/../services/CurriculumReadScope.php';
 
 /**
  * Read model for stored curriculum-version subject history.
@@ -178,7 +179,7 @@ class SubjectOfferingHistoryRepository
              JOIN academic_programs ON academic_programs.id = curricula.academic_program_id
              LEFT JOIN curriculum_version_subject_snapshots AS subject_snapshots
                 ON subject_snapshots.curriculum_version_subject_id=cvs.id
-             WHERE cvs.id = ? LIMIT 1', 'i', [$placementId]);
+             WHERE cvs.id = ?' . (($readScope = CurriculumReadScope::sql('curriculum_versions')) !== '' ? ' AND ' . $readScope : '') . ' LIMIT 1', 'i', [$placementId]);
         $record = $stmt->get_result()->fetch_assoc() ?: null;
         $stmt->close();
         return $record;
@@ -261,6 +262,22 @@ class SubjectOfferingHistoryRepository
         ];
     }
 
+    /** Program / curriculum / version chain for the context strip. Null when the chain is wrong or the version is out of the user's read scope. */
+    public function versionContext(int $program, int $curriculum, int $version): ?array
+    {
+        $scope = ($readScope = CurriculumReadScope::sql('v')) !== '' ? ' AND ' . $readScope : '';
+        $stmt = RepositoryQuery::execute($this->db,
+            'SELECT p.id AS program_id, p.program_code, p.program_name, p.program_type, p.status AS program_status,
+                    c.id AS curriculum_id, c.curriculum_code, c.curriculum_name,
+                    v.id AS version_id, v.version_label, v.effective_academic_year, v.status AS version_status, v.review_status,
+                    v.created_at AS version_created_at, v.updated_at AS version_updated_at
+             FROM curriculum_versions v JOIN curricula c ON c.id = v.curriculum_id JOIN academic_programs p ON p.id = c.academic_program_id
+             WHERE p.id = ? AND c.id = ? AND v.id = ?' . $scope . ' LIMIT 1', 'iii', [$program, $curriculum, $version]);
+        $row = $stmt->get_result()->fetch_assoc() ?: null;
+        $stmt->close();
+        return $row;
+    }
+
     private function historyJoins(): string
     {
         return ' FROM curriculum_version_subjects AS cvs
@@ -279,6 +296,8 @@ class SubjectOfferingHistoryRepository
         $conditions = [];
         $types = '';
         $params = [];
+        // Same read scope as Assignment and Electives: a user without curriculum.view_unapproved sees approved or active versions only.
+        if (($readScope = CurriculumReadScope::sql('curriculum_versions')) !== '') $conditions[] = $readScope;
         foreach ([
             'subject_id' => 'subjects.id',
             'academic_program_id' => 'academic_programs.id',

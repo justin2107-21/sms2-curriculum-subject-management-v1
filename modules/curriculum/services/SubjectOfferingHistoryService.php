@@ -6,6 +6,8 @@ require_once __DIR__ . '/../repositories/CurriculumRepository.php';
 require_once __DIR__ . '/../repositories/CurriculumVersionRepository.php';
 require_once __DIR__ . '/../repositories/SubjectRepository.php';
 require_once __DIR__ . '/../repositories/SubjectOfferingHistoryRepository.php';
+require_once __DIR__ . '/CurriculumReadScope.php';
+require_once __DIR__ . '/ElectivesWorkspaceService.php';
 require_once __DIR__ . '/CurriculumHistoryComparison.php';
 require_once __DIR__ . '/CurriculumVersionReferenceService.php';
 
@@ -52,6 +54,30 @@ class SubjectOfferingHistoryService
         return ['record' => $record];
     }
 
+    /** Shared Program / Curriculum / Version bar lookup (same read-scoped query as Electives Manager). */
+    public function contextOptions(array $input): array
+    {
+        return (new ElectivesWorkspaceService($this->db))->contextOptions($input);
+    }
+
+    public function selectedContext(array $input): array
+    {
+        $record = $this->history->versionContext(
+            DomainValidator::positiveId($input['program_id'] ?? null, 'Program / Strand'),
+            DomainValidator::positiveId($input['curriculum_id'] ?? null, 'Curriculum'),
+            DomainValidator::positiveId($input['version_id'] ?? null, 'Curriculum version')
+        );
+        if (!$record) throw new DomainNotFoundException('Curriculum version not found.');
+        return ['record' => $record];
+    }
+
+    private function assertReadable(array $version): void
+    {
+        if (function_exists('current_user_id') && !CurriculumReadScope::allows($version, current_user_id())) {
+            throw new DomainNotFoundException('Curriculum version not found.');
+        }
+    }
+
     public function listPrograms(array $input): array
     {
         $query = DomainValidator::listQuery($input, ['active', 'inactive']);
@@ -76,6 +102,7 @@ class SubjectOfferingHistoryService
             throw new DomainNotFoundException('Curriculum not found.');
         }
         $query = DomainValidator::listQuery($input, ['draft', 'active', 'archived']);
+        $query['scope_sql'] = CurriculumReadScope::sql('curriculum_versions');
         $result = $this->versions->paginateByCurriculum($curriculumId, $query);
         return ['versions' => $result['records'], 'pagination' => $result['pagination']];
     }
@@ -92,6 +119,8 @@ class SubjectOfferingHistoryService
         if (!$versionA || !$versionB) {
             throw new DomainNotFoundException('One or both curriculum versions were not found.');
         }
+        $this->assertReadable($versionA);
+        $this->assertReadable($versionB);
         if ($query['version_a_id'] === $query['version_b_id']) {
             throw new DomainValidationException('Select two different curriculum versions.');
         }
@@ -145,6 +174,8 @@ class SubjectOfferingHistoryService
             $referenceId=$referenceId??(int)$revision['baseline_version_id'];
             $reference=$this->versions->findById($referenceId);
             if (!$reference) throw new DomainNotFoundException('Reference version not found.');
+            $this->assertReadable($revision);
+            $this->assertReadable($reference);
             if ($reference['version_role']!=='reference' || $reference['baseline_version_id']!==null
                 || (int)$reference['curriculum_id']!==$curriculumId || $referenceId===$revisionId
                 || (int)$revision['baseline_version_id']!==$referenceId) {

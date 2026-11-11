@@ -163,7 +163,7 @@
     }
     function updateCompareAvailability() {
         const valid = Boolean($('compareCurriculum').value && $('compareVersionB').value && $('compareVersionA').value !== $('compareVersionB').value);
-        if (!valid) clearComparisonResult('Select a curriculum revision. The reference defaults to its recorded baseline.');
+        if (!valid) clearComparisonResult('Select a revised version to compare it with the version it was created from.');
         else loadComparison(1).catch(error => clearComparisonResult(error.message || 'Versions could not be compared.'));
     }
     function comparisonRow(record, index) {
@@ -181,7 +181,7 @@
     async function loadComparison(page) {
         const request = ++state.comparisonRequest;
         state.comparison=null;state.compareRows.clear();
-        $('comparisonSummary').textContent='Loading reference and revision comparison...';
+        $('comparisonSummary').textContent='Loading comparison...';
         $('comparisonEvidence').hidden=true;$('comparisonStructures').hidden=true;$('comparisonTableWrap').hidden=true;
         let data;
         try {
@@ -197,8 +197,8 @@
         compareCurriculumPicker.setSelected(data.curriculum,false);compareProgramPicker.setSelected(data.program,false);
         compareCurriculumInput.disabled=false;versionAInput.disabled=false;versionBInput.disabled=false;
         const counters=data.summary;
-        $('versionAHeader').textContent='Reference: '+data.version_a.version_label;
-        $('versionBHeader').textContent='Revision: '+data.version_b.version_label;
+        $('versionAHeader').textContent='Original: '+data.version_a.version_label;
+        $('versionBHeader').textContent='Revised: '+data.version_b.version_label;
         $('comparisonSummary').textContent = counters.total_subjects+' unique subjects · '+counters.unique_changed_subjects+' with confirmed changes · '+
             ['added','removed','moved','changed','unchanged','unresolved'].map(k=>counters[k]+' '+k).join(' · ')+' · '+counters.counter_semantics;
         $('comparisonEvidence').innerHTML=window.CurriculumHistoryComparisonUI.evidence(data);$('comparisonEvidence').hidden=false;
@@ -230,7 +230,7 @@
         if (!record || !state.comparison) return;
         const render = window.CurriculumHistoryComparisonUI;
         $('comparisonDetailsContext').textContent = 'Shared subject identity #' + record.subject_id;
-        $('comparisonDetailsVersions').innerHTML = '<article><h3>Reference</h3>' + render.values(record.before) + '</article><article><h3>Revision</h3>' + render.values(record.after) + '</article>';
+        $('comparisonDetailsVersions').innerHTML = '<article><h3>Original</h3>' + render.values(record.before) + '</article><article><h3>Revised</h3>' + render.values(record.after) + '</article>';
         $('comparisonDetailsChange').textContent = record.categories.join(' / ');
         $('comparisonDetailsExplanation').textContent = (record.warning || 'Recorded placement and supported academic values compared.') + (record.revision_clone_snapshot ? ' ' + record.revision_clone_snapshot.notice : '');
         changeModal.open();
@@ -256,7 +256,7 @@
         if ($('historyCimfButton')) $('historyCimfButton').disabled = true;
         try { await loadPrograms(); } catch (error) { if (subjectView) $('historySummary').textContent = error.message; }
         if (subjectView) clearHistory(); else {
-            clearComparisonResult('Select a curriculum revision to compare with its protected reference baseline.');
+            clearComparisonResult('Select a revised version to compare it with the version it was created from.');
             const params=new URLSearchParams(window.location.search);
             if (params.get('curriculum_id') && params.get('version_b_id')) {
                 $('compareCurriculum').value=params.get('curriculum_id');$('compareVersionB').value=params.get('version_b_id');

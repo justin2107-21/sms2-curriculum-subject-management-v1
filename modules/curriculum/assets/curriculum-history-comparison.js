@@ -20,7 +20,7 @@
     }
     function evidence(data) {
         const context = v => esc(v.version_label) + ' · role: ' + esc(v.version_role) + ' · technical status: ' + esc(v.status) + ' · workflow: ' + esc(v.review_status);
-        return '<h2>Reference &amp; revision</h2><p>Reference: ' + context(data.version_a) + '</p><p>Revision: ' + context(data.version_b) + '</p><p>' + esc(data.institutional_adoption_label) + '</p>' +
+        return '<h2>Original &amp; revised versions</h2><p>Original: ' + context(data.version_a) + '</p><p>Revised: ' + context(data.version_b) + '</p><p>' + esc(data.institutional_adoption_label) + '</p>' +
             '<p class="curriculum-notice">' + (data.partial ? 'Comparison coverage is partial.' : 'Supported comparison dimensions available.') + ' Current shared subject differences do not establish intentional revision-specific changes.</p>' +
             data.warnings.map(w => '<p>' + esc(w) + '</p>').join('') + data.references.map(r => {
                 const assessment = ['document_identity','declared_origin','applicability'].map(k => {

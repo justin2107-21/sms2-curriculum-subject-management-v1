@@ -13,6 +13,14 @@ try {
             curriculum_require_read('subject_history.view');
             json_response(true, 'Stored subject history loaded.', $service->listHistory($_GET));
 
+        case 'context_options': // shared Program / Curriculum / Version bar
+            curriculum_require_read('subject_history.view');
+            json_response(true, 'Context options loaded.', $service->contextOptions($_GET));
+
+        case 'context':
+            curriculum_require_read('subject_history.view');
+            json_response(true, 'Version context loaded.', $service->selectedContext($_GET));
+
         case 'subject_options':
             curriculum_require_read('subject_history.view');
             json_response(true, 'Subjects loaded.', $service->listSubjects($_GET));
