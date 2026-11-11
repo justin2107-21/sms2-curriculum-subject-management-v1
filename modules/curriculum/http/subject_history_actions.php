@@ -21,6 +21,15 @@ try {
             curriculum_require_read('subject_history.view');
             json_response(true, 'Version context loaded.', $service->selectedContext($_GET));
 
+        case 'version_subjects':
+            curriculum_require_read('subject_history.view');
+            json_response(true, 'Subjects in the version loaded.', $service->versionSubjects($_GET));
+
+        case 'timeline':
+            curriculum_require_read('subject_history.view');
+            $placementId = DomainValidator::positiveId($_GET['placement_id'] ?? null, 'Stored placement');
+            json_response(true, 'Subject version timeline loaded.', $service->subjectTimeline($placementId));
+
         case 'subject_options':
             curriculum_require_read('subject_history.view');
             json_response(true, 'Subjects loaded.', $service->listSubjects($_GET));

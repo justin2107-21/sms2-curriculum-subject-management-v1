@@ -40,6 +40,44 @@ class SubjectOfferingHistoryService
         ];
     }
 
+    /** Subjects placed in the selected version (server-side paging and search). */
+    public function versionSubjects(array $input): array
+    {
+        $versionId = DomainValidator::positiveId($input['version_id'] ?? null, 'Curriculum version');
+        $query = DomainValidator::listQuery($input, []);
+        $version = $this->versions->findById($versionId);
+        if (!$version) throw new DomainNotFoundException('Curriculum version not found.');
+        $this->assertReadable($version);
+        $curriculum = $this->curricula->findById((int)$version['curriculum_id']);
+        $result = $this->history->paginateVersionSubjects($versionId, (int)$curriculum['academic_program_id'], $query);
+        foreach ($result['records'] as &$row) {
+            foreach (['placement_id', 'subject_id', 'snapshot_complete', 'version_count', 'is_required'] as $key) $row[$key] = (int)$row[$key];
+        }
+        unset($row);
+        return ['subjects' => $result['records'], 'pagination' => $result['pagination'],
+                'version' => ['id' => $versionId, 'status' => $version['status']]];
+    }
+
+    /** One subject across every readable version of the selected placement's program. */
+    public function subjectTimeline(int $placementId): array
+    {
+        $record = $this->history->findPlacement($placementId);
+        if (!$record) throw new DomainNotFoundException('Stored subject placement not found.');
+        $timeline = $this->history->subjectTimeline((int)$record['subject_id'], (int)$record['academic_program_id']);
+        foreach ($timeline as &$row) {
+            foreach (['placement_id', 'version_id', 'snapshot_complete', 'is_required'] as $key) $row[$key] = (int)$row[$key];
+            $row['is_selected'] = $row['placement_id'] === $placementId;
+        }
+        unset($row);
+        return [
+            'subject' => ['id' => (int)$record['subject_id'], 'current_code' => $record['current_subject_code'],
+                          'current_title' => $record['current_subject_title'], 'current_units' => $record['current_units']],
+            'program' => ['id' => (int)$record['academic_program_id'], 'code' => $record['program_code'], 'name' => $record['program_name']],
+            'selected_placement_id' => $placementId,
+            'timeline' => $timeline,
+        ];
+    }
+
     public function listSubjects(array $input): array
     {
         $query = DomainValidator::listQuery($input, ['active', 'inactive']);

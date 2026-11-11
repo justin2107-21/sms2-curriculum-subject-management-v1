@@ -171,7 +171,7 @@ class SubjectOfferingHistoryRepository
                     curriculum_versions.version_label, curriculum_versions.status AS version_status,
                     curriculum_versions.created_at AS version_created_at, curriculum_versions.updated_at AS version_updated_at,
                     curricula.curriculum_code, curricula.curriculum_name,
-                    academic_programs.program_code, academic_programs.program_name, academic_programs.program_type
+                    academic_programs.id AS academic_program_id, academic_programs.program_code, academic_programs.program_name, academic_programs.program_type
              FROM curriculum_version_subjects cvs
              JOIN subjects ON subjects.id = cvs.subject_id
              JOIN curriculum_versions ON curriculum_versions.id = cvs.curriculum_version_id
@@ -262,6 +262,77 @@ class SubjectOfferingHistoryRepository
         ];
     }
 
+    /**
+     * Subjects placed in one curriculum version, with how many versions of the same program contain each subject.
+     * Code, title and units come from the captured snapshot when it is complete; otherwise from the current Subject Master
+     * and snapshot_complete = 0 so the page can say so. The version count only includes versions the user may read.
+     */
+    public function paginateVersionSubjects(int $versionId, int $programId, array $query): array
+    {
+        $scopeV2 = ($readScope = CurriculumReadScope::sql('v2')) !== '' ? ' AND ' . $readScope : '';
+        $from = ' FROM curriculum_version_subjects cvs
+                  INNER JOIN subjects ON subjects.id = cvs.subject_id
+                  LEFT JOIN curriculum_version_subject_snapshots snap ON snap.curriculum_version_subject_id = cvs.id
+                  WHERE cvs.curriculum_version_id = ?';
+        $types = 'i'; $params = [$versionId];
+        if (($query['search'] ?? null) !== null) {
+            $from .= " AND (" . RepositoryQuery::searchColumn('subjects.subject_code') . " LIKE ? ESCAPE '='
+                         OR " . RepositoryQuery::searchColumn('subjects.subject_title') . " LIKE ? ESCAPE '=')";
+            $pattern = RepositoryQuery::likePattern($query['search']);
+            $types .= 'ss'; $params[] = $pattern; $params[] = $pattern;
+        }
+        $stmt = RepositoryQuery::execute($this->db, 'SELECT COUNT(*) AS total' . $from, $types, $params);
+        $total = (int)$stmt->get_result()->fetch_assoc()['total']; $stmt->close();
+        $pagination = RepositoryQuery::pagination($total, $query['page'], $query['per_page']);
+        $rankParams = [];
+        $searchOrder = RepositoryQuery::searchOrder(['subjects.subject_code', 'subjects.subject_title'], $query['search'] ?? null, $rankParams);
+        $listParams = array_merge([$programId], $params, $rankParams, [$pagination['per_page'], $pagination['offset']]);
+        $stmt = RepositoryQuery::execute($this->db,
+            'SELECT cvs.id AS placement_id, cvs.subject_id, cvs.year_level, cvs.semester, cvs.sequence_order, cvs.is_required,
+                    COALESCE(snap.snapshot_complete, 0) AS snapshot_complete,
+                    CASE WHEN snap.snapshot_complete = 1 THEN snap.subject_code_snapshot ELSE subjects.subject_code END AS subject_code,
+                    CASE WHEN snap.snapshot_complete = 1 THEN snap.subject_title_snapshot ELSE subjects.subject_title END AS subject_title,
+                    CASE WHEN snap.snapshot_complete = 1 THEN snap.units_snapshot ELSE subjects.units END AS units,
+                    (SELECT COUNT(DISTINCT p2.curriculum_version_id)
+                       FROM curriculum_version_subjects p2
+                       INNER JOIN curriculum_versions v2 ON v2.id = p2.curriculum_version_id
+                       INNER JOIN curricula c2 ON c2.id = v2.curriculum_id
+                      WHERE p2.subject_id = cvs.subject_id AND c2.academic_program_id = ?' . $scopeV2 . ') AS version_count'
+            . $from . ' ORDER BY ' . $searchOrder . 'cvs.year_level ASC, cvs.semester ASC, cvs.sequence_order ASC, subjects.subject_code ASC, cvs.id ASC LIMIT ? OFFSET ?',
+            'i' . $types . str_repeat('s', count($rankParams)) . 'ii', $listParams);
+        $records = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
+        unset($pagination['offset']);
+        return ['records' => $records, 'pagination' => $pagination];
+    }
+
+    /**
+     * Every readable version of the program that contains the subject, oldest first. Snapshot values are returned only when
+     * complete; Subject Master values are never returned as historical ones.
+     */
+    public function subjectTimeline(int $subjectId, int $programId): array
+    {
+        $scope = ($readScope = CurriculumReadScope::sql('v')) !== '' ? ' AND ' . $readScope : '';
+        $stmt = RepositoryQuery::execute($this->db,
+            'SELECT cvs.id AS placement_id, cvs.curriculum_version_id AS version_id, cvs.year_level, cvs.semester, cvs.sequence_order, cvs.is_required,
+                    cvs.created_at AS placement_created_at,
+                    c.id AS curriculum_id, c.curriculum_code, c.curriculum_name,
+                    v.version_label, v.effective_academic_year, v.status AS version_status, v.review_status, v.created_at AS version_created_at,
+                    COALESCE(snap.snapshot_complete, 0) AS snapshot_complete,
+                    CASE WHEN snap.snapshot_complete = 1 THEN snap.subject_code_snapshot ELSE NULL END AS subject_code,
+                    CASE WHEN snap.snapshot_complete = 1 THEN snap.subject_title_snapshot ELSE NULL END AS subject_title,
+                    CASE WHEN snap.snapshot_complete = 1 THEN snap.units_snapshot ELSE NULL END AS units,
+                    CASE WHEN snap.snapshot_complete = 1 THEN snap.captured_at ELSE NULL END AS snapshot_captured_at,
+                    CASE WHEN snap.snapshot_complete = 1 THEN snap.capture_method ELSE NULL END AS capture_method
+             FROM curriculum_version_subjects cvs
+             INNER JOIN curriculum_versions v ON v.id = cvs.curriculum_version_id
+             INNER JOIN curricula c ON c.id = v.curriculum_id
+             LEFT JOIN curriculum_version_subject_snapshots snap ON snap.curriculum_version_subject_id = cvs.id
+             WHERE cvs.subject_id = ? AND c.academic_program_id = ?' . $scope . '
+             ORDER BY c.curriculum_code ASC, v.created_at ASC, v.id ASC, cvs.id ASC LIMIT 200', 'ii', [$subjectId, $programId]);
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
+        return $rows;
+    }
+
     /** Program / curriculum / version chain for the context strip. Null when the chain is wrong or the version is out of the user's read scope. */
     public function versionContext(int $program, int $curriculum, int $version): ?array
     {
@@ -269,7 +340,7 @@ class SubjectOfferingHistoryRepository
         $stmt = RepositoryQuery::execute($this->db,
             'SELECT p.id AS program_id, p.program_code, p.program_name, p.program_type, p.status AS program_status,
                     c.id AS curriculum_id, c.curriculum_code, c.curriculum_name,
-                    v.id AS version_id, v.version_label, v.effective_academic_year, v.status AS version_status, v.review_status,
+                    v.id AS version_id, v.version_label, v.effective_academic_year, v.status AS version_status, v.review_status, v.version_role, v.baseline_version_id,
                     v.created_at AS version_created_at, v.updated_at AS version_updated_at
              FROM curriculum_versions v JOIN curricula c ON c.id = v.curriculum_id JOIN academic_programs p ON p.id = c.academic_program_id
              WHERE p.id = ? AND c.id = ? AND v.id = ?' . $scope . ' LIMIT 1', 'iii', [$program, $curriculum, $version]);

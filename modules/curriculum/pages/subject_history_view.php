@@ -79,7 +79,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
           </div>
           <div class="csms-page-table table-scroll" tabindex="0" aria-label="Scrollable subject history table">
             <table class="csms-ctable subject-history-table" id="historyTable">
-              <thead><tr><th class="csms-ctable__code">Code</th><th>Title</th><th>Year &amp; Semester</th><th>Status</th></tr></thead>
+              <thead><tr><th class="csms-ctable__code">Code</th><th>Title</th><th class="csms-ctable__num">Units</th><th>Year &amp; Semester</th><th>Appears in <span class="csms-info"><button type="button" class="csms-info__btn" aria-label="About the Appears in column" aria-describedby="appearsInfoTip"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button><span class="csms-info__tip" role="tooltip" id="appearsInfoTip">How many versions of this program contain the subject, counting every curriculum and every status you may view.</span></span></th><th>Status</th></tr></thead>
               <tbody id="historyRows"></tbody>
             </table>
           </div>
@@ -94,10 +94,12 @@ require __DIR__ . '/../../../shared/sidebar.php';
 
 <div class="curriculum-modal" id="historyDetailsModal" hidden>
   <div class="modal-backdrop" data-modal-close></div>
-  <section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="historyDetailsTitle">
+  <section class="modal-dialog modal-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="historyDetailsTitle">
     <div class="modal-header"><div><h2 id="historyDetailsTitle">Subject History Details</h2><p class="modal-context" id="historyDetailsContext"></p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
-    <div class="confirmation-body"><dl class="csms-detail-list" id="historyDetailsBody"></dl></div>
-    <div class="modal-actions modal-actions-padded"><button type="button" class="button-muted" data-modal-close>Close</button><a class="button-primary" id="historyMappingLink" href="subject_mapping.php" <?= $canViewSubjectMapping ? '' : 'hidden' ?>>View in Subject Mapping</a></div>
+    <div class="confirmation-body"><dl class="csms-detail-list" id="historyDetailsBody"></dl>
+      <h3 class="history-timeline-title">Versions of this program containing the subject <span class="csms-info"><button type="button" class="csms-info__btn" aria-label="About the version timeline" aria-describedby="timelineInfoTip"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button><span class="csms-info__tip" role="tooltip" id="timelineInfoTip">Oldest first. Record dates are technical (when the placement was stored), not approval or offering dates. Code, title and units appear as captured only where a snapshot exists; otherwise only the current Subject Master values are known and they are not shown as history.</span></span></h3>
+      <div class="csms-page-table table-scroll" tabindex="0" aria-label="Scrollable version timeline"><table class="csms-ctable"><thead><tr><th>Curriculum</th><th>Version</th><th>Status</th><th>Year &amp; Semester</th><th>Type</th><th>Stored date</th></tr></thead><tbody id="historyTimelineRows"></tbody></table></div></div>
+    <div class="modal-actions modal-actions-padded"><button type="button" class="button-muted" data-modal-close>Close</button><a class="button-muted" id="historyCompareLink" href="curriculum_history_view.php" hidden>Compare versions</a><a class="button-primary" id="historyMappingLink" href="subject_mapping.php" <?= $canViewSubjectMapping ? '' : 'hidden' ?>>View in Subject Mapping</a></div>
   </section>
 </div>
 

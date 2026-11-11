@@ -125,7 +125,50 @@ try {
     status($guest->request('modules/curriculum/http/working_context_actions.php', ['action' => 'read', 'module' => 'history']), 401, 'Working context requires login');
 
     // ---- Slice 2 checks are appended below by the slice 2 change ----
-    // @@SLICE2@@
+    // ---- Slice 2: version subjects listing and timeline ----
+    $r = status($admin->api('subject_history', 'version_subjects', ['version_id' => 1]), 200, 'Version subjects');
+    $byCode = []; foreach ($r['subjects'] as $s) $byCode[$s['subject_code']] = $s;
+    ok(array_keys($byCode) === ['T1', 'T2'] || (count($byCode) === 2 && isset($byCode['T1'], $byCode['T2'])), 'Lists exactly the subjects placed in the selected version');
+    ok((int)$r['pagination']['total_records'] === 2 && $r['version']['status'] === 'active', 'Paging total and version status');
+    ok($byCode['T1']['version_count'] === 4 && $byCode['T2']['version_count'] === 1, 'Appears-in counts every version of the program (T1 in V1,V2,V3,V0 = 4; T2 = 1; other program excluded)');
+    ok($byCode['T1']['snapshot_complete'] === 0 && $byCode['T1']['subject_title'] === 'Test 1', 'No snapshot: flagged and current values returned');
+    ok($byCode['T1']['year_level'] === '1st Year' && $byCode['T1']['semester'] === '1st Semester', 'Year and semester returned');
+    $r = status($admin->api('subject_history', 'version_subjects', ['version_id' => 2]), 200, 'Version with a snapshot');
+    $snap = null; foreach ($r['subjects'] as $s) if ($s['subject_code'] === 'T1') $snap = $s;
+    ok($snap && $snap['snapshot_complete'] === 1 && $snap['subject_title'] === 'Old Test 1 Title' && (float)$snap['units'] === 4.0, 'Complete snapshot supplies title and units');
+    $r = status($admin->api('subject_history', 'version_subjects', ['version_id' => 1, 'search' => 'T2']), 200, 'Search');
+    ok(count($r['subjects']) === 1 && $r['subjects'][0]['subject_code'] === 'T2', 'Search filters server-side');
+    $r = status($admin->api('subject_history', 'version_subjects', ['version_id' => 1, 'per_page' => 10, 'page' => 2]), 200, 'Page beyond end');
+    ok($r['subjects'] === [] || (int)$r['pagination']['page'] === 1, 'Paging is server-side and bounded');
+    status($admin->api('subject_history', 'version_subjects', ['version_id' => 1, 'per_page' => 7]), 422, 'Invalid page size rejected');
+    status($admin->api('subject_history', 'version_subjects', ['version_id' => 999]), 404, 'Unknown version');
+    status($admin->api('subject_history', 'version_subjects', []), 422, 'Version required');
+    $r = status($restricted->api('subject_history', 'version_subjects', ['version_id' => 1]), 200, 'Restricted reader, in-scope version');
+    $t1 = null; foreach ($r['subjects'] as $s) if ($s['subject_code'] === 'T1') $t1 = $s;
+    ok($t1 && $t1['version_count'] === 2, 'Restricted count excludes out-of-scope versions (V1 and V3 only)');
+    $res = $restricted->api('subject_history', 'version_subjects', ['version_id' => 2]);
+    ok(in_array($res['status'], [403, 404], true) && !str_contains($res['body'], 'Old Test 1 Title'), 'Restricted reader cannot list an out-of-scope version');
+
+    $r = status($admin->api('subject_history', 'timeline', ['placement_id' => 1]), 200, 'Timeline');
+    $vers = array_column($r['timeline'], 'version_label');
+    ok(count($vers) === 4 && !in_array('O1', $vers, true), 'Timeline covers all four versions of the program and none of another program: ' . implode(',', $vers));
+    ok($r['subject']['current_code'] === 'T1' && $r['program']['code'] === 'TP' && $r['selected_placement_id'] === 1, 'Timeline header facts');
+    $by = []; foreach ($r['timeline'] as $row) $by[$row['version_label']] = $row;
+    ok($by['V1']['effective_academic_year'] === '2024-2025' && $by['V2']['effective_academic_year'] === null, 'Effectivity is reported exactly as stored (null when not stored)');
+    ok($by['V1']['version_status'] === 'active' && $by['V0']['version_status'] === 'archived' && $by['V2']['version_status'] === 'draft', 'Status per version');
+    ok($by['V1']['is_selected'] === true && $by['V2']['is_selected'] === false, 'Selected placement marked');
+    ok($by['V2']['snapshot_complete'] === 1 && $by['V2']['subject_title'] === 'Old Test 1 Title' && $by['V1']['snapshot_complete'] === 0 && $by['V1']['subject_title'] === null, 'Captured values only where a snapshot exists; none are filled from the Subject Master');
+    ok(isset($by['V1']['placement_created_at'], $by['V1']['is_required'], $by['V1']['year_level'], $by['V1']['curriculum_code']), 'Timeline carries stored date, type, term and curriculum');
+    $r = status($restricted->api('subject_history', 'timeline', ['placement_id' => 1]), 200, 'Restricted timeline');
+    $vers = array_column($r['timeline'], 'version_label'); sort($vers);
+    ok($vers === ['V1', 'V3'] && !str_contains(json_encode($r), 'Old Test 1 Title'), 'Restricted timeline lists only readable versions and leaks no snapshot');
+    $res = $restricted->api('subject_history', 'timeline', ['placement_id' => 3]);
+    ok(in_array($res['status'], [403, 404], true), 'Restricted reader cannot open a timeline from an out-of-scope placement');
+    status($admin->api('subject_history', 'timeline', ['placement_id' => 999]), 404, 'Unknown placement');
+    status($guest->api('subject_history', 'timeline', ['placement_id' => 1]), 401, 'Guest timeline');
+    status($admin->api('subject_history', 'timeline', ['placement_id' => 1], 'POST', ''), 405, 'Timeline is GET-only');
+    $page = $admin->request('modules/curriculum/pages/subject_history_view.php');
+    ok(!str_contains($page['body'], 'Graduate Outcomes') && str_contains($page['body'], 'View in Subject Mapping') && str_contains($page['body'], 'Appears in'), 'Dialog: no Graduate Outcomes button, Subject Mapping link kept; Appears in column');
 
     ok(fingerprint($db) === $before, 'No curriculum, subject or program table changed by any read');
 } finally {

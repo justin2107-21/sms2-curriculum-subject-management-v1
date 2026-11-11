@@ -51,32 +51,58 @@
     }
     async function loadRows(ticket = state.request) {
         if (!state.context) return;
-        const payload = await ui.fetchJson(api, { action: 'list', curriculum_version_id: state.context.version_id, search: $('historySearch').value.trim(), page: state.page, per_page: $('historyPerPage').value });
+        const payload = await ui.fetchJson(api, { action: 'version_subjects', version_id: state.context.version_id, search: $('historySearch').value.trim(), page: state.page, per_page: $('historyPerPage').value });
         if (ticket !== state.request) return;
         state.rows.clear();
         ui.setCount($('historyCount'), Number(payload.pagination.total_records));
-        $('historyRows').innerHTML = payload.history.map((row, i) => { state.rows.set(String(i), row); return rowHtml(row, i); }).join('');
-        $('historyTable').closest('.csms-page-table').hidden = !payload.history.length;
-        $('historyNoMatch').hidden = payload.history.length > 0;
+        $('historyRows').innerHTML = payload.subjects.map((row, i) => { state.rows.set(String(i), row); return rowHtml(row, i); }).join('');
+        $('historyTable').closest('.csms-page-table').hidden = !payload.subjects.length;
+        $('historyNoMatch').hidden = payload.subjects.length > 0;
+        $('historyNoMatch').querySelector('strong').textContent = $('historySearch').value.trim() ? 'No subjects match' : 'No subjects in this version';
+        $('historyNoMatch').querySelector('span').textContent = $('historySearch').value.trim() ? 'Change the search.' : 'This curriculum version has no subject placements yet.';
         ui.renderPagination($('historyPagination'), payload.pagination, page => { state.page = page; loadRows().catch(e => ui.showToast(e.message, 'error')); });
     }
+    const noSnapshotChip = '<span class="csms-chip csms-chip--draft">No snapshot, current values shown</span>';
+    const plural = (n, one) => n + ' ' + one + (Number(n) === 1 ? '' : 's');
     function rowHtml(row, i) {
-        const code = row.current_subject_code, title = row.current_subject_title;
-        return '<tr class="csms-row-click" tabindex="0" data-row="' + i + '" aria-haspopup="dialog" aria-label="View history details for ' + esc(code || 'subject') + '">' +
-            '<td class="csms-ctable__code">' + esc(code || '—') + '</td><td>' + esc(title || '') + '</td><td>' + esc(termText(row)) + '</td><td>' + statusChip(row.version_status) + '</td></tr>';
+        return '<tr class="csms-row-click" tabindex="0" data-row="' + i + '" aria-haspopup="dialog" aria-label="View version history of ' + esc(row.subject_code || 'subject') + '">' +
+            '<td class="csms-ctable__code">' + esc(row.subject_code || '—') + '</td>' +
+            '<td>' + esc(row.subject_title || '') + (Number(row.snapshot_complete) === 1 ? '' : ' ' + noSnapshotChip) + '</td>' +
+            '<td class="csms-ctable__num">' + esc(ui.formatUnits(row.units)) + '</td>' +
+            '<td>' + esc(termText(row)) + '</td><td>' + esc(plural(row.version_count, 'version')) + '</td>' +
+            '<td>' + statusChip(state.context.version_status) + '</td></tr>';
     }
 
-    // ---- Details dialog ----
+    // ---- Dialog: the subject's version timeline across the program ----
+    // Current vs historical: Active = "Current", Archived = "Historical". Values are "captured" only from a complete snapshot.
+    const standing = status => status === 'active' ? ' <span class="csms-chip csms-chip--type">Current</span>' : status === 'archived' ? ' <span class="csms-chip csms-chip--type">Historical</span>' : '';
+    function timelineRow(t) {
+        const captured = Number(t.snapshot_complete) === 1
+            ? '<br><span class="subtle-text">Captured ' + esc(ui.formatDate(t.snapshot_captured_at)) + ': ' + esc([t.subject_code, t.subject_title].filter(Boolean).join(' · ')) + ' · ' + esc(plural(ui.formatUnits(t.units), 'unit')) + '</span>'
+            : '<br>' + noSnapshotChip;
+        return '<tr' + (t.is_selected ? ' aria-current="true"' : '') + '><td>' + esc(t.curriculum_code === t.curriculum_name || !t.curriculum_name ? t.curriculum_code : t.curriculum_code + ' — ' + t.curriculum_name) + '</td>' +
+            '<td><strong>' + esc(t.version_label) + '</strong>' + (t.is_selected ? ' <span class="csms-chip csms-chip--type">Selected</span>' : '') +
+            '<br><span class="subtle-text">' + (t.effective_academic_year ? 'Effective ' + esc(t.effective_academic_year) : 'Effectivity not recorded') + '</span>' + captured + '</td>' +
+            '<td>' + statusChip(t.version_status) + standing(t.version_status) + '</td><td>' + esc(termText(t)) + '</td>' +
+            '<td>' + (Number(t.is_required) === 1 ? 'Required' : 'Optional') + '</td><td>' + esc(ui.formatDate(t.placement_created_at)) + '</td></tr>';
+    }
     async function showDetails(i) {
         const row = state.rows.get(String(i)); if (!row) return;
         try {
-            const { record: r } = await ui.fetchJson(api, { action: 'details', placement_id: row.placement_id });
-            $('historyDetailsContext').textContent = (r.current_subject_code || '—') + ' · ' + (r.current_subject_title || '');
-            const entries = [['Curriculum', r.curriculum_code === r.curriculum_name ? r.curriculum_code : r.curriculum_code + ' — ' + r.curriculum_name], ['Curriculum Version', r.version_label], ['Year Level', r.year_level], ['Semester / Term', r.semester], ['Placement Type', Number(r.is_required) === 1 ? 'Required' : 'Optional'], ['Stored Date', ui.formatDate(r.placement_created_at)]];
-            $('historyDetailsBody').innerHTML = entries.filter(([, v]) => v).map(([k, v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('');
-            $('historyMappingLink').href = 'subject_mapping.php?version_id=' + Number(r.curriculum_version_id) + '&subject_id=' + Number(r.subject_id);
+            const data = await ui.fetchJson(api, { action: 'timeline', placement_id: row.placement_id });
+            const s = data.subject, p = data.program;
+            $('historyDetailsContext').textContent = (s.current_code || '—') + ' · ' + (s.current_title || '');
+            $('historyDetailsBody').innerHTML = '<dt>Subject Master (current)</dt><dd class="csms-ctable__code">' + esc((s.current_code || '—') + ' — ' + (s.current_title || '—') + (s.current_units != null ? ' · ' + plural(ui.formatUnits(s.current_units), 'unit') : '')) + '</dd>' +
+                '<dt>Program / Strand</dt><dd>' + esc(p.code === p.name ? p.code : p.code + ' — ' + p.name) + '</dd>' +
+                '<dt>Appears in</dt><dd>' + esc(plural(data.timeline.length, 'version')) + '</dd>';
+            $('historyTimelineRows').innerHTML = data.timeline.map(timelineRow).join('');
+            $('historyMappingLink').href = 'subject_mapping.php?version_id=' + Number(state.context.version_id) + '&subject_id=' + Number(row.subject_id);
+            // Same comparison screen Curriculum Builder opens; it only works for a revised version with a recorded original.
+            const c = state.context, link = $('historyCompareLink');
+            link.hidden = !(c && c.version_role === 'proposed' && c.baseline_version_id);
+            if (!link.hidden) link.href = 'curriculum_history_view.php?curriculum_id=' + Number(c.curriculum_id) + '&version_b_id=' + Number(c.version_id);
             details.open();
-        } catch (error) { ui.showToast(error.message || 'History details could not be loaded.', 'error'); }
+        } catch (error) { ui.showToast(error.message || 'Version history could not be loaded.', 'error'); }
     }
     $('historyRows').addEventListener('click', e => { const tr = e.target.closest('tr[data-row]'); if (tr) showDetails(tr.dataset.row); });
     $('historyRows').addEventListener('keydown', e => { if (['Enter', ' '].includes(e.key) && e.target.matches?.('tr[data-row]')) { e.preventDefault(); e.target.click(); } });
