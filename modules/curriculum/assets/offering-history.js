@@ -37,17 +37,13 @@
         try {
             const record = (await ui.fetchJson(api, { action: 'context', program_id: programId(), curriculum_id: curriculumId(), version_id: version })).record;
             if (ticket !== state.request) return;
-            state.context = record; renderStrip(); showPanel('panel');
+            state.context = record; showPanel('panel');
             await loadRows(ticket);
         } catch (error) {
             if (ticket !== state.request) return;
             state.context = null; showPanel('empty');
             ui.showToast(error.message || 'The selected version could not be loaded.', 'error');
         }
-    }
-    function renderStrip() {
-        const c = state.context; if (!c) { $('historyVersionStrip').textContent = ''; return; }
-        $('historyVersionStrip').innerHTML = statusChip(c.version_status) + ' ' + esc(c.curriculum_code + ' · ' + c.version_label) + (c.effective_academic_year ? ' · Effective ' + esc(c.effective_academic_year) : '');
     }
     async function loadRows(ticket = state.request) {
         if (!state.context) return;
@@ -64,27 +60,29 @@
     }
     const noSnapshotChip = '<span class="csms-chip csms-chip--draft">No snapshot, current values shown</span>';
     const plural = (n, one) => n + ' ' + one + (Number(n) === 1 ? '' : 's');
+    const typeText = row => Number(row.is_required) === 1 ? 'Required' : 'Elective';
     function rowHtml(row, i) {
         return '<tr class="csms-row-click" tabindex="0" data-row="' + i + '" aria-haspopup="dialog" aria-label="View version history of ' + esc(row.subject_code || 'subject') + '">' +
             '<td class="csms-ctable__code">' + esc(row.subject_code || '—') + '</td>' +
-            '<td>' + esc(row.subject_title || '') + (Number(row.snapshot_complete) === 1 ? '' : ' ' + noSnapshotChip) + '</td>' +
+            '<td>' + esc(row.subject_title || '') + '</td>' +
             '<td class="csms-ctable__num">' + esc(ui.formatUnits(row.units)) + '</td>' +
-            '<td>' + esc(termText(row)) + '</td><td>' + esc(plural(row.version_count, 'version')) + '</td>' +
-            '<td>' + statusChip(state.context.version_status) + '</td></tr>';
+            '<td>' + esc(termText(row)) + '</td><td>' + typeText(row) + '</td><td>' + esc(plural(row.version_count, 'version')) + '</td></tr>';
     }
 
     // ---- Dialog: the subject's version timeline across the program ----
     // Current vs historical: Active = "Current", Archived = "Historical". Values are "captured" only from a complete snapshot.
     const standing = status => status === 'active' ? ' <span class="csms-chip csms-chip--type">Current</span>' : status === 'archived' ? ' <span class="csms-chip csms-chip--type">Historical</span>' : '';
     function timelineRow(t) {
-        const captured = Number(t.snapshot_complete) === 1
-            ? '<br><span class="subtle-text">Captured ' + esc(ui.formatDate(t.snapshot_captured_at)) + ': ' + esc([t.subject_code, t.subject_title].filter(Boolean).join(' · ')) + ' · ' + esc(plural(ui.formatUnits(t.units), 'unit')) + '</span>'
-            : '<br>' + noSnapshotChip;
-        return '<tr' + (t.is_selected ? ' aria-current="true"' : '') + '><td>' + esc(t.curriculum_code === t.curriculum_name || !t.curriculum_name ? t.curriculum_code : t.curriculum_code + ' — ' + t.curriculum_name) + '</td>' +
-            '<td><strong>' + esc(t.version_label) + '</strong>' + (t.is_selected ? ' <span class="csms-chip csms-chip--type">Selected</span>' : '') +
-            '<br><span class="subtle-text">' + (t.effective_academic_year ? 'Effective ' + esc(t.effective_academic_year) : 'Effectivity not recorded') + '</span>' + captured + '</td>' +
+        const name = t.curriculum_name && t.curriculum_name !== t.curriculum_code ? t.curriculum_name : '';
+        const snapshot = Number(t.snapshot_complete) === 1
+            ? 'Captured ' + esc(ui.formatDate(t.snapshot_captured_at)) + '<small>' + esc([t.subject_code, t.subject_title].filter(Boolean).join(' · ')) + ' · ' + esc(plural(ui.formatUnits(t.units), 'unit')) + '</small>'
+            : noSnapshotChip;
+        return '<tr' + (t.is_selected ? ' aria-current="true"' : '') + '><td><strong title="' + esc(name ? t.curriculum_code + ' — ' + name : t.curriculum_code) + '">' + esc(t.curriculum_code) + ' · ' + esc(t.version_label) + '</strong>' +
+            (t.is_selected ? ' <span class="csms-chip csms-chip--type">Selected</span>' : '') +
+            (name ? '<small>' + esc(name) + '</small>' : '') +
+            '<small>' + (t.effective_academic_year ? 'Effective ' + esc(t.effective_academic_year) : 'Effectivity not recorded') + '</small></td>' +
             '<td>' + statusChip(t.version_status) + standing(t.version_status) + '</td><td>' + esc(termText(t)) + '</td>' +
-            '<td>' + (Number(t.is_required) === 1 ? 'Required' : 'Optional') + '</td><td>' + esc(ui.formatDate(t.placement_created_at)) + '</td></tr>';
+            '<td>' + typeText(t) + '</td><td>' + esc(ui.formatDate(t.placement_created_at)) + '</td><td>' + snapshot + '</td></tr>';
     }
     async function showDetails(i) {
         const row = state.rows.get(String(i)); if (!row) return;
