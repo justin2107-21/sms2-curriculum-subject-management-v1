@@ -86,13 +86,14 @@ require __DIR__ . '/../../../shared/sidebar.php';
         <div class="csms-empty" id="compareNoVersion" role="status" hidden><i class="fa-solid fa-bullseye" aria-hidden="true"></i><strong>No curriculum version selected</strong><span>Use the context bar above to pick the revised version.</span></div>
         <div class="csms-empty" id="compareNoOriginal" role="status" hidden><i class="fa-solid fa-code-branch" aria-hidden="true"></i><strong>No recorded original</strong><span>This version was not created as a revision of another version, so there is nothing to compare it with. Pick a revised version in the context bar.</span></div>
         <div class="csms-empty" id="compareError" role="alert" hidden><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><strong>Comparison unavailable</strong><span id="compareErrorText"></span></div>
-        <div class="csms-plan" id="compareResult" hidden>
+        <div id="compareResult" hidden>
+          <div class="csms-plan">
           <div class="csms-panel__bar">
             <p class="csms-panel__note" id="compareOriginal"></p>
             <span class="csms-info"><button type="button" class="csms-info__btn" aria-label="About this comparison" aria-describedby="compareInfoTip"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button><span class="csms-info__tip" role="tooltip" id="compareInfoTip">All stored subjects are shown, including unchanged ones. Category counts overlap, so a subject can be both moved and changed. Differences in requirements, electives, grade weighting and learning outcomes are listed below the table. Record dates and states are technical history, not official approval dates.</span></span>
           </div>
           <div class="csms-filter-row" id="compareChips" role="group" aria-label="Change counts"></div>
-          <div class="csms-page-table table-scroll" id="comparisonTableWrap" tabindex="0" aria-label="Scrollable curriculum version comparison table">
+          <div class="csms-page-table table-scroll" id="comparisonTableWrap" tabindex="0" hidden aria-label="Scrollable curriculum version comparison table">
             <table class="csms-ctable subject-history-comparison-table">
               <thead><tr><th>Subject</th><th>Change</th><th>Original</th><th>Revised</th></tr></thead>
               <tbody id="comparisonRows"></tbody>
@@ -101,6 +102,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
           <div class="pagination-bar" id="comparisonPagination" hidden></div>
           <section class="domain-card" id="comparisonEvidence" aria-label="Source documents and comparison coverage" hidden></section>
           <section class="domain-card" id="comparisonStructures" aria-label="Requirement, elective and grade weighting differences" hidden></section>
+          </div>
         </div>
       </section>
     </section>

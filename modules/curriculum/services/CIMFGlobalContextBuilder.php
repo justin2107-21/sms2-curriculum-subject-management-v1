@@ -148,14 +148,18 @@ final class CIMFGlobalContextBuilder
             }
         } elseif ($id === 'subject_history') {
             if (empty($input['subject_id'])) throw new InvalidArgumentException('Select a subject to review stored history.');
-            $this->subject((int)$input['subject_id']);
+            $subjectRow = $this->subject((int)$input['subject_id']);
             if (!empty($input['curriculum_version_id'])) $header = $this->header($input);
-            $history = (new SubjectOfferingHistoryService($this->db))->listHistory($input + ['per_page' => 50]);
-            $facts['stored_placements'] = array_map(fn($r) => self::pick($r, ['subject_id', 'subject_code', 'subject_title', 'units', 'program_code', 'curriculum_code', 'version_label', 'year_level', 'semester', 'version_status', 'placement_created_at', 'placement_updated_at']), $history['history']);
-            $facts['summary'] = $history['summary'];
-            $facts['visible_page'] = $history['pagination'];
+            // PHP computes every count from stored placements (read-scoped); the AI only explains them.
+            $deterministic = (new SubjectOfferingHistoryService($this->db))->subjectFindings((int)$subjectRow['id'], !empty($input['curriculum_version_id']) ? (int)$input['curriculum_version_id'] : null);
+            $facts['subject'] = self::pick($subjectRow, ['subject_code', 'subject_title', 'units']);
+            $facts['scope'] = $deterministic['scope'];
+            $facts['version_count'] = $deterministic['version_count'];
+            $facts['notice'] = $deterministic['notice'];
+            $facts['findings'] = array_map(fn($f) => ['label' => $f['label'], 'count' => $f['count'], 'examples' => array_map(fn($s) => ['code' => $s['code'], 'title' => $s['title']], array_slice($f['subjects'], 0, 8))], $deterministic['findings']);
+            $facts['authority'] = 'Counts and version lists are calculated by PHP from stored curriculum placements and are authoritative. Explain them in plain words and say which to review first. Never say the subject was offered, taught or taken in any year.';
             $facts['date_limitations'] = 'Dates are technical database record dates. Stored placements do not establish actual class offerings.';
-            $subjects = $history['history'];
+            $subjects = [['subject_id' => (int)$subjectRow['id'], 'subject_code' => $subjectRow['subject_code'], 'subject_title' => $subjectRow['subject_title'], 'units' => $subjectRow['units']]];
         } elseif ($id === 'curriculum_version_history' || ($id === 'curriculum_builder' && $action === 'compare_versions')) {
             $comparison = (new SubjectOfferingHistoryService($this->db))->compareVersions($input + ['per_page' => 50]);
             if (!empty($input['academic_program_id'])) {

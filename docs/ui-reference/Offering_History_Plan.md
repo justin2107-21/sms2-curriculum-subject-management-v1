@@ -1,5 +1,32 @@
 # Subject Offering History — Plan
 
+## Slice 3 (2026-11-11): validation answers and what was built
+
+Status: **DONE** (CIMF "Summarize History" and stored lifecycle on the timeline). Changes tab and change log stay dropped.
+
+### Part 1: validation (read-only evidence)
+- **Q1 Lifecycle history: YES, partly.** `curriculum_version_review_events` (migration 021) stores submit, return, approve and comment with previous and new status, actor and time. 9 rows in `sms_db_uitest`, 0 in `sms_db`. The timeline now shows them as real history. Activation and archive have no status log: archiving writes an audit row through `ArchiveCenterService` (`<MODULE>_ARCHIVE`), but nothing records the change to "active".
+- **Q2 Snapshots: only two writers.** `CurriculumRevisionRepository` (clone when a revision is created) and `CurriculumVersionReferenceRepository` (reference capture). Approve, submit and archive write none. `sms_db_uitest` has 0 snapshot rows, so today every row shows "No snapshot".
+- **Q3 Removal: recoverable from audit, not shown on the page.** Removing a placement (`CurriculumVersionSubjectService::remove`) hard-deletes the row and writes `CURRICULUM_SUBJECT_REMOVE` in the same transaction, with `subject_id` and `curriculum_version_id` in the metadata. The snapshot is deleted only for proposed versions (`preparePlacementRemoval`). Approved, under-review and reference versions are protected by `CurriculumVersionEditPolicy::isEditable`. **Gap:** that check does not look at `status`, so an archived version whose role is unclassified and review is not started would still accept placement edits. Not fixed (see decisions).
+- **Q4 Consumers: one.** Only the CIMF global builder (`subject_history` and `curriculum_version_history` contexts) calls `SubjectOfferingHistoryService`. Equivalency, Export, Compliance, Assignment, Electives and Grade Weighting read `curriculum_version_subjects` through their own repositories. They agree today because they read the same table, but each applies its own grouping and scope, so counts can differ.
+- **Q5 SHS: the page works for an SHS program** (`ICT`, program type "Senior High School", in `sms_db_uitest`). The term model is two free-text fields: `year_level` and `semester` (50 characters). The test data only uses "1st Semester", "2nd Semester" and "1st". The three-term Grade 12 layout in DO 017 Annex D.2 can be stored as free text, but there is no term model and no term validation. Report only.
+- **Q6 Effectivity: only `effective_academic_year`**, a free-text `varchar(50)` checked for length only (`DomainValidator`). No structured year or date field exists on curricula or versions. "2100" and "21001" were accepted because nothing checks the value; they are junk from manual entry.
+- **Q7 Viewing is not audited.** Consistent with the other modules: no read path writes an audit row. The only audited export is `CURRICULUM_EXPORT_GENERATE` on generation.
+- **Q8 Name verdict: does not match.** The page shows where a subject is placed in stored curriculum versions, not when it is offered. A panelist can ask "which school year and term was it offered?", "can you show removed placements?" (no: they are hard-deleted and only in audit metadata), and "why does every row say No snapshot?" (no approve or archive step captures one). Recommend renaming to "Subject Placement History", pending the client.
+
+### Part 2: what was built
+- **A) CIMF "Summarize History with CIMF"** (button in the details dialog, opens the global CIMF sidebar with `summarize`). `SubjectOfferingHistoryService::subjectFindings()` computes the findings in PHP from stored placements, read-scoped: appearances (versions of the program, or every readable program when no version is chosen), year or term moves between consecutive versions, required or elective changes, versions with no snapshot, versions with no recorded effectivity. The AI receives only those counts with up to 8 example versions per finding, the subject code and the notice; no full dump. If AI is off or errors, the existing `findingsOnly` path shows the findings with a notice. The profile has `summarize`, no write action, and the server enforces `subject_history.view`.
+- **B) Lifecycle on the timeline** (Q1 was yes): each version in the timeline shows its review events, in order, with status change, date and actor. Read-only.
+- **Read-only guarantee:** tests compare checksums of the curriculum tables, the audit-log count and the CIMF usage-log count before and after every CIMF call, and assert that the page script issues no POST. No AI provider is contacted in the tests: the HTTP analyze check runs only when `CIMFConfig` reports AI off.
+
+### Decisions needed (not changed)
+1. **Rename** the module to "Subject Placement History" (or similar), or keep the name and add a real offering source (Class Scheduling / Enrollment), which does not exist yet. Needs client input; may be NDA-restricted.
+2. **Archived versions accept placement edits** when their role is unclassified and not started. Recommend adding a status check to `isEditable` (archived is read-only) plus a test. This changes Curriculum Builder rules, so it needs approval.
+3. **Version status changes are not logged** (activate, archive as a status change). Recommend a status-change event table (schema change, needs approval).
+4. **Effectivity is free text.** Recommend a structured academic-year field (for example `2026-2027`, validated) before any grouping by year. Schema change, needs approval.
+5. **Term model** (three-term SHS versus two semesters). Needs the client's answer on how Grade 12 terms are named and ordered.
+6. **Snapshots only from clone and reference capture.** Decide whether approve should capture a snapshot. Behaviour change, needs approval.
+
 ## Status (updated 2026-11-11): slices 1 and 2 DONE
 
 | Slice | State |

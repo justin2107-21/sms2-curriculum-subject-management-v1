@@ -5,7 +5,7 @@
     const ui = window.CurriculumUI, root = document.getElementById('offeringHistoryWorkspace');
     if (!ui || !root) return;
     const $ = id => document.getElementById(id), esc = ui.escapeHtml, api = root.dataset.historyApi;
-    const state = { context: null, rows: new Map(), page: 1, request: 0, timer: null, panelLocked: false };
+    const state = { context: null, rows: new Map(), page: 1, request: 0, timer: null, panelLocked: false, cimfSubjectId: null };
     const details = ui.createModal($('historyDetailsModal'));
 
     // ---- Shared context bar (same engine and lookups as Assignment and Electives; the selection is shared through js/curriculum-context.js) ----
@@ -23,6 +23,9 @@
     const programId = () => cascade.get(0).getSelectedId() || '';
     const curriculumId = () => cascade.get(1).getSelectedId() || '';
     const versionId = () => cascade.get(2).getSelectedId() || '';
+
+    // CIMF reads the same context the page shows; the subject comes from the open dialog only.
+    window.CSMSPageCIMFContext = () => ({ academic_program_id: state.context?.program_id, curriculum_id: state.context?.curriculum_id, curriculum_version_id: state.context?.version_id });
 
     const PANELS = { loading: 'historyLoading', noPrograms: 'historyNoPrograms', empty: 'historyEmpty', panel: 'historyPanel' };
     function showPanel(name) { Object.entries(PANELS).forEach(([key, id]) => { $(id).hidden = key !== name; }); }
@@ -72,7 +75,9 @@
     // ---- Dialog: the subject's version timeline across the program ----
     // Current vs historical: Active = "Current", Archived = "Historical". Values are "captured" only from a complete snapshot.
     const standing = status => status === 'active' ? ' <span class="csms-chip csms-chip--type">Current</span>' : status === 'archived' ? ' <span class="csms-chip csms-chip--type">Historical</span>' : '';
+    const LIFECYCLE = { submit: 'Submitted for review', return: 'Returned', approve: 'Approved', comment: 'Comment' };
     function timelineRow(t) {
+        const events = (t.lifecycle || []).map(e => '<small>' + esc(LIFECYCLE[e.action] || e.action) + ' ' + esc(ui.formatDate(e.created_at)) + (e.actor_name ? ' · ' + esc(e.actor_name) : '') + ' (' + esc(e.previous_status) + ' → ' + esc(e.new_status) + ')</small>').join('');
         const name = t.curriculum_name && t.curriculum_name !== t.curriculum_code ? t.curriculum_name : '';
         const snapshot = Number(t.snapshot_complete) === 1
             ? '<small>Captured ' + esc(ui.formatDate(t.snapshot_captured_at)) + ': ' + esc([t.subject_code, t.subject_title].filter(Boolean).join(' · ')) + ' · ' + esc(plural(ui.formatUnits(t.units), 'unit')) + '</small>'
@@ -80,7 +85,7 @@
         return '<tr' + (t.is_selected ? ' aria-current="true"' : '') + '><td><strong title="' + esc(name ? t.curriculum_code + ' — ' + name : t.curriculum_code) + '">' + esc(t.curriculum_code) + ' · ' + esc(t.version_label) + '</strong>' +
             (t.is_selected ? ' <span class="csms-chip csms-chip--type">Selected</span>' : '') +
             (name ? '<small>' + esc(name) + '</small>' : '') +
-            '<small>' + (t.effective_academic_year ? 'Effective ' + esc(t.effective_academic_year) : 'Effectivity not recorded') + '</small>' + snapshot + '</td>' +
+            '<small>' + (t.effective_academic_year ? 'Effective ' + esc(t.effective_academic_year) : 'Effectivity not recorded') + '</small>' + events + snapshot + '</td>' +
             '<td>' + statusChip(t.version_status) + standing(t.version_status) + '</td><td>' + esc(termText(t)) + '</td>' +
             '<td>' + typeText(t) + '</td><td>' + esc(ui.formatDate(t.placement_created_at)) + '</td></tr>';
     }
@@ -90,6 +95,7 @@
             const data = await ui.fetchJson(api, { action: 'timeline', placement_id: row.placement_id });
             const s = data.subject, p = data.program;
             $('historyDetailsContext').textContent = (s.current_code || '—') + ' · ' + (s.current_title || '');
+            state.cimfSubjectId = String(s.id);
             $('historyDetailsBody').innerHTML = '<dt>Subject Master (current)</dt><dd class="csms-ctable__code">' + esc((s.current_code || '—') + ' — ' + (s.current_title || '—') + (s.current_units != null ? ' · ' + plural(ui.formatUnits(s.current_units), 'unit') : '')) + '</dd>' +
                 '<dt>Program / Strand</dt><dd>' + esc(p.code === p.name ? p.code : p.code + ' — ' + p.name) + '</dd>' +
                 '<dt>Appears in</dt><dd>' + esc(plural(data.timeline.length, 'version')) + '</dd>';
@@ -97,11 +103,16 @@
             $('historyMappingLink').href = 'subject_mapping.php?version_id=' + Number(state.context.version_id) + '&subject_id=' + Number(row.subject_id);
             // Same comparison screen Curriculum Builder opens; it only works for a revised version with a recorded original.
             const c = state.context, link = $('historyCompareLink');
-            link.hidden = !(c && c.version_role === 'proposed' && c.baseline_version_id);
-            if (!link.hidden) link.href = 'curriculum_history_view.php?program_id=' + Number(c.program_id) + '&curriculum_id=' + Number(c.curriculum_id) + '&version_id=' + Number(c.version_id) + '&subject_id=' + Number(row.subject_id);
+            $('historyCompareWrap').hidden = !(c && c.version_role === 'proposed' && c.baseline_version_id);
+            if (!$('historyCompareWrap').hidden) link.href = 'curriculum_history_view.php?program_id=' + Number(c.program_id) + '&curriculum_id=' + Number(c.curriculum_id) + '&version_id=' + Number(c.version_id) + '&subject_id=' + Number(row.subject_id);
             details.open();
         } catch (error) { ui.showToast(error.message || 'Version history could not be loaded.', 'error'); }
     }
+    $('historySummarizeButton').addEventListener('click', () => {
+        if (!window.CSMSCIMF || !state.cimfSubjectId) { ui.showToast('CIMF is not available on this page.', 'error'); return; }
+        details.close();
+        window.CSMSCIMF.open('summarize', { subject_id: state.cimfSubjectId });
+    });
     $('historyRows').addEventListener('click', e => { const tr = e.target.closest('tr[data-row]'); if (tr) showDetails(tr.dataset.row); });
     $('historyRows').addEventListener('keydown', e => { if (['Enter', ' '].includes(e.key) && e.target.matches?.('tr[data-row]')) { e.preventDefault(); e.target.click(); } });
     $('historySearch').addEventListener('input', ui.debounce(() => { state.page = 1; loadRows().catch(e => ui.showToast(e.message, 'error')); }, 300));

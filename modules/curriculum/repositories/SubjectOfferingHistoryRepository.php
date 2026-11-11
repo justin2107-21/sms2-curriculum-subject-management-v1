@@ -305,6 +305,47 @@ class SubjectOfferingHistoryRepository
         return ['records' => $records, 'pagination' => $pagination];
     }
 
+    /** Every readable placement of one subject (optionally limited to one program), oldest version first. Read-only. */
+    public function subjectAppearances(int $subjectId, ?int $programId): array
+    {
+        $scope = ($readScope = CurriculumReadScope::sql('v')) !== '' ? ' AND ' . $readScope : '';
+        $programFilter = $programId !== null ? ' AND c.academic_program_id = ?' : '';
+        $types = $programId !== null ? 'ii' : 'i';
+        $params = $programId !== null ? [$subjectId, $programId] : [$subjectId];
+        $stmt = RepositoryQuery::execute($this->db,
+            'SELECT cvs.id AS placement_id, v.id AS version_id, v.version_label, v.effective_academic_year, v.status AS version_status,
+                    c.id AS curriculum_id, c.curriculum_code, c.academic_program_id,
+                    cvs.year_level, cvs.semester, cvs.is_required,
+                    COALESCE(snap.snapshot_complete, 0) AS snapshot_complete
+             FROM curriculum_version_subjects cvs
+             INNER JOIN curriculum_versions v ON v.id = cvs.curriculum_version_id
+             INNER JOIN curricula c ON c.id = v.curriculum_id
+             LEFT JOIN curriculum_version_subject_snapshots snap ON snap.curriculum_version_subject_id = cvs.id
+             WHERE cvs.subject_id = ?' . $programFilter . $scope . '
+             ORDER BY v.created_at ASC, v.id ASC, cvs.id ASC LIMIT 500', $types, $params);
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return $rows;
+    }
+
+    /** Review events (submit, return, approve, comment) of the given versions, oldest first. Stored history; read-only. */
+    public function reviewEvents(array $versionIds): array
+    {
+        $ids = array_values(array_unique(array_map('intval', $versionIds)));
+        if ($ids === []) return [];
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = RepositoryQuery::execute($this->db,
+            "SELECT e.curriculum_version_id AS version_id, e.action, e.previous_status, e.new_status, e.created_at,
+                    TRIM(CONCAT_WS(' ', u.first_name, u.last_name)) AS actor_name
+             FROM curriculum_version_review_events e
+             LEFT JOIN users u ON u.id = e.actor_user_id
+             WHERE e.curriculum_version_id IN ($placeholders)
+             ORDER BY e.created_at ASC, e.id ASC LIMIT 500", str_repeat('i', count($ids)), $ids);
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return $rows;
+    }
+
     /**
      * Every readable version of the program that contains the subject, oldest first. Snapshot values are returned only when
      * complete; Subject Master values are never returned as historical ones.

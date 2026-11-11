@@ -64,9 +64,15 @@ class SubjectOfferingHistoryService
         $record = $this->history->findPlacement($placementId);
         if (!$record) throw new DomainNotFoundException('Stored subject placement not found.');
         $timeline = $this->history->subjectTimeline((int)$record['subject_id'], (int)$record['academic_program_id']);
+        $eventsByVersion = [];
+        foreach ($this->history->reviewEvents(array_column($timeline, 'version_id')) as $event) {
+            $eventsByVersion[(int)$event['version_id']][] = ['action' => $event['action'], 'previous_status' => $event['previous_status'],
+                'new_status' => $event['new_status'], 'created_at' => $event['created_at'], 'actor_name' => $event['actor_name'] !== '' ? $event['actor_name'] : null];
+        }
         foreach ($timeline as &$row) {
             foreach (['placement_id', 'version_id', 'snapshot_complete', 'is_required'] as $key) $row[$key] = (int)$row[$key];
             $row['is_selected'] = $row['placement_id'] === $placementId;
+            $row['lifecycle'] = $eventsByVersion[$row['version_id']] ?? [];
         }
         unset($row);
         return [
@@ -75,6 +81,63 @@ class SubjectOfferingHistoryService
             'program' => ['id' => (int)$record['academic_program_id'], 'code' => $record['program_code'], 'name' => $record['program_name']],
             'selected_placement_id' => $placementId,
             'timeline' => $timeline,
+        ];
+    }
+
+    /**
+     * Deterministic findings for one subject, for CIMF "Summarize History". Counts come from stored placements only.
+     * Scope: the program of the selected version, or every readable program when no version is selected.
+     */
+    public function subjectFindings(int $subjectId, ?int $versionId): array
+    {
+        $subject = $this->subjects->findById($subjectId);
+        if (!$subject) throw new DomainNotFoundException('Subject not found.');
+        $programId = null;
+        $scope = 'every readable program';
+        if ($versionId !== null) {
+            $version = $this->versions->findById($versionId);
+            if (!$version) throw new DomainNotFoundException('Curriculum version not found.');
+            $this->assertReadable($version);
+            $curriculum = $this->curricula->findById((int)$version['curriculum_id']);
+            $programId = (int)$curriculum['academic_program_id'];
+            $scope = 'the program of the selected version';
+        }
+        // One appearance per version (first placement in the version); later rows of the same version are not counted twice.
+        $byVersion = [];
+        foreach ($this->history->subjectAppearances($subjectId, $programId) as $row) $byVersion[(int)$row['version_id']] ??= $row;
+        $appearances = array_values($byVersion);
+        $term = static fn(array $r): string => trim(($r['year_level'] ?? '') . ' · ' . ($r['semester'] ?? ''), ' ·') ?: 'term not recorded';
+        $moves = []; $typeChanges = [];
+        for ($i = 1; $i < count($appearances); $i++) {
+            $before = $appearances[$i - 1]; $after = $appearances[$i];
+            if (($before['year_level'] ?? '') !== ($after['year_level'] ?? '') || ($before['semester'] ?? '') !== ($after['semester'] ?? '')) {
+                $moves[] = ['id' => (int)$after['version_id'], 'code' => $before['version_label'] . ' → ' . $after['version_label'], 'title' => $term($before) . ' → ' . $term($after)];
+            }
+            if ((int)$before['is_required'] !== (int)$after['is_required']) {
+                $typeChanges[] = ['id' => (int)$after['version_id'], 'code' => $before['version_label'] . ' → ' . $after['version_label'], 'title' => ''];
+            }
+        }
+        $version = static fn(array $r): array => ['id' => (int)$r['version_id'], 'code' => $r['curriculum_code'] . ' · ' . $r['version_label'], 'title' => $term($r)];
+        $noSnapshot = array_map($version, array_filter($appearances, static fn(array $r): bool => (int)$r['snapshot_complete'] !== 1));
+        $noEffectivity = array_map($version, array_filter($appearances, static fn(array $r): bool => trim((string)($r['effective_academic_year'] ?? '')) === ''));
+        $findings = [
+            ['key' => 'appears', 'label' => 'Appears in curriculum versions', 'count' => count($appearances), 'subjects' => array_map($version, $appearances),
+             'hint' => 'Each version is a stored curriculum plan. Being placed in a version is not a class offering.'],
+            ['key' => 'moved', 'label' => 'Year or term changed between consecutive versions', 'count' => count($moves), 'subjects' => $moves,
+             'hint' => 'Review these first: the placement moved to another year or term from one version to the next.'],
+            ['key' => 'type_changed', 'label' => 'Required or elective status changed between versions', 'count' => count($typeChanges), 'subjects' => $typeChanges,
+             'hint' => 'Confirm the change was intended in the curriculum plan.'],
+            ['key' => 'no_snapshot', 'label' => 'Versions without a stored snapshot (current values shown)', 'count' => count($noSnapshot), 'subjects' => $noSnapshot,
+             'hint' => 'Their code, title and units are current Subject Master values, not captured history.'],
+            ['key' => 'no_effectivity', 'label' => 'Versions with no recorded effectivity', 'count' => count($noEffectivity), 'subjects' => $noEffectivity,
+             'hint' => 'The effective academic year is free text and was not entered for these versions.'],
+        ];
+        return [
+            'subject' => ['id' => (int)$subject['id'], 'subject_code' => $subject['subject_code'], 'subject_title' => $subject['subject_title'], 'units' => $subject['units'] ?? null],
+            'scope' => $scope,
+            'version_count' => count($appearances),
+            'findings' => $findings,
+            'notice' => 'Counts are calculated by CSMS from stored curriculum placements. They are not class offerings, enrollment or instructors.',
         ];
     }
 

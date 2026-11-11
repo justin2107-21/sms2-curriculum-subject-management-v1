@@ -55,6 +55,7 @@
         $('compareOriginal').innerHTML = 'Compared with: <strong>' + esc(data.curriculum.curriculum_code + ' / ' + data.version_a.version_label) + '</strong> (recorded original)';
         renderChips(data.summary);
         $('comparisonRows').innerHTML = data.comparison.map((record, i) => { state.rows.set(String(i), record); return render.row(record, i); }).join('');
+        $('comparisonTableWrap').hidden = data.comparison.length === 0;
         markHighlight();
         $('comparisonPagination').hidden = Number(data.pagination.total_pages) <= 1;
         ui.renderPagination($('comparisonPagination'), data.pagination, p => loadComparison(p).catch(e => showPanel('error', e.message)));

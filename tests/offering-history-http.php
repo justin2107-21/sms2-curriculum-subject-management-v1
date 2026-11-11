@@ -192,6 +192,65 @@ try {
     $old = $admin->request('modules/curriculum/pages/subject_offering_history.php', ['view' => 'curriculum']);
     ok($old['status'] === 302, 'Legacy subject_offering_history.php address still redirects');
 
+    // ---- Slice 3: stored lifecycle events on the timeline (read-only) ----
+    $db->query("INSERT INTO curriculum_version_review_events(curriculum_version_id,actor_user_id,action,previous_status,new_status) VALUES (3,1,'submit','not_started','under_review'),(3,1,'approve','under_review','approved')");
+    $r = status($admin->api('subject_history', 'timeline', ['placement_id' => 1]), 200, 'Timeline with lifecycle');
+    $by = []; foreach ($r['timeline'] as $row) $by[$row['version_label']] = $row;
+    ok(array_column($by['V3']['lifecycle'], 'action') === ['submit', 'approve'], 'Lifecycle: stored review events of V3 in order');
+    ok($by['V3']['lifecycle'][1]['new_status'] === 'approved' && $by['V3']['lifecycle'][1]['actor_name'] !== null, 'Lifecycle carries status change and actor name');
+    ok($by['V1']['lifecycle'] === [], 'A version without review events has an empty lifecycle');
+
+    // ---- Slice 3: CIMF "Summarize History" (deterministic findings; the AI only explains them) ----
+    require_once __DIR__ . '/../modules/curriculum/services/CIMFProfileRegistry.php';
+    require_once __DIR__ . '/../modules/curriculum/services/CIMFConfig.php';
+    require_once __DIR__ . '/../modules/curriculum/services/CIMFGlobalContextBuilder.php';
+    $profile = CIMFProfileRegistry::profiles()['subject_history'];
+    ok(array_keys($profile['actions'])[0] === 'summarize' && !in_array('create', array_keys($profile['actions']), true), 'Profile offers summarize and no write action');
+    $before = fingerprint($db);
+    $auditBefore = (int)$db->query('SELECT COUNT(*) FROM audit_logs')->fetch_row()[0];
+    $aiBefore = (int)$db->query('SELECT COUNT(*) FROM cimf_ai_logs')->fetch_row()[0];
+    $input = ['subject_id' => 1, 'academic_program_id' => 1, 'curriculum_id' => 1, 'curriculum_version_id' => 3];
+    // Deterministic numbers for T1 in program TP: V1, V2, V3, V0 (archived) = 4 appearances; 3 year/term moves; V1, V3, V0 have no snapshot; V2 has no effectivity.
+    $built = (new CIMFGlobalContextBuilder($db))->build($profile, 'summarize', $input);
+    $det = $built['deterministic'];
+    $counts = []; foreach ($det['findings'] as $f) $counts[$f['key']] = $f['count'];
+    ok($counts === ['appears' => 4, 'moved' => 3, 'type_changed' => 0, 'no_snapshot' => 3, 'no_effectivity' => 1], 'Findings are computed by PHP: ' . json_encode($counts));
+    ok($det['version_count'] === 4 && str_contains($det['notice'], 'not class offerings'), 'Findings state the version count and the not-an-offering notice');
+    ok(!str_contains(json_encode($built['facts']), 'offered in') && isset($built['facts']['findings'][1]['examples'][0]['code']), 'AI payload is compact: findings with examples, no full dump');
+    ok(count($built['allowed']) === 1 && isset($built['allowed'][1]), 'Only the selected subject is allowed in the AI response');
+
+    $page = $admin->request('modules/curriculum/pages/subject_history_view.php');
+    status($page, 200, 'Page with CIMF panel');
+    ok(str_contains($page['body'], 'historySummarizeButton') && preg_match('/data-page-token="([^"]+)"/', $page['body'], $tok) === 1, 'Summarize button and CIMF page token rendered');
+    $token = html_entity_decode($tok[1], ENT_QUOTES);
+    $cimf = static fn(FoundationHttpClient $c, string $op, string $action, array $context, string $pageToken): array => $c->request('modules/curriculum/http/global_cimf_actions.php', [
+        'operation' => $op, 'route' => 'modules/curriculum/pages/subject_history_view.php', 'profile' => 'subject_history', 'action' => $action,
+        'page_token' => $pageToken, 'context' => json_encode($context), 'question' => ''], 'POST');
+    $r = $cimf($admin, 'context', 'summarize', $input, $token);
+    status($r, 200, 'CIMF context loads for the summarize action');
+    ok(!str_contains($r['body'], 'Fatal') && str_contains($r['body'], 'Subject History'), 'CIMF context is a read');
+    status($cimf($admin, 'context', 'summarize', $input, 'not-a-token'), 422, 'CIMF refuses a forged page token');
+    status($cimf($admin, 'context', 'create', $input, $token), 422, 'CIMF refuses a write action');
+    status($cimf($admin, 'context', 'summarize', $input + ['curriculum_version_history' => 1], $token), 422, 'CIMF refuses unknown context fields');
+    $guestCimf = $cimf($guest, 'context', 'summarize', $input, $token);
+    ok(in_array($guestCimf['status'], [401, 403], true), 'Guest cannot use CIMF on this page');
+    // AI is configured only through the environment. Calling the analyze operation with AI on would contact a provider,
+    // so the HTTP analyze check runs only when AI is off; the findings path is covered above without any provider call.
+    if (CIMFConfig::status(CIMFConfig::load()) !== 'SUCCESS') {
+        $a = $cimf($admin, 'analyze', 'summarize', $input, $token);
+        status($a, 200, 'AI off: deterministic findings are returned');
+        ok(isset($a['json']['data']['deterministic']) || str_contains($a['body'], '"deterministic"'), 'AI off: findings are shown with a notice');
+        ok(!str_contains($a['body'], '"analysis"'), 'AI off: no AI analysis is produced');
+    } else {
+        echo "NOTE: AI is configured in this environment; the HTTP analyze check was skipped so no provider is called.
+";
+    }
+    ok(fingerprint($db) === $before, 'Summarize writes no curriculum, subject, program or snapshot rows');
+    ok((int)$db->query('SELECT COUNT(*) FROM audit_logs')->fetch_row()[0] === $auditBefore, 'Summarize writes no audit rows');
+    ok((int)$db->query('SELECT COUNT(*) FROM cimf_ai_logs')->fetch_row()[0] === $aiBefore, 'Summarize writes no AI usage rows while AI is off');
+    $js = file_get_contents(__DIR__ . '/../modules/curriculum/assets/offering-history.js');
+    ok(!preg_match('/POST|method:/', $js), 'Offering History script issues no POST');
+
     ok(fingerprint($db) === $before, 'No curriculum, subject or program table changed by any read');
 } finally {
     foreach ($clients as $c) $c->close();
