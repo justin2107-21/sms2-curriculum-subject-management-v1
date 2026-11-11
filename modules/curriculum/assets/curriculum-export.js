@@ -13,14 +13,17 @@
     const values = ids.map(id => document.getElementById(id));
     const inputs = inputIds.map(id => document.getElementById(id));
     const selections = [null, null, null];
-    const previewButton = document.getElementById('generateCurriculumPreview');
     const csvButton = document.getElementById('downloadCurriculumCsv');
+    const pdfButton = document.getElementById('downloadCurriculumPdf');
     const printButton = document.getElementById('printCurriculumExport');
     const preview = document.getElementById('curriculumExportPreview');
     const status = document.getElementById('exportActionStatus');
     const yearSelect = document.getElementById('exportYear');
     const semesterSelect = document.getElementById('exportSemester');
-    const panels = Array.from(document.querySelectorAll('.export-tab-panel'));
+    const emptyBox = document.getElementById('exportEmpty');
+    const panelBox = document.getElementById('exportPanel');
+    // Same pattern as Offering History: an empty state until a version is chosen, then the panel.
+    function showPanel(visible) { emptyBox.hidden = visible; panelBox.hidden = !visible; }
     let dataset = null;
     let requestId = 0;
     let scopeRequestId = 0;
@@ -37,9 +40,9 @@
 
     function ready() { return values.every(input => Boolean(input.value)); }
     function setActionsEnabled(enabled) {
-        previewButton.disabled = !enabled;
         const hasSubjects = enabled && dataset && Number(dataset.summary.total_subjects) > 0;
         csvButton.disabled = !hasSubjects;
+        pdfButton.disabled = !hasSubjects;
         printButton.disabled = !hasSubjects;
     }
 
@@ -54,23 +57,8 @@
 
     function clearPreview(message) {
         dataset = null;
-        document.getElementById('exportPreviewTitle').textContent = 'Curriculum Structure';
         document.getElementById('exportPreviewSummary').textContent = '';
-        preview.innerHTML = '<div class="export-empty-state"><p>' + ui.escapeHtml(message) + '</p></div>';
-    }
-
-    function scopeLabel() {
-        const year = yearSelect.selectedOptions[0]?.textContent;
-        const semester = semesterSelect.selectedOptions[0]?.textContent;
-        if (!yearSelect.value && !semesterSelect.value) return 'Entire Curriculum';
-        if (!yearSelect.value) return 'All Year Levels · ' + semester;
-        return year + ' · ' + (semesterSelect.value ? semester : 'All Semesters / Terms');
-    }
-
-    function updateScopeSummary() {
-        const label = scopeLabel();
-        document.getElementById('exportScopeSummary').textContent = label;
-        document.querySelectorAll('[data-scope-label]').forEach(node => { node.textContent = label; });
+        preview.innerHTML = '<div class="csms-empty" role="status"><i class="fa-solid fa-spinner" aria-hidden="true"></i><strong>' + ui.escapeHtml(message) + '</strong></div>';
     }
 
     function setSelectOptions(select, values, allLabel) {
@@ -82,7 +70,7 @@
         if (!ready()) return;
         ++requestId;
         setActionsEnabled(false);
-        clearPreview('Updating the available export scope...');
+        clearPreview('Loading curriculum…');
         const currentRequest = ++scopeRequestId;
         const priorYear = resetYear ? '' : yearSelect.value;
         const priorSemester = resetYear ? '' : semesterSelect.value;
@@ -91,15 +79,14 @@
         try {
             const yearData = await ui.fetchJson(endpoint, Object.assign({ action: 'scope_options' }, params(), { year_level: '' }));
             if (currentRequest !== scopeRequestId) return;
-            setSelectOptions(yearSelect, yearData.year_levels || [], 'All Year Levels');
+            setSelectOptions(yearSelect, yearData.year_levels || [], 'All year levels');
             if (priorYear && Array.from(yearSelect.options).some(option => option.value === priorYear)) yearSelect.value = priorYear;
             const termData = await ui.fetchJson(endpoint, Object.assign({ action: 'scope_options' }, params(), { year_level: yearSelect.value }));
             if (currentRequest !== scopeRequestId) return;
-            setSelectOptions(semesterSelect, termData.semesters || [], 'All Semesters / Terms');
+            setSelectOptions(semesterSelect, termData.semesters || [], 'All semesters / terms');
             if (priorSemester && Array.from(semesterSelect.options).some(option => option.value === priorSemester)) semesterSelect.value = priorSemester;
             yearSelect.disabled = false;
             semesterSelect.disabled = false;
-            updateScopeSummary();
             await generatePreview();
         } catch (error) {
             if (currentRequest !== scopeRequestId) return;
@@ -109,26 +96,17 @@
         }
     }
 
-    function activateTab(name) {
-        document.querySelectorAll('[data-export-tab]').forEach(function (tab) {
-            const active = tab.dataset.exportTab === name;
-            tab.classList.toggle('is-active', active);
-            tab.setAttribute('aria-selected', active ? 'true' : 'false');
-        });
-        panels.forEach(panel => { panel.hidden = panel.id !== 'exportPanel' + name.charAt(0).toUpperCase() + name.slice(1); });
-    }
-
     function renderReport(data) {
         const context = data.context;
         const count = Number(data.summary.total_subjects || 0);
         document.getElementById('exportPreviewTitle').textContent = context.curriculum_name;
-        document.getElementById('exportPreviewSummary').textContent = context.version_label + ' · ' + count + ' Subjects · ' + displayUnits(data.summary.total_units).replace(/&mdash;/g, '0') + ' Units · ' + data.scope.label;
+        document.getElementById('exportPreviewSummary').textContent = context.version_label + ' · ' + count + (count === 1 ? ' subject' : ' subjects') + ' · ' + displayUnits(data.summary.total_units).replace(/&mdash;/g, '0') + ' units · ' + data.scope.label;
         const graduateOutcomes = Array.isArray(data.graduate_outcomes) ? data.graduate_outcomes : [];
         const outcomeMarkup = graduateOutcomes.length ? '<section class="export-outcomes"><h2>CHED BSIT Graduate Outcome Mapping</h2><p>CHED Memorandum Order No. 25, series of 2015 · Section 6.3. Institutional adoption/approval not verified. Curriculum mapping does not establish student outcome attainment, regulatory compliance, or institutional approval.</p>' + graduateOutcomes.map(outcome => '<article><h3>' + escape(outcome.outcome_code) + ' · ' + escape(outcome.coverage_status.replace('_',' ')) + '</h3><p>' + escape(outcome.outcome_text) + '</p><small>' + escape(outcome.document_code + ' · ' + outcome.document_title + ' · ' + outcome.source_section + ' · printed p. ' + outcome.printed_page + ' / PDF p. ' + outcome.pdf_page_index + ' · SHA-256 ' + outcome.source_sha256) + '</small><ul>' + outcome.mappings.map(mapping => '<li><strong>' + escape(mapping.subject_code + ' · ' + mapping.subject_title) + '</strong> — ' + escape(mapping.rationale) + '</li>').join('') + (outcome.mappings.length ? '' : '<li>No subject links recorded.</li>') + '</ul></article>').join('') + '</section>' : '';
         const clos = Array.isArray(data.course_learning_outcomes) ? data.course_learning_outcomes : [];
         const cloMarkup = clos.length ? '<section class="export-outcomes"><h2>Course Learning Outcomes &amp; Planned Assessment</h2><p>These are placement-scoped user-authored planning records. They do not establish student attainment, regulatory compliance, or institutional approval.</p>' + clos.map(clo => '<article><h3>' + escape(clo.subject_code + ' · ' + clo.subject_title + ' · ' + clo.clo_code) + (clo.origin === 'inherited' ? ' · Inherited' : '') + '</h3><p>' + escape(clo.clo_statement) + '</p><small>' + escape(clo.record_state + ' · ' + clo.review_state + ' · sequence ' + clo.sequence_order) + '</small><h4>Graduate outcome alignment</h4>' + (clo.alignments.length ? '<ul>' + clo.alignments.map(a => '<li>' + escape(a.outcome_code + ' · ' + a.rationale + ' · ' + a.record_state + ' · ' + a.review_state) + '</li>').join('') + '</ul>' : '<p>No alignment recorded.</p>') + '<h4>Planned assessment</h4>' + (clo.assessment_plans.length ? clo.assessment_plans.map(p => '<p>' + escape([p.assessment_method,p.planned_task,p.evidence_description,p.performance_indicator,p.rubric_or_standard,p.record_state,p.review_state].filter(Boolean).join(' · ')) + '</p>').join('') : '<p>No assessment plan recorded.</p>') + '</article>').join('') + '</section>' : '';
         if (!count) {
-            preview.innerHTML = '<div class="export-empty-state"><p>No mapped subjects were found for the selected export scope.</p></div>' + outcomeMarkup + cloMarkup + '<p>' + escape(data.disclaimer) + '</p>';
+            preview.innerHTML = '<div class="csms-empty" role="status"><i class="fa-solid fa-filter" aria-hidden="true"></i><strong>No subjects in this scope</strong><span>No mapped subjects were found for the selected export scope.</span></div>' + outcomeMarkup + cloMarkup + '<p>' + escape(data.disclaimer) + '</p>';
             return;
         }
 
@@ -149,19 +127,17 @@
         if (!ready()) return;
         const currentRequest = ++requestId;
         setActionsEnabled(false);
-        clearPreview('Loading stored curriculum data...');
-        status.textContent = 'Loading curriculum preview from stored records…';
+        clearPreview('Loading curriculum…');
+        status.textContent = '';
         try {
             const payload = await ui.fetchJson(endpoint, Object.assign({ action: 'preview' }, params()));
             if (currentRequest !== requestId) return;
             dataset = payload;
             renderReport(dataset);
-            status.textContent = 'Preview generated from current stored curriculum data.';
         } catch (error) {
             if (currentRequest !== requestId) return;
             clearPreview('The curriculum preview could not be generated.');
             ui.showToast(error.message, 'error');
-            status.textContent = 'The preview could not be generated.';
         } finally {
             if (currentRequest === requestId) setActionsEnabled(ready());
         }
@@ -177,7 +153,7 @@
     // Password protection (AES-256 ZIP). The password lives only in these two inputs and in the one POST; it is cleared after every attempt.
     const protectBox = document.getElementById('exportProtect'), protectFields = document.getElementById('exportProtectFields');
     const passwordInput = document.getElementById('exportPassword'), confirmInput = document.getElementById('exportPasswordConfirm');
-    const passwordError = document.getElementById('exportPasswordError'), csvLabel = document.getElementById('downloadCurriculumCsvLabel');
+    const passwordError = document.getElementById('exportPasswordError');
     const MIN_PASSWORD = Number(passwordInput.getAttribute('minlength')) || 10;
     function passwordProblem() {
         const pw = passwordInput.value, again = confirmInput.value;
@@ -192,12 +168,16 @@
     function clearPasswords() { passwordInput.value = ''; confirmInput.value = ''; }
     protectBox.addEventListener('change', () => {
         protectFields.hidden = !protectBox.checked;
-        csvLabel.textContent = protectBox.checked ? 'Download protected ZIP' : 'Download CSV';
         showPasswordError('');
         if (!protectBox.checked) clearPasswords(); else passwordInput.focus();
     });
 
-    async function downloadCsv() {
+    const FORMATS = {
+        csv: { action: 'download_csv', label: 'CSV', type: /^text\/csv\b/i, button: csvButton },
+        pdf: { action: 'download_pdf', label: 'PDF', type: /^application\/pdf\b/i, button: pdfButton }
+    };
+    async function download(kind) {
+        const format = FORMATS[kind];
         if (!ready() || !dataset || Number(dataset.summary.total_subjects) === 0) return;
         const protect = protectBox.checked;
         if (protect) {
@@ -205,22 +185,22 @@
             showPasswordError(problem);
             if (problem) { (passwordInput.value.length < MIN_PASSWORD ? passwordInput : confirmInput).focus(); return; }
         }
-        csvButton.disabled = true;
-        status.textContent = protect ? 'Generating password-protected ZIP from stored curriculum data…' : 'Generating CSV from stored curriculum data…';
+        setActionsEnabled(false);
+        status.textContent = protect ? 'Generating password-protected ' + format.label + ' ZIP…' : 'Generating ' + format.label + '…';
         const form = new FormData();
-        form.set('action', 'download_csv');
+        form.set('action', format.action);
         Object.entries(params()).forEach(([key, value]) => form.set(key, value));
         if (protect) { form.set('protect', '1'); form.set('export_password', passwordInput.value); form.set('export_password_confirm', confirmInput.value); }
         form.set('_csrf_token', document.querySelector('meta[name="csrf-token"]')?.content || '');
         try {
             const response = await fetch(endpoint, { method: 'POST', body: form, credentials: 'same-origin' });
             if (!response.ok) {
-                let message = 'The CSV could not be generated.';
+                let message = 'The ' + format.label + ' could not be generated.';
                 try { message = (await response.json()).message || message; } catch (error) { /* keep generic message */ }
                 throw new Error(message);
             }
             const blob = await response.blob();
-            if (blob.size === 0 || !(protect ? /^application\/zip\b/i : /^text\/csv\b/i).test(response.headers.get('Content-Type') || '')) throw new Error('The server returned an invalid ' + (protect ? 'protected ZIP' : 'CSV') + ' response.');
+            if (blob.size === 0 || !(protect ? /^application\/zip\b/i : format.type).test(response.headers.get('Content-Type') || '')) throw new Error('The server returned an invalid ' + (protect ? 'protected ZIP' : format.label) + ' response.');
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
@@ -229,13 +209,13 @@
             link.click();
             link.remove();
             URL.revokeObjectURL(url);
-            status.textContent = protect ? 'Password-protected ZIP generated from current stored curriculum data. Keep the password safe: it cannot be recovered.' : 'CSV generated from current stored curriculum data.';
-            ui.showToast(protect ? 'Protected curriculum ZIP downloaded.' : 'Curriculum CSV downloaded.', 'success');
+            status.textContent = protect ? 'Protected ZIP downloaded. Keep the password safe: it cannot be recovered.' : format.label + ' downloaded.';
+            ui.showToast(protect ? 'Protected ' + format.label + ' ZIP downloaded.' : 'Curriculum ' + format.label + ' downloaded.', 'success');
             if (protect) { clearPasswords(); showPasswordError(''); }
         } catch (error) {
             if (protect) showPasswordError(error.message);
             ui.showToast(error.message, 'error');
-            status.textContent = protect ? 'The protected export could not be generated.' : 'The CSV could not be generated.';
+            status.textContent = 'The ' + format.label + ' could not be generated.';
         } finally { setActionsEnabled(ready()); }
     }
 
@@ -273,41 +253,34 @@
             for (let child = index + 1; child < selections.length; child++) selections[child] = null;
             ++requestId;
             setActionsEnabled(false);
-            clearPreview('Select a Program / Strand, Curriculum, and Curriculum Version to preview an export.');
-            status.textContent = 'Select a curriculum version to preview its stored data.';
+            dataset = null;
+            status.textContent = '';
             if (index < 2 || action !== 'select') {
                 ++scopeRequestId;
                 yearSelect.value = '';
                 semesterSelect.value = '';
-                setSelectOptions(yearSelect, [], 'All Year Levels');
-                setSelectOptions(semesterSelect, [], 'All Semesters / Terms');
+                setSelectOptions(yearSelect, [], 'All year levels');
+                setSelectOptions(semesterSelect, [], 'All semesters / terms');
                 yearSelect.disabled = true;
                 semesterSelect.disabled = true;
-                updateScopeSummary();
             }
-            if (index === 2 && action === 'select') loadScopeOptions(true);
+            if (index === 2 && action === 'select') { showPanel(true); loadScopeOptions(true); } else showPanel(false);
         }
     });
 
-    document.querySelectorAll('[data-export-tab]').forEach(tab => tab.addEventListener('click', () => activateTab(tab.dataset.exportTab)));
     yearSelect.addEventListener('change', function () {
         semesterSelect.value = '';
-        updateScopeSummary();
         loadScopeOptions(false);
     });
-    semesterSelect.addEventListener('change', function () {
-        updateScopeSummary();
-        generatePreview();
-    });
-    previewButton.addEventListener('click', generatePreview);
-    csvButton.addEventListener('click', downloadCsv);
+    semesterSelect.addEventListener('change', generatePreview);
+    csvButton.addEventListener('click', () => download('csv'));
+    pdfButton.addEventListener('click', () => download('pdf'));
     printButton.addEventListener('click', openPrintView);
     inputs.forEach(input => input.addEventListener('input', function () {
         ++requestId;
         dataset = null;
         setActionsEnabled(false);
-        clearPreview('The selected context changed. Complete the selection again to generate the current curriculum.');
     }));
-    updateScopeSummary();
+    showPanel(false);
     setActionsEnabled(false);
 }());

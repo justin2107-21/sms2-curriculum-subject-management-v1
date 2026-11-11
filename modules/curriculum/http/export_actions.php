@@ -97,6 +97,43 @@ try {
                 throw $error;
             }
 
+        case 'download_pdf':
+            // Same gate, same password rules and same dataset as the CSV. The PDF is plain unless protection is on; then it goes
+            // inside the AES-256 ZIP (the password is used once and never logged, audited or stored). POST + CSRF only.
+            curriculum_require_mutation('curriculum_export.view');
+            $requireExportable($_POST);
+            $protect = ($_POST['protect'] ?? '') === '1';
+            $password = $protect ? CurriculumExportService::validateExportPassword($_POST['export_password'] ?? null, $_POST['export_password_confirm'] ?? null) : null;
+            unset($_POST['export_password'], $_POST['export_password_confirm']);
+            $dataset = $service->dataset($_POST);
+            if ((int)$dataset['summary']['total_subjects'] === 0) {
+                throw new DomainValidationException('No mapped subjects were found for the selected export scope.');
+            }
+            $pdfBytes = $service->pdf($dataset);
+            if ($protect) {
+                $body = $service->protectedZip($pdfBytes, $service->pdfFilename($dataset), (string)$password);
+                $password = null;
+                $service->recordProtectedGeneration($dataset, 'pdf_zip_aes256');
+                $type = 'application/zip';
+                $filename = $service->zipFilename($dataset, 'pdf');
+            } else {
+                $body = $pdfBytes;
+                $service->recordPdfGeneration($dataset);
+                $type = 'application/pdf';
+                $filename = $service->pdfFilename($dataset);
+            }
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            header('Content-Type: ' . $type);
+            header('Content-Disposition: attachment; filename="' . $filename . '"');
+            header('X-Content-Type-Options: nosniff');
+            header('Cache-Control: private, no-store, no-cache, must-revalidate');
+            header('Pragma: no-cache');
+            header('Content-Length: ' . strlen($body));
+            echo $body;
+            exit;
+
         default:
             json_response(false, 'Unknown action.', [], 400);
     }

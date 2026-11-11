@@ -6,6 +6,7 @@ require_once __DIR__ . '/../repositories/CurriculumRepository.php';
 require_once __DIR__ . '/../repositories/CurriculumVersionRepository.php';
 require_once __DIR__ . '/../repositories/CurriculumExportRepository.php';
 require_once __DIR__ . '/../../../shared/audit.php';
+require_once __DIR__ . '/CurriculumPdfRenderer.php';
 
 class CurriculumExportService
 {
@@ -292,9 +293,9 @@ class CurriculumExportService
         }
     }
 
-    public function zipFilename(array $dataset): string
+    public function zipFilename(array $dataset, string $kind = 'csv'): string
     {
-        return substr($this->csvFilename($dataset), 0, -4) . '_protected.zip';
+        return substr($this->csvFilename($dataset), 0, -4) . ($kind === 'pdf' ? '_pdf' : '') . '_protected.zip';
     }
 
     public function recordCsvGeneration(array $dataset): void
@@ -308,9 +309,25 @@ class CurriculumExportService
     }
 
     /** Audit row for a password-protected export. Records that protection was used, never the password or anything derived from it. */
-    public function recordProtectedGeneration(array $dataset): void
+    public function recordProtectedGeneration(array $dataset, string $format = 'csv_zip_aes256'): void
     {
-        $this->recordGeneration($dataset, 'csv_zip_aes256', 'Password-protected curriculum export generated.', true);
+        $this->recordGeneration($dataset, $format, 'Password-protected curriculum export generated.', true);
+    }
+
+    public function recordPdfGeneration(array $dataset): void
+    {
+        $this->recordGeneration($dataset, 'pdf', 'Curriculum PDF export generated.', false);
+    }
+
+    /** PDF bytes drawn from the same dataset as the CSV and the preview. */
+    public function pdf(array $dataset): string
+    {
+        return CurriculumPdfRenderer::render($dataset);
+    }
+
+    public function pdfFilename(array $dataset): string
+    {
+        return substr($this->csvFilename($dataset), 0, -4) . '.pdf';
     }
 
     private function recordGeneration(array $dataset, string $format, string $description = 'Curriculum CSV export generated.', bool $protected = false): void
@@ -327,6 +344,7 @@ class CurriculumExportService
                 'curriculum_version_id' => (int)$context['curriculum_version_id'],
                 'version_label' => (string)$context['version_label'],
                 'review_status' => (string)$context['version_review_status'],
+                'scope' => (string)($dataset['scope']['label'] ?? ''),
                 'format' => $format,
                 'protected' => $protected,
                 'subject_count' => (int)$dataset['summary']['total_subjects'],

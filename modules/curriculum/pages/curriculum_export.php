@@ -43,7 +43,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
   <main class="content curriculum-content mapping-content export-content" id="curriculumExportWorkspace"
         data-export-api="../http/export_actions.php" data-print-page="curriculum_print.php">
     <div class="page-title-bar curriculum-title-bar">
-      <div><h1 class="page-title">Curriculum Export</h1><p class="page-subtitle">Generate a clean curriculum document for review or sharing.</p></div>
+      <div><h1 class="page-title">Curriculum Export</h1><p class="page-subtitle">Download the stored curriculum as CSV or PDF, or print it. Generated from stored curriculum data.</p></div>
     </div>
 
     <section class="mapping-workspace-shell export-workspace">
@@ -63,41 +63,27 @@ require __DIR__ . '/../../../shared/sidebar.php';
         <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear curriculum version" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button><div class="record-autocomplete-options" id="exportVersionOptions" role="listbox" aria-label="Version suggestions" hidden></div>
       </div></label>
     </section>
-    <section class="domain-card export-scope-card" aria-label="Export scope">
-      <div class="export-scope-heading"><h2>Export Scope</h2><span class="status-badge status-inactive" id="exportScopeSummary">Entire Curriculum</span></div>
-      <div class="export-scope-grid">
-        <label class="mapping-context-field" for="exportYear"><span>Year Level / Grade Level</span><span class="select-control"><select id="exportYear" disabled><option value="">All Year Levels</option></select></span></label>
-        <label class="mapping-context-field" for="exportSemester"><span>Semester / Term</span><span class="select-control"><select id="exportSemester" disabled><option value="">All Semesters / Terms</option></select></span></label>
-      </div>
-    </section>
-    <div class="mapping-workspace-tabs export-tabs" role="tablist" aria-label="Curriculum export format">
-      <button type="button" class="export-tab is-active" role="tab" id="exportTabPreview" aria-selected="true" aria-controls="exportPanelPreview" data-export-tab="preview">Preview</button>
-      <button type="button" class="export-tab" role="tab" id="exportTabCsv" aria-selected="false" aria-controls="exportPanelCsv" data-export-tab="csv">CSV</button>
-      <button type="button" class="export-tab" role="tab" id="exportTabPrint" aria-selected="false" aria-controls="exportPanelPrint" data-export-tab="print">Print / PDF</button>
-    </div>
-
-    <section class="export-tab-panel" id="exportPanelPreview" role="tabpanel" aria-labelledby="exportTabPreview">
-      <div class="domain-card export-preview-card">
-        <div class="export-preview-heading"><div><p class="eyebrow">Document Preview</p><h2 id="exportPreviewTitle">Curriculum Structure</h2><p id="exportPreviewSummary" class="export-preview-summary"></p></div>
-          <button type="button" class="primary-action-button" id="generateCurriculumPreview" disabled><i class="fa-solid fa-rotate" aria-hidden="true"></i> Generate</button></div>
-        <div id="curriculumExportPreview" class="export-report-host"><div class="export-empty-state"><p>Select a Program / Strand, Curriculum, and Curriculum Version to preview an export.</p></div></div>
-      </div>
-    </section>
-
-    <section class="export-tab-panel" id="exportPanelCsv" role="tabpanel" aria-labelledby="exportTabCsv" hidden>
-      <div class="domain-card export-format-card"><div><h2>CSV Export</h2><p>Download the selected curriculum scope's stored subjects, placements, and units as a UTF-8 CSV file.</p><p class="export-format-scope">Current scope: <strong data-scope-label>Entire Curriculum</strong></p>
-        <p><label><input type="checkbox" id="exportProtect"/> Protect with password</label> <span class="csms-info"><button type="button" class="csms-info__btn" aria-label="About password protection" aria-describedby="exportProtectInfoTip"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button><span class="csms-info__tip" role="tooltip" id="exportProtectInfoTip">Downloads a ZIP encrypted with AES-256 that contains the CSV. Open it with 7-Zip, WinRAR or WinZip. As far as we know, Windows File Explorer cannot open AES-encrypted ZIPs, so 7-Zip is the safe choice. The password is used once and is not stored: if it is lost the file cannot be opened and the export must be generated again. Use at least <?= (int)CurriculumExportService::MIN_EXPORT_PASSWORD ?> characters.</span></span></p>
+    <section class="mapping-workspace-panel csms-panel" aria-label="Curriculum export">
+      <div class="csms-empty" id="exportEmpty" role="status"><i class="fa-solid fa-bullseye" aria-hidden="true"></i><strong>No curriculum version selected</strong><span>Use the context bar above to pick a curriculum version.</span></div>
+      <div id="exportPanel" hidden>
+        <div class="export-preview-heading"><div><h2 id="exportPreviewTitle">Curriculum Structure</h2><p id="exportPreviewSummary" class="export-preview-summary" role="status"></p></div></div>
+        <div class="csms-filter-row">
+          <select class="csms-select" id="exportYear" aria-label="Year level" disabled><option value="">All year levels</option></select>
+          <select class="csms-select" id="exportSemester" aria-label="Semester or term" disabled><option value="">All semesters / terms</option></select>
+          <button type="button" class="primary-action-button" id="downloadCurriculumCsv" disabled><i class="fa-solid fa-file-csv" aria-hidden="true"></i> Download CSV</button>
+          <button type="button" class="primary-action-button" id="downloadCurriculumPdf" disabled><i class="fa-solid fa-file-pdf" aria-hidden="true"></i> Download PDF</button>
+          <button type="button" class="button-muted" id="printCurriculumExport" disabled><i class="fa-solid fa-print" aria-hidden="true"></i> Print</button>
+        </div>
+        <p class="export-protect-row"><label><input type="checkbox" id="exportProtect"/> Protect with password</label> <span class="csms-info"><button type="button" class="csms-info__btn" aria-label="About password protection" aria-describedby="exportProtectInfoTip"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button><span class="csms-info__tip" role="tooltip" id="exportProtectInfoTip">Applies to Download CSV and Download PDF: you get a ZIP encrypted with AES-256 that contains the file. Open it with 7-Zip, WinRAR or WinZip. As far as we know, Windows File Explorer cannot open AES-encrypted ZIPs, so 7-Zip is the safe choice. The password is used once and is not stored: if it is lost the file cannot be opened and the export must be generated again. Use at least <?= (int)CurriculumExportService::MIN_EXPORT_PASSWORD ?> characters. Print is not affected.</span></span></p>
         <div id="exportProtectFields" hidden>
           <label class="form-field" for="exportPassword"><span>Password</span><input type="password" id="exportPassword" autocomplete="new-password" minlength="<?= (int)CurriculumExportService::MIN_EXPORT_PASSWORD ?>" maxlength="<?= (int)CurriculumExportService::MAX_EXPORT_PASSWORD ?>"/></label>
           <label class="form-field" for="exportPasswordConfirm"><span>Confirm password</span><input type="password" id="exportPasswordConfirm" autocomplete="new-password" maxlength="<?= (int)CurriculumExportService::MAX_EXPORT_PASSWORD ?>"/></label>
           <p class="mapping-context-message" id="exportPasswordError" role="alert" hidden></p>
-        </div></div><button type="button" class="primary-action-button" id="downloadCurriculumCsv" disabled><i class="fa-solid fa-download" aria-hidden="true"></i> <span id="downloadCurriculumCsvLabel">Download CSV</span></button></div>
+        </div>
+        <p class="export-action-status" id="exportActionStatus" role="status" aria-live="polite"></p>
+        <div id="curriculumExportPreview" class="export-report-host"></div>
+      </div>
     </section>
-
-    <section class="export-tab-panel" id="exportPanelPrint" role="tabpanel" aria-labelledby="exportTabPrint" hidden>
-      <div class="domain-card export-format-card"><div><h2>Print / Save as PDF</h2><p>Open a print-ready version of the currently selected curriculum scope.</p><p class="export-format-scope">Current scope: <strong data-scope-label>Entire Curriculum</strong></p></div><button type="button" class="primary-action-button" id="printCurriculumExport" disabled><i class="fa-solid fa-print" aria-hidden="true"></i> Print Curriculum</button></div>
-    </section>
-    <p class="export-action-status" id="exportActionStatus" role="status" aria-live="polite">Select a Program / Strand, Curriculum, and Curriculum Version to preview an export.</p>
     </section>
   </main>
 </div>

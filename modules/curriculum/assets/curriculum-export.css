@@ -117,17 +117,7 @@
 .export-print-body > .export-report { margin-top: 24px; }
 
 /* Compact curriculum document shared by the live preview and print endpoint. */
-.export-tab-panel[hidden] { display: none !important; }
 .export-context-picker { margin: 14px 0 14px; overflow: visible; position: relative; z-index: 4; }
-.export-scope-card { margin: 0 0 12px; padding: 18px 20px; }
-.export-scope-heading { align-items: center; display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; margin-bottom: 15px; }
-.export-scope-heading h2 { color: #263449; font-size: .85rem; margin: 0; }
-.export-scope-grid { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(220px, 1fr)); }
-.export-scope-grid .mapping-context-field { gap: 5px; }
-.export-scope-grid .select-control, .export-scope-grid select { min-width: 0; width: 100%; }
-.export-scope-grid select:disabled { background: #f1f5f9; }
-.export-tabs { margin: 12px 0 16px; }
-.export-tab-panel { min-width: 0; }
 .export-preview-heading { align-items:flex-start; }
 .export-preview-heading .eyebrow { color:var(--sms2-sidebar-blue); font-weight:800; letter-spacing:.07em; text-transform:uppercase; }
 .export-preview-heading h2 { color:var(--export-ink); font-size:1.05rem; margin:4px 0; }
@@ -154,13 +144,6 @@
 .export-document-totals { border-top:2px solid #294d7c; display:flex; gap:24px; justify-content:flex-end; margin-top:22px; padding-top:11px; }
 .export-document-totals strong { color:#203a5f; font-size:.82rem; }
 .export-report-table tfoot th { background:#f8fafc; border:1px solid #dfe5ed; color:#34445b; font-size:var(--csms-text-xs, .75rem); padding:7px 8px; text-align:left; }
-.export-format-card { align-items: center; display: flex; gap: 24px; justify-content: space-between; padding: 20px 24px; }
-.export-format-card > div { flex: 1 1 auto; min-width: 0; }
-.export-format-card h2 { font-size:.95rem; margin: 0; }
-.export-format-card p { color:var(--export-muted); font-size:.76rem; line-height:1.5; margin-top:7px; }
-.export-format-card button { flex: 0 0 auto; white-space: nowrap; }
-.export-format-scope { margin-top: 9px !important; }
-.export-format-scope strong { color: #334155; font-weight: 650; }
 
 @media (max-width: 900px) {
   .export-report-host { padding: 16px; }
@@ -168,9 +151,6 @@
 }
 
 @media (max-width: 680px) {
-  .export-format-card { align-items: flex-start; flex-direction: column; gap: 16px; padding: 18px; }
-  .export-format-card button { align-self: flex-start; }
-  .export-scope-grid,
   .export-context-summary,
   .export-unit-summary { grid-template-columns: 1fr; }
   .export-report-host { padding: 10px; }
