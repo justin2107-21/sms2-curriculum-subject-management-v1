@@ -51,7 +51,7 @@ class SubjectOfferingHistoryService
         $curriculum = $this->curricula->findById((int)$version['curriculum_id']);
         $result = $this->history->paginateVersionSubjects($versionId, (int)$curriculum['academic_program_id'], $query);
         foreach ($result['records'] as &$row) {
-            foreach (['placement_id', 'subject_id', 'snapshot_complete', 'version_count', 'is_required'] as $key) $row[$key] = (int)$row[$key];
+            foreach (['placement_id', 'subject_id', 'snapshot_complete', 'version_count', 'is_required', 'reported_count'] as $key) $row[$key] = (int)$row[$key];
         }
         unset($row);
         return ['subjects' => $result['records'], 'pagination' => $result['pagination'],
@@ -75,12 +75,22 @@ class SubjectOfferingHistoryService
             $row['lifecycle'] = $eventsByVersion[$row['version_id']] ?? [];
         }
         unset($row);
+        // Reported by other subsystems through the API: separate from placements, not verified here, read-scoped.
+        [$reportedTotal, $reportedRows] = $this->history->reportedOfferings((int)$record['subject_id'], (int)$record['academic_program_id']);
+        $reported = array_map(static fn(array $r): array => [
+            'academic_year' => $r['academic_year'], 'term' => $r['term'], 'status' => $r['status'],
+            'section_count' => (int)$r['section_count'], 'enrolled_count' => $r['enrolled_count'] === null ? null : (int)$r['enrolled_count'],
+            'flags' => $r['flags'] !== null && $r['flags'] !== '' ? explode(',', $r['flags']) : [],
+            'source_system' => $r['source_system'], 'is_demo' => str_starts_with((string)$r['source_system'], 'demo-'),
+            'received_at' => $r['received_at'],
+        ], $reportedRows);
         return [
             'subject' => ['id' => (int)$record['subject_id'], 'current_code' => $record['current_subject_code'],
                           'current_title' => $record['current_subject_title'], 'current_units' => $record['current_units']],
             'program' => ['id' => (int)$record['academic_program_id'], 'code' => $record['program_code'], 'name' => $record['program_name']],
             'selected_placement_id' => $placementId,
             'timeline' => $timeline,
+            'reported' => ['available' => $this->history->reportedAvailable(), 'total' => $reportedTotal, 'rows' => $reported],
         ];
     }
 
@@ -132,12 +142,25 @@ class SubjectOfferingHistoryService
             ['key' => 'no_effectivity', 'label' => 'Versions with no recorded effectivity', 'count' => count($noEffectivity), 'subjects' => $noEffectivity,
              'hint' => 'The effective academic year is free text and was not entered for these versions.'],
         ];
+        if ($this->history->reportedAvailable()) {
+            // Programs, not offerings: advisory counts of where reported data and curriculum placement disagree. Same read scope as the dialog.
+            $placed = array_values(array_unique(array_map(static fn(array $r): int => (int)$r['academic_program_id'], $appearances)));
+            $reportedIds = array_map(static fn(array $r): int => (int)$r['program_id'], $this->history->reportedPrograms($subjectId, $programId));
+            $unplaced = array_values(array_diff($reportedIds, $placed));
+            $silent = array_values(array_diff($placed, $reportedIds));
+            $codes = $this->history->programCodes(array_merge($unplaced, $silent));
+            $program = static fn(int $id): array => ['id' => $id, 'code' => (string)($codes[$id] ?? ''), 'title' => ''];
+            $findings[] = ['key' => 'reported_not_placed', 'label' => 'Programs with reported offerings but no curriculum placement', 'count' => count($unplaced), 'subjects' => array_map($program, $unplaced),
+                'hint' => 'Another system reported this subject for a program whose stored curricula do not contain it. Review the placement or the report; neither is assumed correct.'];
+            $findings[] = ['key' => 'placed_not_reported', 'label' => 'Programs with a curriculum placement but no reported offerings', 'count' => count($silent), 'subjects' => array_map($program, $silent),
+                'hint' => 'This depends on whether a source system sends data. No report may only mean no system has reported yet; it does not show the subject was not offered.'];
+        }
         return [
             'subject' => ['id' => (int)$subject['id'], 'subject_code' => $subject['subject_code'], 'subject_title' => $subject['subject_title'], 'units' => $subject['units'] ?? null],
             'scope' => $scope,
             'version_count' => count($appearances),
             'findings' => $findings,
-            'notice' => 'Counts are calculated by CSMS from stored curriculum placements. They are not class offerings, enrollment or instructors.',
+            'notice' => 'Counts are calculated by CSMS from stored curriculum placements and from offerings reported by other systems. Reported offerings are not verified by CSMS. None of this is enrollment or instructors.',
         ];
     }
 

@@ -157,7 +157,7 @@ final class CIMFGlobalContextBuilder
             $facts['version_count'] = $deterministic['version_count'];
             $facts['notice'] = $deterministic['notice'];
             $facts['findings'] = array_map(fn($f) => ['label' => $f['label'], 'count' => $f['count'], 'examples' => array_map(fn($s) => ['code' => $s['code'], 'title' => $s['title']], array_slice($f['subjects'], 0, 8))], $deterministic['findings']);
-            $facts['authority'] = 'Counts and version lists are calculated by PHP from stored curriculum placements and are authoritative. Explain them in plain words and say which to review first. Never say the subject was offered, taught or taken in any year.';
+            $facts['authority'] = 'Counts and version lists are calculated by PHP from stored curriculum placements and are authoritative. Explain them in plain words and say which to review first. Reported offerings come from other systems and are not verified by CSMS; call them reported, never confirmed. The last two findings depend on whether a source system sends data. Never say the subject was offered, taught or taken in any year.';
             $facts['date_limitations'] = 'Dates are technical database record dates. Stored placements do not establish actual class offerings.';
             $subjects = [['subject_id' => (int)$subjectRow['id'], 'subject_code' => $subjectRow['subject_code'], 'subject_title' => $subjectRow['subject_title'], 'units' => $subjectRow['units']]];
         } elseif ($id === 'curriculum_version_history' || ($id === 'curriculum_builder' && $action === 'compare_versions')) {

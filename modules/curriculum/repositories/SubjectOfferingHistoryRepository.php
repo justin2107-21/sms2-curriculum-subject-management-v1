@@ -286,7 +286,12 @@ class SubjectOfferingHistoryRepository
         $pagination = RepositoryQuery::pagination($total, $query['page'], $query['per_page']);
         $rankParams = [];
         $searchOrder = RepositoryQuery::searchOrder(['subjects.subject_code', 'subjects.subject_title'], $query['search'] ?? null, $rankParams);
-        $listParams = array_merge([$programId], $params, $rankParams, [$pagination['per_page'], $pagination['offset']]);
+        // Reported offerings (other subsystems, unverified) are counted separately from placements. Without the table (migration 029 not applied) the count is 0.
+        $reportedAvailable = $this->reportedAvailable();
+        $reportedSql = $reportedAvailable
+            ? ', (SELECT COUNT(*) FROM reported_offerings ro WHERE ro.subject_id = cvs.subject_id AND ro.program_id = ?' . $this->reportedScope('ro') . ') AS reported_count'
+            : ', 0 AS reported_count';
+        $listParams = array_merge([$programId], $reportedAvailable ? [$programId] : [], $params, $rankParams, [$pagination['per_page'], $pagination['offset']]);
         $stmt = RepositoryQuery::execute($this->db,
             'SELECT cvs.id AS placement_id, cvs.subject_id, cvs.year_level, cvs.semester, cvs.sequence_order, cvs.is_required,
                     COALESCE(snap.snapshot_complete, 0) AS snapshot_complete,
@@ -297,9 +302,9 @@ class SubjectOfferingHistoryRepository
                        FROM curriculum_version_subjects p2
                        INNER JOIN curriculum_versions v2 ON v2.id = p2.curriculum_version_id
                        INNER JOIN curricula c2 ON c2.id = v2.curriculum_id
-                      WHERE p2.subject_id = cvs.subject_id AND c2.academic_program_id = ?' . $scopeV2 . ') AS version_count'
+                      WHERE p2.subject_id = cvs.subject_id AND c2.academic_program_id = ?' . $scopeV2 . ') AS version_count' . $reportedSql
             . $from . ' ORDER BY ' . $searchOrder . 'cvs.year_level ASC, cvs.semester ASC, cvs.sequence_order ASC, subjects.subject_code ASC, cvs.id ASC LIMIT ? OFFSET ?',
-            'i' . $types . str_repeat('s', count($rankParams)) . 'ii', $listParams);
+            'i' . ($reportedAvailable ? 'i' : '') . $types . str_repeat('s', count($rankParams)) . 'ii', $listParams);
         $records = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
         unset($pagination['offset']);
         return ['records' => $records, 'pagination' => $pagination];
@@ -372,6 +377,73 @@ class SubjectOfferingHistoryRepository
              ORDER BY c.curriculum_code ASC, v.created_at ASC, v.id ASC, cvs.id ASC LIMIT 200', 'ii', [$subjectId, $programId]);
         $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
         return $rows;
+    }
+
+    private ?bool $reportedTable = null;
+
+    /** True when the reported_offerings table exists (migration 029 applied). Cached per request. */
+    public function reportedAvailable(): bool
+    {
+        if ($this->reportedTable === null) {
+            $this->reportedTable = (bool)$this->db->query("SHOW TABLES LIKE 'reported_offerings'")->num_rows;
+        }
+        return $this->reportedTable;
+    }
+
+    /**
+     * Read scope for reported offerings. A user restricted to approved or active versions sees a reported row only where the same
+     * subject is placed in that program in a version they may read. Unrestricted readers see every row. Constant SQL, no user input.
+     */
+    private function reportedScope(string $alias): string
+    {
+        $scope = CurriculumReadScope::sql('rv');
+        if ($scope === '') return '';
+        return " AND EXISTS (SELECT 1 FROM curriculum_version_subjects rp
+                    INNER JOIN curriculum_versions rv ON rv.id = rp.curriculum_version_id
+                    INNER JOIN curricula rc ON rc.id = rv.curriculum_id
+                    WHERE rp.subject_id = $alias.subject_id AND rc.academic_program_id = $alias.program_id AND $scope)";
+    }
+
+    /** Reported offerings of one subject in one program, newest academic year first, read-scoped. Read-only. Returns [total, rows]. */
+    public function reportedOfferings(int $subjectId, int $programId, int $limit = 100): array
+    {
+        if (!$this->reportedAvailable()) return [0, []];
+        $scope = $this->reportedScope('ro');
+        $stmt = RepositoryQuery::execute($this->db,
+            'SELECT COUNT(*) AS total FROM reported_offerings ro WHERE ro.subject_id = ? AND ro.program_id = ?' . $scope, 'ii', [$subjectId, $programId]);
+        $total = (int)$stmt->get_result()->fetch_assoc()['total']; $stmt->close();
+        $stmt = RepositoryQuery::execute($this->db,
+            'SELECT ro.academic_year, ro.term, ro.status, ro.section_count, ro.enrolled_count, ro.flags, ro.source_system, ro.received_at
+             FROM reported_offerings ro WHERE ro.subject_id = ? AND ro.program_id = ?' . $scope . '
+             ORDER BY ro.academic_year DESC, ro.term ASC, ro.source_system ASC, ro.id ASC LIMIT ?', 'iii', [$subjectId, $programId, $limit]);
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
+        return [$total, $rows];
+    }
+
+    /** Programs where the subject has reported offerings (read-scoped), with counts. Programs only, no offering detail. */
+    public function reportedPrograms(int $subjectId, ?int $programId): array
+    {
+        if (!$this->reportedAvailable()) return [];
+        $filter = $programId !== null ? ' AND ro.program_id = ?' : '';
+        $stmt = RepositoryQuery::execute($this->db,
+            'SELECT ro.program_id, p.program_code, COUNT(*) AS reported
+             FROM reported_offerings ro INNER JOIN academic_programs p ON p.id = ro.program_id
+             WHERE ro.subject_id = ?' . $filter . $this->reportedScope('ro') . '
+             GROUP BY ro.program_id, p.program_code ORDER BY p.program_code ASC LIMIT 200',
+            $programId !== null ? 'ii' : 'i', $programId !== null ? [$subjectId, $programId] : [$subjectId]);
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
+        return $rows;
+    }
+
+    /** Program codes by id (small lists only). */
+    public function programCodes(array $ids): array
+    {
+        $ids = array_values(array_unique(array_map('intval', $ids)));
+        if ($ids === []) return [];
+        $stmt = RepositoryQuery::execute($this->db,
+            'SELECT id, program_code FROM academic_programs WHERE id IN (' . implode(',', array_fill(0, count($ids), '?')) . ')', str_repeat('i', count($ids)), $ids);
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
+        return array_column($rows, 'program_code', 'id');
     }
 
     /** Program / curriculum / version chain for the context strip. Null when the chain is wrong or the version is out of the user's read scope. */

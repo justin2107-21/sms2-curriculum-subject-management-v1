@@ -200,6 +200,80 @@ try {
     ok($by['V3']['lifecycle'][1]['new_status'] === 'approved' && $by['V3']['lifecycle'][1]['actor_name'] !== null, 'Lifecycle carries status change and actor name');
     ok($by['V1']['lifecycle'] === [], 'A version without review events has an empty lifecycle');
 
+    // ---- Slice 4C: reported offerings (read-only, separate from placements, read-scoped) ----
+    // Fixture rows are inserted directly into the DISPOSABLE schema only (the API itself is covered by offering-api-http.php).
+    $db->query("INSERT INTO api_clients(id,name,source_system,key_prefix,key_hash,scope) VALUES (1,'Fixture','demo-class-scheduling','abcdefgh','" . str_repeat('0', 64) . "','write')");
+    $ins = $db->prepare('INSERT INTO reported_offerings(source_system,external_id,subject_id,subject_code,program_id,program_code,academic_year,term,status,section_count,enrolled_count,flags,payload_hash,api_client_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1)');
+    foreach ([
+        ['demo-class-scheduling', 'E1', 1, 'T1', 1, 'TP', '2026-2027', '1st Semester', 'offered', 3, 90, null],
+        ['class_scheduling', 'E2', 1, 'T1', 1, 'TP', '2025-2026', '2nd Semester', 'cancelled', 0, null, 'subject_inactive,not_in_program_curriculum'],
+        ['class_scheduling', 'E3', 3, 'T3', 1, 'TP', '2026-2027', '1st Semester', 'offered', 1, null, null],   // T3 is placed only in draft V2 (out of scope for the restricted reader)
+        ['class_scheduling', 'E4', 2, 'T2', 2, 'OP', '2026-2027', '1st Semester', 'offered', 2, null, 'not_in_program_curriculum'], // T2 is not placed in OP
+        ['class_scheduling', 'E5', 1, 'T1', 2, 'OP', '2026-2027', '1st Semester', 'offered', 1, null, null],
+    ] as [$src, $ext, $sid, $sc, $pid, $pc, $ay, $term, $st, $sec, $enr, $fl]) {
+        $ph = hash('sha256', $ext);
+        $ins->bind_param('ssissssssiiss', $src, $ext, $sid, $sc, $pid, $pc, $ay, $term, $st, $sec, $enr, $fl, $ph); $ins->execute();
+    }
+    $ins->close();
+    $reportedBefore = fingerprint($db);
+    $page = $admin->request('modules/curriculum/pages/subject_history_view.php');
+    ok(str_contains($page['body'], 'Reported offerings') && str_contains($page['body'], 'No offering data received yet.') && str_contains($page['body'], 'Read-only: placement history plus reported offerings.') && str_contains($page['body'], '>Reported <'), 'Page: Reported offerings section, empty state, header chip and Reported column');
+    ok(str_contains($page['body'], 'not verified by this system') && substr_count($page['body'], 'modal-dialog-large') === 1 && !str_contains($page['body'], 'reported-offerings.css'), 'Page: unverified wording, dialog size unchanged, no extra stylesheet');
+    $js = file_get_contents(__DIR__ . '/../modules/curriculum/assets/offering-history.js');
+    ok(!str_contains($js, 'style=') && str_contains($js, 'csms-chip--type') && str_contains($js, 'is_demo'), 'Script: shared chip classes only, Demo chip driven by the server flag');
+    $r = status($admin->api('subject_history', 'version_subjects', ['version_id' => 1]), 200, 'Reported counts, version 1');
+    $by1 = []; foreach ($r['subjects'] as $x) $by1[$x['subject_code']] = $x;
+    ok($by1['T1']['reported_count'] === 2 && $by1['T2']['reported_count'] === 0, 'Reported count is per subject and program (T1 in TP = 2, other program excluded; T2 in TP = 0)');
+    $r = status($admin->api('subject_history', 'version_subjects', ['version_id' => 2]), 200, 'Reported counts, version 2');
+    $by2 = []; foreach ($r['subjects'] as $x) $by2[$x['subject_code']] = $x;
+    ok($by2['T3']['reported_count'] === 1 && $by2['T1']['reported_count'] === 2, 'Reported count does not depend on which version is open');
+    $r = status($restricted->api('subject_history', 'version_subjects', ['version_id' => 1]), 200, 'Restricted reported counts');
+    $byR = []; foreach ($r['subjects'] as $x) $byR[$x['subject_code']] = $x;
+    ok($byR['T1']['reported_count'] === 2, 'Restricted reader: subject placed in a readable version keeps its reported count');
+    $r = status($admin->api('subject_history', 'timeline', ['placement_id' => 1]), 200, 'Timeline with reported offerings');
+    $rep = $r['reported'];
+    ok($rep['available'] === true && $rep['total'] === 2 && count($rep['rows']) === 2, 'Timeline carries the reported offerings of the subject in the program only');
+    ok($rep['rows'][0]['academic_year'] === '2026-2027' && $rep['rows'][1]['academic_year'] === '2025-2026', 'Newest academic year first');
+    ok($rep['rows'][0]['is_demo'] === true && $rep['rows'][1]['is_demo'] === false && $rep['rows'][0]['source_system'] === 'demo-class-scheduling', 'Rows from a demo- source are marked demo');
+    ok($rep['rows'][0]['flags'] === [] && $rep['rows'][1]['flags'] === ['subject_inactive', 'not_in_program_curriculum'] && $rep['rows'][1]['status'] === 'cancelled' && $rep['rows'][1]['enrolled_count'] === null && $rep['rows'][0]['enrolled_count'] === 90, 'Flags, status and optional enrolled count are returned as reported');
+    ok(!isset($rep['rows'][0]['external_id']) && !isset($rep['rows'][0]['api_client_id']) && !isset($rep['rows'][0]['payload_hash']), 'No internal identifiers in the reported rows');
+    ok(count($r['timeline']) === 4 && !str_contains(json_encode($r['timeline']), 'demo-class-scheduling'), 'Reported offerings are kept out of the placement timeline');
+    $r = status($admin->api('subject_history', 'timeline', ['placement_id' => 2]), 200, 'Timeline without reports');
+    ok($r['reported']['total'] === 0 && $r['reported']['rows'] === [], 'A subject with no reports in the program has an empty list (empty state)');
+    $r = status($admin->api('subject_history', 'timeline', ['placement_id' => 7]), 200, 'Timeline of another program');
+    ok($r['reported']['total'] === 1 && $r['reported']['rows'][0]['term'] === '1st Semester', 'Other program: only its own reported rows');
+    $r = status($restricted->api('subject_history', 'timeline', ['placement_id' => 1]), 200, 'Restricted timeline with reported offerings');
+    ok($r['reported']['total'] === 2, 'Restricted reader sees reported rows where the subject is placed in a readable version');
+
+    // Read scope on the repository and findings, as each reader (the process has no session, so the acting user is set here).
+    $GLOBALS['conn'] = $db; $actingUser = 1;
+    require_once __DIR__ . '/../shared/authorization.php';
+    if (!function_exists('current_user_id')) { function current_user_id(): ?int { global $actingUser; return $actingUser; } }
+    require_once __DIR__ . '/../modules/curriculum/services/SubjectOfferingHistoryService.php';
+    $repo = new SubjectOfferingHistoryRepository($db); $svc = new SubjectOfferingHistoryService($db);
+    $actingUser = 2; // restricted: T3 is placed only in draft V2, so its reported rows are out of scope
+    ok($repo->reportedOfferings(3, 1)[0] === 0 && $repo->reportedPrograms(3, null) === [] && $repo->reportedOfferings(1, 1)[0] === 2, 'Scope: restricted reader sees no reported rows for a subject placed only in an unreadable version');
+    $actingUser = 3; ok($repo->reportedOfferings(3, 1)[0] === 1 && count($repo->reportedPrograms(3, null)) === 1, 'Scope: reader with view_unapproved sees them');
+    $actingUser = 1; ok($repo->reportedOfferings(3, 1)[0] === 1, 'Scope: super admin sees them');
+    $cnt = static fn(array $f): array => array_column(array_map(static fn($x) => ['k' => $x['key'], 'c' => $x['count']], $f['findings']), 'c', 'k');
+    $actingUser = 1;
+    $f = $svc->subjectFindings(2, null); $c = $cnt($f);
+    ok($c['reported_not_placed'] === 1 && $c['placed_not_reported'] === 1, 'CIMF: T2 is reported in OP without a placement there, and placed in TP without a report: ' . json_encode($c));
+    $codes = []; foreach ($f['findings'] as $x) if ($x['key'] === 'reported_not_placed') $codes = array_column($x['subjects'], 'code');
+    ok($codes === ['OP'], 'CIMF: the unplaced program is named by code only');
+    $c = $cnt($svc->subjectFindings(2, 1));
+    ok($c['reported_not_placed'] === 0 && $c['placed_not_reported'] === 1, 'CIMF: selecting a version limits the counts to that program');
+    $c = $cnt($svc->subjectFindings(1, 3));
+    ok($c['reported_not_placed'] === 0 && $c['placed_not_reported'] === 0, 'CIMF: T1 in TP is placed and reported');
+    $actingUser = 2; $c = $cnt($svc->subjectFindings(3, null));
+    ok($c['reported_not_placed'] === 0 && $c['placed_not_reported'] === 0, 'CIMF scope: the restricted reader gets no finding from reports on versions they cannot read');
+    $actingUser = 3; $c = $cnt($svc->subjectFindings(3, null));
+    ok($c['reported_not_placed'] === 0 && $c['placed_not_reported'] === 0, 'CIMF scope: unrestricted reader, T3 is placed and reported in TP');
+    $actingUser = 1;
+    $hints = ''; foreach ($svc->subjectFindings(2, null)['findings'] as $x) if ($x['key'] === 'placed_not_reported') $hints = $x['hint'];
+    ok(str_contains($hints, 'depends on whether a source system sends data'), 'CIMF: the no-report finding states it depends on the source system sending data');
+    ok(fingerprint($db) === $reportedBefore, 'Reported reads and findings change no curriculum table');
+
     // ---- Slice 3: CIMF "Summarize History" (deterministic findings; the AI only explains them) ----
     require_once __DIR__ . '/../modules/curriculum/services/CIMFProfileRegistry.php';
     require_once __DIR__ . '/../modules/curriculum/services/CIMFConfig.php';
@@ -214,8 +288,8 @@ try {
     $built = (new CIMFGlobalContextBuilder($db))->build($profile, 'summarize', $input);
     $det = $built['deterministic'];
     $counts = []; foreach ($det['findings'] as $f) $counts[$f['key']] = $f['count'];
-    ok($counts === ['appears' => 4, 'moved' => 3, 'type_changed' => 0, 'no_snapshot' => 3, 'no_effectivity' => 1], 'Findings are computed by PHP: ' . json_encode($counts));
-    ok($det['version_count'] === 4 && str_contains($det['notice'], 'not class offerings'), 'Findings state the version count and the not-an-offering notice');
+    ok($counts === ['appears' => 4, 'moved' => 3, 'type_changed' => 0, 'no_snapshot' => 3, 'no_effectivity' => 1, 'reported_not_placed' => 0, 'placed_not_reported' => 0], 'Findings are computed by PHP: ' . json_encode($counts));
+    ok($det['version_count'] === 4 && str_contains($det['notice'], 'not verified by CSMS'), 'Findings state the version count and the not-an-offering notice');
     ok(!str_contains(json_encode($built['facts']), 'offered in') && isset($built['facts']['findings'][1]['examples'][0]['code']), 'AI payload is compact: findings with examples, no full dump');
     ok(count($built['allowed']) === 1 && isset($built['allowed'][1]), 'Only the selected subject is allowed in the AI response');
 
@@ -251,6 +325,13 @@ try {
     $js = file_get_contents(__DIR__ . '/../modules/curriculum/assets/offering-history.js');
     ok(!preg_match('/POST|method:/', $js), 'Offering History script issues no POST');
 
+    // Without the table (migration 029 not applied) the page degrades to "-" and no findings, with no error.
+    $db->query('DROP TABLE reported_offerings');
+    $r = status($admin->api('subject_history', 'version_subjects', ['version_id' => 1]), 200, 'No reported table: version subjects');
+    ok($r['subjects'][0]['reported_count'] === 0, 'No reported table: Reported count is 0');
+    $r = status($admin->api('subject_history', 'timeline', ['placement_id' => 1]), 200, 'No reported table: timeline');
+    ok($r['reported']['available'] === false && $r['reported']['rows'] === [], 'No reported table: timeline reports it as unavailable');
+    ok(!in_array('reported_not_placed', array_column((new SubjectOfferingHistoryService($db))->subjectFindings(1, 3)['findings'], 'key'), true), 'No reported table: no reported findings');
     ok(fingerprint($db) === $before, 'No curriculum, subject or program table changed by any read');
 } finally {
     foreach ($clients as $c) $c->close();

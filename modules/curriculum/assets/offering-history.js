@@ -1,7 +1,7 @@
 (function () {
     'use strict';
     // Subject Offering History: one page under the shared Program / Curriculum / Version context bar.
-    // GET-only. Everything shown is derived from stored curriculum placements; nothing here writes.
+    // GET-only. Placement history is derived from stored curriculum placements; reported offerings come from other subsystems and are shown apart. Nothing here writes.
     const ui = window.CurriculumUI, root = document.getElementById('offeringHistoryWorkspace');
     if (!ui || !root) return;
     const $ = id => document.getElementById(id), esc = ui.escapeHtml, api = root.dataset.historyApi;
@@ -69,7 +69,8 @@
             '<td class="csms-ctable__code">' + esc(row.subject_code || '—') + '</td>' +
             '<td>' + esc(row.subject_title || '') + '</td>' +
             '<td class="csms-ctable__num">' + esc(ui.formatUnits(row.units)) + '</td>' +
-            '<td>' + esc(termText(row)) + '</td><td>' + typeText(row) + '</td><td>' + esc(plural(row.version_count, 'version')) + '</td></tr>';
+            '<td>' + esc(termText(row)) + '</td><td>' + typeText(row) + '</td><td>' + esc(plural(row.version_count, 'version')) + '</td>' +
+            '<td class="csms-ctable__num">' + (Number(row.reported_count) > 0 ? esc(row.reported_count) : '-') + '</td></tr>';
     }
 
     // ---- Dialog: the subject's version timeline across the program ----
@@ -89,6 +90,23 @@
             '<td>' + statusChip(t.version_status) + standing(t.version_status) + '</td><td>' + esc(termText(t)) + '</td>' +
             '<td>' + typeText(t) + '</td><td>' + esc(ui.formatDate(t.placement_created_at)) + '</td></tr>';
     }
+    // Reported offerings: read-only rows from other subsystems, shown apart from the placement timeline.
+    const FLAGS = { not_in_program_curriculum: 'Not in program curriculum', subject_inactive: 'Subject inactive', program_inactive: 'Program inactive' };
+    const flagChips = flags => (flags || []).map(f => '<span class="csms-chip csms-chip--under_review">' + esc(FLAGS[f] || String(f).replaceAll('_', ' ')) + '</span>').join(' ') || '—';
+    function reportedRow(r) {
+        return '<tr><td>' + esc(r.academic_year) + '</td><td>' + esc(r.term) + '</td><td><span class="csms-chip csms-chip--' + (r.status === 'offered' ? 'active' : 'archived') + '">' + (r.status === 'offered' ? 'Offered' : 'Cancelled') + '</span></td>' +
+            '<td class="csms-ctable__num">' + esc(r.section_count) + '</td><td class="csms-ctable__num">' + (r.enrolled_count == null ? '—' : esc(r.enrolled_count)) + '</td>' +
+            '<td>' + flagChips(r.flags) + '</td><td>' + esc(r.source_system) + (r.is_demo ? ' <span class="csms-chip csms-chip--type">Demo</span>' : '') + '</td><td>' + esc(ui.formatDate(r.received_at)) + '</td></tr>';
+    }
+    function renderReported(rep) {
+        const rows = (rep && rep.rows) || [];
+        $('historyReportedWrap').hidden = !rows.length;
+        $('historyReportedEmpty').hidden = rows.length > 0;
+        $('historyReportedRows').innerHTML = rows.map(reportedRow).join('');
+        const note = $('historyReportedNote');
+        note.hidden = !(rep && rep.total > rows.length);
+        note.textContent = note.hidden ? '' : 'Showing ' + rows.length + ' of ' + rep.total + ' reported offerings, newest academic year first.';
+    }
     async function showDetails(i) {
         const row = state.rows.get(String(i)); if (!row) return;
         try {
@@ -100,6 +118,7 @@
                 '<dt>Program / Strand</dt><dd>' + esc(p.code === p.name ? p.code : p.code + ' — ' + p.name) + '</dd>' +
                 '<dt>Appears in</dt><dd>' + esc(plural(data.timeline.length, 'version')) + '</dd>';
             $('historyTimelineRows').innerHTML = data.timeline.map(timelineRow).join('');
+            renderReported(data.reported);
             $('historyMappingLink').href = 'subject_mapping.php?version_id=' + Number(state.context.version_id) + '&subject_id=' + Number(row.subject_id);
             // Same comparison screen Curriculum Builder opens; it only works for a revised version with a recorded original.
             const c = state.context, link = $('historyCompareLink');
