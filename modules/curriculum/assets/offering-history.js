@@ -75,14 +75,14 @@
     function timelineRow(t) {
         const name = t.curriculum_name && t.curriculum_name !== t.curriculum_code ? t.curriculum_name : '';
         const snapshot = Number(t.snapshot_complete) === 1
-            ? 'Captured ' + esc(ui.formatDate(t.snapshot_captured_at)) + '<small>' + esc([t.subject_code, t.subject_title].filter(Boolean).join(' · ')) + ' · ' + esc(plural(ui.formatUnits(t.units), 'unit')) + '</small>'
-            : noSnapshotChip;
+            ? '<small>Captured ' + esc(ui.formatDate(t.snapshot_captured_at)) + ': ' + esc([t.subject_code, t.subject_title].filter(Boolean).join(' · ')) + ' · ' + esc(plural(ui.formatUnits(t.units), 'unit')) + '</small>'
+            : '<small>' + noSnapshotChip + '</small>';
         return '<tr' + (t.is_selected ? ' aria-current="true"' : '') + '><td><strong title="' + esc(name ? t.curriculum_code + ' — ' + name : t.curriculum_code) + '">' + esc(t.curriculum_code) + ' · ' + esc(t.version_label) + '</strong>' +
             (t.is_selected ? ' <span class="csms-chip csms-chip--type">Selected</span>' : '') +
             (name ? '<small>' + esc(name) + '</small>' : '') +
-            '<small>' + (t.effective_academic_year ? 'Effective ' + esc(t.effective_academic_year) : 'Effectivity not recorded') + '</small></td>' +
+            '<small>' + (t.effective_academic_year ? 'Effective ' + esc(t.effective_academic_year) : 'Effectivity not recorded') + '</small>' + snapshot + '</td>' +
             '<td>' + statusChip(t.version_status) + standing(t.version_status) + '</td><td>' + esc(termText(t)) + '</td>' +
-            '<td>' + typeText(t) + '</td><td>' + esc(ui.formatDate(t.placement_created_at)) + '</td><td>' + snapshot + '</td></tr>';
+            '<td>' + typeText(t) + '</td><td>' + esc(ui.formatDate(t.placement_created_at)) + '</td></tr>';
     }
     async function showDetails(i) {
         const row = state.rows.get(String(i)); if (!row) return;
@@ -98,7 +98,7 @@
             // Same comparison screen Curriculum Builder opens; it only works for a revised version with a recorded original.
             const c = state.context, link = $('historyCompareLink');
             link.hidden = !(c && c.version_role === 'proposed' && c.baseline_version_id);
-            if (!link.hidden) link.href = 'curriculum_history_view.php?curriculum_id=' + Number(c.curriculum_id) + '&version_b_id=' + Number(c.version_id);
+            if (!link.hidden) link.href = 'curriculum_history_view.php?program_id=' + Number(c.program_id) + '&curriculum_id=' + Number(c.curriculum_id) + '&version_id=' + Number(c.version_id) + '&subject_id=' + Number(row.subject_id);
             details.open();
         } catch (error) { ui.showToast(error.message || 'Version history could not be loaded.', 'error'); }
     }

@@ -76,6 +76,9 @@ try {
         $client->request('auth/signin.php');
         status($client->request('shared/auth_actions.php', ['action' => 'login', 'username' => $username, 'password' => $password], 'POST'), 200, 'Fixture login ' . $username);
     }
+    // A revised version with a recorded original: V3 (proposed) was created from V0 (reference), same curriculum.
+    $db->query("UPDATE curriculum_versions SET version_role='reference' WHERE id=4");
+    $db->query("UPDATE curriculum_versions SET version_role='proposed', baseline_version_id=4 WHERE id=3");
     $before = fingerprint($db);
 
     // ---- Slice 1: access, page, context bar, read scope ----
@@ -169,6 +172,25 @@ try {
     status($admin->api('subject_history', 'timeline', ['placement_id' => 1], 'POST', ''), 405, 'Timeline is GET-only');
     $page = $admin->request('modules/curriculum/pages/subject_history_view.php');
     ok(!str_contains($page['body'], 'Graduate Outcomes') && str_contains($page['body'], 'View in Subject Mapping') && str_contains($page['body'], 'Appears in'), 'Dialog: no Graduate Outcomes button, Subject Mapping link kept; Appears in column');
+
+    // ---- Compare Curriculum Versions page (polish 2) ----
+    $legacy = $admin->request('modules/curriculum/pages/curriculum_history_view.php', ['curriculum_id' => 1, 'version_b_id' => 3]);
+    ok($legacy['status'] === 302, 'Builder-style link (curriculum_id + version_b_id) is redirected');
+    $loc = ''; foreach ($admin->headers as $h) if (stripos($h, 'location:') === 0) $loc = trim(substr($h, 9));
+    ok(str_contains($loc, 'program_id=1') && str_contains($loc, 'curriculum_id=1') && str_contains($loc, 'version_id=3') && !str_contains($loc, 'version_b_id'), 'Redirect carries program, curriculum and version for the context bar: ' . $loc);
+    $page = $admin->request('modules/curriculum/pages/curriculum_history_view.php', ['program_id' => 1, 'curriculum_id' => 1, 'version_id' => 3, 'subject_id' => 1]);
+    status($page, 200, 'Compare page renders');
+    ok(!str_contains($page['body'], '<select') && str_contains($page['body'], 'id="versionSearch"') && str_contains($page['body'], 'subject-back-link') && !str_contains($page['body'], 'historyCimfButton'), 'Compare page: shared bar, no stacked selects, shared back link, no CIMF button');
+    $r = status($admin->api('subject_history', 'context', ['program_id' => 1, 'curriculum_id' => 1, 'version_id' => 3]), 200, 'Context of the revised version');
+    ok($r['record']['version_role'] === 'proposed' && (int)$r['record']['baseline_version_id'] === 4, 'Context exposes role and recorded original');
+    $r = status($admin->api('subject_history', 'compare_revision', ['curriculum_id' => 1, 'version_b_id' => 3]), 200, 'compare_revision resolves the recorded original');
+    ok((int)$r['version_a']['id'] === 4 && (int)$r['version_b']['id'] === 3 && isset($r['summary']['added']), 'Original resolved automatically; summary counters present');
+    $res = $admin->api('subject_history', 'compare_revision', ['curriculum_id' => 1, 'version_b_id' => 1]);
+    ok($res['status'] === 422, 'A version without a recorded original is refused by the endpoint (the page shows its own empty state)');
+    $res = $restricted->api('subject_history', 'compare_revision', ['curriculum_id' => 1, 'version_b_id' => 3]);
+    ok(in_array($res['status'], [403, 404], true), 'Restricted reader cannot compare against an out-of-scope original');
+    $old = $admin->request('modules/curriculum/pages/subject_offering_history.php', ['view' => 'curriculum']);
+    ok($old['status'] === 302, 'Legacy subject_offering_history.php address still redirects');
 
     ok(fingerprint($db) === $before, 'No curriculum, subject or program table changed by any read');
 } finally {

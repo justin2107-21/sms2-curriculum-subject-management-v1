@@ -36,3 +36,5 @@
 .subject-history-content #comparisonPagination[hidden]{display:none!important}
 @media(max-width:1050px){.history-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.history-more-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.curriculum-history-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:700px){.history-title-actions{align-items:flex-start;margin:12px 0 0}.history-filter-grid,.history-more-filters,.curriculum-history-filter-grid{grid-template-columns:1fr}.history-filter-grid,.history-more-filters{padding-left:14px;padding-right:14px}.history-state-notice,.history-summary-line{margin-left:12px;margin-right:12px}.history-details-grid,.history-version-pair{grid-template-columns:1fr}}
+
+.subject-history-content .csms-ctable tr[aria-current="true"] td{background:var(--csms-surface-muted,#f4f6fb)}
