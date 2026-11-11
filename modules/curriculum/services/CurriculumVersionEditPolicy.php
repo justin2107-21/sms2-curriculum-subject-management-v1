@@ -49,6 +49,8 @@ final class CurriculumVersionEditPolicy
 
     public static function isEditable(array $version): bool
     {
+        // An archived version is history: no content change is allowed, whatever its role or review state.
+        if (($version['status'] ?? null) === 'archived') return false;
         $role = $version['version_role'] ?? null;
         $review = $version['review_status'] ?? null;
         $baseline = $version['baseline_version_id'] ?? null;
@@ -59,6 +61,9 @@ final class CurriculumVersionEditPolicy
 
     private function assertState(array $version): void
     {
+        if (($version['status'] ?? null) === 'archived') {
+            throw new DomainConflictException('This curriculum version is archived and cannot be changed.');
+        }
         if (!self::isEditable($version)) {
             throw new DomainConflictException('This curriculum version is protected or has an invalid lifecycle state.');
         }
