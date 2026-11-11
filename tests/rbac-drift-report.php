@@ -9,7 +9,7 @@ $m = csms_drift_parse_matrix((string)file_get_contents(__DIR__ . '/../docs/ui-re
 $check(in_array('student.status.update', $m['super_admin'], true) && !in_array('student.view', $m['admin'], true), 'shorthand keys expand');
 $check(in_array('user.manage', $m['admin'], true), 'a scoped cell counts as granted');
 $check(in_array('curriculum.clo.manage', $m['staff'], true) && !in_array('curriculum.clo.manage', $m['acad_faculty'], true), 'annotated cells parse');
-$check(count($m['super_admin']) === 51, 'Super Admin has all 51 keys, got ' . count($m['super_admin']));
+$check(count($m['super_admin']) === 52, 'Super Admin has all 52 keys, got ' . count($m['super_admin']));
 $check(csms_drift_compare($m, $m) === [], 'identical sets have no drift');
 $live = $m; $live['staff'][] = 'rbac.manage'; array_shift($live['admin']);
 $d = csms_drift_compare($m, $live);

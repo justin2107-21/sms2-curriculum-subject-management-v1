@@ -96,6 +96,7 @@ Moved to `user_roles`: the access decisions in `database/import_demo.php`, `repa
 | `user.manage` **New** | ✓ | ◐ Staff and Acad only | — | — | — |
 | `audit.view` | ✓ | ✓ | — | — | — |
 | `settings.view` | ✓ | — | — | — | — |
+| `api_client.manage` (create, rotate, revoke API clients; migration 029) | ✓ | — | — | — | — |
 | **Programs** | | | | | |
 | `program.view` | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `program.create` | ✓ | ✓ | — | — | — |
@@ -151,7 +152,7 @@ Moved to `user_roles`: the access decisions in `database/import_demo.php`, `repa
 
 `*` = one of the seven sensitive permissions.
 
-Totals: 45 existing keys plus 6 new = 51.
+Totals: 45 existing keys plus 6 new = 51, plus `api_client.manage` (migration 029, Super Admin only) = 52.
 
 ### Existing permission keys (45)
 `account.update`, `account.view`, `archive.restore`, `archive.view`, `audit.view`, `compliance.manage`, `compliance.reference.verify`, `compliance.run`, `compliance.view`, `curriculum.assessment_plan.manage`, `curriculum.clo.manage`, `curriculum.create`, `curriculum.outcome_mapping.manage`, `curriculum.reference.attach`, `curriculum.reference.classify`, `curriculum.update`, `curriculum.version.clone`, `curriculum.version.create`, `curriculum.view`, `curriculum_export.view`, `dashboard.view`, `elective.manage`, `elective.view`, `equivalency.manage`, `equivalency.view`, `grade_weighting.manage`, `grade_weighting.view`, `prerequisite.manage`, `prerequisite.view`, `program.create`, `program.update`, `program.view`, `program_assignment.manage`, `program_assignment.view`, `rbac.manage`, `settings.view`, `student.create`, `student.delete`, `student.status.update`, `student.update`, `student.view`, `subject.create`, `subject.update`, `subject.view`, `subject_history.view`.

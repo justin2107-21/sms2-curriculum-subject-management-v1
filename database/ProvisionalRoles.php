@@ -23,7 +23,7 @@ final class ProvisionalRoles
                     'curriculum.outcome_mapping.manage', 'curriculum.clo.manage', 'curriculum.assessment_plan.manage', 'grade_weighting.view', 'grade_weighting.manage',
                     'equivalency.view', 'equivalency.manage', 'compliance.view', 'compliance.run', 'compliance.manage',
                     'curriculum_export.view', 'curriculum_export.draft', 'curriculum_export.official', 'archive.view', 'archive.restore',
-                    'student.view', 'student.create', 'student.update', 'student.delete', 'student.status.update'])],
+                    'student.view', 'student.create', 'student.update', 'student.delete', 'student.status.update', 'api_client.manage'])],
             'admin' => ['label' => 'Admin', 'user_type' => 'Admin', 'description' => 'Manages Staff and Acad accounts, programs and curricula records; views audit logs.',
                 'permissions' => array_merge($base, ['user.manage', 'audit.view', 'program.view', 'program.create', 'program.update', 'program_assignment.view', 'program_assignment.manage',
                     'curriculum.view', 'curriculum.view_unapproved', 'curriculum.create', 'curriculum.update', 'curriculum.version.create',

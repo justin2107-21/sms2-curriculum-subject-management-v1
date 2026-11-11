@@ -46,6 +46,11 @@ function csms_legacy_baseline_declared_changes(): array
             'permissions_added' => ['user.manage', 'curriculum.view_unapproved', 'curriculum.review.submit',
                 'curriculum.review.decide', 'curriculum_export.draft', 'curriculum_export.official'],
         ],
+        '029_offering_api.sql' => [
+            'checksum' => '804b950853a2d9c70925ed16ea355f6f6c46eb445ed101ff3ffa020e9f8ba890',
+            'permissions_added' => ['api_client.manage'],
+            'new_role_grants_only' => true, // the only grant is api_client.manage to super_admin
+        ],
     ];
 }
 

@@ -12,7 +12,7 @@ $check = static function (bool $ok, string $label) use (&$failures, &$checks): v
 $definitions = ProvisionalRoles::definitions();
 $check(array_keys($definitions) === ['super_admin', 'admin', 'staff', 'acad_office', 'acad_faculty'], 'five defined roles');
 $allKeys = array_column($conn->query('SELECT name FROM permissions')->fetch_all(MYSQLI_ASSOC), 'name');
-$check(count($allKeys) === 51, 'permission count is 51, got ' . count($allKeys));
+$check(count($allKeys) === 52, 'permission count is 52, got ' . count($allKeys));
 
 // Database grants equal the definitions exactly, in both directions.
 foreach ($definitions as $role => $definition) {
