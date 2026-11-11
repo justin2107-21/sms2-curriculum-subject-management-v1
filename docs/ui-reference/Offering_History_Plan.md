@@ -1,4 +1,37 @@
-# Subject Offering History — Plan (Slice 0, read-only)
+# Subject Offering History — Plan
+
+## Status (updated 2026-11-11): slices 1 and 2 DONE
+
+| Slice | State |
+|---|---|
+| 0 Findings | Done (7f9fa79). |
+| 1 Shell | Done (a25f35a). One page under the shared Program / Curriculum / Version bar (working-context key `history`, permission `subject_history.view`), no tab bar, no blank "Select/Search" state (loading, then the saved or default version; `csms-empty` only for "no programs exist" or "no version available"). Read scope (`CurriculumReadScope::sql`) now applies to list, details, version options, context lookups and both compare endpoints; an out-of-scope user gets nothing. Internal wording removed ("Protected reference" is now "Original version", "Curriculum revision" is "Revised version"). |
+| 2 Subjects tab | Done. Table of subjects placed in the selected version (Code blue, Title, Units, Year & Semester, Appears in N versions, status chip), search and rows per page in the shared filter row, server-side paging. Row click opens a dialog with the version timeline across all readable versions of the program. |
+| 3 Changes tab, 4 change log | **Dropped** by the amendment below. |
+| 5 Read-scope hardening | Done inside slice 1. |
+| 6 Offered-in integration / rename | Waiting on the client (section 9). |
+
+### Amendment finding: Builder's comparison vs this page's "Curriculum version history" tab
+
+1. Builder has no separate comparison. Its "Compare versions" item (More menu in `builder_workspace`, `compareBaselineLink` in `curriculum-builder.js`) opens `curriculum_history_view.php`, which is this page's old second tab.
+2. Both are the same Task 5 screen and the same endpoint, `subject_history_actions.php?action=compare_revision` (service `SubjectOfferingHistoryService::compareRevision`, read-only REPEATABLE READ snapshot).
+3. It shows per subject: added, removed, moved (year/term), placement type, unit/title/description changes where both sides have snapshots, plus requirement, elective, grade-weighting and CLO/assessment differences and source-document provenance. It only accepts a proposed revision against its recorded baseline.
+4. So the tab added nothing the Builder comparison lacks, because it is that comparison. The tab bar was removed and Offering History is one page. **Nothing was built or duplicated.** The screen stays at `curriculum_history_view.php` (renamed "Compare Curriculum Versions", with a back link) because Builder links to it. The timeline dialog shows a "Compare versions" button that opens it, only for a revised version with a recorded original, the one case where the comparison works.
+5. Deleting the screen was rejected: it would break Builder's link and the existing comparison tests.
+
+### What the page stores and shows (slice 2, as built)
+- `version_subjects`: placements of the selected version. Code, title and units come from a complete snapshot, else from the Subject Master with a "No snapshot, current values shown" chip. "Appears in" counts distinct versions of the same program (all its curricula, readable statuses only).
+- `timeline`: for the chosen subject, every readable version of the program, oldest first: curriculum, version, effectivity as stored (`effective_academic_year`, else "Effectivity not recorded"), status chip plus "Current" (active) or "Historical" (archived), year/semester, Required/Optional, stored date, and captured values only where a snapshot exists.
+- What is actually stored: `effective_academic_year` is free text and set on 4 of 17 test versions (junk such as 2050, 2100, 21001). No term dates, no offering dates, no cohort. The page reports exactly that and infers nothing.
+- CIMF button: not carried over to the new page (not built yet). The comparison screen keeps its own button.
+- The older `list` / `details` endpoints are kept (tested) but the page no longer calls them; `compare_versions` (legacy compare) is unchanged apart from the read scope.
+
+### Cleanup note (test data, not code)
+Curriculum `123` / "123" under BSIT has version "1" (id 45) with **status Active** and effectivity 2100, and version "2" (id 46) draft with effectivity 21001. They are junk from testing (1 placement each) and appear as an Active version in the context bar and in "Appears in" counts. Delete or archive them in the test database. A curriculum with code `123` also exists in `sms_db` (not touched).
+
+---
+
+# Slice 0 findings (original)
 
 Date: 2026-11-11 · Branch `ui-redesign-pilot` · Status: **findings and proposal, awaiting approval.** No code, schema or data was changed. `sms_db` was not touched; `sms_db_uitest` was queried read-only (SELECT only).
 
