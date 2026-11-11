@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../../shared/bootstrap.php';
+require_once __DIR__ . '/../services/CurriculumExportService.php';
 
 if (!is_authenticated()) {
     header('Location: ../../../auth/signin.php');
@@ -84,7 +85,13 @@ require __DIR__ . '/../../../shared/sidebar.php';
     </section>
 
     <section class="export-tab-panel" id="exportPanelCsv" role="tabpanel" aria-labelledby="exportTabCsv" hidden>
-      <div class="domain-card export-format-card"><div><h2>CSV Export</h2><p>Download the selected curriculum scope's stored subjects, placements, and units as a UTF-8 CSV file.</p><p class="export-format-scope">Current scope: <strong data-scope-label>Entire Curriculum</strong></p></div><button type="button" class="primary-action-button" id="downloadCurriculumCsv" disabled><i class="fa-solid fa-download" aria-hidden="true"></i> Download CSV</button></div>
+      <div class="domain-card export-format-card"><div><h2>CSV Export</h2><p>Download the selected curriculum scope's stored subjects, placements, and units as a UTF-8 CSV file.</p><p class="export-format-scope">Current scope: <strong data-scope-label>Entire Curriculum</strong></p>
+        <p><label><input type="checkbox" id="exportProtect"/> Protect with password</label> <span class="csms-info"><button type="button" class="csms-info__btn" aria-label="About password protection" aria-describedby="exportProtectInfoTip"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button><span class="csms-info__tip" role="tooltip" id="exportProtectInfoTip">Downloads a ZIP encrypted with AES-256 that contains the CSV. Open it with 7-Zip, WinRAR or WinZip. As far as we know, Windows File Explorer cannot open AES-encrypted ZIPs, so 7-Zip is the safe choice. The password is used once and is not stored: if it is lost the file cannot be opened and the export must be generated again. Use at least <?= (int)CurriculumExportService::MIN_EXPORT_PASSWORD ?> characters.</span></span></p>
+        <div id="exportProtectFields" hidden>
+          <label class="form-field" for="exportPassword"><span>Password</span><input type="password" id="exportPassword" autocomplete="new-password" minlength="<?= (int)CurriculumExportService::MIN_EXPORT_PASSWORD ?>" maxlength="<?= (int)CurriculumExportService::MAX_EXPORT_PASSWORD ?>"/></label>
+          <label class="form-field" for="exportPasswordConfirm"><span>Confirm password</span><input type="password" id="exportPasswordConfirm" autocomplete="new-password" maxlength="<?= (int)CurriculumExportService::MAX_EXPORT_PASSWORD ?>"/></label>
+          <p class="mapping-context-message" id="exportPasswordError" role="alert" hidden></p>
+        </div></div><button type="button" class="primary-action-button" id="downloadCurriculumCsv" disabled><i class="fa-solid fa-download" aria-hidden="true"></i> <span id="downloadCurriculumCsvLabel">Download CSV</span></button></div>
     </section>
 
     <section class="export-tab-panel" id="exportPanelPrint" role="tabpanel" aria-labelledby="exportTabPrint" hidden>

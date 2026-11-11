@@ -39,6 +39,10 @@ try {
         case 'download_csv':
             curriculum_require_mutation('curriculum_export.view');
             $requireExportable($_POST);
+            // Optional password protection (AES-256 ZIP). The password exists only in this request; it is never logged, audited or stored.
+            $protect = ($_POST['protect'] ?? '') === '1';
+            $password = $protect ? CurriculumExportService::validateExportPassword($_POST['export_password'] ?? null, $_POST['export_password_confirm'] ?? null) : null;
+            unset($_POST['export_password'], $_POST['export_password_confirm']);
             $dataset = $service->dataset($_POST);
             if ((int)$dataset['summary']['total_subjects'] === 0) {
                 throw new DomainValidationException('No mapped subjects were found for the selected export scope.');
@@ -50,6 +54,24 @@ try {
             }
             try {
                 $service->writeCsv($stream, $dataset);
+                if ($protect) {
+                    rewind($stream);
+                    $zipBytes = $service->protectedZip((string)stream_get_contents($stream), $service->csvFilename($dataset), (string)$password);
+                    $password = null;
+                    $service->recordProtectedGeneration($dataset);
+                    fclose($stream);
+                    while (ob_get_level() > 0) {
+                        ob_end_clean();
+                    }
+                    header('Content-Type: application/zip');
+                    header('Content-Disposition: attachment; filename="' . $service->zipFilename($dataset) . '"');
+                    header('X-Content-Type-Options: nosniff');
+                    header('Cache-Control: private, no-store, no-cache, must-revalidate');
+                    header('Pragma: no-cache');
+                    header('Content-Length: ' . strlen($zipBytes));
+                    echo $zipBytes;
+                    exit;
+                }
                 // Record only after the CSV has been built successfully. A failed
                 // generation must not leave a misleading success audit event.
                 $service->recordCsvGeneration($dataset);

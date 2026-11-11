@@ -174,13 +174,43 @@
         return match ? match[1].replace(/[^A-Za-z0-9._-]/g, '_') : 'curriculum_export.csv';
     }
 
+    // Password protection (AES-256 ZIP). The password lives only in these two inputs and in the one POST; it is cleared after every attempt.
+    const protectBox = document.getElementById('exportProtect'), protectFields = document.getElementById('exportProtectFields');
+    const passwordInput = document.getElementById('exportPassword'), confirmInput = document.getElementById('exportPasswordConfirm');
+    const passwordError = document.getElementById('exportPasswordError'), csvLabel = document.getElementById('downloadCurriculumCsvLabel');
+    const MIN_PASSWORD = Number(passwordInput.getAttribute('minlength')) || 10;
+    function passwordProblem() {
+        const pw = passwordInput.value, again = confirmInput.value;
+        if (!pw) return 'Enter a password to protect the export.';
+        if (!pw.trim()) return 'The password cannot be only spaces.';
+        if (pw.length < MIN_PASSWORD) return 'The password must be at least ' + MIN_PASSWORD + ' characters.';
+        if (!again) return 'Confirm the password.';
+        if (pw !== again) return 'The password and its confirmation do not match.';
+        return '';
+    }
+    function showPasswordError(message) { passwordError.textContent = message; passwordError.hidden = !message; }
+    function clearPasswords() { passwordInput.value = ''; confirmInput.value = ''; }
+    protectBox.addEventListener('change', () => {
+        protectFields.hidden = !protectBox.checked;
+        csvLabel.textContent = protectBox.checked ? 'Download protected ZIP' : 'Download CSV';
+        showPasswordError('');
+        if (!protectBox.checked) clearPasswords(); else passwordInput.focus();
+    });
+
     async function downloadCsv() {
         if (!ready() || !dataset || Number(dataset.summary.total_subjects) === 0) return;
+        const protect = protectBox.checked;
+        if (protect) {
+            const problem = passwordProblem();
+            showPasswordError(problem);
+            if (problem) { (passwordInput.value.length < MIN_PASSWORD ? passwordInput : confirmInput).focus(); return; }
+        }
         csvButton.disabled = true;
-        status.textContent = 'Generating CSV from stored curriculum data…';
+        status.textContent = protect ? 'Generating password-protected ZIP from stored curriculum data…' : 'Generating CSV from stored curriculum data…';
         const form = new FormData();
         form.set('action', 'download_csv');
         Object.entries(params()).forEach(([key, value]) => form.set(key, value));
+        if (protect) { form.set('protect', '1'); form.set('export_password', passwordInput.value); form.set('export_password_confirm', confirmInput.value); }
         form.set('_csrf_token', document.querySelector('meta[name="csrf-token"]')?.content || '');
         try {
             const response = await fetch(endpoint, { method: 'POST', body: form, credentials: 'same-origin' });
@@ -190,7 +220,7 @@
                 throw new Error(message);
             }
             const blob = await response.blob();
-            if (blob.size === 0 || !/^text\/csv\b/i.test(response.headers.get('Content-Type') || '')) throw new Error('The server returned an invalid CSV response.');
+            if (blob.size === 0 || !(protect ? /^application\/zip\b/i : /^text\/csv\b/i).test(response.headers.get('Content-Type') || '')) throw new Error('The server returned an invalid ' + (protect ? 'protected ZIP' : 'CSV') + ' response.');
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
@@ -199,11 +229,13 @@
             link.click();
             link.remove();
             URL.revokeObjectURL(url);
-            status.textContent = 'CSV generated from current stored curriculum data.';
-            ui.showToast('Curriculum CSV downloaded.', 'success');
+            status.textContent = protect ? 'Password-protected ZIP generated from current stored curriculum data. Keep the password safe: it cannot be recovered.' : 'CSV generated from current stored curriculum data.';
+            ui.showToast(protect ? 'Protected curriculum ZIP downloaded.' : 'Curriculum CSV downloaded.', 'success');
+            if (protect) { clearPasswords(); showPasswordError(''); }
         } catch (error) {
+            if (protect) showPasswordError(error.message);
             ui.showToast(error.message, 'error');
-            status.textContent = 'The CSV could not be generated.';
+            status.textContent = protect ? 'The protected export could not be generated.' : 'The CSV could not be generated.';
         } finally { setActionsEnabled(ready()); }
     }
 

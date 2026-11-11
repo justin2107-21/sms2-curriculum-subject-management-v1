@@ -252,6 +252,51 @@ class CurriculumExportService
         return intdiv($value, 100) . '.' . str_pad((string)($value % 100), 2, '0', STR_PAD_LEFT);
     }
 
+    public const MIN_EXPORT_PASSWORD = 10;
+    public const MAX_EXPORT_PASSWORD = 128;
+
+    /** Validates a protection password and its confirmation. Messages never contain the password. */
+    public static function validateExportPassword(mixed $password, mixed $confirmation): string
+    {
+        if (!is_string($password) || $password === '') throw new DomainValidationException('Enter a password to protect the export.');
+        if (!is_string($confirmation) || $confirmation === '') throw new DomainValidationException('Confirm the password.');
+        if (trim($password) === '') throw new DomainValidationException('The password cannot be only spaces.');
+        if (mb_strlen($password, 'UTF-8') < self::MIN_EXPORT_PASSWORD) throw new DomainValidationException('The password must be at least ' . self::MIN_EXPORT_PASSWORD . ' characters.');
+        if (mb_strlen($password, 'UTF-8') > self::MAX_EXPORT_PASSWORD) throw new DomainValidationException('The password must be at most ' . self::MAX_EXPORT_PASSWORD . ' characters.');
+        if (!hash_equals($password, $confirmation)) throw new DomainValidationException('The password and its confirmation do not match.');
+        return $password;
+    }
+
+    /**
+     * AES-256 encrypted ZIP holding one file. The password is used once, in memory. The temporary archive has a random name
+     * unrelated to the password and is deleted before returning, also on failure. Errors are generic and never include the password.
+     */
+    public function protectedZip(string $content, string $entryName, string $password): string
+    {
+        if (!class_exists('ZipArchive') || !method_exists('ZipArchive', 'setEncryptionName')) {
+            throw new RuntimeException('Encrypted export is not available on this server.');
+        }
+        $tmp = tempnam(sys_get_temp_dir(), 'cx');
+        if ($tmp === false) throw new RuntimeException('Unable to prepare the protected export.');
+        try {
+            $zip = new ZipArchive();
+            if ($zip->open($tmp, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) throw new RuntimeException('Unable to prepare the protected export.');
+            $ok = $zip->addFromString($entryName, $content) && $zip->setEncryptionName($entryName, ZipArchive::EM_AES_256, $password);
+            $closed = $zip->close();
+            if (!$ok || !$closed) throw new RuntimeException('Unable to encrypt the export.');
+            $bytes = file_get_contents($tmp);
+            if ($bytes === false || $bytes === '') throw new RuntimeException('Unable to read the protected export.');
+            return $bytes;
+        } finally {
+            if (is_file($tmp)) @unlink($tmp);
+        }
+    }
+
+    public function zipFilename(array $dataset): string
+    {
+        return substr($this->csvFilename($dataset), 0, -4) . '_protected.zip';
+    }
+
     public function recordCsvGeneration(array $dataset): void
     {
         $this->recordGeneration($dataset, 'csv');
@@ -262,14 +307,20 @@ class CurriculumExportService
         $this->recordGeneration($dataset, 'print_html');
     }
 
-    private function recordGeneration(array $dataset, string $format): void
+    /** Audit row for a password-protected export. Records that protection was used, never the password or anything derived from it. */
+    public function recordProtectedGeneration(array $dataset): void
+    {
+        $this->recordGeneration($dataset, 'csv_zip_aes256', 'Password-protected curriculum export generated.', true);
+    }
+
+    private function recordGeneration(array $dataset, string $format, string $description = 'Curriculum CSV export generated.', bool $protected = false): void
     {
         $context = $dataset['context'];
         audit_log_required(
             'CURRICULUM_EXPORT_GENERATE',
             'curriculum_version',
             (int)$context['curriculum_version_id'],
-            'Curriculum CSV export generated.',
+            $description,
             [
                 'academic_program_id' => (int)$context['academic_program_id'],
                 'curriculum_id' => (int)$context['curriculum_id'],
@@ -277,6 +328,7 @@ class CurriculumExportService
                 'version_label' => (string)$context['version_label'],
                 'review_status' => (string)$context['version_review_status'],
                 'format' => $format,
+                'protected' => $protected,
                 'subject_count' => (int)$dataset['summary']['total_subjects'],
                 'total_units' => (string)$dataset['summary']['total_units'],
             ]
