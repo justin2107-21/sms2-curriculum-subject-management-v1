@@ -4,9 +4,9 @@ Date: 2026-11-11 · Branch `ui-redesign-pilot` · Status: **design, awaiting app
 
 Purpose: Curriculum & Subject Management is the master of subjects. Class Scheduling (Section Assignment Tool) is the essential source of real offerings; Enrollment (aggregate counts) and Faculty are optional. They call a small REST API; CSMS stores what they report and shows it next to, never mixed with, the curriculum placement history. We do not assume how other subsystems are built.
 
-## Status (2026-11-11): slice 4B BUILT (backend). Where this section and the design text below differ, this section wins.
+## Status (2026-11-11): slices 4B (backend), 4C (UI, read-only) and 4E (demo + contract) BUILT. Slice 4D (admin screen) is skipped: the CLI stays. Where this section and the design text below differ, this section wins.
 
-Commits: archived-edit rule (9ac49c6) and the API (see `git log`, "Offering API slice 4B"). Not applied to `sms_db`; applied only to `sms_db_uitest`. Slices 4C (UI section), 4D (admin screen) and 4E (demo payload, published contract file) are not started.
+Commits: archived-edit rule (9ac49c6) and the API (see `git log`, "Offering API slice 4B"). Not applied to `sms_db`; applied only to `sms_db_uitest`. Slices 4C and 4E are built (see "Slices 4C and 4E" and "Demo steps" below). Slice 4D (admin screen) is intentionally not built; clients are managed with `scripts/api-client-create.php`.
 
 ### Final decisions (the owner's)
 1. Migration **029** for the API; Electives is renumbered **030** (`Electives_Plan.md` updated).
@@ -87,7 +87,22 @@ Use the codes shown in CSMS. Do not send names, emails, student or staff identif
 8. Rollback if needed: restore the dump from step 1, or run `database\rollbacks\029_rollback.sql` then `DELETE FROM schema_migrations WHERE migration = '029_offering_api.sql';`, and revert the code.
 
 ### Still open
-Slices 4C-4E; whether other groups confirm the term list and year format (client input); the not-yet-decided points from section "Decisions" that were not in the owner's list (retention of `api_rejected_items`: proposal 90 days, manual); the admin screen for clients (CLI only for now).
+Slice 4D is skipped by decision; whether other groups confirm the term list and year format (client input); the not-yet-decided points from section "Decisions" that were not in the owner's list (retention of `api_rejected_items`: proposal 90 days, manual); the admin screen for clients (CLI only for now).
+
+### Slices 4C and 4E (built 2026-11-11)
+- **UI (4C), read-only:** Subject History Details dialog, below the version timeline: "Reported offerings" (info text: reported by other subsystems through the API, not verified by this system, separate from curriculum placement history). Columns: Academic year, Term, Status chip, Sections, Enrolled, Flags (chips), Source system (+ "Demo" chip when the source starts with `demo-`), Received. Empty state "No offering data received yet." Newest academic year first, 100 rows maximum with a "Showing N of M" line. Main table: compact "Reported" column (count for that subject in the selected program, "-" if none). Header chip: "Read-only: placement history plus reported offerings." Only shared classes (`csms-chip`, `csms-info`, `csms-empty`, `csms-ctable`); no new CSS, no wider dialog.
+- **Read scope:** a user restricted to approved or active versions sees a reported row only where the subject is placed, in that program, in a version they may read (an `EXISTS` on placements using `CurriculumReadScope`). Unrestricted readers see all rows. The rows and counts never carry `external_id`, client id or hash.
+- **No table, no error:** if migration 029 is not applied (as on `sms_db` today) the page shows "-" and an empty section, and CIMF adds no reported findings.
+- **CIMF (Summarize History):** two new advisory counts, per subject and program scope: *programs with reported offerings but no curriculum placement* and *programs with a placement but no reported offerings* (the second states it depends on whether a source system sends data). Programs are listed by code only; the AI payload stays compact; nothing is written.
+- **CLI change:** `--source` now also accepts hyphens (`demo-class-scheduling`); still lowercase, starts with a letter, 2-40 characters.
+- **Contract for other groups (4E):** `docs/api/OFFERING_API_CONTRACT.md` (standalone; no internal names or secrets; year format and terms marked as our assumptions). Demo requests: `docs/api/offering-demo.http`.
+
+### Demo steps (sms_db_uitest only; never sms_db)
+1. In a terminal: `set DB_NAME=sms_db_uitest` and `set API_KEY_PEPPER=<any 32+ characters>` (the same pepper must be in the Apache/PHP environment, then restart Apache).
+2. Create the demo client; the key is printed once, keep it out of git: `C:\xampp\php\php.exe scripts\api-client-create.php create --name="Demo Class Scheduling" --source=demo-class-scheduling --scope=read_write --operator=<super admin username>`
+3. Send request 1 of `docs/api/offering-demo.http` with that key (REST Client in VS Code, or curl with `Authorization: Bearer <key>`). Expected summary: received 7, accepted 5, flagged 1 (CC101, inactive subject), rejected 1 (unknown subject NOPE999), created 6. Send it again: 6 unchanged.
+4. Open Subject Offering History, choose Program BSIT and a version, look at the "Reported" column (CC104 = 2, CC105 = 1, CC106 = 1, DM102 = 1, CC101 = 1), open CC104 or CC101: the section shows the rows, the Demo chip and the flag chip. A subject with no reports shows "-" and "No offering data received yet.".
+5. To stop further use of the demo client, revoke it (`revoke --name="Demo Class Scheduling"`); the demo rows stay as history on the demo database.
 
 ---
 

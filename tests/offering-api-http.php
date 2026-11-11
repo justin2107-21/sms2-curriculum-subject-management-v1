@@ -222,6 +222,12 @@ try {
     $meta = $db->query("SELECT metadata_json FROM audit_logs WHERE action='API_CLIENT_CREATE' LIMIT 1")->fetch_row()[0];
     ok(str_contains($meta, 'key_prefix') && !str_contains($meta, 'key_hash'), 'Audit metadata holds the prefix, never the key or hash');
 
+    // The demo source name uses a hyphen ("demo-" marks demo data in the UI); the key still binds the source.
+    [$cd, $outD] = cli(['create', '--name=Demo Class Scheduling', '--source=demo-class-scheduling', '--scope=write', '--operator=opsuper'], $env);
+    ok($cd === 0 && (string)$db->query("SELECT source_system FROM api_clients WHERE name='Demo Class Scheduling'")->fetch_row()[0] === 'demo-class-scheduling', 'CLI accepts a hyphenated demo source system');
+    [$cu] = cli(['create', '--name=Bad2', '--source=-bad', '--scope=write', '--operator=opsuper'], $env); [$cv] = cli(['create', '--name=Bad3', '--source=Demo-X', '--scope=write', '--operator=opsuper'], $env);
+    ok($cu !== 0 && $cv !== 0, 'CLI still refuses a leading hyphen and uppercase in the source system');
+
     // ---- Rollback and re-apply on the disposable schema ----
     $rollback = file_get_contents(__DIR__ . '/../database/rollbacks/029_rollback.sql');
     $db->multi_query($rollback); do { if ($res = $db->store_result()) $res->free(); } while ($db->more_results() && $db->next_result());

@@ -1,0 +1,46 @@
+### CSMS Offerings API: demo requests (REST Client / IntelliJ HTTP syntax; the curl equivalent is at the end).
+### Demo database only (sms_db_uitest). Data goes in through the API; never insert rows directly.
+###
+### Setup (once, in a terminal; the key is printed once, keep it out of git and out of this file):
+###   set DB_NAME=sms_db_uitest
+###   set API_KEY_PEPPER=<32+ characters, any value for the demo>
+###   C:\xampp\php\php.exe scripts\api-client-create.php create --name="Demo Class Scheduling" --source=demo-class-scheduling --scope=read_write --operator=<super admin username>
+### Then put the printed key in your REST Client environment (or: set CSMS_API_KEY=<key>) and run the requests below.
+### The pepper must also be set in the Apache/PHP environment that serves the API.
+
+@host = http://localhost/sms-csms
+@key = {{$processEnv CSMS_API_KEY}}
+
+### 1. Demo batch: 5 accepted (one cancelled), 1 flagged (CC101 is inactive in Subject Master), 1 rejected (unknown subject).
+### Expected summary: received 7, accepted 5, flagged 1, rejected 1, created 6.
+POST {{host}}/api/v1/offerings
+Authorization: Bearer {{key}}
+Content-Type: application/json
+
+{"offerings":[
+  {"external_id":"DEMO-0001","subject_code":"CC104","program_code":"BSIT","academic_year":"2026-2027","term":"1st Semester","status":"offered","section_count":4,"enrolled_count":132,"reported_at":"2026-11-10T08:00:00Z"},
+  {"external_id":"DEMO-0002","subject_code":"CC105","program_code":"BSIT","academic_year":"2026-2027","term":"1st Semester","status":"offered","section_count":3,"enrolled_count":96,"reported_at":"2026-11-10T08:00:00Z"},
+  {"external_id":"DEMO-0003","subject_code":"CC104","program_code":"BSIT","academic_year":"2025-2026","term":"2nd Semester","status":"offered","section_count":2,"enrolled_count":61,"reported_at":"2026-03-02T08:00:00Z"},
+  {"external_id":"DEMO-0004","subject_code":"CC106","program_code":"BSIT","academic_year":"2026-2027","term":"2nd Semester","status":"cancelled","section_count":0},
+  {"external_id":"DEMO-0005","subject_code":"DM102","program_code":"BSIT","academic_year":"2026-2027","term":"Summer","status":"offered","section_count":1},
+  {"external_id":"DEMO-0006","subject_code":"CC101","program_code":"BSIT","academic_year":"2026-2027","term":"1st Semester","status":"offered","section_count":2,"enrolled_count":55,"reported_at":"2026-11-10T08:00:00Z"},
+  {"external_id":"DEMO-0007","subject_code":"NOPE999","program_code":"BSIT","academic_year":"2026-2027","term":"1st Semester","status":"offered","section_count":1}
+]}
+
+### 2. Replay the same batch: every valid item returns "unchanged" and nothing is written (idempotent).
+### (Send request 1 again.)
+
+### 3. Read back what this client reported (own records only).
+GET {{host}}/api/v1/offerings?program_code=BSIT&per_page=50
+Authorization: Bearer {{key}}
+
+### 4. Wrong key: 401 unauthorized.
+GET {{host}}/api/v1/offerings
+Authorization: Bearer csms_00000000_wrong
+
+### Where it shows in the UI (Subject Offering History, Program BSIT, any version that contains the subject):
+###   CC104: 2 reported offerings (2026-2027 and 2025-2026), CC105: 1, CC106: 1 (cancelled), DM102: 1,
+###   CC101: 1 with the "Subject inactive" flag chip. A subject with no reports shows "-" in the Reported column and the
+###   empty state "No offering data received yet." in its dialog. DEMO-0007 (unknown subject) is rejected and appears nowhere.
+###   Source system "demo-class-scheduling" shows the Demo chip.
+### An unknown subject is never created. To see the 'not in program curriculum' flag, report an active subject that BSIT does not contain (for example MA102).

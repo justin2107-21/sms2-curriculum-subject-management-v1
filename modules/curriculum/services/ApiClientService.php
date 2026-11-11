@@ -64,7 +64,7 @@ final class ApiClientService
     {
         $name = trim($name);
         if ($name === '' || strlen($name) > 100) throw new InvalidArgumentException('Name must be 1 to 100 characters.');
-        if (!preg_match('/^[a-z][a-z0-9_]{1,39}$/D', $sourceSystem)) throw new InvalidArgumentException('Source system must be 2 to 40 characters: lowercase letters, digits and underscores, starting with a letter.');
+        if (!preg_match('/^[a-z][a-z0-9_-]{1,39}$/D', $sourceSystem)) throw new InvalidArgumentException('Source system must be 2 to 40 characters: lowercase letters, digits, underscores and hyphens, starting with a letter.');
         if (!in_array($scope, self::SCOPES, true)) throw new InvalidArgumentException('Scope must be write, read or read_write.');
         $generated = self::generate();
         $this->db->begin_transaction();
