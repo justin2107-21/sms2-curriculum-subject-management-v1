@@ -70,6 +70,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
       </nav>
 
       <?php if ($canBrowse): ?>
+      <p class="subject-back-row" id="programBackRow" hidden><a class="button-muted" id="programBack" href="subjects.php?view=program"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> All programs</a></p>
       <section class="mapping-context-bar" id="subjectContextBar" aria-label="Curriculum context" hidden>
         <?php foreach (['program' => 'Program / Strand', 'curriculum' => 'Curriculum', 'version' => 'Curriculum Version'] as $key => $label): ?>
         <div class="mapping-context-field"><label for="<?= $key ?>Search"><?= $label ?></label><div class="record-autocomplete">
@@ -119,6 +120,27 @@ require __DIR__ . '/../../../shared/sidebar.php';
 
         <!-- By program -->
         <div id="viewProgram" data-panel="program" hidden>
+          <div id="programCardsView" hidden>
+            <div class="csms-filter-row">
+              <label class="csms-search"><span class="sr-only">Search programs and strands by code or name</span><input type="search" id="cardSearch" maxlength="100" placeholder="Search code or name"/></label>
+              <div class="program-tabs" id="cardLevel" role="group" aria-label="Program level">
+                <button type="button" class="program-tab" data-level="all" aria-pressed="true">All</button>
+                <button type="button" class="program-tab" data-level="college" aria-pressed="false">College programs</button>
+                <button type="button" class="program-tab" data-level="shs" aria-pressed="false">SHS strands</button>
+              </div>
+              <span class="csms-filter-row__summary" id="cardCount" role="status"></span>
+            </div>
+            <div class="csms-empty" id="cardLoading" role="status"><i class="fa-solid fa-spinner" aria-hidden="true"></i><strong>Loading programs…</strong></div>
+            <div class="csms-empty" id="cardEmpty" role="status" hidden><i class="fa-solid fa-graduation-cap" aria-hidden="true"></i><strong>No programs yet</strong><span>Programs appear here when they are created in Academic Programs.</span></div>
+            <div class="csms-empty" id="cardNoMatch" role="status" hidden><i class="fa-solid fa-filter" aria-hidden="true"></i><strong>No programs match these filters</strong><span>Change the search or the level.</span><button type="button" class="button-muted" id="cardClear">Clear filters</button></div>
+            <div class="csms-empty" id="cardError" role="alert" hidden><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><strong>Programs could not be loaded</strong><span id="cardErrorText"></span><button type="button" class="button-muted" id="cardRetry">Retry</button></div>
+            <div id="cardGroups" class="subject-card-groups" hidden>
+              <section data-group="college" aria-labelledby="cardHeadCollege" hidden><h2 class="subject-group-heading" id="cardHeadCollege">College degree programs <span class="csms-chip csms-chip--type" id="cardCountCollege"></span></h2><div class="subject-card-grid" id="cardGridCollege"></div></section>
+              <section data-group="shs" aria-labelledby="cardHeadShs" hidden><h2 class="subject-group-heading" id="cardHeadShs">SHS strands <span class="csms-chip csms-chip--type" id="cardCountShs"></span></h2><div class="subject-card-grid" id="cardGridShs"></div></section>
+            </div>
+            <div class="pagination-bar" id="cardPagination" hidden></div>
+          </div>
+          <div id="programTableView" hidden>
           <div class="csms-empty" id="programNoVersion" role="status"><i class="fa-solid fa-bullseye" aria-hidden="true"></i><strong>No curriculum version selected</strong><span>Use the context bar above to pick a curriculum version.</span></div>
           <div class="csms-empty" id="programLoading" role="status" hidden><i class="fa-solid fa-spinner" aria-hidden="true"></i><strong>Loading placements…</strong></div>
           <div class="csms-empty" id="programError" role="alert" hidden><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><strong>Placements could not be loaded</strong><span id="programErrorText"></span><button type="button" class="button-muted" id="programRetry">Retry</button></div>
@@ -139,6 +161,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
                 <tbody id="programRows"></tbody>
               </table>
             </div>
+          </div>
           </div>
         </div>
       </section>

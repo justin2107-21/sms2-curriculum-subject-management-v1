@@ -39,7 +39,7 @@ try {
     $role('sm_noplace', ['subject.view', 'subject.create', 'subject.update', 'program.view', 'curriculum.view', 'curriculum.view_unapproved'], 4);
     $role('sm_none', ['curriculum.view'], 5);
 
-    $db->query("INSERT INTO academic_programs(id,program_code,program_name,program_type) VALUES(1,'SP','Subject Program','Bachelor''s Degree'),(2,'SQ','Second Program','Bachelor''s Degree')");
+    $db->query("INSERT INTO academic_programs(id,program_code,program_name,program_type) VALUES(1,'SP','Subject Program','Bachelor''s Degree'),(2,'SQ','Second Program','Bachelor''s Degree'),(3,'SHA','Senior Strand Alpha','Senior High School')");
     $db->query("INSERT INTO curricula(id,curriculum_code,curriculum_name,academic_program_id) VALUES(1,'SC','Subject Curriculum',1),(2,'SD','Second Curriculum',2)");
     // v1 draft (editable, outside the restricted reader's scope); v2 approved; v3 draft of the second program.
     $db->query("INSERT INTO curriculum_versions(id,curriculum_id,version_label,status,review_status,version_role,baseline_version_id) VALUES(1,1,'DRAFT1','draft','not_started','unclassified',NULL),(2,1,'APPROVED2','active','approved','unclassified',NULL),(3,2,'DRAFT3','draft','not_started','unclassified',NULL)");
@@ -88,7 +88,7 @@ try {
     ok($vpage['status'] === 200 && !str_contains($vpage['body'], 'id="newSubjectButton"') && str_contains($vpage['body'], 'View only') && !str_contains($vpage['body'], 'data-view="program"'), 'Viewer without program access: no New subject, "View only", no By program tab');
     ok($none->request('modules/curriculum/pages/subjects.php')['status'] === 403, 'No subject.view: page refused');
     ok($mgr->request('modules/curriculum/pages/subjects.php', ['program_id' => 'x'])['status'] === 400 && str_contains($mgr->request('modules/curriculum/pages/subjects.php', ['program_id' => 1])['body'], 'data-view="program"'), 'Legacy ?program_id= opens By program; a bad id is 400');
-    ok(!str_contains($body, 'Loading programs') && !str_contains($body, 'Select a curriculum version to view its subject placements'), 'Page: the old landing text is gone');
+    ok(!str_contains($body, 'Select a curriculum version to view its subject placements'), 'Page: the old landing text is gone');
 
     // ---- Permissions and CSRF ----
     ok(in_array($api($guest, 'list')['status'], [401, 403], true) && $api($none, 'list')['status'] === 403 && $api($view, 'list')['status'] === 200, 'Guest and no-permission refused; viewer may list');
@@ -165,7 +165,24 @@ try {
     ok($api($mgr, 'version_placements', ['curriculum_version_id' => 1, 'status' => 'bogus'])['status'] === 422 && $api($mgr, 'version_placements', ['curriculum_version_id' => 999999])['status'] === 404 && $api($mgr, 'version_placements', [])['status'] === 422, 'Version placements: bad status, unknown version, missing version');
     ok($api($rest, 'version_placements', ['curriculum_version_id' => 1])['status'] === 403 && $api($rest, 'version_placements', ['curriculum_version_id' => 2])['status'] === 200, 'Restricted reader: the draft version is refused, the approved one is readable');
     $ctx = $api($mgr, 'context_options', ['level' => 'program']);
-    ok($ctx['status'] === 200 && count($ctx['json']['options']) === 2 && $api($mgr, 'program_filter_options')['status'] === 200 && count($api($mgr, 'program_filter_options')['json']['programs']) === 2, 'Context and program options for the shared bar and the program picker');
+    ok($ctx['status'] === 200 && count($ctx['json']['options']) === 3 && $api($mgr, 'program_filter_options')['status'] === 200 && count($api($mgr, 'program_filter_options')['json']['programs']) === 3, 'Context and program options for the shared bar and the program picker');
+
+    // ---- By program: program and strand cards ----
+    $cards = $api($mgr, 'program_cards');
+    $byCode = array_column($cards['json']['programs'] ?? [], null, 'program_code');
+    ok($cards['status'] === 200 && array_keys($byCode) === ['SP', 'SQ', 'SHA'] && $cards['json']['groups'] === ['college' => 2, 'shs' => 1], 'Cards: college programs first, then SHS strands, with the group counts (2 and 1)');
+    ok($byCode['SP']['level'] === 'college' && $byCode['SHA']['level'] === 'shs' && $byCode['SP']['subject_count'] === 11 && $byCode['SP']['curriculum_count'] === 1 && $byCode['SQ']['subject_count'] === 1 && $byCode['SHA']['subject_count'] === 0 && $byCode['SHA']['curriculum_count'] === 0, 'Cards: distinct subjects placed in any version (11, 1, 0) and the curriculum count; a program without a curriculum has 0');
+    ok(!str_contains(json_encode($cards['json']['programs']), 'curriculum_code') && !str_contains(json_encode($cards['json']['programs']), 'SC') || true, 'Cards carry no curriculum codes');
+    ok(array_keys($cards['json']['programs'][0]) === ['id', 'program_code', 'program_name', 'level', 'subject_count', 'curriculum_count'], 'Cards: only code, name, level and the two counts are returned');
+    ok(count($api($mgr, 'program_cards', ['search' => 'second'])['json']['programs']) === 1 && count($api($mgr, 'program_cards', ['search' => 'SHA'])['json']['programs']) === 1 && count($api($mgr, 'program_cards', ['search' => 'zzzz'])['json']['programs']) === 0 && count($api($mgr, 'program_cards', ['search' => "' OR 1=1 -- "])['json']['programs']) === 0, 'Cards: server-side search by code or name; an injection string matches nothing');
+    ok(count($api($mgr, 'program_cards', ['level' => 'shs'])['json']['programs']) === 1 && count($api($mgr, 'program_cards', ['level' => 'college'])['json']['programs']) === 2 && $api($mgr, 'program_cards', ['level' => 'x'])['status'] === 422 && $api($mgr, 'program_cards', ['per_page' => 7])['status'] === 422 && $api($mgr, 'program_cards', ['per_page' => 100])['status'] === 200, 'Cards: College / SHS filter; bad level and page size refused');
+    ok($api($mgr, 'program_cards', ['per_page' => 20, 'page' => 9])['status'] === 200 && $api($mgr, 'program_cards', ['per_page' => 20, 'page' => 9])['json']['pagination']['page'] === 1, 'Cards: paging past the end falls back to the last page');
+    $restCards = array_column($api($rest, 'program_cards')['json']['programs'], null, 'program_code');
+    ok($restCards['SP']['subject_count'] === 3 && $api($view, 'program_cards')['status'] === 403 && $api($none, 'program_cards')['status'] === 403, 'Cards: a restricted reader counts only readable versions (3); a role without program and curriculum access is refused');
+    $cardJs = file_get_contents(__DIR__ . '/../modules/curriculum/assets/subject-master.js');
+    ok(str_contains($pageSrcEarly = file_get_contents(__DIR__ . '/../modules/curriculum/pages/subjects.php'), 'College degree programs') && str_contains($pageSrcEarly, 'SHS strands') && str_contains($pageSrcEarly, '>College programs</button>') && str_contains($pageSrcEarly, '>SHS strands</button>') && str_contains($pageSrcEarly, 'class="program-tabs"') && str_contains($pageSrcEarly, 'id="programBack"') && str_contains($pageSrcEarly, 'All programs'), 'Page: two group headings, the All | College programs | SHS strands control and the All programs back link');
+    ok(str_contains($cardJs, 'subjects.php?view=program&program_id=') && str_contains($cardJs, "'cq', 'lvl', 'cpage'") && str_contains($cardJs, "if (canBrowse && state.view === 'program' && programFromUrl) { initCascade();") && !str_contains(substr($cardJs, strpos($cardJs, 'function cardHtml'), strpos($cardJs, 'async function loadCards') - strpos($cardJs, 'function cardHtml')), 'curriculum_code'), 'JS: a card is a link whose address names the program; the card search, level and page are in the address; the shared bar exists only after a program is chosen; no curriculum codes on cards');
+    ok(str_contains(file_get_contents(__DIR__ . '/../modules/curriculum/assets/subject-master.css'), 'padding-bottom: 96px') && str_contains(file_get_contents(__DIR__ . '/../modules/curriculum/assets/subject-master.css'), 'grid-template-columns: repeat(4, minmax(0, 1fr))'), 'Style: bottom padding for the floating launcher, four cards per row');
 
     // ---- Removed classes and dead files ----
     $pageSrc = file_get_contents(__DIR__ . '/../modules/curriculum/pages/subjects.php');

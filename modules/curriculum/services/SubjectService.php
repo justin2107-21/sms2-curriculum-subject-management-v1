@@ -74,6 +74,28 @@ class SubjectService
         return $subject;
     }
 
+    /** Cards of the By program tab (server-side search, College / SHS filter, paging). */
+    public function programCards(array $input): array
+    {
+        $perPage = filter_var($input['per_page'] ?? 60, FILTER_VALIDATE_INT);
+        if ($perPage === false || !in_array((int)$perPage, [20, 40, 60, 100], true)) {
+            throw new DomainValidationException('Per page must be 20, 40, 60 or 100.');
+        }
+        $query = DomainValidator::listQuery(array_merge($input, ['per_page' => 20]));
+        $query['per_page'] = (int)$perPage;
+        $level = DomainValidator::optionalString($input, 'level', 'Level', 10) ?? 'all';
+        if (!in_array($level, ['all', 'college', 'shs'], true)) {
+            throw new DomainValidationException('Invalid level filter.');
+        }
+        $query['level'] = $level;
+        $result = $this->subjects->programCards($query);
+        $programs = array_map(static fn(array $p): array => [
+            'id' => (int)$p['id'], 'program_code' => $p['program_code'], 'program_name' => $p['program_name'], 'level' => (int)$p['is_shs'] === 1 ? 'shs' : 'college',
+            'subject_count' => (int)$p['subject_count'], 'curriculum_count' => (int)$p['curriculum_count'],
+        ], $result['records']);
+        return ['programs' => $programs, 'pagination' => $result['pagination'], 'groups' => $result['groups']];
+    }
+
     /** Placements of one version with the filters of the By program tab, plus whole-version totals (units of all placements and of required placements). */
     public function versionPlacements(array $input): array
     {

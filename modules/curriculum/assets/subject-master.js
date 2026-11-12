@@ -47,18 +47,19 @@
         ? '<span class="csms-sub">' + num(row.lecture_units) + ' lecture · ' + num(row.laboratory_units) + ' lab</span>' : '';
 
     // ---------- the address (view, filters, sort and page) ----------
-    const OWN = ['view', 'q', 'status', 'program', 'placed', 'sort', 'dir', 'per_page', 'page', 'pq', 'year', 'sem', 'pst', 'subject_id'];
+    const OWN = ['view', 'q', 'status', 'program', 'placed', 'sort', 'dir', 'per_page', 'page', 'pq', 'year', 'sem', 'pst', 'subject_id', 'cq', 'lvl', 'cpage'];
     function writeUrl(extra, push) {
         const params = new URLSearchParams(window.location.search);
         OWN.forEach(key => params.delete(key));
         params.set('view', state.view);
-        Object.entries(extra || {}).forEach(([key, value]) => { if (value !== '' && value !== null && value !== undefined && !(key === 'per_page' && String(value) === '20') && !(key === 'page' && Number(value) <= 1) && !(key === 'dir' && value === 'asc')) params.set(key, String(value)); });
+        Object.entries(extra || {}).forEach(([key, value]) => { if (value !== '' && value !== null && value !== undefined && !(key === 'per_page' && String(value) === '20') && !((key === 'page' || key === 'cpage') && Number(value) <= 1) && !(key === 'dir' && value === 'asc')) params.set(key, String(value)); });
         const url = window.location.pathname + '?' + params.toString();
         if (url !== window.location.pathname + window.location.search) window.history[push ? 'pushState' : 'replaceState'](null, '', url);
     }
     const allExtra = () => ({ q: $('subjectSearch').value.trim(), status: $('subjectStatus').value, program: programValue(), placed: $('subjectPlaced')?.value || '', sort: list.sort, dir: list.direction, per_page: $('subjectPerPage').value, page: list.page });
     const programExtra = () => ({ pq: $('programSearch2').value.trim(), year: $('programYear').value, sem: $('programSemester').value, pst: $('programStatus').value });
-    function writeCurrent(push) { writeUrl(state.view === 'all' ? allExtra() : programExtra(), push); }
+    const cardExtra = () => ({ cq: $('cardSearch').value.trim(), lvl: cards.level === 'all' ? '' : cards.level, cpage: cards.page });
+    function writeCurrent(push) { writeUrl(state.view === 'all' ? allExtra() : (cascade ? programExtra() : cardExtra()), push); }
     function readUrl() {
         const p = new URLSearchParams(window.location.search);
         $('subjectSearch').value = p.get('q') || '';
@@ -69,6 +70,9 @@
         list.direction = p.get('dir') === 'desc' ? 'desc' : 'asc';
         list.page = Math.max(1, parseInt(p.get('page'), 10) || 1);
         state.pendingProgram = p.get('program') || '';
+        $('cardSearch').value = p.get('cq') || '';
+        cards.level = ['college', 'shs'].includes(p.get('lvl')) ? p.get('lvl') : 'all';
+        cards.page = Math.max(1, parseInt(p.get('cpage'), 10) || 1);
         $('programSearch2').value = p.get('pq') || '';
         state.pendingYear = p.get('year') || ''; state.pendingSemester = p.get('sem') || '';
         $('programStatus').value = ['active', 'inactive'].includes(p.get('pst')) ? p.get('pst') : '';
@@ -81,14 +85,18 @@
         state.view = view;
         $('viewAll').hidden = view !== 'all';
         $('viewProgram').hidden = view !== 'program';
-        if ($('subjectContextBar')) $('subjectContextBar').hidden = view !== 'program';
+        const table = view === 'program' && Boolean(cascade);
+        if ($('subjectContextBar')) $('subjectContextBar').hidden = !table;
+        if ($('programBackRow')) $('programBackRow').hidden = !table;
+        $('programCardsView').hidden = !(view === 'program' && !cascade);
+        $('programTableView').hidden = !table;
         document.querySelectorAll('#subjectViews [role="tab"]').forEach(tab => {
             const active = tab.dataset.view === view;
             tab.setAttribute('aria-selected', active ? 'true' : 'false');
             if (active) tab.removeAttribute('tabindex'); else tab.setAttribute('tabindex', '-1');
         });
         writeCurrent(push);
-        if (view === 'all') loadList(); else loadPlacements();
+        if (view === 'all') loadList(); else if (cascade) loadPlacements(); else loadCards();
     }
     document.querySelectorAll('#subjectViews [role="tab"]').forEach(tab => tab.addEventListener('click', () => { if (tab.dataset.view !== state.view) showView(tab.dataset.view, true); }));
     document.getElementById('subjectViews').addEventListener('keydown', event => {
@@ -191,7 +199,7 @@
             list.sort = button.dataset.sort; list.page = 1; writeCurrent(true); loadList();
         });
     });
-    window.addEventListener('popstate', () => { readUrl(); syncProgramPicker(); const view = new URLSearchParams(window.location.search).get('view'); showView(view === 'program' ? 'program' : 'all', false); });
+    window.addEventListener('popstate', () => { readUrl(); syncProgramPicker(); const view = new URLSearchParams(window.location.search).get('view'); showView(view === 'program' && canBrowse ? 'program' : 'all', false); });
     $('subjectRows').addEventListener('click', event => {
         const menu = event.target.closest('[data-menu]');
         if (menu) { const row = list.records.get(Number(menu.dataset.menu)); if (row) rowMenu?.open(menu, menuItems(row)); return; }
@@ -245,18 +253,39 @@
     }
 
     // ---------- By program ----------
-    const cascade = canBrowse ? ui.createCascadingAutocomplete({ levels: ['program', 'curriculum', 'version'].map((key, index) => ({
+    // The shared Program > Curriculum > Version bar exists only in the table view (a program was chosen from a card or the address names one).
+    let cascade = null;
+    function initCascade() { cascade = ui.createCascadingAutocomplete({ levels: ['program', 'curriculum', 'version'].map((key, index) => ({
         input: $(key + 'Search'), valueInput: $(key + 'Id'), list: $(key + 'Options'), minimumLength: 0, showSuggestionsOnFocus: true, showSuggestionsOnEnable: true,
         placeholder: index === 0 ? 'Search program code or name' : 'Search ' + key, disabledPlaceholder: index === 1 ? 'Choose program first' : 'Choose curriculum first',
         search: async query => (await ui.fetchJson(api, { action: 'context_options', level: key, ...ctxIds(), search: query })).options,
         format: item => ({ label: [item.code, item.title].filter(Boolean).join(' — '), code: item.code, title: item.title || '' })
-    })), onChange: (index, item) => { state.ctx[index] = item || null; for (let i = index + 1; i < 3; i += 1) state.ctx[i] = null; clearTimeout(state.timer); state.timer = setTimeout(loadPlacements, 250); } }) : null;
+    })), onChange: (index, item) => { state.ctx[index] = item || null; for (let i = index + 1; i < 3; i += 1) state.ctx[i] = null; clearTimeout(state.timer); state.timer = setTimeout(loadPlacements, 250); } }); }
     function ctxIds() {
         const out = {};
         [['program_id', 0], ['curriculum_id', 1]].forEach(([key, i]) => { const id = cascade?.get(i)?.getSelectedId?.(); if (id) out[key] = id; });
         return out;
     }
     const ctxId = i => cascade?.get(i)?.getSelectedId?.() || '';
+    // Opened from a card (or an address with program_id): the shared context resolves what it can; whatever it leaves empty is filled in here so
+    // the bar is always prefilled with the chosen program, and with its curriculum and version when there is exactly one curriculum.
+    function resolveContext(programId) {
+        setTimeout(async () => {
+            const item = state.programs.get(String(programId));
+            if (!cascade || !item || cascade.get(2).hasSelection()) return;
+            try {
+                const program = { id: item.id, code: item.code, title: item.name, program_type: item.level === 'shs' ? 'Senior High School' : "Bachelor's Degree" };
+                if (!cascade.get(0).hasSelection()) { cascade.get(0).setSelected(program, false); state.ctx[0] = program; }
+                if (cascade.get(1).hasSelection()) return;
+                const curricula = (await ui.fetchJson(api, { action: 'context_options', level: 'curriculum', program_id: programId, search: '' })).options || [];
+                if (curricula.length !== 1 || cascade.get(1).hasSelection()) return;
+                cascade.get(1).setSelected(curricula[0], false); state.ctx[1] = curricula[0];
+                const versions = (await ui.fetchJson(api, { action: 'context_options', level: 'version', program_id: programId, curriculum_id: curricula[0].id, search: '' })).options || [];
+                const pick = [...versions].reverse().find(v => v.status === 'active') || versions[versions.length - 1];
+                if (pick && !cascade.get(2).hasSelection()) cascade.get(2).setSelected(pick, true);
+            } catch (error) { /* the bar stays as it is; the user can choose */ }
+        }, 1800);
+    }
     function programStates(which, message) {
         $('programNoVersion').hidden = which !== 'noVersion';
         $('programLoading').hidden = which !== 'loading';
@@ -322,6 +351,59 @@
     $('programRetry').addEventListener('click', loadPlacements);
     $('programRows').addEventListener('click', event => { const tr = event.target.closest('[data-subject]'); if (tr) openDetails(Number(tr.dataset.subject)); });
     $('programRows').addEventListener('keydown', event => { if (event.target.matches?.('[data-subject]') && ['Enter', ' '].includes(event.key)) { event.preventDefault(); openDetails(Number(event.target.dataset.subject)); } });
+
+    // ---------- By program: program and strand cards ----------
+    const cards = { page: 1, level: 'all', request: 0 };
+    function cardStates(which, message) {
+        $('cardLoading').hidden = which !== 'loading';
+        $('cardEmpty').hidden = which !== 'empty';
+        $('cardNoMatch').hidden = which !== 'nomatch';
+        $('cardError').hidden = which !== 'error';
+        $('cardGroups').hidden = which !== 'list';
+        $('cardPagination').hidden = which !== 'list';
+        if (which === 'error') $('cardErrorText').textContent = message || '';
+    }
+    function cardHtml(program) {
+        const subjects = Number(program.subject_count), curricula = Number(program.curriculum_count);
+        const meta = curricula === 0 ? 'No curriculum yet' : subjects + (subjects === 1 ? ' subject' : ' subjects') + ' · ' + curricula + (curricula === 1 ? ' curriculum' : ' curricula');
+        return '<a class="csms-card subject-card" href="subjects.php?view=program&program_id=' + Number(program.id) + '" aria-label="Open ' + esc(program.program_code) + ', ' + esc(meta) + '">' +
+            '<span class="subject-card__code">' + esc(program.program_code) + '</span><span class="subject-card__name">' + esc(program.program_name) + '</span><span class="subject-card__meta">' + esc(meta) + '</span></a>';
+    }
+    async function loadCards() {
+        const ticket = ++cards.request;
+        document.querySelectorAll('#cardLevel [data-level]').forEach(b => b.setAttribute('aria-pressed', b.dataset.level === cards.level ? 'true' : 'false'));
+        cardStates('loading');
+        const params = { action: 'program_cards', page: cards.page, per_page: 60 };
+        const q = $('cardSearch').value.trim();
+        if (q.length >= SEARCH_MIN) params.search = q;
+        if (cards.level !== 'all') params.level = cards.level;
+        try {
+            const payload = await ui.fetchJson(api, params);
+            if (ticket !== cards.request) return;
+            const total = Number(payload.pagination.total_records);
+            ui.setCount($('cardCount'), total);
+            if (Number(payload.pagination.page) !== cards.page) cards.page = Number(payload.pagination.page);
+            if (!payload.programs.length) { cardStates(q.length >= SEARCH_MIN || cards.level !== 'all' ? 'nomatch' : 'empty'); return; }
+            ['college', 'shs'].forEach(level => {
+                const rows = payload.programs.filter(p => p.level === level);
+                const section = document.querySelector('#cardGroups [data-group="' + level + '"]');
+                section.hidden = rows.length === 0;
+                $(level === 'college' ? 'cardGridCollege' : 'cardGridShs').innerHTML = rows.map(cardHtml).join('');
+                $(level === 'college' ? 'cardCountCollege' : 'cardCountShs').textContent = payload.groups[level];
+            });
+            ui.renderPagination($('cardPagination'), payload.pagination, page => { cards.page = page; writeCurrent(true); loadCards(); });
+            $('cardPagination').hidden = Number(payload.pagination.total_pages) <= 1;
+            cardStates('list');
+            $('cardPagination').hidden = Number(payload.pagination.total_pages) <= 1;
+        } catch (error) {
+            if (ticket !== cards.request) return;
+            cardStates('error', friendly(error));
+        }
+    }
+    $('cardSearch').addEventListener('input', ui.debounce(() => { if ($('cardSearch').value.trim().length === 1) return; cards.page = 1; writeCurrent(false); loadCards(); }, 300));
+    $('cardLevel').addEventListener('click', event => { const b = event.target.closest('[data-level]'); if (!b || b.dataset.level === cards.level) return; cards.level = b.dataset.level; cards.page = 1; writeCurrent(true); loadCards(); });
+    $('cardClear').addEventListener('click', () => { $('cardSearch').value = ''; cards.level = 'all'; cards.page = 1; writeCurrent(true); loadCards(); });
+    $('cardRetry').addEventListener('click', loadCards);
 
     // ---------- the one dialog (details, create, edit) ----------
     const dialogEl = $('subjectDialog');
@@ -505,6 +587,8 @@
     async function start() {
         readUrl();
         listStates('loading');
+        const programFromUrl = new URLSearchParams(window.location.search).get('program_id');
+        if (canBrowse && state.view === 'program' && programFromUrl) { initCascade(); resolveContext(programFromUrl); }
         await loadPrograms();
         showView(state.view, false);
         const open = Number(root.dataset.openSubject);

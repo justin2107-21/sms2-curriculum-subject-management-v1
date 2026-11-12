@@ -1,6 +1,9 @@
 /* Subjects (Subject Master): header, tabs, filter row, table, chips, menu, empty states and the dialog shell come from the shared csms-*
    components and the curriculum dialog classes; only what has no shared class is here (same approach as Equivalency and Compliance). */
-.subject-master-content { min-width: 0; }
+.subject-master-content { min-width: 0; padding-bottom: 96px; } /* keeps the floating assistant launcher off the last row and the row menu */
+.subject-back-row { margin: 16px 0 0; }
+.subject-back-row + .mapping-context-bar { margin-top: 12px; }
+.subject-back-row[hidden] { display: none; }
 .subject-master-content [hidden], #subjectDialog [hidden] { display: none !important; }
 
 /* Filter row: one line from 1280px up, 12px to the table (as Equivalency); wraps with the same spacing below that. */
@@ -35,6 +38,21 @@
 .csms-ctable__num .csms-sub { white-space: nowrap; }
 #programSummary { margin: 0 0 12px; }
 .subject-title-cell { max-width: 32rem; overflow-wrap: anywhere; }
+
+/* Program and strand cards (the shared csms-card, four per row at 1440). */
+.subject-card-groups { display: flex; flex-direction: column; gap: 20px; margin-top: 16px; }
+.subject-group-heading { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; font-size: 18px; }
+.subject-card-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.subject-card { gap: 6px; padding: 16px 18px; color: inherit; text-decoration: none; min-width: 0; }
+.subject-card:hover { border-color: var(--csms-navy, #1a3a8c); }
+.subject-card:focus-visible { outline: 3px solid var(--csms-focus, #2563eb); outline-offset: 2px; }
+.subject-card__code { font-size: 18px; font-weight: 700; color: var(--csms-code-blue, #2163c5); }
+.subject-card__name { font-size: 14px; font-weight: 600; color: var(--csms-text, #1f2937); overflow-wrap: anywhere; }
+.subject-card__meta { font-size: 13px; color: var(--csms-text-secondary, #374151); }
+@media (max-width: 1279px) { .subject-card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 899px) { .subject-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .subject-card-grid { grid-template-columns: 1fr; } }
+#cardLevel { flex: 0 0 auto; }
 
 /* Dialog. */
 .subject-dialog { max-width: 640px; width: 100%; }

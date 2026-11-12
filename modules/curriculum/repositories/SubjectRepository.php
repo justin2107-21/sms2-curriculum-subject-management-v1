@@ -198,6 +198,39 @@ class SubjectRepository
                 JOIN academic_programs ap ON ap.id = c.academic_program_id WHERE p.subject_id = ?', 'i', [$subjectId]), static fn(array $v): bool => !CurriculumVersionEditPolicy::isEditable($v)));
     }
 
+    /**
+     * Program and strand cards for the By program tab: code, name, distinct subjects placed in any version of the program (readable versions only)
+     * and number of curricula. Server-side search over code and name, College / SHS filter and paging; college programs come first.
+     */
+    public function programCards(array $query): array
+    {
+        $shs = "(LOWER(TRIM(COALESCE(ap.program_type, ''))) LIKE '%senior high%' OR LOWER(TRIM(COALESCE(ap.program_type, ''))) = 'shs' OR LOWER(TRIM(COALESCE(ap.program_type, ''))) LIKE '%strand%')";
+        $conditions = ['ap.archived_at IS NULL'];
+        $types = '';
+        $params = [];
+        if ($query['search'] !== null) {
+            $conditions[] = '(' . RepositoryQuery::searchColumn('ap.program_code') . " LIKE ? ESCAPE '=' OR " . RepositoryQuery::searchColumn('ap.program_name') . " LIKE ? ESCAPE '=')";
+            $pattern = RepositoryQuery::likePattern($query['search']);
+            $types .= 'ss';
+            array_push($params, $pattern, $pattern);
+        }
+        $searchWhere = ' WHERE ' . implode(' AND ', $conditions);
+        $groups = $this->rows("SELECT COALESCE(SUM(NOT $shs), 0) AS college, COALESCE(SUM($shs), 0) AS shs FROM academic_programs ap" . $searchWhere, $types, $params)[0];
+        if ($query['level'] === 'college') $conditions[] = "NOT $shs";
+        if ($query['level'] === 'shs') $conditions[] = $shs;
+        $where = ' WHERE ' . implode(' AND ', $conditions);
+        $total = (int)$this->rows('SELECT COUNT(*) AS total FROM academic_programs ap' . $where, $types, $params)[0]['total'];
+        $pagination = RepositoryQuery::pagination($total, $query['page'], $query['per_page']);
+        $scope = CurriculumReadScope::sql('v');
+        $rows = $this->rows("SELECT ap.id, ap.program_code, ap.program_name, ap.program_type, ($shs) AS is_shs,
+                (SELECT COUNT(*) FROM curricula c WHERE c.academic_program_id = ap.id) AS curriculum_count,
+                (SELECT COUNT(DISTINCT p.subject_id) FROM curriculum_version_subjects p JOIN curriculum_versions v ON v.id = p.curriculum_version_id JOIN curricula c ON c.id = v.curriculum_id
+                  WHERE c.academic_program_id = ap.id" . ($scope !== '' ? ' AND ' . $scope : '') . ") AS subject_count
+            FROM academic_programs ap" . $where . ' ORDER BY is_shs ASC, ap.program_code ASC, ap.id ASC LIMIT ? OFFSET ?', $types . 'ii', array_merge($params, [$pagination['per_page'], $pagination['offset']]));
+        unset($pagination['offset']);
+        return ['records' => $rows, 'pagination' => $pagination, 'groups' => ['college' => (int)$groups['college'], 'shs' => (int)$groups['shs']]];
+    }
+
     /** All placements of one version, filtered, for the By program tab (a version holds tens to a few hundred placements). */
     public function versionPlacements(int $versionId, array $filters): array
     {

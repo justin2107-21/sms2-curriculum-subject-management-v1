@@ -25,6 +25,12 @@ try {
             $input['_include_usage'] = user_can(current_user_id(), 'curriculum.view');
             json_response(true, 'Subjects loaded.', $service->list($input));
 
+        case 'program_cards':
+            curriculum_require_read('subject.view');
+            curriculum_require_read('program.view');
+            curriculum_require_read('curriculum.view');
+            json_response(true, 'Programs loaded.', $service->programCards($_GET));
+
         case 'program_filter_options':
             curriculum_require_read('subject.view');
             curriculum_require_read('curriculum.view');
