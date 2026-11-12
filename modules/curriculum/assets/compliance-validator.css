@@ -32,3 +32,7 @@
 .compliance-content .mapping-workspace-header .page-title .csms-info { vertical-align: middle; }
 .compliance-content .mapping-workspace-header .page-title .csms-info__btn { width: 24px; height: 24px; }
 .compliance-content .mapping-workspace-header > :not(:first-child) { white-space: nowrap; }
+/* Same 16px between tabs and the context bar as Electives Manager has between its context bar and tabs. */
+.compliance-content .csms-tabs + .mapping-context-bar { margin-top: 16px; }
+/* The read-only chip stays on the title's line, so the header keeps the height it has for managers. */
+.compliance-content .mapping-workspace-header { flex-wrap: nowrap; }

@@ -55,7 +55,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
       </div>
       <?php if ($canManage): ?><button type="button" class="primary-action-button" id="ruleAdd" hidden><i class="fa-solid fa-plus" aria-hidden="true"></i> Add rule</button>
       <button type="button" class="primary-action-button" id="sourceAdd" hidden><i class="fa-solid fa-plus" aria-hidden="true"></i> Add source</button><?php endif; ?>
-      <?php if (!$canRun && !$canManage): ?><span class="csms-chip csms-chip--draft">Read-only for your role</span><?php endif; ?>
+      <?php if (!$canRun && !$canManage): ?><span class="csms-chip csms-chip--draft">View only</span><?php endif; ?>
     </div>
 
     <section class="mapping-workspace-shell">

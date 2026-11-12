@@ -93,7 +93,7 @@ try {
     ok(!preg_match('/mapping-filter-card|read-only-pill|curriculum-notice|list-toolbar/', $body) && !preg_match('/domain-card|domain-table/', file_get_contents(__DIR__ . '/../modules/curriculum/pages/compliance_validator.php')), 'Page: no retired classes');
     ok(str_contains($body, 'Run validation') && str_contains($body, 'Run validation to see results for this version') && str_contains($body, 'No rules apply to this program'), 'Page: run button and the two Results empty states');
     $vpage = $viewer->request('modules/curriculum/pages/compliance_validator.php');
-    ok($vpage['status'] === 200 && !str_contains($vpage['body'], 'id="runValidation"') && !str_contains($vpage['body'], 'id="ruleAdd"') && str_contains($vpage['body'], 'Read-only for your role'), 'View-only role: no run, add rule or add source controls');
+    ok($vpage['status'] === 200 && !str_contains($vpage['body'], 'id="runValidation"') && !str_contains($vpage['body'], 'id="ruleAdd"') && str_contains($vpage['body'], 'View only'), 'View-only role: no run, add rule or add source controls');
     ok($none->request('modules/curriculum/pages/compliance_validator.php')['status'] === 403, 'No compliance.view: page refused');
     foreach (['validate_curriculum' => 'results', 'compliance_rules' => 'rules', 'compliance_references' => 'sources', 'validation_history' => 'history'] as $old => $view) {
         $r = $manager->request("modules/curriculum/pages/$old.php?curriculum_version_id=1");
@@ -308,6 +308,8 @@ try {
     // ---- Builder verification path for sources, and the retired code ----
     $js = file_get_contents(__DIR__ . '/../modules/curriculum/assets/compliance-validator.js');
     ok(!preg_match('/Internal Compliance Status|\bcompliant\b|official BCP/i', $js . file_get_contents(__DIR__ . '/../modules/curriculum/pages/compliance_validator.php')), 'Page code: no old status wording, no verdict word');
+    $css = file_get_contents(__DIR__ . '/../modules/curriculum/assets/compliance-validator.css');
+    ok(str_contains($css, '.csms-tabs + .mapping-context-bar { margin-top: 16px; }') && str_contains(file_get_contents(__DIR__ . '/../modules/curriculum/assets/electives-manager.css'), '.mapping-context-bar + .csms-tabs { margin-top: 16px; }'), 'Tabs and context bar keep a 16px gap, the same value Electives Manager uses (the screenshot check measures the bounding boxes)');
     ok(str_contains($js, 'Cannot determine from stored data') && str_contains($js, 'Source confirmed'), 'JS uses the new wording');
     ok(str_contains($js, "const EVIDENCE_TEXT = 'Evidence is a locator and fingerprint recorded by a person. It is not a stored document.'") && str_contains($js, "evidenceHead('evidenceTipDetail'") && str_contains($js, "evidenceHead('evidenceTipForm'"), 'The evidence sentence lives in the source detail dialog and the add/edit source dialog as a csms-info');
 } finally {
