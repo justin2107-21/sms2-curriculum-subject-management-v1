@@ -219,6 +219,12 @@ const terms = () => [...el('mappingMap').innerHTML.matchAll(/<tr class="map-tabl
     clickCell(cell(103));
     assert.equal(el('mapAddModal').hidden, false); assert.equal(el('mapAddRationale').value, ''); assert.equal(el('mapAddRationale').selected, true);
     assert.equal(posted.length, 0, 'opening the dialog saves nothing');
+    assert.equal(el('mapAccessNote').textContent, 'Check mark = this subject is linked to the outcome. Click a cell to add or remove a link.', 'one legend line above the grid');
+    assert.equal(el('mapAddContext').textContent, 'S3 Subject 3 \u2192 IT01 Apply knowledge of computing, science, and mathematics appropriate to the discipline'); assert.equal(el('mapAddContext').title, el('mapAddContext').textContent, 'the full text is in the title'); assert.equal(el('mapAddExample').textContent, 'IT01');
+    const uiText = ['modules/curriculum/pages/subject_mapping.php', 'modules/curriculum/assets/subject-mapping-final.js', 'modules/curriculum/assets/outcomes-presentation.js'].map(f => fs.readFileSync(f, 'utf8')).join('\n');
+    for (const old of ['<span>Rationale', 'Academic rationale', '<strong>Rationale:', "fact('Rationale'", 'Edit rationale', 'Enter the rationale']) assert.ok(!uiText.includes(old), 'no user-facing "' + old + '"');
+    assert.ok(uiText.includes('Why does this subject support this outcome?') && uiText.includes('One short sentence. Example: Introduces computing concepts used in') && uiText.includes('Shift+Enter adds a line'), 'new label and helper text');
+    assert.ok(/<textarea id="mapAddRationale" name="rationale" rows="4" maxlength="3000" required/.test(uiText), 'still required, same field name and limit');
     await sendAdd(); assert.equal(posted.length, 0, 'a blank rationale is not sent'); assert.equal(el('mapAddModal').hidden, false);
     el('mapAddRationale').value = 'Covers IT01 through lab work.'; await sendAdd();
     assert.deepEqual([posted[0].action, posted[0].placement_id, posted[0].outcome_id, posted[0].rationale], ['add', '103', '1', 'Covers IT01 through lab work.']);

@@ -377,7 +377,7 @@ class CurriculumExportService
             $this->csvRow($stream, []);
             $this->csvRow($stream, ['CHED CMO 25 BSIT Graduate Outcome Mapping — source and coverage; not attainment or compliance evidence']);
             $this->csvRow($stream, ['Disclaimer','Curriculum mapping does not establish student outcome attainment, regulatory compliance, or institutional approval.']);
-            $this->csvRow($stream, ['Outcome Code','Outcome Description','Source Document','Document Title','Section','Printed Page','PDF Page','Source SHA-256','Coverage Status','Subject Code','Subject Title','Year','Semester','Mapping Rationale','Mapping Origin']);
+            $this->csvRow($stream, ['Outcome Code','Outcome Description','Source Document','Document Title','Section','Printed Page','PDF Page','Source SHA-256','Coverage Status','Subject Code','Subject Title','Year','Semester','Why this subject supports this outcome','Mapping Origin']);
             foreach ($dataset['graduate_outcomes'] as $outcome) {
                 if (!$outcome['mappings']) $this->csvRow($stream,[$outcome['outcome_code'],$outcome['outcome_text'],$outcome['document_code'],$outcome['document_title'],$outcome['source_section'],$outcome['printed_page'],$outcome['pdf_page_index'],$outcome['source_sha256'],$outcome['coverage_status']]);
                 foreach($outcome['mappings'] as $mapping)$this->csvRow($stream,[$outcome['outcome_code'],$outcome['outcome_text'],$outcome['document_code'],$outcome['document_title'],$outcome['source_section'],$outcome['printed_page'],$outcome['pdf_page_index'],$outcome['source_sha256'],$outcome['coverage_status'],$mapping['subject_code'],$mapping['subject_title'],$mapping['year_level'],$mapping['semester'],$mapping['rationale'],$mapping['mapping_origin']]);
@@ -386,7 +386,7 @@ class CurriculumExportService
         if (!empty($dataset['course_learning_outcomes'])) {
             $this->csvRow($stream, []);
             $this->csvRow($stream, ['Course Learning Outcomes and Planned Assessment','Planning records only; no student attainment is represented.']);
-            $this->csvRow($stream, ['Subject','CLO code','CLO statement','CLO status','Review state','Record type','Graduate outcome','Alignment rationale','Assessment method','Planned task','Evidence','Performance indicator','Rubric / standard','Record review state']);
+            $this->csvRow($stream, ['Subject','CLO code','CLO statement','CLO status','Review state','Record type','Graduate outcome','Why this CLO supports this outcome','Assessment method','Planned task','Evidence','Performance indicator','Rubric / standard','Record review state']);
             foreach ($dataset['course_learning_outcomes'] as $clo) {
                 $identity=[$clo['subject_code'].' · '.$clo['subject_title'],$clo['clo_code'],$clo['clo_statement'],$clo['record_state'],$clo['review_state']];
                 if (!$clo['alignments'] && !$clo['assessment_plans']) $this->csvRow($stream,array_merge($identity,['CLO','','','','','','','','']));

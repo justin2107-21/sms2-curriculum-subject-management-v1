@@ -206,8 +206,9 @@ require __DIR__ . '/../../../shared/sidebar.php';
     <div class="modal-header"><div><h2 id="mapAddTitle">Record outcome mapping</h2><p class="modal-context" id="mapAddContext"></p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
     <form class="domain-form" id="mapAddForm" novalidate>
       <div class="form-error" role="alert" hidden></div>
-      <label class="form-field form-field-wide"><span>Rationale <strong>*</strong></span><textarea id="mapAddRationale" name="rationale" rows="4" maxlength="3000" required></textarea></label>
-      <p class="mapping-edit-note">Why this subject supports this outcome. Enter saves; Shift+Enter adds a line.</p>
+      <label class="form-field form-field-wide"><span>Why does this subject support this outcome? <strong>*</strong></span><textarea id="mapAddRationale" name="rationale" rows="4" maxlength="3000" required aria-describedby="mapAddHelp"></textarea></label>
+      <p class="mapping-edit-note" id="mapAddHelp">One short sentence. Example: Introduces computing concepts used in <span id="mapAddExample">IT01</span>.</p>
+      <p class="mapping-edit-note mapping-edit-note--muted">Enter saves; Shift+Enter adds a line.</p>
       <div class="modal-actions"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="submit" class="button-primary">Save mapping</button></div>
     </form>
   </section>

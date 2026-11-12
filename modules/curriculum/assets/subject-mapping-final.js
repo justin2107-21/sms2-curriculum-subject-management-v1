@@ -555,9 +555,9 @@
     function updateAccessNote() {
         const note = el('mapAccessNote'), matrix = state.matrix;
         if (!note || !matrix || matrix.status !== 'ready') return;
-        const base = 'Which program outcomes each subject supports. Placements are edited in the Curriculum Builder.';
-        note.textContent = matrix.editable ? 'Click a cell to map or remove a subject-outcome link. Placements are edited in the Curriculum Builder.'
-            : (permission.manageOutcomes ? 'Read-only: this curriculum version cannot be edited. ' : 'Read-only for your role. ') + base;
+        const legend = 'Check mark = this subject is linked to the outcome. ';
+        note.textContent = matrix.editable ? legend + 'Click a cell to add or remove a link.'
+            : legend + (permission.manageOutcomes ? 'Read-only: this curriculum version cannot be edited.' : 'Read-only for your role.');
     }
     // Editing: a rationale dialog when a cell is checked, a confirmation when it is cleared. The server decides; its message is shown.
     const addModal = ui.createModal(el('mapAddModal'), { restoreFocus: () => null });
@@ -579,7 +579,8 @@
         } else {
             pendingAdd = { placement: row.placement_id, outcome: outcome.id };
             ui.clearFormError(el('mapAddForm'));
-            el('mapAddContext').textContent = row.subject_code + ' \u2192 ' + outcome.outcome_code;
+            const context = row.subject_code + ' ' + row.subject_title + ' \u2192 ' + outcome.outcome_code + ' ' + (outcome.outcome_text || '');
+            el('mapAddContext').textContent = context; el('mapAddContext').title = context; el('mapAddExample').textContent = outcome.outcome_code;
             el('mapAddRationale').value = lastRationale;
             addModal.open(); el('mapAddRationale').focus(); el('mapAddRationale').select();
         }
@@ -591,7 +592,7 @@
         event.preventDefault();
         if (!pendingAdd || !state.version) return;
         const text = el('mapAddRationale').value.trim();
-        if (!text) { ui.showFormError(el('mapAddForm'), 'Enter the rationale for this mapping.'); el('mapAddRationale').focus(); return; }
+        if (!text) { ui.showFormError(el('mapAddForm'), 'Explain why this subject supports this outcome.'); el('mapAddRationale').focus(); return; }
         ui.clearFormError(el('mapAddForm'));
         const data = new FormData();
         data.set('action', 'add'); data.set('curriculum_version_id', String(versionIdInput.value)); data.set('placement_id', String(pendingAdd.placement)); data.set('outcome_id', String(pendingAdd.outcome)); data.set('rationale', text);

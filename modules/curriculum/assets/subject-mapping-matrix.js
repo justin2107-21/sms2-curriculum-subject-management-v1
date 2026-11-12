@@ -43,7 +43,7 @@
         }));
         const foot = '<tr><th colspan="2" scope="row">Subjects mapped</th>' + counts(rows, outcomes, idx).map(n => '<td class="map-table__cell">' + n + '</td>').join('') + '</tr>';
         return '<div class="map-scroll"><table class="map-table"><thead>' + head + '</thead><tbody>' + body + '</tbody><tfoot>' + foot + '</tfoot></table></div>' +
-            '<p class="map-legend">' + (h.editable ? 'Click a cell to map or remove. ' : '') + '<span class="map-cell map-cell--on" aria-hidden="true"><i class="fa-solid fa-check"></i></span> mapped · <span class="map-cell" aria-hidden="true">–</span> not mapped. Hover or focus a column heading for the full outcome. Mapping does not establish attainment, compliance or institutional approval.</p>';
+            '<p class="map-legend">' + '<span class="map-cell map-cell--on" aria-hidden="true"><i class="fa-solid fa-check"></i></span> mapped · <span class="map-cell" aria-hidden="true">–</span> not mapped. Hover or focus a column heading for the full outcome. Mapping does not establish attainment, compliance or institutional approval.</p>';
     }
     window.SubjectMappingMatrix = { mapCell, index, isMapped, counts, render };
 }());

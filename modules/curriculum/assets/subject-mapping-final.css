@@ -258,6 +258,9 @@
 .map-table tfoot th, .map-table tfoot td { position: sticky; bottom: 0; z-index: 2; border-bottom: 0; border-top: 2px solid var(--csms-border, #dfe4ee); font-weight: 700; background: var(--csms-surface-muted, #f4f6fb); }
 .map-cell { display: inline-flex; align-items: center; justify-content: center; min-width: 1rem; color: var(--csms-text-muted, #5b6478); }
 .map-cell--on { color: var(--csms-navy, #1a3a8c); }
+#mapAddModal .modal-header > div:first-child { min-width: 0; flex: 1 1 auto; }
+#mapAddContext { display: block; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mapping-edit-note--muted { margin-top: 0; color: #475569; }
 .map-legend { margin: 8px 2px 0; font-size: 13px; color: var(--csms-text-secondary, #374151); }
 @media (max-width: 600px) { .map-table .map-table__name { position: static; min-width: 11rem; } .map-table .map-table__code { width: 5.5rem; min-width: 5.5rem; padding-left: 10px; } }
 /* The matrix scrolls inside its card; no ancestor may grow to its width. */
