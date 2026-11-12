@@ -627,9 +627,24 @@ class DomainValidator
         ];
     }
 
+    /** Page size 10 / 20 / 50 / 100 and the demo switch shared by the Compliance Validator lists. */
+    private static function complianceListBase(array $input): array
+    {
+        $perPage = filter_var($input['per_page'] ?? 20, FILTER_VALIDATE_INT);
+        if ($perPage === false || !in_array((int)$perPage, [10, 20, 50, 100], true)) {
+            throw new DomainValidationException('Per page must be 10, 20, 50 or 100.');
+        }
+        $query = self::listQuery(array_merge($input, ['per_page' => 20]));
+        $query['per_page'] = (int)$perPage;
+        $includeDemo = self::optionalString($input, 'include_demo', 'Include demo', 1);
+        if ($includeDemo !== null && !in_array($includeDemo, ['0', '1'], true)) throw new DomainValidationException('Include demo must be 0 or 1.');
+        $query['include_demo'] = $includeDemo === '1';
+        return $query;
+    }
+
     public static function complianceReferenceQuery(array $input): array
     {
-        $query = self::listQuery($input);
+        $query = self::complianceListBase($input);
         $type = self::optionalString($input, 'reference_type', 'Reference type', 30);
         if ($type !== null) {
             $type = strtoupper($type);
@@ -718,7 +733,7 @@ class DomainValidator
 
     public static function complianceRuleQuery(array $input): array
     {
-        $query = self::listQuery($input);
+        $query = self::complianceListBase($input);
         $query['compliance_reference_id'] = self::optionalPositiveId(
             $input['compliance_reference_id'] ?? null,
             'Compliance reference'
@@ -758,7 +773,7 @@ class DomainValidator
 
     public static function complianceHistoryQuery(array $input): array
     {
-        $query = self::listQuery($input);
+        $query = self::complianceListBase($input);
         $query['academic_program_id'] = self::optionalPositiveId(
             $input['academic_program_id'] ?? null,
             'Academic program'

@@ -481,6 +481,10 @@ class CurriculumExportService
         }
         $name = trim((string)$run['run_by_first_name'] . ' ' . (string)$run['run_by_last_name']);
         $run['run_by_name'] = $name !== '' ? $name : ($run['run_by_username'] ?: 'Unknown user');
+        // Counts in the words used on the Compliance Validator page. There is no overall verdict.
+        $run['met_count'] = (int)$run['passed_count'];
+        $run['not_met_count'] = (int)$run['failed_count'];
+        $run['cannot_determine_count'] = (int)$run['not_evaluated_count'];
         return $run;
     }
 

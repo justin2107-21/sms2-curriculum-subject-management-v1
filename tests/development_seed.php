@@ -102,12 +102,12 @@ foreach(['pending','equivalent','not_equivalent'] as $decision) {
 $placement=(int)$conn->query("SELECT id FROM curriculum_version_subjects WHERE curriculum_version_id=$v1 AND subject_id=$subject")->fetch_row()[0];
 $scheme=(new GradeWeightingService($conn))->getSchemeForPlacement($placement)['scheme'];
 seedCheck($scheme['total_weight']==='100.00' && $scheme['completion_status']==='complete','Demo weights exactly 100');
-$run=(new ComplianceValidationService($conn))->run($v1,$actor);
+$run=(new ComplianceValidationService($conn))->run($v1,$actor,true);
 seedCheck($run['summary']===['rules_evaluated'=>5,'passed'=>3,'failed'=>1,'not_evaluated'=>1],'Demo synthetic compliance outcomes');
 $exportService=new CurriculumExportService($conn);
 $export=$exportService->dataset(['academic_program_id'=>$program,'curriculum_id'=>$curriculum,'curriculum_version_id'=>$v1,
     'include_requirements'=>1,'include_electives'=>1,'include_grade_weighting'=>1,'include_compliance'=>1]);
-seedCheck(count($export['subjects'])===5 && count($export['requirements'])===3 && $export['latest_compliance_run']!==null,'Demo export all optional sections');
+seedCheck(count($export['subjects'])===5 && count($export['requirements'])===3 && $export['latest_compliance_run']===null,'Demo export all optional sections (a run that evaluated demo rules is not exported)');
 $csv=fopen('php://temp','w+b');$exportService->writeCsv($csv,$export);
 seedCheck(ftell($csv)>0,'Demo CSV generated in memory');fclose($csv);
 $auditCount=(int)$conn->query('SELECT COUNT(*) FROM audit_logs')->fetch_row()[0];

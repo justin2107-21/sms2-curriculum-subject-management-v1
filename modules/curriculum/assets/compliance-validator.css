@@ -1,117 +1,18 @@
-.compliance-content { min-width: 0; }
-
-.compliance-content .table-scroll::-webkit-scrollbar { display: none; }
-.compliance-content .table-scroll { scrollbar-width: none; }
-
-.compliance-panel { min-width: 0; }
-.compliance-context-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-
-.compliance-results-card,
-.compliance-list-card { margin-bottom: 24px; }
-
-.compliance-summary {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  padding: 0 18px 16px;
-}
-
-.compliance-summary > div {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 10px 12px;
-}
-
-.compliance-summary span { color: #64748b; display: block; font-size: var(--csms-text-xs, .75rem); font-weight: 750; }
-.compliance-summary strong { color: #172554; display: block; font-size: 1rem; margin-top: 4px; }
-.compliance-summary .is-pass { background: #f0fdf4; border-color: #bbf7d0; }
-.compliance-summary .is-pass strong { color: #166534; }
-.compliance-summary .is-fail { background: #fff1f2; border-color: #fecdd3; }
-.compliance-summary .is-fail strong { color: #b42318; }
-.compliance-summary .is-neutral { background: #f8fafc; border-color: #cbd5e1; }
-
-.compliance-results-table { min-width: 1100px; }
-.compliance-rules-table { min-width: 1180px; }
-.compliance-reference-table { min-width: 980px; }
-.compliance-history-table { min-width: 1220px; }
-
-.compliance-name { color: #172554; display: block; font-size: var(--csms-text-xs, .75rem); font-weight: 800; min-width: 150px; }
-.compliance-subtext { color: #64748b; display: block; font-size: var(--csms-text-xs, .75rem); line-height: 1.4; margin-top: 3px; max-width: 260px; overflow-wrap: anywhere; }
-.compliance-reference-link { color: var(--sms2-sidebar-blue); font-size: var(--csms-text-xs, .75rem); font-weight: 750; text-decoration: none; }
-.compliance-reference-link:hover { text-decoration: underline; }
-.compliance-row-actions { display: flex; flex-wrap: wrap; gap: 6px; }
-
-.compliance-badge {
-  align-items: center;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  display: inline-flex;
-  font-size: var(--csms-text-xs, .75rem);
-  font-weight: 800;
-  gap: 5px;
-  padding: 4px 7px;
-  white-space: nowrap;
-}
-
-.compliance-badge.pass,
-.compliance-badge.verified { background: #ecfdf3; border-color: #86efac; color: #166534; }
-.compliance-badge.fail { background: #fff1f2; border-color: #fecdd3; color: #b42318; }
-.compliance-badge.not-evaluated,
-.compliance-badge.draft { background: #f8fafc; border-color: #cbd5e1; color: #475569; }
-.compliance-badge.inactive { background: #f1f5f9; border-color: #cbd5e1; color: #64748b; }
-.compliance-badge.recorded { background: #eef4ff; border-color: #c7d5f5; color: var(--sms2-sidebar-blue); }
-.compliance-badge.ched { background: #eef4ff; border-color: #c7d5f5; color: var(--sms2-sidebar-blue); }
-.compliance-badge.deped { background: #f0fdfa; border-color: #99f6e4; color: #0f766e; }
-.compliance-badge.institutional,
-.compliance-badge.other { background: #faf5ff; border-color: #e9d5ff; color: #7e22ce; }
-
-.compliance-toolbar { align-items: center; flex-wrap: wrap; gap: 10px; }
-.compliance-toolbar .search-control { flex: 1 1 300px; }
-.compliance-toolbar .select-control {
-  align-items: center;
-  color: #5f6f85;
-  display: flex;
-  flex: 0 1 205px;
-  font-size: var(--csms-text-xs, .75rem);
-  font-weight: 700;
-  gap: 7px;
-  white-space: nowrap;
-}
-.compliance-toolbar .select-control select { flex: 1 1 auto; min-width: 0; }
-.compliance-toolbar .compact-select { flex: 0 0 auto; }
-.compliance-toolbar input:focus,
-.compliance-toolbar select:focus { border-color: var(--sms2-sidebar-blue); box-shadow: 0 0 0 2px rgba(26, 58, 140, .14); }
-
-.compliance-history-lock {
-  align-items: flex-start;
-  background: #fff8e8;
-  border: 1px solid #f2d58c;
-  border-radius: 7px;
-  color: #73510d;
-  display: flex;
-  font-size: var(--csms-text-xs, .75rem);
-  gap: 7px;
-  line-height: 1.45;
-  margin: 0 0 14px;
-  padding: 9px 10px;
-}
-
-.compliance-run-detail { padding: 18px 20px; }
-.compliance-run-detail .compliance-summary { padding: 0 0 14px; }
-.compliance-run-detail .table-scroll { border: 1px solid #e2e8f0; border-radius: 7px; }
-
-@media (max-width: 1100px) {
-  .compliance-context-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .compliance-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-
-@media (max-width: 700px) {
-  .compliance-context-grid,
-  .compliance-summary { grid-template-columns: 1fr; }
-  .compliance-toolbar { align-items: stretch; flex-direction: column; }
-  .compliance-toolbar .search-control,
-  .compliance-toolbar .select-control,
-  .compliance-toolbar .compact-select { flex: 1 1 auto; max-width: none; width: 100%; }
-}
-.compliance-evidence-history { white-space: pre-line; max-height: 12rem; overflow: auto; padding: .75rem; margin: .5rem 0 1rem; border: 1px solid var(--border-color, #d7dde5); border-radius: .5rem; font-size: .875rem; }
+/* CHED/DepEd Compliance Validator: only what the shared components do not already cover. */
+.compliance-note, .compliance-evidence-note { display: flex; gap: 8px; align-items: flex-start; margin: 0 0 12px; color: #475467; font-size: 13px; line-height: 1.45; }
+.compliance-note i, .compliance-evidence-note i { color: #2163c5; margin-top: 2px; }
+.compliance-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #344054; white-space: nowrap; }
+.compliance-counts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 4px 0 12px; }
+.compliance-counts__total { font-size: 13px; color: #344054; margin-right: 4px; }
+.compliance-section { margin: 16px 0 6px; font-size: 14px; }
+.compliance-none { color: #667085; font-size: 13px; margin: 0; }
+.compliance-detail { margin: 0 0 8px; }
+.compliance-dialog { max-width: 560px; width: 100%; }
+.compliance-dialog.compliance-dialog--wide { max-width: 880px; }
+.compliance-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
+.compliance-form-grid .form-field-wide { grid-column: 1 / -1; }
+.compliance-form-grid input, .compliance-form-grid textarea { width: 100%; box-sizing: border-box; }
+.csms-ctable .csms-sub { display: block; font-size: 12px; color: #667085; margin-top: 2px; }
+.csms-row-click { cursor: pointer; }
+#complianceContextBar[hidden], .compliance-content [hidden] { display: none !important; }
+@media (max-width: 720px) { .compliance-form-grid { grid-template-columns: 1fr; } }

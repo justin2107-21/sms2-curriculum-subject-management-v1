@@ -1,26 +1,8 @@
 <?php
-$complianceView = $complianceView ?? null;
-
-if ($complianceView === null) {
-    $legacyQuery = $_GET;
-    $legacyView = strtolower(trim((string)($legacyQuery['view'] ?? $legacyQuery['tab'] ?? 'validate')));
-    unset($legacyQuery['view'], $legacyQuery['tab']);
-    $legacyTargets = [
-        'rules' => 'compliance_rules.php',
-        'references' => 'compliance_references.php',
-        'history' => 'validation_history.php',
-    ];
-    $legacyTarget = $legacyTargets[$legacyView] ?? 'validate_curriculum.php';
-    $legacyQueryString = http_build_query($legacyQuery);
-    header('Location: ' . $legacyTarget . ($legacyQueryString !== '' ? '?' . $legacyQueryString : ''), true, 302);
-    exit;
-}
-
-if (!in_array($complianceView, ['validate', 'rules', 'references', 'history'], true)) {
-    http_response_code(404);
-    exit('Page not found.');
-}
-
+// CHED/DepEd Compliance Validator: one page. Results | Rule library | Sources | History are views of the same page (?view=).
+// Rules and sources are data entered by people; nothing here is a default and nothing says a curriculum: the page shows
+// what the stored curriculum data does or does not show against each rule, as counts and per-rule statuses only.
+// The old addresses (validate_curriculum.php, compliance_rules.php, compliance_references.php, validation_history.php) redirect here.
 require_once __DIR__ . '/../../../shared/bootstrap.php';
 
 if (!is_authenticated()) {
@@ -29,33 +11,15 @@ if (!is_authenticated()) {
 }
 require_permission('compliance.view');
 
-$complianceViewLabels = [
-    'validate' => 'Validate Curriculum',
-    'rules' => 'Compliance Rules',
-    'references' => 'References',
-    'history' => 'Validation History',
-];
-$complianceViewDescriptions = [
-    'validate' => 'Run deterministic configured checks against a selected curriculum version.',
-    'rules' => 'Manage the deterministic rules used by curriculum validation.',
-    'references' => 'Manage traceable source records used by compliance rules.',
-    'history' => 'Review append-only snapshots of previous curriculum validation runs.',
-];
-$viewLabel = $complianceViewLabels[$complianceView];
-$viewDescription = $complianceViewDescriptions[$complianceView];
+$views = ['results' => 'Results', 'rules' => 'Rule library', 'sources' => 'Sources', 'history' => 'History'];
+$view = (string)($_GET['view'] ?? 'results');
+if (!isset($views[$view])) $view = 'results';
 $userId = current_user_id();
-$canRunCompliance = $userId !== null && user_can($userId, 'compliance.run');
-$canManageCompliance = $userId !== null && user_can($userId, 'compliance.manage');
-$canVerifyReferences = $userId !== null && user_can($userId, 'compliance.reference.verify');
-$avatarInitial = strtoupper(substr((string)($_SESSION['first_name'] ?? 'U'), 0, 1));
-$curriculumCssVersion = (int)filemtime(__DIR__ . '/../assets/curriculum.css');
-$typographyCssVersion = (int)filemtime(__DIR__ . '/../../../css/csms-typography.css');
-$mappingCssVersion = (int)filemtime(__DIR__ . '/../assets/subject-mapping.css');
-$complianceCssVersion = (int)filemtime(__DIR__ . '/../assets/compliance-validator.css');
-$commonJsVersion = (int)filemtime(__DIR__ . '/../assets/curriculum-common.js');
-$complianceJsVersion = (int)filemtime(__DIR__ . '/../assets/compliance-validator.js');
-$ruleColumns = $canManageCompliance ? 8 : 7;
-$referenceColumns = ($canManageCompliance || $canVerifyReferences) ? 7 : 6;
+$canRun = $userId !== null && user_can($userId, 'compliance.run');
+$canManage = $userId !== null && user_can($userId, 'compliance.manage');
+$canVerify = $userId !== null && user_can($userId, 'compliance.reference.verify');
+$e = static fn($value): string => htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
+$v = static fn(string $file): int => (int)filemtime(__DIR__ . '/' . $file);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -63,218 +27,153 @@ $referenceColumns = ($canManageCompliance || $canVerifyReferences) ? 7 : 6;
   <?php require __DIR__ . '/../../../shared/favicon.php'; ?>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <meta name="csrf-token" content="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>"/>
-  <title><?= htmlspecialchars($viewLabel, ENT_QUOTES, 'UTF-8') ?> - BCP Student Management System</title>
+  <meta name="csrf-token" content="<?= $e(csrf_token()) ?>"/>
+  <title>CHED/DepEd Compliance Validator - BCP Student Management System</title>
   <link rel="stylesheet" href="../../../css/dashboard.css"/>
-  <link rel="stylesheet" href="../assets/curriculum.css?v=<?= $curriculumCssVersion ?>"/>
-  <link rel="stylesheet" href="../assets/subject-mapping.css?v=<?= $mappingCssVersion ?>"/>
-  <link rel="stylesheet" href="../assets/compliance-validator.css?v=<?= $complianceCssVersion ?>"/>
-  <link rel="stylesheet" href="../../../css/csms-typography.css?v=<?= $typographyCssVersion ?>"/>
+  <link rel="stylesheet" href="../assets/curriculum.css?v=<?= $v('../assets/curriculum.css') ?>"/>
+  <link rel="stylesheet" href="../assets/subject-mapping.css?v=<?= $v('../assets/subject-mapping.css') ?>"/>
+  <link rel="stylesheet" href="../../../css/csms-typography.css?v=<?= $v('../../../css/csms-typography.css') ?>"/>
+  <link rel="stylesheet" href="../assets/subject-mapping-final.css?v=<?= $v('../assets/subject-mapping-final.css') ?>"/>
+  <link rel="stylesheet" href="../assets/compliance-validator.css?v=<?= $v('../assets/compliance-validator.css') ?>"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
 </head>
 <body>
 <?php
 $APP_ROOT = '../../../';
-$ACTIVE_NAV = 'compliance-' . $complianceView;
+$ACTIVE_NAV = 'compliance-validator';
 require __DIR__ . '/../../../shared/sidebar.php';
 ?>
-
 <div class="main">
   <?php require __DIR__ . '/../../../shared/topbar.php'; ?>
-
-  <main class="content curriculum-content mapping-content compliance-content"
-        id="complianceWorkspace"
-        data-compliance-api="../http/compliance_actions.php"
-        data-compliance-view="<?= htmlspecialchars($complianceView, ENT_QUOTES, 'UTF-8') ?>"
-        data-can-run="<?= $canRunCompliance ? '1' : '0' ?>"
-        data-can-manage="<?= $canManageCompliance ? '1' : '0' ?>"
-        data-can-verify-references="<?= $canVerifyReferences ? '1' : '0' ?>"
-        data-rule-columns="<?= $ruleColumns ?>"
-        data-reference-columns="<?= $referenceColumns ?>">
+  <main class="content curriculum-content mapping-content compliance-content" id="complianceWorkspace"
+        data-compliance-api="../http/compliance_actions.php" data-view="<?= $e($view) ?>"
+        data-can-run="<?= $canRun ? '1' : '0' ?>" data-can-manage="<?= $canManage ? '1' : '0' ?>" data-can-verify="<?= $canVerify ? '1' : '0' ?>">
     <div class="page-title-bar curriculum-title-bar">
       <div>
-        <h1 class="page-title"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> <?= htmlspecialchars($viewLabel, ENT_QUOTES, 'UTF-8') ?></h1>
-        <p class="page-subtitle"><?= htmlspecialchars($viewDescription, ENT_QUOTES, 'UTF-8') ?></p>
-        <?php $moduleViews = 'compliance'; include __DIR__ . '/_module_views.php'; ?>
+        <h1 class="page-title"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> CHED/DepEd Compliance Validator <span class="csms-info"><button type="button" class="csms-info__btn" aria-label="About the Compliance Validator" aria-describedby="complianceInfoTip"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button><span class="csms-info__tip" role="tooltip" id="complianceInfoTip">Rules come from the sources listed on each rule. Results show what the stored curriculum data does or does not show. They are not an official CHED, DepEd or institutional determination.</span></span></h1>
+        <p class="page-subtitle">Check a curriculum version against the rules and sources recorded in this system.</p>
+        <nav class="csms-segmented module-views" id="complianceViews" aria-label="Views of the Compliance Validator">
+          <?php foreach ($views as $key => $label): ?><a href="?view=<?= $e($key) ?>" data-view="<?= $e($key) ?>" class="<?= $key === $view ? 'is-active' : '' ?>"<?= $key === $view ? ' aria-current="page"' : '' ?>><?= $e($label) ?></a><?php endforeach; ?>
+        </nav>
       </div>
-      <span class="read-only-pill"><i class="fa-solid fa-list-check" aria-hidden="true"></i> Deterministic checks</span>
+      <div class="card-header-actions">
+        <?php if (!$canRun && !$canManage): ?><span class="csms-chip csms-chip--draft">Read-only for your role</span><?php endif; ?>
+      </div>
     </div>
+    <p class="compliance-note" role="note"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Results are internal decision-support output only. They are not official CHED, DepEd, or Bestlink College approval, certification, or legal advice.</p>
 
-    <p class="curriculum-notice compliance-disclaimer" role="note">
-      <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
-      Results are internal decision-support output only. They are not official CHED, DepEd, or Bestlink College approval, certification, or legal advice.
-    </p>
-
-    <?php if ($complianceView === 'validate'): ?>
-    <section class="compliance-panel" id="validatePanel">
-      <section class="domain-card mapping-filter-card" aria-labelledby="validationContextTitle">
-        <div class="domain-card-header">
-          <div><p class="eyebrow">Validation context</p><h2 id="validationContextTitle">Select a curriculum version</h2></div>
-          <?php if ($canRunCompliance): ?><button type="button" class="primary-action-button" id="runComplianceValidation" disabled><i class="fa-solid fa-play" aria-hidden="true"></i> Run Validation</button><?php endif; ?>
-        </div>
-        <div class="mapping-filter-grid compliance-context-grid">
-          <label class="mapping-filter-field"><span>Academic Program</span><select id="complianceProgram"><option value="">Loading programs...</option></select></label>
-          <label class="mapping-filter-field"><span>Curriculum</span><select id="complianceCurriculum" disabled><option value="">Select a program first</option></select></label>
-          <label class="mapping-filter-field"><span>Curriculum Version</span><select id="complianceVersion" disabled><option value="">Select a curriculum first</option></select></label>
-        </div>
+    <section class="mapping-workspace-shell">
+      <section class="mapping-context-bar" id="complianceContextBar" aria-label="Curriculum context">
+        <?php foreach (['program' => 'Program / Strand', 'curriculum' => 'Curriculum', 'version' => 'Curriculum Version'] as $key => $label): ?>
+        <div class="mapping-context-field"><label for="<?= $key ?>Search"><?= $label ?></label><div class="record-autocomplete">
+          <input type="search" id="<?= $key ?>Search" placeholder="<?= $key === 'program' ? 'Search program code or name' : ($key === 'curriculum' ? 'Choose program first' : 'Choose curriculum first') ?>" <?= $key !== 'program' ? 'disabled' : '' ?> autocomplete="off"/>
+          <input type="hidden" id="<?= $key ?>Id"/>
+          <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear <?= $label ?>" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+          <div class="record-autocomplete-options" id="<?= $key ?>Options" role="listbox" aria-label="<?= $label ?> suggestions" hidden></div>
+        </div></div>
+        <?php if ($key !== 'version'): ?><span class="mapping-context-separator" aria-hidden="true"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span><?php endif; ?>
+        <?php endforeach; ?>
       </section>
 
-      <section class="domain-card compliance-results-card" aria-labelledby="validationResultsTitle">
-        <div class="domain-card-header"><div><p class="eyebrow">Stored validation output</p><h2 id="validationResultsTitle">Validation Results</h2><p class="mapping-context-message" id="validationContextMessage">Select a curriculum version to run configured checks.</p></div></div>
-        <div class="compliance-summary" id="complianceSummary" hidden>
-          <div><span>Rules Evaluated</span><strong id="summaryEvaluated">0</strong></div>
-          <div class="is-pass"><span>Pass</span><strong id="summaryPassed">0</strong></div>
-          <div class="is-fail"><span>Fail</span><strong id="summaryFailed">0</strong></div>
-          <div class="is-neutral"><span>Not Evaluated</span><strong id="summaryNotEvaluated">0</strong></div>
+      <section class="mapping-workspace-panel csms-panel" aria-label="Compliance Validator">
+        <!-- Results -->
+        <div id="viewResults" data-panel="results" hidden>
+          <div class="csms-empty" id="resultsLoading" role="status"><i class="fa-solid fa-spinner" aria-hidden="true"></i><strong>Loading your working context…</strong></div>
+          <div class="csms-empty" id="resultsNoVersion" role="status" hidden><i class="fa-solid fa-bullseye" aria-hidden="true"></i><strong>No curriculum version selected</strong><span>Use the context bar above to pick a curriculum version.</span></div>
+          <div id="resultsPanel" hidden>
+            <div class="csms-filter-row">
+              <?php if ($canRun): ?><button type="button" class="primary-action-button" id="runValidation" disabled><i class="fa-solid fa-play" aria-hidden="true"></i> Run validation</button><?php endif; ?>
+              <?php if ($canManage): ?><label class="compliance-check"><input type="checkbox" id="runIncludeDemo"/> Include demo rules</label><?php endif; ?>
+              <span class="csms-filter-row__summary" id="resultsCaption" role="status"></span>
+            </div>
+            <div class="csms-empty" id="resultsBeforeRun" role="status" hidden><i class="fa-solid fa-list-check" aria-hidden="true"></i><strong>Run validation to see results for this version</strong><span>Results appear here and are stored in History.</span></div>
+            <div class="csms-empty" id="resultsNoRules" role="status" hidden><i class="fa-solid fa-folder-open" aria-hidden="true"></i><strong>No rules apply to this program</strong><span>No CHED/DepEd source for it is recorded in this system yet.</span></div>
+            <div id="resultsBody" hidden>
+              <div class="compliance-counts" id="resultsCounts" aria-label="Counts"></div>
+              <div class="csms-page-table table-scroll" tabindex="0" aria-label="Scrollable results">
+                <table class="csms-ctable"><thead><tr><th>Rule</th><th>Source</th><th>Requirement</th><th>Actual</th><th>Result</th><th>Explanation</th></tr></thead><tbody id="resultsRows"></tbody></table>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="table-scroll" tabindex="0" aria-label="Scrollable compliance results">
-          <table class="domain-table compliance-results-table"><thead><tr><th>Rule</th><th>Reference</th><th>Requirement</th><th>Actual</th><th>Result</th><th>Explanation</th></tr></thead><tbody id="complianceResultRows"><tr><td colspan="6" class="empty-cell">No validation has been run in this workspace.</td></tr></tbody></table>
+
+        <!-- Rule library -->
+        <div id="viewRules" data-panel="rules" hidden>
+          <div class="csms-filter-row">
+            <label class="csms-search"><span class="sr-only">Search rules</span><input type="search" id="ruleSearch" maxlength="100" placeholder="Search rule or source"/></label>
+            <select class="csms-select" id="ruleType" aria-label="Rule type"><option value="">All types</option><option value="MIN_TOTAL_UNITS">Minimum total units</option><option value="MAX_TOTAL_UNITS">Maximum total units</option><option value="REQUIRED_SUBJECT">Required subject</option><option value="MIN_SUBJECT_UNITS">Minimum subject units</option><option value="MAX_SUBJECT_UNITS">Maximum subject units</option></select>
+            <select class="csms-select" id="ruleStatus" aria-label="Rule status"><option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select>
+            <label class="compliance-check"><input type="checkbox" id="ruleDemo"/> Include demo rules</label>
+            <select class="csms-select" id="rulePerPage" aria-label="Rows per page"><option value="10">10 rows</option><option value="20" selected>20 rows</option><option value="50">50 rows</option><option value="100">100 rows</option></select>
+            <?php if ($canManage): ?><button type="button" class="primary-action-button" id="ruleAdd"><i class="fa-solid fa-plus" aria-hidden="true"></i> Add rule</button><?php endif; ?>
+            <span class="csms-filter-row__summary" id="ruleCount" role="status">0 records</span>
+          </div>
+          <div class="csms-empty" id="ruleEmpty" role="status" hidden><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i><strong>No rules recorded yet</strong><span>A rule is checked against a version only when its source has been confirmed.</span></div>
+          <div class="csms-empty" id="ruleNoMatch" role="status" hidden><i class="fa-solid fa-filter" aria-hidden="true"></i><strong>No rules match these filters</strong><span>Change the search or a filter.</span></div>
+          <div class="csms-empty" id="ruleError" role="alert" hidden><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><strong>Rules could not be loaded</strong><span id="ruleErrorText"></span></div>
+          <div class="csms-page-table table-scroll" id="ruleWrap" tabindex="0" aria-label="Scrollable rule library" hidden>
+            <table class="csms-ctable"><thead><tr><th>Rule</th><th>Source</th><th>Requirement</th><th>Applies to</th><th>Status</th></tr></thead><tbody id="ruleRows"></tbody></table>
+          </div>
+          <div class="pagination-bar" id="rulePagination"></div>
+        </div>
+
+        <!-- Sources -->
+        <div id="viewSources" data-panel="sources" hidden>
+          <div class="csms-filter-row">
+            <label class="csms-search"><span class="sr-only">Search sources</span><input type="search" id="sourceSearch" maxlength="100" placeholder="Search code, title or issuing body"/></label>
+            <select class="csms-select" id="sourceType" aria-label="Source category"><option value="">All categories</option><option value="CHED">CHED</option><option value="DEPED">DepEd</option><option value="INSTITUTIONAL">Institutional</option><option value="OTHER">Other</option></select>
+            <select class="csms-select" id="sourceStatus" aria-label="Source status"><option value="">All statuses</option><option value="draft">Draft</option><option value="verified">Source confirmed</option><option value="inactive">Inactive</option></select>
+            <label class="compliance-check"><input type="checkbox" id="sourceDemo"/> Include demo sources</label>
+            <select class="csms-select" id="sourcePerPage" aria-label="Rows per page"><option value="10">10 rows</option><option value="20" selected>20 rows</option><option value="50">50 rows</option><option value="100">100 rows</option></select>
+            <?php if ($canManage): ?><button type="button" class="primary-action-button" id="sourceAdd"><i class="fa-solid fa-plus" aria-hidden="true"></i> Add source</button><?php endif; ?>
+            <span class="csms-filter-row__summary" id="sourceCount" role="status">0 records</span>
+          </div>
+          <p class="compliance-evidence-note"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Evidence is a locator and fingerprint recorded by a person. It is not a stored document.</p>
+          <div class="csms-empty" id="sourceEmpty" role="status" hidden><i class="fa-solid fa-book" aria-hidden="true"></i><strong>No sources recorded yet</strong><span>Record a CHED or DepEd document here before adding rules that rely on it.</span></div>
+          <div class="csms-empty" id="sourceNoMatch" role="status" hidden><i class="fa-solid fa-filter" aria-hidden="true"></i><strong>No sources match these filters</strong><span>Change the search or a filter.</span></div>
+          <div class="csms-empty" id="sourceError" role="alert" hidden><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><strong>Sources could not be loaded</strong><span id="sourceErrorText"></span></div>
+          <div class="csms-page-table table-scroll" id="sourceWrap" tabindex="0" aria-label="Scrollable sources" hidden>
+            <table class="csms-ctable"><thead><tr><th>Source</th><th>Issuing body</th><th>Year</th><th>Kind</th><th>Source status</th><th class="csms-ctable__num">Rules</th></tr></thead><tbody id="sourceRows"></tbody></table>
+          </div>
+          <div class="pagination-bar" id="sourcePagination"></div>
+        </div>
+
+        <!-- History -->
+        <div id="viewHistory" data-panel="history" hidden>
+          <div class="csms-filter-row">
+            <label class="csms-search"><span class="sr-only">Search validation history</span><input type="search" id="historySearch" maxlength="100" placeholder="Search program, curriculum or version"/></label>
+            <label class="compliance-check"><input type="checkbox" id="historyOnlyVersion"/> Only the selected version</label>
+            <label class="compliance-check"><input type="checkbox" id="historyDemo"/> Include demo runs</label>
+            <select class="csms-select" id="historyPerPage" aria-label="Rows per page"><option value="10">10 rows</option><option value="20" selected>20 rows</option><option value="50">50 rows</option><option value="100">100 rows</option></select>
+            <span class="csms-filter-row__summary" id="historyCount" role="status">0 records</span>
+          </div>
+          <div class="csms-empty" id="historyEmpty" role="status" hidden><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><strong>No validation runs recorded yet</strong><span>Runs are stored when a version is validated.</span></div>
+          <div class="csms-empty" id="historyNoMatch" role="status" hidden><i class="fa-solid fa-filter" aria-hidden="true"></i><strong>No runs match these filters</strong><span>Change the search or a filter.</span></div>
+          <div class="csms-empty" id="historyError" role="alert" hidden><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><strong>History could not be loaded</strong><span id="historyErrorText"></span></div>
+          <div class="csms-page-table table-scroll" id="historyWrap" tabindex="0" aria-label="Scrollable validation history" hidden>
+            <table class="csms-ctable"><thead><tr><th>Run date</th><th>Program</th><th>Curriculum</th><th>Version</th><th class="csms-ctable__num">Rules</th><th class="csms-ctable__num">Met</th><th class="csms-ctable__num">Not met</th><th class="csms-ctable__num">Cannot determine</th><th>Run by</th></tr></thead><tbody id="historyRows"></tbody></table>
+          </div>
+          <div class="pagination-bar" id="historyPagination"></div>
         </div>
       </section>
     </section>
-
-    <?php elseif ($complianceView === 'rules'): ?>
-    <section class="compliance-panel" id="rulesPanel">
-      <section class="domain-card compliance-list-card">
-        <div class="domain-card-header"><div><p class="eyebrow">Configurable deterministic checks</p><h2>Compliance Rules</h2><p class="mapping-context-message">Only active rules linked to verified references are evaluated.</p></div><?php if ($canManageCompliance): ?><button type="button" class="primary-action-button" id="newComplianceRule"><i class="fa-solid fa-plus" aria-hidden="true"></i> New Rule</button><?php endif; ?></div>
-        <div class="list-toolbar compliance-toolbar">
-          <label class="search-control"><span class="sr-only">Search rules</span><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input type="search" id="ruleSearch" maxlength="100" placeholder="Rule or reference"/></label>
-          <label class="select-control"><span>Type</span><select id="ruleTypeFilter"><option value="">All types</option><option value="MIN_TOTAL_UNITS">Minimum total units</option><option value="MAX_TOTAL_UNITS">Maximum total units</option><option value="REQUIRED_SUBJECT">Required subject</option><option value="MIN_SUBJECT_UNITS">Minimum subject units</option><option value="MAX_SUBJECT_UNITS">Maximum subject units</option></select></label>
-          <label class="select-control"><span>Status</span><select id="ruleStatusFilter"><option value="">All</option><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
-          <label class="select-control compact-select"><span>Rows</span><select id="rulePerPage"><option value="10">10</option><option value="20" selected>20</option><option value="50">50</option></select></label>
-        </div>
-        <div class="table-scroll" tabindex="0" aria-label="Scrollable compliance rules"><table class="domain-table compliance-rules-table"><thead><tr><th>Rule</th><th>Reference</th><th>Type</th><th>Scope</th><th>Configured Parameter</th><th>Status</th><th>History</th><?php if ($canManageCompliance): ?><th>Actions</th><?php endif; ?></tr></thead><tbody id="complianceRuleRows"><tr><td colspan="<?= $ruleColumns ?>" class="empty-cell">Loading compliance rules...</td></tr></tbody></table></div>
-        <div class="pagination-bar" id="rulePagination"></div>
-      </section>
-    </section>
-
-    <?php elseif ($complianceView === 'references'): ?>
-    <section class="compliance-panel" id="referencesPanel">
-      <section class="domain-card compliance-list-card">
-        <div class="domain-card-header"><div><p class="eyebrow">Traceable source registry</p><h2>Compliance References</h2><p class="mapping-context-message">“Verified” means internally confirmed as the intended source; it is not external regulatory certification.</p></div><?php if ($canManageCompliance): ?><button type="button" class="primary-action-button" id="newComplianceReference"><i class="fa-solid fa-plus" aria-hidden="true"></i> New Reference</button><?php endif; ?></div>
-        <div class="list-toolbar compliance-toolbar">
-          <label class="search-control"><span class="sr-only">Search references</span><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input type="search" id="referenceSearch" maxlength="100" placeholder="Code, title, or issuing body"/></label>
-          <label class="select-control"><span>Category</span><select id="referenceTypeFilter"><option value="">All</option><option value="CHED">CHED</option><option value="DEPED">DepEd</option><option value="INSTITUTIONAL">Institutional</option><option value="OTHER">Other</option></select></label>
-          <label class="select-control"><span>Status</span><select id="referenceStatusFilter"><option value="">All</option><option value="draft">Draft</option><option value="verified">Verified</option><option value="inactive">Inactive</option></select></label>
-          <label class="select-control compact-select"><span>Rows</span><select id="referencePerPage"><option value="10">10</option><option value="20" selected>20</option><option value="50">50</option></select></label>
-        </div>
-        <div class="table-scroll" tabindex="0" aria-label="Scrollable compliance references"><table class="domain-table compliance-reference-table"><thead><tr><th>Reference</th><th>Category / source kind</th><th>Issuing Body</th><th>Status</th><th>Source</th><th>Rules</th><?php if ($canManageCompliance || $canVerifyReferences): ?><th>Actions</th><?php endif; ?></tr></thead><tbody id="complianceReferenceRows"><tr><td colspan="<?= $referenceColumns ?>" class="empty-cell">Loading compliance references...</td></tr></tbody></table></div>
-        <div class="pagination-bar" id="referencePagination"></div>
-      </section>
-    </section>
-
-    <?php else: ?>
-    <section class="compliance-panel" id="historyPanel">
-      <section class="domain-card compliance-list-card">
-        <div class="domain-card-header"><div><p class="eyebrow">Append-only validation snapshots</p><h2>Validation History</h2><p class="mapping-context-message">Historical results retain the rule and reference wording used at run time.</p></div></div>
-        <div class="list-toolbar compliance-toolbar"><label class="search-control"><span class="sr-only">Search validation history</span><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input type="search" id="historySearch" maxlength="100" placeholder="Program, curriculum, or version"/></label><label class="select-control compact-select"><span>Rows</span><select id="historyPerPage"><option value="10">10</option><option value="20" selected>20</option><option value="50">50</option></select></label></div>
-        <div class="table-scroll" tabindex="0" aria-label="Scrollable validation history"><table class="domain-table compliance-history-table"><thead><tr><th>Run Date</th><th>Program</th><th>Curriculum</th><th>Version</th><th>Evaluated</th><th>Pass</th><th>Fail</th><th>Not Evaluated</th><th>Run By</th><th>Results</th></tr></thead><tbody id="complianceHistoryRows"><tr><td colspan="10" class="empty-cell">Loading validation history...</td></tr></tbody></table></div>
-        <div class="pagination-bar" id="historyPagination"></div>
-      </section>
-    </section>
-    <?php endif; ?>
   </main>
+  <div class="footer">Bestlink College of the Philippines &middot; CSMS-SMS2 &copy; 2026</div>
 </div>
 
-<?php if ($canManageCompliance): ?>
-<div class="curriculum-modal" id="complianceReferenceModal" hidden>
-  <div class="modal-backdrop" data-modal-close></div>
-  <section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="complianceReferenceModalTitle">
-    <div class="modal-header"><div><h2 id="complianceReferenceModalTitle">New Compliance Reference</h2><p class="modal-context">Register a traceable source without asserting official endorsement.</p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close reference form"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
-    <form class="domain-form" id="complianceReferenceForm">
-      <input type="hidden" name="id" id="complianceReferenceId"/><div class="form-error" role="alert" hidden></div>
-      <div class="form-grid">
-        <label class="form-field"><span>Reference Category <strong>*</strong></span><select name="reference_type" id="complianceReferenceType" required><option value="CHED">CHED</option><option value="DEPED">DepEd</option><option value="INSTITUTIONAL">Institutional</option><option value="OTHER">Other</option></select></label>
-        <label class="form-field"><span>Document kind <strong>*</strong></span><select name="source_kind" id="complianceReferenceSourceKind" required><option value="unknown">Unknown / not classified</option><option value="regulatory_document">Regulatory document</option><option value="ched_sample_curriculum">CHED sample curriculum</option><option value="institutional_curriculum">Institution-provided curriculum</option><option value="institutional_policy">Institutional policy</option><option value="supporting_document">Supporting document</option><option value="other_document">Other document</option></select><small>Issuer category and document kind are separate facts.</small></label>
-        <label class="form-field"><span>Supersedes reference ID</span><input type="number" name="supersedes_reference_id" id="complianceReferenceSupersedes" min="1" step="1" placeholder="Optional existing record ID"/></label>
-        <label class="form-field"><span>Reference Code</span><input type="text" name="reference_code" id="complianceReferenceCode" maxlength="120" placeholder="Optional source identifier"/></label>
-        <label class="form-field form-field-wide"><span>Reference Title</span><input type="text" name="title" id="complianceReferenceTitle" maxlength="255" placeholder="Required when no code is supplied"/></label>
-        <label class="form-field"><span>Issuing Body <strong>*</strong></span><input type="text" name="issuing_body" id="complianceReferenceIssuer" maxlength="180" required/></label>
-        <label class="form-field"><span>Effective Date</span><input type="date" name="effective_date" id="complianceReferenceDate"/></label>
-        <label class="form-field form-field-wide"><span>Source URL</span><input type="url" name="source_url" id="complianceReferenceUrl" maxlength="1000" placeholder="https://..."/></label>
-        <label class="form-field"><span>Internal Compliance Status <strong>*</strong></span><select name="verification_status" id="complianceReferenceStatus" required><option value="draft">Draft</option><option value="verified">Verified (confirmed identity evidence required)</option><option value="inactive">Inactive</option></select><small>This legacy status is not CHED certification, applicability, or BCP approval. Document identity must be confirmed in the separate evidence action.</small></label>
-        <label class="form-field form-field-wide"><span>Notes</span><textarea name="notes" id="complianceReferenceNotes" rows="3" placeholder="Optional traceability notes"></textarea></label>
-      </div>
-      <div class="modal-actions"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="submit" class="button-primary" id="saveComplianceReference">Create Reference</button></div>
+<div class="curriculum-modal" id="complianceDialog" hidden>
+  <div class="modal-backdrop" id="complianceBackdrop"></div>
+  <section class="modal-dialog compliance-dialog" role="dialog" aria-modal="true" aria-labelledby="complianceDialogTitle">
+    <div class="modal-header"><div><h2 id="complianceDialogTitle">Details</h2><p class="modal-context" id="complianceDialogContext"></p></div><button type="button" class="modal-close-button" id="complianceDialogX" aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
+    <form id="complianceForm" novalidate>
+      <div class="confirmation-body" id="complianceDialogBody"></div>
+      <div class="modal-actions modal-actions-padded" id="complianceDialogFooter"></div>
     </form>
-  </section>
-</div>
-<?php endif; ?>
-
-<?php if ($canVerifyReferences): ?>
-<div class="curriculum-modal" id="complianceEvidenceModal" hidden>
-  <div class="modal-backdrop" data-modal-close></div>
-  <section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="complianceEvidenceTitle">
-    <div class="modal-header"><div><h2 id="complianceEvidenceTitle">Internal Source Assessment</h2><p class="modal-context">Record the evidence and scope of this internal assessment. It does not certify legal applicability or BCP adoption.</p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close assessment"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
-    <form class="domain-form" id="complianceEvidenceForm"><input type="hidden" name="id" id="complianceEvidenceReferenceId"/><div class="form-error" role="alert" hidden></div>
-      <p id="complianceEvidenceReferenceLabel" class="curriculum-notice"></p><div id="complianceEvidenceHistory" class="compliance-evidence-history" aria-live="polite"></div>
-      <div class="form-grid"><label class="form-field"><span>Assessment subject <strong>*</strong></span><select name="verification_subject" required><option value="document_identity">Document identity</option><option value="declared_origin">Declared origin</option><option value="applicability">Applicability</option></select></label><label class="form-field"><span>Result <strong>*</strong></span><select name="result" required><option value="not_assessed">Not assessed</option><option value="confirmed">Confirmed</option><option value="not_confirmed">Not confirmed</option></select></label><label class="form-field form-field-wide"><span>Evidence locator</span><input name="evidence_locator" maxlength="1000" placeholder="Local document identifier or page/section; no server URL fetch"/></label><label class="form-field form-field-wide"><span>Evidence SHA-256</span><input name="evidence_sha256" maxlength="64" pattern="[a-fA-F0-9]{64}" placeholder="Optional 64-character digest"/></label><label class="form-field form-field-wide"><span>Rationale <strong>*</strong></span><textarea name="rationale" maxlength="2000" rows="3" required></textarea></label></div>
-      <div class="modal-actions"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="submit" class="button-primary">Record Assessment</button></div>
-    </form>
-  </section>
-</div>
-<?php endif; ?>
-
-<?php if ($canManageCompliance): ?>
-<div class="curriculum-modal" id="complianceRuleModal" hidden>
-  <div class="modal-backdrop" data-modal-close></div>
-  <section class="modal-dialog modal-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="complianceRuleModalTitle">
-    <div class="modal-header"><div><h2 id="complianceRuleModalTitle">New Compliance Rule</h2><p class="modal-context">Configure one deterministic check from a registered source.</p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close rule form"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
-    <form class="domain-form" id="complianceRuleForm">
-      <input type="hidden" name="id" id="complianceRuleId"/><div class="form-error" role="alert" hidden></div>
-      <p class="compliance-history-lock" id="complianceRuleHistoryNotice" hidden><i class="fa-solid fa-lock" aria-hidden="true"></i> This rule has history. Its reference, scope, type, subject, and threshold are locked to preserve traceability.</p>
-      <div class="form-grid">
-        <label class="form-field form-field-wide"><span>Rule Name <strong>*</strong></span><input type="text" name="rule_name" id="complianceRuleName" maxlength="180" required/></label>
-        <div class="form-field">
-          <label for="complianceRuleReferenceInput">Reference <strong>*</strong></label>
-          <div class="record-autocomplete">
-            <input type="search" id="complianceRuleReferenceInput" maxlength="100" placeholder="Search reference code or title" required/>
-            <input type="hidden" name="compliance_reference_id" id="complianceRuleReference"/>
-            <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear compliance reference" title="Clear selection" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
-            <div class="record-autocomplete-options" id="complianceRuleReferenceOptions" role="listbox" aria-label="Compliance reference suggestions" hidden></div>
-          </div>
-        </div>
-        <label class="form-field"><span>Technical Status <strong>*</strong></span><select name="technical_status" id="complianceRuleStatus" required><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
-        <label class="form-field"><span>Scope Type <strong>*</strong></span><select name="scope_type" id="complianceRuleScopeType" required><option value="program">Academic Program</option><option value="curriculum">Curriculum</option></select></label>
-        <div class="form-field">
-          <label for="complianceRuleScopeInput">Scope Record <strong>*</strong></label>
-          <div class="record-autocomplete">
-            <input type="search" id="complianceRuleScopeInput" maxlength="100" placeholder="Select scope type first" required disabled/>
-            <input type="hidden" name="scope_id" id="complianceRuleScope"/>
-            <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear scope record" title="Clear selection" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
-            <div class="record-autocomplete-options" id="complianceRuleScopeOptions" role="listbox" aria-label="Scope record suggestions" hidden></div>
-          </div>
-        </div>
-        <label class="form-field"><span>Rule Type <strong>*</strong></span><select name="rule_type" id="complianceRuleType" required><option value="MIN_TOTAL_UNITS">Minimum total units</option><option value="MAX_TOTAL_UNITS">Maximum total units</option><option value="REQUIRED_SUBJECT">Required subject</option><option value="MIN_SUBJECT_UNITS">Minimum subject units</option><option value="MAX_SUBJECT_UNITS">Maximum subject units</option></select></label>
-        <label class="form-field" id="complianceNumericField"><span>Numeric Threshold <strong>*</strong></span><input type="number" name="numeric_value" id="complianceRuleNumeric" min="0" step="0.01" inputmode="decimal" required/></label>
-        <div class="form-field form-field-wide" id="complianceSubjectField" hidden>
-          <label for="complianceRuleSubjectInput">Configured Subject <strong>*</strong></label>
-          <div class="record-autocomplete">
-            <input type="search" id="complianceRuleSubjectInput" maxlength="100" placeholder="Search all subjects by code or title"/>
-            <input type="hidden" name="subject_id" id="complianceRuleSubject"/>
-            <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear configured subject" title="Clear selection" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
-            <div class="record-autocomplete-options" id="complianceRuleSubjectOptions" role="listbox" aria-label="Configured subject suggestions" hidden></div>
-          </div>
-        </div>
-        <label class="form-field form-field-wide"><span>Description</span><textarea name="description" id="complianceRuleDescription" rows="3" placeholder="Optional explanation of this configured check"></textarea></label>
-      </div>
-      <div class="modal-actions"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="submit" class="button-primary" id="saveComplianceRule">Create Rule</button></div>
-    </form>
-  </section>
-</div>
-<?php endif; ?>
-
-<div class="curriculum-modal record-details-modal" id="complianceRunModal" hidden>
-  <div class="modal-backdrop" data-modal-close></div>
-  <section class="modal-dialog modal-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="complianceRunModalTitle">
-    <div class="modal-header"><div><p class="modal-kicker">Compliance Validation History</p><h2 id="complianceRunModalTitle">Validation Run Results</h2><p class="modal-context" id="complianceRunModalContext"></p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close validation results"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
-    <div class="modal-body"><div class="compliance-run-detail"><div class="compliance-summary" id="historyRunSummary"></div><div class="table-scroll" tabindex="0" aria-label="Scrollable historical compliance results"><table class="domain-table compliance-results-table"><thead><tr><th>Rule</th><th>Reference</th><th>Requirement</th><th>Actual</th><th>Result</th><th>Explanation</th></tr></thead><tbody id="historyRunResultRows"></tbody></table></div></div></div>
-    <div class="modal-footer"><button type="button" class="button-muted" data-modal-close>Close</button></div>
   </section>
 </div>
 
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
-<script src="../assets/curriculum-common.js?v=<?= $commonJsVersion ?>"></script>
-<script src="../assets/compliance-validator.js?v=<?= $complianceJsVersion ?>"></script>
+<script src="../assets/curriculum-common.js?v=<?= $v('../assets/curriculum-common.js') ?>"></script>
+<script src="../assets/compliance-validator.js?v=<?= $v('../assets/compliance-validator.js') ?>"></script>
 </body>
 </html>

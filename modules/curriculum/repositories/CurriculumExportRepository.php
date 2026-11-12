@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/RepositoryQuery.php';
+require_once __DIR__ . '/ComplianceDemo.php';
 
 class CurriculumExportRepository
 {
@@ -232,7 +233,7 @@ class CurriculumExportRepository
                     runner.last_name AS run_by_last_name
              FROM compliance_validation_runs AS runs
              LEFT JOIN users AS runner ON runner.id = runs.run_by
-             WHERE runs.curriculum_version_id = ?
+             WHERE runs.curriculum_version_id = ? AND NOT ' . ComplianceDemo::runIsDemo('runs') . '
              ORDER BY runs.created_at DESC, runs.id DESC LIMIT 1',
             'i',
             [$versionId]

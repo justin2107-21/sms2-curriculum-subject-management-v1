@@ -13,6 +13,10 @@ require_http_method(['GET', 'POST']);
 
 try {
     switch ($action) {
+        case 'context_options':
+            curriculum_require_read('compliance.view');
+            json_response(true, 'Context options loaded.', $validationService->contextOptions($_GET));
+
         case 'program_options':
             curriculum_require_read('compliance.view');
             json_response(true, 'Academic program options loaded.', $validationService->programOptions($_GET));
@@ -90,7 +94,7 @@ try {
                 $_POST['curriculum_version_id'] ?? null,
                 'Curriculum version'
             );
-            $result = $validationService->run($versionId, curriculum_actor_id());
+            $result = $validationService->run($versionId, curriculum_actor_id(), ($_POST['include_demo'] ?? '') === '1');
             json_response(true, $result['message'], $result, $result['run'] ? 201 : 200);
 
         default:

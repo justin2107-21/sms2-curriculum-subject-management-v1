@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/../modules/curriculum/repositories/ComplianceDemo.php';
+
 require_once __DIR__ . '/../modules/curriculum/repositories/RepositoryQuery.php';
 
 /**
@@ -177,6 +179,8 @@ final class DashboardAnalyticsRepository
         if (!isset($map[$series])) throw new InvalidArgumentException('Unknown activity series.');
         $from = $map[$series];
         [$where, $types, $params] = self::programClause($programId, 'c.academic_program_id');
+        // Runs that evaluated demo rules are not counted.
+        if ($series === 'runs') $where .= ' AND NOT ' . ComplianceDemo::runIsDemo('x');
         return $this->rows(
             "SELECT DATE_FORMAT(x.created_at, '%Y-%m') AS month, COUNT(*) AS total
              FROM $from
@@ -198,7 +202,7 @@ final class DashboardAnalyticsRepository
              FROM compliance_validation_runs AS r
              JOIN (SELECT curriculum_version_id, MAX(id) AS id
                    FROM compliance_validation_runs
-                   WHERE curriculum_version_id IN ($in)
+                   WHERE curriculum_version_id IN ($in) AND NOT " . ComplianceDemo::runIsDemo('compliance_validation_runs') . "
                    GROUP BY curriculum_version_id) AS latest ON latest.id = r.id",
             $types,
             $ids
@@ -211,7 +215,7 @@ final class DashboardAnalyticsRepository
         [$in, $types, $ids] = self::idList($versionIds);
         $rows = $this->rows(
             "SELECT curriculum_version_id AS version_id, COUNT(*) AS runs
-             FROM compliance_validation_runs WHERE curriculum_version_id IN ($in)
+             FROM compliance_validation_runs WHERE curriculum_version_id IN ($in) AND NOT " . ComplianceDemo::runIsDemo('compliance_validation_runs') . "
              GROUP BY curriculum_version_id",
             $types,
             $ids
@@ -311,7 +315,7 @@ final class DashboardAnalyticsRepository
         return $this->rows(
             "SELECT v.id, v.version_label, v.updated_at, c.curriculum_code, c.curriculum_name, p.program_code,
                     (SELECT COUNT(*) FROM curriculum_version_subjects AS m WHERE m.curriculum_version_id = v.id) AS placements,
-                    (SELECT COUNT(*) FROM compliance_validation_runs AS r WHERE r.curriculum_version_id = v.id) AS runs
+                    (SELECT COUNT(*) FROM compliance_validation_runs AS r WHERE r.curriculum_version_id = v.id AND NOT " . ComplianceDemo::runIsDemo('r') . ") AS runs
              FROM curriculum_versions AS v
              JOIN curricula AS c ON c.id = v.curriculum_id
              JOIN academic_programs AS p ON p.id = c.academic_program_id
@@ -330,7 +334,7 @@ final class DashboardAnalyticsRepository
             "SELECT v.id, v.version_label, c.curriculum_code, p.program_code,
                     r.failed_count, r.passed_count, r.not_evaluated_count, r.created_at
              FROM compliance_validation_runs AS r
-             JOIN (SELECT curriculum_version_id, MAX(id) AS id FROM compliance_validation_runs
+             JOIN (SELECT curriculum_version_id, MAX(id) AS id FROM compliance_validation_runs WHERE NOT " . ComplianceDemo::runIsDemo('compliance_validation_runs') . "
                    GROUP BY curriculum_version_id) AS latest ON latest.id = r.id
              JOIN curriculum_versions AS v ON v.id = r.curriculum_version_id
              JOIN curricula AS c ON c.id = v.curriculum_id
@@ -349,7 +353,7 @@ final class DashboardAnalyticsRepository
         return (int)($this->rows(
             "SELECT COUNT(*) AS total
              FROM compliance_validation_runs AS r
-             JOIN (SELECT curriculum_version_id, MAX(id) AS id FROM compliance_validation_runs
+             JOIN (SELECT curriculum_version_id, MAX(id) AS id FROM compliance_validation_runs WHERE NOT " . ComplianceDemo::runIsDemo('compliance_validation_runs') . "
                    GROUP BY curriculum_version_id) AS latest ON latest.id = r.id
              JOIN curriculum_versions AS v ON v.id = r.curriculum_version_id
              JOIN curricula AS c ON c.id = v.curriculum_id
@@ -512,8 +516,8 @@ final class DashboardAnalyticsRepository
         return $this->rows(
             "SELECT v.id, v.version_label, v.status, v.review_status, v.updated_at, c.curriculum_code, p.program_code,
                     (SELECT COUNT(*) FROM curriculum_version_subjects AS m WHERE m.curriculum_version_id = v.id) AS placements,
-                    (SELECT COUNT(*) FROM compliance_validation_runs AS r WHERE r.curriculum_version_id = v.id) AS runs,
-                    COALESCE((SELECT r.failed_count FROM compliance_validation_runs AS r WHERE r.curriculum_version_id = v.id ORDER BY r.id DESC LIMIT 1), 0) AS failed_count,
+                    (SELECT COUNT(*) FROM compliance_validation_runs AS r WHERE r.curriculum_version_id = v.id AND NOT " . ComplianceDemo::runIsDemo('r') . ") AS runs,
+                    COALESCE((SELECT r.failed_count FROM compliance_validation_runs AS r WHERE r.curriculum_version_id = v.id AND NOT " . ComplianceDemo::runIsDemo('r') . " ORDER BY r.id DESC LIMIT 1), 0) AS failed_count,
                     (SELECT e.comments FROM curriculum_version_review_events AS e WHERE e.curriculum_version_id = v.id AND e.action = 'return' ORDER BY e.id DESC LIMIT 1) AS last_reason
              FROM curriculum_versions AS v
              JOIN curricula AS c ON c.id = v.curriculum_id

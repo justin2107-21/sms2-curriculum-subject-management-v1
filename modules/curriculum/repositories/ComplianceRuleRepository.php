@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/RepositoryQuery.php';
+require_once __DIR__ . '/ComplianceDemo.php';
 
 class ComplianceRuleRepository
 {
@@ -93,6 +94,7 @@ class ComplianceRuleRepository
                 $params[] = $query[$field];
             }
         }
+        if (!$query['include_demo']) $conditions[] = 'NOT ' . ComplianceDemo::ruleIsDemo('rules', 'references_table');
         $where = $conditions ? ' WHERE ' . implode(' AND ', $conditions) : '';
         $countStmt = RepositoryQuery::execute(
             $this->db,
@@ -121,7 +123,7 @@ class ComplianceRuleRepository
         return ['records' => $records, 'pagination' => $pagination];
     }
 
-    public function eligibleForContext(int $programId, int $curriculumId): array
+    public function eligibleForContext(int $programId, int $curriculumId, bool $includeDemo = false): array
     {
         $stmt = RepositoryQuery::execute(
             $this->db,
@@ -129,6 +131,7 @@ class ComplianceRuleRepository
             " WHERE rules.technical_status = 'active'
                 AND references_table.verification_status = 'verified'
                 AND (rules.academic_program_id = ? OR rules.curriculum_id = ?)
+              " . ($includeDemo ? '' : ' AND NOT ' . ComplianceDemo::ruleIsDemo('rules', 'references_table')) . "
               ORDER BY rules.id ASC",
             'ii',
             [$programId, $curriculumId]
@@ -216,6 +219,9 @@ class ComplianceRuleRepository
                        programs.program_code, programs.program_name,
                        curricula.curriculum_code, curricula.curriculum_name,
                        creator.username AS creator_username,
+                       references_table.effective_date, YEAR(references_table.effective_date) AS reference_year,
+                       references_table.source_kind,
+                       (' . ComplianceDemo::ruleIsDemo('rules', 'references_table') . ') AS is_demo,
                        EXISTS(SELECT 1 FROM compliance_validation_results AS history
                               WHERE history.compliance_rule_id = rules.id) AS has_history'
             . $this->detailJoins();

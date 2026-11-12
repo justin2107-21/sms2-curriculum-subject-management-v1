@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/RepositoryQuery.php';
+require_once __DIR__ . '/ComplianceDemo.php';
 
 class ComplianceReferenceRepository
 {
@@ -77,6 +78,7 @@ class ComplianceReferenceRepository
             $types .= 's';
             $params[] = $query['verification_status'];
         }
+        if (!$query['include_demo']) $conditions[] = 'NOT ' . ComplianceDemo::referenceIsDemo('references_table');
         $where = $conditions ? ' WHERE ' . implode(' AND ', $conditions) : '';
         $countStmt = RepositoryQuery::execute(
             $this->db,
@@ -215,7 +217,8 @@ class ComplianceReferenceRepository
 
     private function detailSelect(): string
     {
-        return 'SELECT references_table.*, creator.username AS creator_username,
+        return 'SELECT references_table.*, YEAR(references_table.effective_date) AS reference_year, (' . ComplianceDemo::referenceIsDemo('references_table') . ') AS is_demo,
+                       creator.username AS creator_username,
                        (SELECT COUNT(*) FROM compliance_rules AS linked_rules
                         WHERE linked_rules.compliance_reference_id = references_table.id) AS rule_count,
                        (SELECT CASE WHEN e.reference_code_snapshot <=> references_table.reference_code

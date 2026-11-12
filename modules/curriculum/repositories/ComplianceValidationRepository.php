@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/RepositoryQuery.php';
+require_once __DIR__ . '/ComplianceDemo.php';
 
 class ComplianceValidationRepository
 {
@@ -36,7 +37,8 @@ class ComplianceValidationRepository
         $stmt = RepositoryQuery::execute(
             $this->db,
             'SELECT COUNT(*) AS mapped_subject_count,
-                    CAST(COALESCE(SUM(subjects.units), 0) AS DECIMAL(12,2)) AS total_units
+                    CAST(COALESCE(SUM(subjects.units), 0) AS DECIMAL(12,2)) AS total_units,
+                    CAST(COALESCE(SUM(CASE WHEN placements.is_required = 1 THEN subjects.units ELSE 0 END), 0) AS DECIMAL(12,2)) AS required_units
              FROM curriculum_version_subjects AS placements
              INNER JOIN subjects ON subjects.id = placements.subject_id
              WHERE placements.curriculum_version_id = ?',
@@ -48,6 +50,7 @@ class ComplianceValidationRepository
         return [
             'mapped_subject_count' => (int)$row['mapped_subject_count'],
             'total_units' => (string)$row['total_units'],
+            'required_units' => (string)$row['required_units'],
         ];
     }
 
@@ -145,11 +148,15 @@ class ComplianceValidationRepository
         }
         $resultStmt = RepositoryQuery::execute(
             $this->db,
-            'SELECT id, compliance_rule_id, rule_name_snapshot, rule_type_snapshot,
-                    reference_identifier_snapshot, reference_url_snapshot, requirement_snapshot,
-                    actual_value_snapshot, result_status, explanation, created_at
-             FROM compliance_validation_results
-             WHERE validation_run_id = ? ORDER BY id ASC',
+            'SELECT results.id, results.compliance_rule_id, results.rule_name_snapshot, results.rule_type_snapshot,
+                    results.reference_identifier_snapshot, results.reference_url_snapshot, results.requirement_snapshot,
+                    results.actual_value_snapshot, results.result_status, results.explanation, results.created_at,
+                    refs.reference_code, refs.issuing_body, YEAR(refs.effective_date) AS reference_year, refs.reference_type,
+                    refs.verification_status AS reference_status, refs.source_kind
+             FROM compliance_validation_results AS results
+             LEFT JOIN compliance_rules AS rules ON rules.id = results.compliance_rule_id
+             LEFT JOIN compliance_references AS refs ON refs.id = rules.compliance_reference_id
+             WHERE results.validation_run_id = ? ORDER BY results.id ASC',
             'i',
             [$id]
         );
@@ -184,6 +191,9 @@ class ComplianceValidationRepository
                 $params[] = $query[$field];
             }
         }
+        // Restricted roles only see the runs of versions they may read (same scope as the other modules).
+        if (($scope = CurriculumReadScope::sql('versions')) !== '') $conditions[] = $scope;
+        if (!$query['include_demo']) $conditions[] = 'NOT ' . ComplianceDemo::runIsDemo('runs');
         $where = $conditions ? ' WHERE ' . implode(' AND ', $conditions) : '';
         $joins = $this->runJoins();
         $countStmt = RepositoryQuery::execute(
@@ -215,7 +225,7 @@ class ComplianceValidationRepository
 
     private function runSelect(): string
     {
-        return 'SELECT runs.*, versions.version_label, versions.effective_academic_year,
+        return 'SELECT runs.*, versions.version_label, versions.effective_academic_year, versions.status AS version_status, versions.review_status AS version_review_status,
                        curricula.id AS curriculum_id, curricula.curriculum_code,
                        curricula.curriculum_name, programs.id AS academic_program_id,
                        programs.program_code, programs.program_name,

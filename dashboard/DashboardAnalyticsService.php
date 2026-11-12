@@ -185,7 +185,7 @@ final class DashboardAnalyticsService
             $this->stat('my_drafts', 'My drafts', count($drafts), self::CURRICULA),
             $this->stat('returned', 'Returned to me', count($returned), self::CURRICULA),
             $this->stat('waiting', 'Awaiting decision', count($waiting), self::CURRICULA),
-            $this->stat('failing', 'Failing checks', count($failing), 'modules/curriculum/pages/validation_history.php'),
+            $this->stat('failing', 'Not met checks', count($failing), 'modules/curriculum/pages/validation_history.php'),
         ];
         $charts = ['term_load' => $this->termLoad($selected), 'prerequisite_health' => $this->prerequisiteHealth(),
             'compliance_working' => $this->complianceWorking($selected)];
@@ -193,7 +193,7 @@ final class DashboardAnalyticsService
 
         $attention = [];
         foreach ($failing as $v) {
-            $attention[] = ['primary' => $this->versionName($v), 'secondary' => (int)$v['failed_count'] . ' failed validator checks', 'meta' => ''];
+            $attention[] = ['primary' => $this->versionName($v), 'secondary' => (int)$v['failed_count'] . ' not met checks', 'meta' => ''];
         }
         if ($this->allow('grade_weighting.view')) {
             $ids = [];
@@ -216,7 +216,7 @@ final class DashboardAnalyticsService
                 'secondary' => (int)$v['placements'] . ' placements · Next: ' . DashboardShaper::draftNextStep((int)$v['placements'], (int)$v['runs']),
                 'meta' => $v['updated_at'],
             ], array_slice($drafts, 0, 5)), 'No drafts.')),
-            'needs_attention' => $this->meta('Needs attention', 'list', self::CURRICULA, 'Validator failures and incomplete grade weighting in your versions.',
+            'needs_attention' => $this->meta('Needs attention', 'list', self::CURRICULA, 'Not met checks and incomplete grade weighting in your versions.',
                 $this->listOf(array_slice($attention, 0, 8), 'Nothing needs attention.')),
         ];
         return compact('stats', 'charts', 'lists');
@@ -250,7 +250,7 @@ final class DashboardAnalyticsService
             'decision_split' => $this->meta('Decisions, last 90 days', 'donut', self::CURRICULA, 'Approved against returned.',
                 $this->donut(array_map(static fn($k, $v) => ['label' => $k, 'value' => $v], array_keys($split), $split), 'No decisions in the last 90 days.')),
             'pipeline' => $this->pipeline(true),
-            'compliance_under_review' => $this->meta('Compliance of versions under review', 'bar', self::VALIDATION, 'Latest validation run of each version under review.',
+            'compliance_under_review' => $this->meta('Checks of versions under review', 'bar', self::VALIDATION, 'Latest validation run of each version under review.',
                 $this->allow('compliance.view') ? $this->compliance($underReview) : DashboardShaper::empty()),
         ];
         $lists = [
@@ -392,7 +392,7 @@ final class DashboardAnalyticsService
 
     private function complianceWorking(?array $selected): array
     {
-        $title = 'Compliance of working version';
+        $title = 'Checks of working version';
         $module = self::VALIDATION;
         if (!$this->allow('compliance.view')) return $this->meta($title, 'donut', $module, '', DashboardShaper::empty());
         if ($selected === null) return $this->meta($title, 'donut', $module, 'Latest validation run.', DashboardShaper::empty('Choose a version in the picker or the filter above.'));
@@ -400,9 +400,9 @@ final class DashboardAnalyticsService
         $description = 'Latest validation run of ' . $this->versionName($selected) . '.';
         if ($run === null) return $this->meta($title, 'donut', $module, $description, DashboardShaper::empty('This version has not been validated yet.'));
         return $this->meta($title, 'donut', $module, $description, $this->donut([
-            ['label' => 'Pass', 'value' => (int)$run['passed_count']],
-            ['label' => 'Fail', 'value' => (int)$run['failed_count']],
-            ['label' => 'Not evaluated', 'value' => (int)$run['not_evaluated_count']],
+            ['label' => 'Met', 'value' => (int)$run['passed_count']],
+            ['label' => 'Not met', 'value' => (int)$run['failed_count']],
+            ['label' => 'Cannot determine', 'value' => (int)$run['not_evaluated_count']],
         ], 'The latest run evaluated no rules.'));
     }
 

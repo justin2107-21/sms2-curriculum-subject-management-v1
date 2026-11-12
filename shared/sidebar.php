@@ -27,7 +27,7 @@ $sidebarCurriculum = [
     ['Subject Offering History', $sidebarPages . 'subject_history_view.php', 'fa-clock-rotate-left', ['subject-history-subject', 'subject-history-curriculum'], 'subject_history.view', true],
     ['Subject Equivalency Tool', $sidebarPages . 'subject_equivalency.php', 'fa-right-left', ['subject-equivalency'], 'equivalency.view', true],
     ['Grade Weighting Setup', $sidebarPages . 'grade_weighting_setup.php', 'fa-chart-pie', ['grade-weighting'], 'grade_weighting.view', true],
-    ['CHED / DepEd Compliance Validator', $sidebarPages . 'validate_curriculum.php', 'fa-shield-halved', ['compliance-validate', 'compliance-rules', 'compliance-references', 'compliance-history'], 'compliance.view', true],
+    ['CHED / DepEd Compliance Validator', $sidebarPages . 'compliance_validator.php', 'fa-shield-halved', ['compliance-validator'], 'compliance.view', true],
     ['Curriculum Export Tool', $sidebarPages . 'curriculum_export.php', 'fa-file-export', ['curriculum-export'], 'curriculum_export.view', true],
 ];
 $sidebarSetup = [

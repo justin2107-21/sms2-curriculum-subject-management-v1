@@ -93,10 +93,10 @@ try {
     $readerBuilder=$reader->request('modules/curriculum/pages/curriculum_builder.php',['program_id'=>$program,'curriculum_id'=>$curriculum,'version_id'=>$version]);
     task3HttpStatus($readerBuilder,200,'read-only Builder access');
     task3HttpCheck(!str_contains($readerBuilder['body'],'id="builderClassifyForm"') && !str_contains($readerBuilder['body'],'id="builderAttachForm"'),'read-only Builder contains no unauthorized mutation forms');
-    $referencesPage=$editor->request('modules/curriculum/pages/compliance_references.php');
-    task3HttpCheck($referencesPage['status']===200 && str_contains($referencesPage['body'],'complianceEvidenceForm'),'verification permission exposes evidence-based form');
-    $readerReferencesPage=$reader->request('modules/curriculum/pages/compliance_references.php');
-    task3HttpCheck($readerReferencesPage['status']===200 && !str_contains($readerReferencesPage['body'],'id="complianceEvidenceForm"'),'read-only source registry hides verification form');
+    $referencesPage=$editor->request('modules/curriculum/pages/compliance_validator.php',['view'=>'sources']);
+    task3HttpCheck($referencesPage['status']===200 && str_contains($referencesPage['body'],'data-can-verify="1"'),'verification permission exposes the evidence-based form');
+    $readerReferencesPage=$reader->request('modules/curriculum/pages/compliance_validator.php',['view'=>'sources']);
+    task3HttpCheck($readerReferencesPage['status']===200 && str_contains($readerReferencesPage['body'],'data-can-verify="0"'),'read-only source registry hides the verification form');
     echo json_encode(['passed'=>true,'checks'=>$checks,'suite'=>'Task 3 reference baseline HTTP'], JSON_THROW_ON_ERROR).PHP_EOL;
 } finally {
     foreach($clients as $client)$client->close();if(is_resource($server)){proc_terminate($server);proc_close($server);}foreach(glob($sessions.'/*') as $file)unlink($file);rmdir($sessions);unlink($log);

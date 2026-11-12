@@ -28,6 +28,13 @@ class ComplianceValidationService
         $this->validations = new ComplianceValidationRepository($db);
     }
 
+    /** Options for the shared Program > Curriculum > Version bar (versions respect the reader's scope). */
+    public function contextOptions(array $input): array
+    {
+        require_once __DIR__ . '/ElectivesWorkspaceService.php';
+        return (new ElectivesWorkspaceService($this->db))->contextOptions($input);
+    }
+
     public function programOptions(array $input): array
     {
         $result = $this->programs->paginate(
@@ -68,7 +75,24 @@ class ComplianceValidationService
         return ['subjects' => $result['records'], 'pagination' => $result['pagination']];
     }
 
-    public function run(int $versionId, int $actorId): array
+    /** Words shown to people. The stored values (PASS / FAIL / NOT_EVALUATED) are unchanged. */
+    public const RESULT_LABELS = ['PASS' => 'Met', 'FAIL' => 'Not met', 'NOT_EVALUATED' => 'Cannot determine from stored data'];
+    public const NO_RULES_MESSAGE = 'No rules apply to this program. No CHED/DepEd source for it is recorded in this system yet.';
+    public const ELECTIVE_NOTE = 'Elective units count toward the total only up to the required amount.';
+
+    /** Adds the human labels and the counts in the same words (met / not met / cannot determine). Counts only: there is no overall verdict. */
+    private function decorateRun(array $run): array
+    {
+        $run['met_count'] = (int)$run['passed_count'];
+        $run['not_met_count'] = (int)$run['failed_count'];
+        $run['cannot_determine_count'] = (int)$run['not_evaluated_count'];
+        foreach ($run['results'] ?? [] as $index => $result) {
+            $run['results'][$index]['result_label'] = self::RESULT_LABELS[$result['result_status']] ?? $result['result_status'];
+        }
+        return $run;
+    }
+
+    public function run(int $versionId, int $actorId, bool $includeDemo = false): array
     {
         $context = $this->validations->versionContext($versionId);
         if (!$context) {
@@ -76,7 +100,8 @@ class ComplianceValidationService
         }
         $rules = $this->rules->eligibleForContext(
             (int)$context['academic_program_id'],
-            (int)$context['curriculum_id']
+            (int)$context['curriculum_id'],
+            $includeDemo
         );
         if (!$rules) {
             return [
@@ -84,7 +109,7 @@ class ComplianceValidationService
                 'context' => $context,
                 'summary' => $this->emptySummary(),
                 'results' => [],
-                'message' => 'No active rules from verified references apply to this curriculum version.',
+                'message' => self::NO_RULES_MESSAGE,
             ];
         }
 
@@ -120,6 +145,7 @@ class ComplianceValidationService
                 ]
             );
             $run = $this->validations->findRun($runId);
+            $run = $run ? $this->decorateRun($run) : null;
             if (!$run) {
                 throw new RuntimeException('Completed validation run could not be loaded.');
             }
@@ -134,7 +160,7 @@ class ComplianceValidationService
             'context' => $context,
             'summary' => $summary,
             'results' => $run['results'],
-            'message' => 'Validation completed using active rules from verified references.',
+            'message' => 'Checked ' . $summary['rules_evaluated'] . ($summary['rules_evaluated'] === 1 ? ' rule' : ' rules') . ' from confirmed sources.',
         ];
     }
 
@@ -152,7 +178,11 @@ class ComplianceValidationService
         if (!$run) {
             throw new DomainNotFoundException('Compliance validation run not found.');
         }
-        return $run;
+        // The version is derived from the run; a reader who may not open that version gets nothing.
+        if (!CurriculumReadScope::allows(['status' => $run['version_status'] ?? null, 'review_status' => $run['version_review_status'] ?? null], current_user_id())) {
+            throw new DomainNotFoundException('Compliance validation run not found.');
+        }
+        return $this->decorateRun($run);
     }
 
     private function evaluateRule(array $rule, int $versionId, array $totals): array
@@ -170,20 +200,20 @@ class ComplianceValidationService
         switch ($type) {
             case 'MIN_TOTAL_UNITS':
                 $requirement = 'Total mapped subject units must be at least ' . $this->formatDecimal($threshold) . '.';
-                $actual = $this->formatDecimal((string)$totals['total_units']) . ' total units';
+                $actual = $this->unitsBoth($totals);
                 $result = $this->compareDecimal((string)$totals['total_units'], $threshold) >= 0 ? 'PASS' : 'FAIL';
-                $explanation = $result === 'PASS'
+                $explanation = ($result === 'PASS'
                     ? 'The mapped-subject unit total meets the configured minimum.'
-                    : 'The mapped-subject unit total is below the configured minimum.';
+                    : 'The mapped-subject unit total is below the configured minimum.') . ' ' . self::ELECTIVE_NOTE;
                 break;
 
             case 'MAX_TOTAL_UNITS':
                 $requirement = 'Total mapped subject units must not exceed ' . $this->formatDecimal($threshold) . '.';
-                $actual = $this->formatDecimal((string)$totals['total_units']) . ' total units';
+                $actual = $this->unitsBoth($totals);
                 $result = $this->compareDecimal((string)$totals['total_units'], $threshold) <= 0 ? 'PASS' : 'FAIL';
-                $explanation = $result === 'PASS'
+                $explanation = ($result === 'PASS'
                     ? 'The mapped-subject unit total is within the configured maximum.'
-                    : 'The mapped-subject unit total exceeds the configured maximum.';
+                    : 'The mapped-subject unit total exceeds the configured maximum.') . ' ' . self::ELECTIVE_NOTE;
                 break;
 
             case 'REQUIRED_SUBJECT':
@@ -228,6 +258,11 @@ class ComplianceValidationService
             'result' => $result,
             'explanation' => $explanation,
         ];
+    }
+
+    private function unitsBoth(array $totals): string
+    {
+        return 'units of all placements: ' . $this->formatDecimal((string)$totals['total_units']) . '; units of required placements: ' . $this->formatDecimal((string)($totals['required_units'] ?? '0'));
     }
 
     private function referenceIdentifier(array $rule): string

@@ -20,7 +20,7 @@
   const series = [color.blue, color.orange, color.green, color.pink, color.sky, color.slate];
   const bucketColor = { draft: color.slate, active: color.blue, in_review: color.orange, returned: color.pink, approved: color.green, archived: color.charcoal };
   const semantic = {
-    Pass: color.green, Fail: color.vermilion, 'Not evaluated': color.slate,
+    Met: color.green, 'Not met': color.vermilion, 'Cannot determine': color.slate,
     Approved: color.green, Returned: color.pink, Submitted: color.blue
   };
 
@@ -370,7 +370,7 @@
     },
     compliance_under_review(body, d, context) {
       if (d.bars.length) {
-        const sets = [['Pass', 'pass'], ['Fail', 'fail'], ['Not evaluated', 'not_evaluated']];
+        const sets = [['Met', 'pass'], ['Not met', 'fail'], ['Cannot determine', 'not_evaluated']];
         chart(canvas(body, 'Compliance results: ' + d.bars.map(b => b.label + ' pass ' + b.pass + ', fail ' + b.fail + ', not evaluated ' + b.not_evaluated).join('; '), Math.max(170, 34 * d.bars.length + 90)), {
           type: 'bar', plugins: [valueLabels],
           data: { labels: d.bars.map(b => b.label), datasets: sets.map(([name, key]) => ({ label: name + ' (' + d.bars.reduce((m, b) => m + b[key], 0) + ')', data: d.bars.map(b => b[key]), backgroundColor: semantic[name], borderColor: '#ffffff', borderWidth: 1 })) },

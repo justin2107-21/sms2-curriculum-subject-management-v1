@@ -45,8 +45,11 @@ class CurriculumVersionService
         // The curriculum's own MIN_TOTAL_UNITS rule beats its program's; no active rule means no target.
         $curriculumId = (int)$version['curriculum_id'];
         $programId = (int)$version['academic_program_id'];
-        $stmt = $this->db->prepare("SELECT rule_name, numeric_value FROM compliance_rules WHERE rule_type = 'MIN_TOTAL_UNITS' AND technical_status = 'active'
-            AND (curriculum_id = ? OR (academic_program_id = ? AND curriculum_id IS NULL)) ORDER BY (curriculum_id = ?) DESC, id LIMIT 1");
+        $stmt = $this->db->prepare("SELECT rules.rule_name, rules.numeric_value FROM compliance_rules AS rules
+            INNER JOIN compliance_references AS refs ON refs.id = rules.compliance_reference_id
+            WHERE rules.rule_type = 'MIN_TOTAL_UNITS' AND rules.technical_status = 'active' AND refs.verification_status = 'verified'
+            AND COALESCE(rules.rule_name, '') NOT LIKE 'DEV-DEMO%' AND COALESCE(refs.reference_code, '') NOT LIKE 'DEV-DEMO%'
+            AND (rules.curriculum_id = ? OR (rules.academic_program_id = ? AND rules.curriculum_id IS NULL)) ORDER BY (rules.curriculum_id = ?) DESC, rules.id LIMIT 1");
         $stmt->bind_param('iii', $curriculumId, $programId, $curriculumId);
         $stmt->execute();
         $rule = $stmt->get_result()->fetch_assoc();

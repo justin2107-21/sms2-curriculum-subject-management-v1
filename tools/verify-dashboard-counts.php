@@ -145,7 +145,7 @@ foreach ([null, (int)one("SELECT c.academic_program_id FROM curricula c JOIN cur
                 check($R, $scope, 'Returned to me', $S['returned'], $mine("AND v.review_status='returned'"));
                 check($R, $scope, 'Awaiting decision', $S['waiting'], $mine("AND v.review_status='under_review'"));
                 $failSql = "SELECT COUNT(*) FROM curriculum_versions v JOIN curricula c ON c.id=v.curriculum_id WHERE $owner" . $pc($programId) . " AND COALESCE((SELECT r.failed_count FROM compliance_validation_runs r WHERE r.curriculum_version_id=v.id ORDER BY r.id DESC LIMIT 1),0) > 0";
-                check($R, $scope, 'Failing checks', $S['failing'], (int)one($failSql));
+                check($R, $scope, 'Not met checks', $S['failing'], (int)one($failSql));
                 $sel = $payload['filter']['version_id'];
                 if ($sel) {
                     $t = rows("SELECT COUNT(*) n, COALESCE(SUM(s.units),0) u FROM curriculum_version_subjects m JOIN subjects s ON s.id=m.subject_id WHERE m.curriculum_version_id=$sel")[0];

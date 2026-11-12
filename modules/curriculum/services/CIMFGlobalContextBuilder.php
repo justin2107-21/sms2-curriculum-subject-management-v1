@@ -4,6 +4,7 @@ require_once __DIR__ . '/CIMFContextBuilder.php';
 require_once __DIR__ . '/CurriculumExportService.php';
 require_once __DIR__ . '/SubjectEquivalencyService.php';
 require_once __DIR__ . '/GradeWeightingService.php';
+require_once __DIR__ . '/../repositories/ComplianceDemo.php';
 require_once __DIR__ . '/SubjectOfferingHistoryService.php';
 require_once __DIR__ . '/ProgramSubjectAssignmentService.php';
 require_once __DIR__ . '/../repositories/ElectivesWorkspaceRepository.php';
@@ -232,15 +233,25 @@ final class CIMFGlobalContextBuilder
                     if (!empty($input['run_id'])) {
                         $run = (new ComplianceValidationService($this->db))->getRun((int)$input['run_id']);
                         if ($versionId && (int)$run['curriculum_version_id'] !== $versionId) throw new InvalidArgumentException('Validation run does not match the selected version.');
-                        $facts['validation'] = self::pick($run, ['curriculum_version_id', 'version_label', 'passed_count', 'failed_count', 'needs_review_count', 'results']);
+                        $facts['validation'] = self::pick($run, ['curriculum_version_id', 'version_label', 'met_count', 'not_met_count', 'cannot_determine_count', 'results']);
+                        // Demo rules are never part of the context, and the words are the ones on the page (Met / Not met / Cannot determine from stored data).
+                        $facts['validation']['results'] = array_values(array_filter($run['results'], static fn($r) => !ComplianceDemo::isDemoName($r['rule_name_snapshot'] ?? null)));
                         if (!empty($input['finding_id'])) {
-                            $facts['validation']['results'] = array_values(array_filter($run['results'], fn($r) => (int)$r['id'] === (int)$input['finding_id']));
+                            $facts['validation']['results'] = array_values(array_filter($facts['validation']['results'], fn($r) => (int)$r['id'] === (int)$input['finding_id']));
                             if (!$facts['validation']['results']) throw new InvalidArgumentException('Finding does not belong to the selected run.');
                         }
                         $versionId = (int)$run['curriculum_version_id'];
-                    } elseif (!empty($input['rule_id'])) $facts['configured_rule'] = self::pick((new ComplianceRuleService($this->db))->get((int)$input['rule_id']), ['id', 'rule_name', 'rule_type', 'authority', 'requirement_value', 'description', 'reference_id', 'status', 'reference_code', 'reference_title']);
-                    elseif (!empty($input['reference_id'])) $facts['reference'] = self::pick((new ComplianceReferenceService($this->db))->get((int)$input['reference_id']), ['id', 'title', 'reference_code', 'source_url', 'issuing_body', 'reference_type', 'description', 'status']);
-                    else throw new InvalidArgumentException('Select a stored validation result, rule or reference. CIMF does not run or change validation.');
+                    } elseif (!empty($input['rule_id'])) {
+                        $rule = (new ComplianceRuleService($this->db))->get((int)$input['rule_id']);
+                        if (!empty($rule['is_demo'])) throw new InvalidArgumentException('Demo rules are not available to CIMF.');
+                        // Fields that exist on the rule record: the authority is the reference's issuing body, the requirement is the stored number.
+                        $facts['configured_rule'] = self::pick($rule, ['id', 'rule_name', 'rule_type', 'description', 'numeric_value', 'subject_code', 'issuing_body', 'reference_type', 'reference_code', 'reference_title', 'reference_year', 'verification_status', 'technical_status']);
+                    } elseif (!empty($input['reference_id'])) {
+                        $reference = (new ComplianceReferenceService($this->db))->get((int)$input['reference_id']);
+                        if (!empty($reference['is_demo'])) throw new InvalidArgumentException('Demo sources are not available to CIMF.');
+                        $facts['reference'] = self::pick($reference, ['id', 'title', 'reference_code', 'source_url', 'issuing_body', 'reference_type', 'source_kind', 'reference_year', 'notes', 'verification_status']);
+                    }
+                    else { throw new InvalidArgumentException('Select a stored validation result, rule or reference. CIMF does not run or change validation.'); }
                     $facts['authority'] = 'Based on configured validation rules only. No official CHED or DepEd approval may be concluded.';
                 } else {
                     if (!$versionId) throw new InvalidArgumentException('Select a curriculum version.');
