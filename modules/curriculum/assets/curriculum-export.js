@@ -57,6 +57,8 @@
     function clearPreview(message) {
         dataset = null;
         document.getElementById('exportPreviewSummary').textContent = '';
+        document.getElementById('exportPreviewScope').textContent = '';
+        document.getElementById('exportPreviewStatus').hidden = true;
         preview.innerHTML = '<div class="csms-empty" role="status"><i class="fa-solid fa-spinner" aria-hidden="true"></i><strong>' + ui.escapeHtml(message) + '</strong></div>';
     }
 
@@ -99,7 +101,13 @@
         const context = data.context;
         const count = Number(data.summary.total_subjects || 0);
         document.getElementById('exportPreviewTitle').textContent = context.curriculum_name;
-        document.getElementById('exportPreviewSummary').textContent = context.version_label + ' · ' + count + (count === 1 ? ' subject' : ' subjects') + ' · ' + displayUnits(data.summary.total_units).replace(/&mdash;/g, '0') + ' units · ' + data.scope.label;
+        document.getElementById('exportPreviewSummary').textContent = context.version_label + ' · ' + count + (count === 1 ? ' subject' : ' subjects') + ' · ' + displayUnits(data.summary.total_units).replace(/&mdash;/g, '0') + ' units';
+        document.getElementById('exportPreviewScope').textContent = data.scope.label;
+        const statusChip = document.getElementById('exportPreviewStatus');
+        const versionStatus = String(context.version_status || '');
+        statusChip.hidden = !versionStatus;
+        statusChip.textContent = versionStatus.replace(/_/g, ' ');
+        statusChip.className = 'csms-chip csms-chip--' + versionStatus;
         const graduateOutcomes = Array.isArray(data.graduate_outcomes) ? data.graduate_outcomes : [];
         const outcomeMarkup = graduateOutcomes.length ? '<section class="export-outcomes"><h2>CHED BSIT Graduate Outcome Mapping</h2><p>CHED Memorandum Order No. 25, series of 2015 · Section 6.3. Institutional adoption/approval not verified. Curriculum mapping does not establish student outcome attainment, regulatory compliance, or institutional approval.</p>' + graduateOutcomes.map(outcome => '<article><h3>' + escape(outcome.outcome_code) + ' · ' + escape(outcome.coverage_status.replace('_',' ')) + '</h3><p>' + escape(outcome.outcome_text) + '</p><small>' + escape(outcome.document_code + ' · ' + outcome.document_title + ' · ' + outcome.source_section + ' · printed p. ' + outcome.printed_page + ' / PDF p. ' + outcome.pdf_page_index + ' · SHA-256 ' + outcome.source_sha256) + '</small><ul>' + outcome.mappings.map(mapping => '<li><strong>' + escape(mapping.subject_code + ' · ' + mapping.subject_title) + '</strong> — ' + escape(mapping.rationale) + '</li>').join('') + (outcome.mappings.length ? '' : '<li>No subject links recorded.</li>') + '</ul></article>').join('') + '</section>' : '';
         const clos = Array.isArray(data.course_learning_outcomes) ? data.course_learning_outcomes : [];

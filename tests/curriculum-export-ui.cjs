@@ -11,7 +11,7 @@ const make = (id, extra = {}) => {
 };
 const els = {};
 for (const id of ['curriculumExportWorkspace', 'exportProgram', 'exportCurriculum', 'exportVersion', 'exportProgramSearch', 'exportCurriculumSearch', 'exportVersionSearch', 'exportProgramOptions', 'exportCurriculumOptions', 'exportVersionOptions',
-    'downloadCurriculumCsv', 'downloadCurriculumPdf', 'printCurriculumExport', 'curriculumExportPreview', 'exportActionStatus', 'exportYear', 'exportSemester', 'exportEmpty', 'exportPanel', 'exportPreviewSummary', 'exportPreviewTitle',
+    'downloadCurriculumCsv', 'downloadCurriculumPdf', 'printCurriculumExport', 'curriculumExportPreview', 'exportActionStatus', 'exportYear', 'exportSemester', 'exportEmpty', 'exportPanel', 'exportPreviewSummary', 'exportPreviewTitle', 'exportPreviewScope', 'exportPreviewStatus',
     'exportProtect', 'exportProtectFields', 'exportPassword', 'exportPasswordConfirm', 'exportPasswordError']) els[id] = make(id);
 els.curriculumExportWorkspace.dataset = { exportApi: '/api' };
 for (const id of ['exportProgram', 'exportCurriculum', 'exportVersion']) els[id].value = '1';
@@ -33,6 +33,8 @@ const reply = (ok, type, body = 'x', message) => ({ ok, headers: { get: h => /ty
     ui.fetchJson = async (api, args) => args.action === 'preview' ? { summary: { total_subjects: 2, total_units: 6 }, context: { curriculum_name: 'C', version_label: 'V', curriculum_code: 'c', program_name: 'p' }, scope: { label: 'All' }, years: [], generated_at: 'now', disclaimer: 'd' } : { year_levels: [], semesters: [] };
     await els.exportYear.fire('change'); await new Promise(r => setTimeout(r, 20));
     check(els.downloadCurriculumCsv.disabled === false, 'buttons enabled once a preview is loaded');
+    check(els.exportProtectFields.hidden === true, 'password fields hidden on load');
+    check(els.exportPreviewScope.textContent === 'All' && els.exportPreviewStatus.hidden === true, 'preview header shows scope; no status chip when the version has no status');
     // Checkbox shows / hides and clears the fields
     els.exportProtect.checked = true; await els.exportProtect.fire('change');
     check(els.exportProtectFields.hidden === false, 'ticking shows the password fields');

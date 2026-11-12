@@ -47,6 +47,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
     </div>
 
     <section class="mapping-workspace-shell export-workspace">
+    <div class="export-top">
     <section class="mapping-context-bar export-context-picker" id="exportContextPicker" aria-label="Select curriculum context">
       <label class="mapping-context-field"><span>Program / Strand</span><div class="record-autocomplete">
         <input type="search" id="exportProgramSearch" placeholder="Search code or program name"/><input type="hidden" id="exportProgram"/>
@@ -63,10 +64,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
         <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear curriculum version" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button><div class="record-autocomplete-options" id="exportVersionOptions" role="listbox" aria-label="Version suggestions" hidden></div>
       </div></label>
     </section>
-    <section class="mapping-workspace-panel csms-panel" aria-label="Curriculum export">
-      <div class="csms-empty" id="exportEmpty" role="status"><i class="fa-solid fa-bullseye" aria-hidden="true"></i><strong>No curriculum version selected</strong><span>Use the context bar above to pick a curriculum version.</span></div>
-      <div id="exportPanel" hidden>
-        <div class="csms-card export-summary-card"><h2 id="exportPreviewTitle">Curriculum Structure</h2><p id="exportPreviewSummary" class="export-preview-summary" role="status"></p></div>
+    <div class="export-actions">
         <div class="csms-filter-row export-toolbar">
           <select class="csms-select" id="exportYear" aria-label="Year level" disabled><option value="">All year levels</option></select>
           <select class="csms-select" id="exportSemester" aria-label="Semester or term" disabled><option value="">All semesters / terms</option></select>
@@ -84,7 +82,17 @@ require __DIR__ . '/../../../shared/sidebar.php';
         </div>
         <p class="export-error" id="exportPasswordError" role="alert" hidden></p>
         <p class="export-action-status" id="exportActionStatus" role="status" aria-live="polite"></p>
-        <div id="curriculumExportPreview" class="export-report-host"></div>
+    </div>
+    </div>
+    <section class="mapping-workspace-panel csms-panel" aria-label="Curriculum export">
+      <div class="csms-empty" id="exportEmpty" role="status"><i class="fa-solid fa-bullseye" aria-hidden="true"></i><strong>No curriculum version selected</strong><span>Use the context bar above to pick a curriculum version.</span></div>
+      <div id="exportPanel" hidden>
+        <div class="export-preview">
+          <div class="export-preview-head">
+            <div class="export-preview-head__main"><h2 id="exportPreviewTitle">Curriculum Structure</h2><p id="exportPreviewSummary" class="export-preview-summary" role="status"></p></div>
+            <div class="export-preview-head__scope"><span id="exportPreviewScope"></span> <span class="csms-chip" id="exportPreviewStatus" hidden></span></div>
+          <div id="curriculumExportPreview" class="export-report-host"></div>
+        </div>
       </div>
     </section>
     </section>

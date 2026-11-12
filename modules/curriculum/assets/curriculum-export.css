@@ -6,16 +6,24 @@
 
 .export-content { padding-bottom: 36px; }
 
-/* Layout groups: summary card, then the toolbar (shared csms-filter-row spacing), then the compact protect line, then the preview. */
-.export-summary-card { gap: 4px; margin-bottom: var(--csms-space-4, 16px); }
-.export-summary-card h2 { color: var(--csms-text, #1f2937); font-size: 18px; margin: 0; }
-.export-preview-summary { color: var(--export-muted); font-size: 14px; margin: 0; }
-.export-toolbar { margin-bottom: var(--csms-space-3, 12px); }
-.export-protect { margin-bottom: var(--csms-space-3, 12px); }
-.export-protect-row { align-items: center; display: flex; gap: var(--csms-space-2, 8px); margin: 0; }
+/* Layout: context bar on the left, actions (toolbar, protect option) on the right; the actions drop below at 1024px and under. */
+.export-top { align-items: center; display: flex; flex-wrap: wrap; gap: var(--csms-space-3, 12px) var(--csms-space-4, 16px); margin: 14px 0; }
+.export-top > .export-context-picker { flex: 1 1 34rem; margin: 0; min-width: 0; }
+.export-actions { align-items: flex-end; display: flex; flex: 0 1 auto; flex-direction: column; gap: var(--csms-space-2, 8px); max-width: 100%; }
+.export-actions .export-toolbar { justify-content: flex-end; }
+@media (max-width: 1280px) { .export-actions { align-items: stretch; flex: 1 1 100%; } .export-actions .export-toolbar, .export-actions .export-protect-row { justify-content: flex-start; } .export-protect-fields { justify-content: start; } }
+.export-protect { align-items: flex-end; display: flex; flex-direction: column; gap: var(--csms-space-2, 8px); }
+.export-protect-row { align-items: center; display: flex; gap: var(--csms-space-2, 8px); justify-content: flex-end; margin: 0; }
 .export-protect-row label { align-items: center; cursor: pointer; display: inline-flex; gap: var(--csms-space-2, 8px); }
-.export-protect-fields { align-items: start; display: grid; gap: var(--csms-space-2, 8px) var(--csms-space-3, 12px); grid-template-columns: repeat(2, minmax(0, 18rem)); margin-top: var(--csms-space-2, 8px); }
+.export-protect-fields { align-items: start; display: grid; gap: var(--csms-space-2, 8px) var(--csms-space-3, 12px); grid-template-columns: repeat(2, minmax(0, 14rem)); }
+.export-protect-fields[hidden] { display: none !important; }
 .export-protect-fields .form-field { margin: 0; }
+.export-preview { background: #e9eef5; border: 1px solid #d7e0eb; border-radius: var(--csms-radius-surface, 12px); overflow: hidden; }
+.export-preview-head { align-items: center; background: #fff; border-bottom: 1px solid var(--csms-border, #dfe4ee); display: flex; flex-wrap: wrap; gap: 4px 16px; justify-content: space-between; padding: 12px 20px; }
+.export-preview-head h2 { color: var(--csms-text, #1f2937); font-size: 18px; margin: 0; }
+.export-preview-head__scope { align-items: center; color: var(--export-muted); display: inline-flex; font-size: 14px; gap: 8px; }
+.export-preview-summary { color: var(--export-muted); font-size: 14px; margin: 0; }
+.export-error, .export-action-status { margin: 0; text-align: right; }
 .export-pw { display: block; position: relative; }
 .export-pw input { box-sizing: border-box; padding-right: 40px; width: 100%; }
 .export-pw__toggle { background: none; border: 0; border-radius: var(--csms-radius-sm, 6px); color: var(--csms-text-secondary, #374151); cursor: pointer; height: 32px; position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 32px; }
@@ -23,7 +31,7 @@
 .export-pw-hint { color: var(--export-muted); grid-column: 1 / -1; }
 .export-error { background: #fdecec; border: 1px solid #f3b8b8; border-radius: var(--csms-radius-md, 8px); color: #8a1c1c; font-size: 14px; margin: 0 0 var(--csms-space-3, 12px); padding: 8px 12px; }
 .export-error[hidden] { display: none; }
-@media (max-width: 600px) { .export-protect-fields { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .export-protect-fields { grid-template-columns: 1fr; } .export-protect, .export-protect-row { align-items: flex-start; justify-content: flex-start; } .export-error, .export-action-status { text-align: left; } }
 
 .export-action-status { color: #66748a; font-size: var(--csms-text-xs, .75rem); }
 
@@ -49,7 +57,7 @@
 .export-empty-state h3 { color: #445269; font-size: .94rem; margin-bottom: 6px; }
 .export-empty-state p { font-size: .76rem; line-height: 1.55; max-width: 430px; }
 
-.export-report-host { background: #e9eef5; border: 1px solid #d7e0eb; border-radius: var(--csms-radius-surface, 12px); overflow: hidden; padding: 12px; }
+.export-report-host { padding: 12px; }
 
 .export-report {
   background: #fff;
@@ -146,7 +154,7 @@
 .export-document-footer > p,
 .export-document-footer > small { color:var(--export-muted); flex-basis:100%; font-size:var(--csms-text-xs, .75rem); margin:0; text-align:right; }
 .export-document-footer > small { font-size:var(--csms-text-xs, .75rem); }
-.export-action-status { color:var(--export-muted); font-size:var(--csms-text-xs, .75rem); margin:10px 2px 0; }
+.export-action-status { color:var(--export-muted); font-size:var(--csms-text-xs, .75rem); margin:0; }
 .export-document-totals { border-top:2px solid #294d7c; display:flex; gap:24px; justify-content:flex-end; margin-top:22px; padding-top:11px; }
 .export-document-totals strong { color:#203a5f; font-size:.82rem; }
 .export-report-table tfoot th { background:#f8fafc; border:1px solid #dfe5ed; color:#34445b; font-size:var(--csms-text-xs, .75rem); padding:7px 8px; text-align:left; }
@@ -170,10 +178,12 @@
   html, body { background: #fff !important; }
   /* Printing from the Export page: only the preview document (current year / semester selection) is printed. */
   .sidebar, .csms-sidebar, .topbar, .sidebar-overlay, #csmsCimfLauncher, #csmsCimfPanel, .page-title-bar, .export-context-picker, #exportEmpty,
-  .export-summary-card, .export-toolbar, .export-protect, .export-error, .export-action-status { display: none !important; }
+  .export-top, .export-preview-head, .export-toolbar, .export-protect, .export-error, .export-action-status { display: none !important; }
   .main { margin: 0 !important; padding: 0 !important; width: auto !important; }
   .export-content, .export-content .mapping-workspace-shell, .export-content .mapping-workspace-panel { background: none !important; border: 0 !important; box-shadow: none !important; margin: 0 !important; padding: 0 !important; }
-  .export-report-host { background: none; border: 0; border-radius: 0; overflow: visible; padding: 0; }
+  .export-top, .export-actions, .export-preview-head { display: none !important; }
+  .export-preview { background: none; border: 0; border-radius: 0; overflow: visible; }
+  .export-report-host { padding: 0; }
   .export-screen-toolbar { display: none !important; }
   .export-print-body { padding: 0; }
   .export-print-body > .export-report,
