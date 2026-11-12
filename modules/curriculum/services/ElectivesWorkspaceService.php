@@ -57,7 +57,7 @@ class ElectivesWorkspaceService
             'years'=>$years, 'terms'=>$terms, 'terms_by_year'=>$termsByYear, 'review'=>self::review($groups)];
     }
 
-    private static function academicOrder(string $a, string $b): int
+    public static function academicOrder(string $a, string $b): int
     {
         $number = static function (string $value): int {
             return preg_match('/\d+/', $value, $match) ? (int)$match[0] : PHP_INT_MAX;

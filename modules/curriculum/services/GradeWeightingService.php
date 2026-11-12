@@ -1,6 +1,8 @@
 <?php
 
 require_once __DIR__ . '/CurriculumVersionEditPolicy.php';
+require_once __DIR__ . '/CurriculumReadScope.php';
+require_once __DIR__ . '/ElectivesWorkspaceService.php';
 
 require_once __DIR__ . '/../validators/DomainValidator.php';
 require_once __DIR__ . '/../repositories/AcademicProgramRepository.php';
@@ -27,76 +29,111 @@ class GradeWeightingService
         $this->weighting = new GradeWeightingRepository($db);
     }
 
-    public function programOptions(array $input): array
+    /** Shared Program / Curriculum / Version bar lookup (same read-scoped query as Electives Manager and Offering History). */
+    public function contextOptions(array $input): array
     {
-        $result = $this->programs->paginate(
-            DomainValidator::listQuery($input, ['active', 'inactive'])
-        );
-        return ['programs' => $result['records'], 'pagination' => $result['pagination']];
+        return (new ElectivesWorkspaceService($this->db))->contextOptions($input);
     }
 
-    public function curriculumOptions(array $input): array
+    private const REASON_TEXT = [
+        'role' => 'Your role can view grade weighting but cannot change it.',
+        'archived' => 'This version is archived and cannot be changed.',
+        'approved' => 'This version is approved and cannot be changed. Create a new revision to change weights.',
+        'under_review' => 'This version is under review and cannot be changed.',
+        'reference' => 'This is a reference version and cannot be changed.',
+        'protected' => 'This version is protected and cannot be changed.',
+    ];
+
+    /** Whether the current user can change weights in this version, and why not. Mirrors CurriculumVersionEditPolicy (which still decides on save). */
+    private function editState(array $version): array
     {
-        $result = $this->curricula->paginate(
-            DomainValidator::listQuery($input, ['active', 'inactive'], true)
-        );
-        return ['curricula' => $result['records'], 'pagination' => $result['pagination']];
+        $userId = current_user_id();
+        $reason = null;
+        if ($userId === null || !user_can($userId, 'grade_weighting.manage')) $reason = 'role';
+        elseif (($version['status'] ?? '') === 'archived') $reason = 'archived';
+        elseif (($version['review_status'] ?? '') === 'approved') $reason = 'approved';
+        elseif (($version['review_status'] ?? '') === 'under_review') $reason = 'under_review';
+        elseif (($version['version_role'] ?? '') === 'reference') $reason = 'reference';
+        elseif (!CurriculumVersionEditPolicy::isEditable($version)) $reason = 'protected';
+        return ['editable' => $reason === null, 'reason_code' => $reason, 'reason_text' => $reason === null ? null : self::REASON_TEXT[$reason]];
     }
 
-    public function versionOptions(array $input): array
+    private function assertVersionReadable(int $versionId): void
     {
-        $curriculumId = DomainValidator::positiveId(
-            $input['curriculum_id'] ?? null,
-            'Curriculum'
-        );
-        if (!$this->curricula->findById($curriculumId)) {
-            throw new DomainNotFoundException('Curriculum not found.');
-        }
-        $result = $this->versions->paginateByCurriculum(
-            $curriculumId,
-            DomainValidator::listQuery($input, ['draft', 'active', 'archived'])
-        );
-        return ['versions' => $result['records'], 'pagination' => $result['pagination']];
-    }
-
-    public function placementOptions(array $input): array
-    {
-        $versionId = DomainValidator::positiveId(
-            $input['curriculum_version_id'] ?? null,
-            'Curriculum version'
-        );
-        if (!$this->versions->findById($versionId)) {
+        $version = $this->weighting->versionById($versionId);
+        if (!$version || !CurriculumReadScope::allows($version, current_user_id())) {
             throw new DomainNotFoundException('Curriculum version not found.');
         }
-        $result = $this->placements->paginateByVersion(
-            $versionId,
-            DomainValidator::listQuery($input)
-        );
-        return ['placements' => $result['records'], 'pagination' => $result['pagination']];
     }
 
+    /** The selected version: labels, lifecycle, edit state, terms for the filters and whole-version coverage. */
+    public function versionContext(array $input): array
+    {
+        $record = $this->weighting->versionContext(
+            DomainValidator::positiveId($input['program_id'] ?? null, 'Program / Strand'),
+            DomainValidator::positiveId($input['curriculum_id'] ?? null, 'Curriculum'),
+            DomainValidator::positiveId($input['curriculum_version_id'] ?? null, 'Curriculum version')
+        );
+        if (!$record || !CurriculumReadScope::allows($record, current_user_id())) throw new DomainNotFoundException('Curriculum version not found.');
+        $terms = $this->weighting->versionTerms((int)$record['version_id']);
+        $years = array_values(array_unique(array_filter(array_column($terms, 'year_level'))));
+        $semesters = array_values(array_unique(array_filter(array_column($terms, 'semester'))));
+        usort($years, [ElectivesWorkspaceService::class, 'academicOrder']);
+        usort($semesters, [ElectivesWorkspaceService::class, 'academicOrder']);
+        $userId = current_user_id();
+        $canManage = $userId !== null && user_can($userId, 'grade_weighting.manage');
+        return [
+            'record' => $record + $this->editState($record),
+            'years' => $years, 'semesters' => $semesters,
+            'coverage' => $this->weighting->coverage((int)$record['version_id']),
+            // For roles that can edit weights: is there any version they may open and change? (page message when not)
+            'can_manage' => $canManage,
+            'editable_version_exists' => !$canManage || $this->weighting->editableVersionExists(CurriculumReadScope::sql('versions')),
+        ];
+    }
+
+    /** Server-side paged subjects table of one version. */
+    public function overview(array $input): array
+    {
+        $query = DomainValidator::gradeWeightingOverviewQuery($input);
+        $this->assertVersionReadable($query['version_id']);
+        $result = $this->weighting->overview($query['version_id'], $query);
+        $rows = array_map(function (array $row): array {
+            $total = $this->decimalToHundredths((string)$row['total_weight']);
+            $row['component_count'] = (int)$row['component_count'];
+            $row['total_weight'] = $this->formatHundredths($total);
+            $row['status'] = $row['component_count'] === 0 ? 'not_configured' : ($total === 10000 ? 'configured' : 'incomplete');
+            return $row;
+        }, $result['records']);
+        return ['placements' => $rows, 'pagination' => $result['pagination']];
+    }
+
+    /** One placement for the editor dialog: placement, version edit state, scheme and its components (at most 100). */
     public function getSchemeForPlacement(int $placementId): array
     {
         $placement = $this->placements->findDetailedById($placementId);
         if (!$placement) {
             throw new DomainNotFoundException('Curriculum subject placement not found.');
         }
+        $this->assertVersionReadable((int)$placement['curriculum_version_id']);
         $scheme = $this->weighting->findSchemeByPlacement($placementId);
-        $isDemoContext = stripos((string)($placement['curriculum_code'] ?? ''), 'demo') !== false
-            || stripos((string)($placement['version_label'] ?? ''), 'demo') !== false;
-        $placement['is_demo'] = $isDemoContext ? 1 : 0;
+        $version = $this->weighting->versionById((int)$placement['curriculum_version_id']) ?? [];
         return [
             'placement' => $placement,
             'scheme' => $scheme ? $this->decorateScheme($scheme) : null,
+            'components' => $scheme ? $this->weighting->allComponents((int)$scheme['id']) : [],
+            'version' => $this->editState($version),
         ];
     }
 
+    /** Components of a scheme. The version is derived from the scheme and read scope applies to it. */
     public function listComponents(int $schemeId, array $input): array
     {
         $scheme = $this->weighting->findDetailedSchemeById($schemeId);
         if (!$scheme) {
             throw new DomainNotFoundException('Grade weighting scheme not found.');
         }
+        $this->assertVersionReadable((int)$scheme['curriculum_version_id']);
         $result = $this->weighting->paginateComponents(
             $schemeId,
             DomainValidator::listQuery($input)
@@ -108,6 +145,51 @@ class GradeWeightingService
         ];
     }
 
+    /**
+     * Removes a subject's whole weighting configuration (components and scheme) in one transaction, so the placement can be removed
+     * again. Same permission and the same editable-version rules as saving. The audit row keeps the old components and weights.
+     */
+    public function removeConfiguration(int $placementId, int $versionId, int $actorId): void
+    {
+        $this->db->begin_transaction();
+        try {
+            (new CurriculumVersionEditPolicy($this->db))->assertChildEditable('placement', $placementId);
+            $placement = $this->placements->findDetailedById($placementId);
+            if (!$placement) throw new DomainNotFoundException('Curriculum subject placement not found.');
+            if ((int)$placement['curriculum_version_id'] !== $versionId) {
+                throw new DomainValidationException('The selected subject is not mapped to this curriculum version.');
+            }
+            $scheme = $this->weighting->findSchemeByPlacement($placementId, true);
+            if (!$scheme) throw new DomainConflictException('This subject has no grade weighting configuration to remove.');
+            $schemeId = (int)$scheme['id'];
+            $old = $this->weighting->allComponents($schemeId, true);
+            foreach ($old as $component) $this->weighting->deleteComponent((int)$component['id']);
+            $this->weighting->deleteScheme($schemeId);
+            audit_log_required(
+                'GRADE_WEIGHTING_CONFIGURATION_REMOVE',
+                'grade_weighting_scheme',
+                $schemeId,
+                'Grade weighting configuration removed (components and scheme).',
+                $this->weightingAuditContext($placement) + [
+                    'old_components' => $this->auditComponents($old),
+                    'old_total' => $this->formatHundredths(array_sum(array_map(fn(array $c): int => $this->decimalToHundredths((string)$c['weight_percentage']), $old))),
+                    'component_count' => count($old),
+                ]
+            );
+            $this->db->commit();
+        } catch (Throwable $error) {
+            $this->db->rollback();
+            throw $error;
+        }
+    }
+
+    /** Names and weights only (what an audit reader needs), in saved order. */
+    private function auditComponents(array $components): array
+    {
+        return array_map(static fn(array $c): array => [
+            'component_name' => trim((string)$c['component_name']), 'weight_percentage' => (string)$c['weight_percentage'],
+        ], $components);
+    }
     public function createScheme(array $input, int $actorId): array
     {
         $data = DomainValidator::gradeWeightingScheme($input);
@@ -402,6 +484,7 @@ class GradeWeightingService
                 $existing = $this->weighting->allComponents($schemeId, true);
             }
 
+            $oldList = $this->auditComponents($existing);
             $byId = [];
             foreach ($existing as $component) $byId[(int)$component['id']] = $component;
             $incomingIds = [];
@@ -464,6 +547,8 @@ class GradeWeightingService
                             $this->weightingAuditContext($placement) + [
                                 'component_name' => $component['component_name'],
                                 'weight_percentage' => $component['weight_percentage'],
+                                'old_component_name' => trim((string)$old['component_name']),
+                                'old_weight_percentage' => (string)$old['weight_percentage'],
                             ]
                         );
                     }
@@ -489,7 +574,14 @@ class GradeWeightingService
                 'grade_weighting_scheme',
                 $schemeId,
                 'Grade weighting configuration saved at exactly 100%.',
-                $this->weightingAuditContext($placement) + ['component_count' => count($components)]
+                $this->weightingAuditContext($placement) + [
+                    'component_count' => count($components),
+                    // Old and new lists (names and weights) and totals, so a reader can see exactly what changed.
+                    'old_components' => $oldList,
+                    'old_total' => $this->formatHundredths(array_sum(array_map(fn(array $c): int => $this->decimalToHundredths((string)$c['weight_percentage']), $existing))),
+                    'new_components' => array_map(static fn(array $c): array => ['component_name' => $c['component_name'], 'weight_percentage' => $c['weight_percentage']], $components),
+                    'new_total' => $this->formatHundredths($total),
+                ]
             );
             $savedScheme = $this->weighting->findDetailedSchemeById($schemeId);
             $savedComponents = $this->weighting->allComponents($schemeId);

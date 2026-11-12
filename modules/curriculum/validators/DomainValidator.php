@@ -413,6 +413,36 @@ class DomainValidator
         ];
     }
 
+    public const WEIGHTING_SORTS = ['code', 'title', 'term', 'components', 'total', 'status'];
+    public const WEIGHTING_PAGE_SIZES = [10, 20, 50, 100];
+
+    /** List parameters of the Grade Weighting subjects table; anything unknown is rejected, never ignored. */
+    public static function gradeWeightingOverviewQuery(array $input): array
+    {
+        $page = filter_var($input['page'] ?? 1, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($page === false) throw new DomainValidationException('Page must be a positive integer.');
+        $perPage = filter_var($input['per_page'] ?? 20, FILTER_VALIDATE_INT);
+        if ($perPage === false || !in_array((int)$perPage, self::WEIGHTING_PAGE_SIZES, true)) {
+            throw new DomainValidationException('Per page must be 10, 20, 50 or 100.');
+        }
+        $search = self::optionalString($input, 'search', 'Search', 100);
+        if ($search !== null && mb_strlen($search, 'UTF-8') < 2) throw new DomainValidationException('Search needs at least 2 characters.');
+        $status = self::optionalString($input, 'status', 'Status', 20);
+        if ($status !== null && !in_array($status, ['configured', 'incomplete', 'not_configured'], true)) {
+            throw new DomainValidationException('Status must be configured, incomplete or not_configured.');
+        }
+        $sort = self::optionalString($input, 'sort', 'Sort', 20) ?? 'term';
+        if (!in_array($sort, self::WEIGHTING_SORTS, true)) throw new DomainValidationException('Cannot sort by that column.');
+        $direction = self::optionalString($input, 'direction', 'Sort direction', 4) ?? 'asc';
+        if (!in_array($direction, ['asc', 'desc'], true)) throw new DomainValidationException('Sort direction must be asc or desc.');
+        return [
+            'version_id' => self::positiveId($input['curriculum_version_id'] ?? null, 'Curriculum version'),
+            'page' => (int)$page, 'per_page' => (int)$perPage, 'search' => $search, 'status' => $status,
+            'year_level' => self::optionalString($input, 'year_level', 'Year level', 50),
+            'semester' => self::optionalString($input, 'semester', 'Semester', 50),
+            'sort' => $sort, 'direction' => $direction,
+        ];
+    }
     public static function gradeWeightingScheme(array $input): array
     {
         return [
