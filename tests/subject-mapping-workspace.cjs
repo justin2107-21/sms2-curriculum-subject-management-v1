@@ -25,6 +25,7 @@ class Element {
     addEventListener(name, fn) { this.handlers[name] = fn; }
     setAttribute(name, value) { this.attributes[name] = String(value); }
     getAttribute(name) { return this.attributes[name]; }
+    removeAttribute(name) { delete this.attributes[name]; }
     replaceChildren(...items) { this.children = items; this.innerHTML = ''; }
     add(item) { this.children.push(item); }
     focus() {}
@@ -35,6 +36,8 @@ class Element {
     querySelector(selector) { return el(this.id + '-save'); }
     querySelectorAll(selector) { return (this.graphElements || []).filter(node => selector === '[data-graph-link]' ? node.dataset.graphLink != null : selector === '[data-open-relationship-mapping]' && node.dataset.openRelationshipMapping != null); }
     setPointerCapture() {}
+    contains() { return false; }
+    get parentElement() { return this._parent || (this._parent = { querySelector: () => null, contains: () => false }); }
 }
 const elements = new Map();
 const el = id => { if (!elements.has(id)) elements.set(id, new Element(id)); return elements.get(id); };
@@ -50,13 +53,16 @@ const edge = { id: 1, curriculum_version_id: 3, subject_id: 2, required_subject_
 let requirements = [edge];
 let outcomeLinks = [{ id: 501, placement_id: 101, outcome_id: 1 }, { id: 502, placement_id: 102, outcome_id: 1 }];
 let workspaceEditable = true, removeRefusal = false;
+const IT = n => ({ id: n, outcome_code: 'IT' + String(n).padStart(2, '0'), outcome_text: 'Outcome text number ' + n + ' of the BSIT graduate outcomes', document_code: 'CHED Memorandum Order No. 25, series of 2015', source_section: 'Section 6.3', printed_page: 8, pdf_page_index: 8, coverage_status: 'not_assessed', mapping_count: 0 });
+let outcomeRows = [{ ...IT(1), outcome_text: 'Apply knowledge of computing, science, and mathematics appropriate to the discipline', mapping_count: 2 }];
+let cloRows = [];
 const selectors = {}, calls = [], posted = [];
 let delayedVersion = null;
 let previewValidation = {valid:true, conflicts:[], relationships:[]};
 let delayedTrace = null, delayNextTrace = false;
 const root = el('subjectMappingWorkspace');
 root.dataset = { programApi: 'programs', curriculumApi: 'curricula', versionApi: 'versions', subjectApi: 'subjects',
-    assignmentApi: 'mappings', requirementApi: 'requirements', outcomeApi: 'outcomes', canViewPrograms: '1', canViewSubjects: '1', canManageMappings: '1', canManageOutcomes: '1', canAddMappings: '1', canViewPrerequisites: '1' };
+    assignmentApi: 'mappings', requirementApi: 'requirements', outcomeApi: 'outcomes', canViewPrograms: '1', canViewSubjects: '1', canManageMappings: '1', canManageOutcomes: '1', canAddMappings: '1', canViewPrerequisites: '1', canManageClos: '1', canManagePlans: '1', cloApi: 'clos' };
 el('mappingHighlightPrerequisites').setAttribute('aria-pressed', false);
 function autocomplete(config) {
     let selected = null;
@@ -85,8 +91,9 @@ const ui = {
         calls.push({ endpoint, params });
         if (endpoint === 'outcomes' && params.action === 'workspace' && String(params.curriculum_version_id) === '21') throw new Error('CHED CMO 25 BSIT outcomes are available only for BSIT curriculum versions.');
         if (endpoint === 'outcomes' && params.action === 'workspace') return {context:{version_id:3,version_label:'V1',program_code:'BSIT',curriculum_name:'Information Technology',editable:workspaceEditable},
-            outcomes:[{id:1,outcome_code:'IT01',outcome_text:'Apply knowledge of computing, science, and mathematics appropriate to the discipline',document_code:'CHED Memorandum Order No. 25, series of 2015',source_section:'Section 6.3',printed_page:8,pdf_page_index:8,coverage_status:'not_assessed',mapping_count:2}],
+            outcomes:outcomeRows,
             placements:mappings.map(m=>({...m,placement_id:m.id+100})),mappings:outcomeLinks,limitations:{}};
+        if (endpoint === 'clos' && params.action === 'workspace') return { placement: { placement_id: Number(params.placement_id), curriculum_version_id: 3, subject_code: 'S1', subject_title: 'Subject 1', version_label: 'V1', year_level: '1st Year', semester: '1st Semester' }, editable: workspaceEditable, clos: cloRows, alignments: [], plans: [], parent_mappings: [], disclaimer: 'Planning records.' };
         if (params.action === 'preview_placement') return {validation: previewValidation};
         if (endpoint === 'mappings' && params.subject_id && delayNextTrace) {
             delayNextTrace = false;
@@ -141,7 +148,7 @@ class FormDataMock extends Map {
     }
 }
 const context = { window: { CurriculumUI: ui, location: new URL('http://localhost/?program_id=1&curriculum_id=2&version_id=3'), addEventListener() {}, history: {pushState(_a,_b,url) { context.window.location = new URL(url); }} },
-    document: { getElementById: el, createElement: () => new Element('option') },
+    document: { getElementById: el, createElement: () => new Element('option'), addEventListener() {} },
     Option: class { constructor(text, value) { this.text = text; this.value = value; } },
     URL, URLSearchParams, FormData: FormDataMock, setTimeout, clearTimeout, console };
 vm.runInNewContext(fs.readFileSync('modules/curriculum/assets/subject-mapping-data.js', 'utf8'), context);
@@ -264,6 +271,51 @@ const terms = () => [...el('mappingMap').innerHTML.matchAll(/<tr class="map-tabl
     selectors.mappingVersionInput.setSelected(version); await settle();
     assert.equal(count('subjectsNoOutcome'), 0); assert.equal(count('outcomesNoSubject'), 0);
     assert.match(el('mappingReviewResults').innerHTML, /No mapping issues detected/);
+    // ---- Graduate Outcomes tab: one description line, status chips with counts, one compact table; Course outcomes in its own tab.
+    const tabClick = id => el('mappingWorkspaceTabs').handlers.click({ target: { closest: () => ({ id }) } });
+    const rowsShown = () => (el('outcomeMatrix').innerHTML.match(/<tr class="csms-row-click/g) || []).length;
+    const chipN = key => Number((el('outcomeChips').innerHTML.match(new RegExp('data-outcome-filter="' + key + '"[^>]*>[^<]*<span class="outcome-chip__n">(\\d+)')) || [])[1]);
+    const chip = key => el('outcomeChips').handlers.click({ target: { closest: () => ({ dataset: { outcomeFilter: key } }) } });
+    outcomeRows = [{ ...IT(1), coverage_status: 'mapped', mapping_count: 2 }, { ...IT(2), coverage_status: 'incomplete', mapping_count: 1 }, { ...IT(3), coverage_status: 'unmapped' }, ...Array.from({ length: 10 }, (_, i) => IT(i + 4))];
+    outcomeRows[4].mapping_count = 1;
+    selectors.mappingVersionInput.setSelected(version); await settle();
+    tabClick('mappingTabOutcomes'); await settle();
+    assert.equal(context.window.location.searchParams.get('tab'), 'outcomes');
+    assert.deepEqual(['all', 'mapped', 'incomplete', 'unmapped', 'not_assessed'].map(chipN), [13, 1, 1, 1, 10], 'chip counts: All 13, Mapped 1, Incomplete 1, Unmapped 1, Not assessed 10');
+    for (const key of ['all', 'mapped', 'incomplete', 'unmapped', 'not_assessed']) { chip(key); assert.equal(rowsShown(), chipN(key), 'rows shown equal the count of the ' + key + ' chip'); assert.match(el('outcomeChips').innerHTML, new RegExp('data-outcome-filter="' + key + '" aria-pressed="true"'), 'the active chip is marked'); }
+    chip('all'); el('outcomeSearch').value = 'IT1'; el('outcomeSearch').handlers.input();
+    assert.equal(chipN('all'), 4, 'IT10 to IT13 match the search'); for (const key of ['all', 'mapped', 'not_assessed']) { chip(key); assert.equal(rowsShown(), chipN(key), 'search and chip agree for ' + key); }
+    el('outcomeSearch').value = ''; el('outcomeSearch').handlers.input(); chip('all');
+    assert.equal(el('outcomeZero').hidden, true, 'links exist: no zero-state line');
+    assert.match(el('outcomeMatrix').innerHTML, /<span class="csms-code">IT01<\/span>/); assert.ok(el('outcomeMatrix').innerHTML.includes('class="outcome-text" title="Outcome text number 1'), 'full text in the tooltip, two lines clamped by CSS');
+    assert.match(el('outcomeMatrix').innerHTML, /<td class="csms-ctable__num">2<\/td>/); assert.match(el('outcomeMatrix').innerHTML, />View links<\/button>/);
+    assert.ok(!/outcomeOverview|outcomeCoverage|academic-notice/.test(fs.readFileSync('modules/curriculum/pages/subject_mapping.php', 'utf8')), 'no stat cards, coverage dropdown or yellow banner');
+    el('outcomeMatrix').handlers.click({ target: { closest: () => ({ dataset: { outcomeOpen: '1' } }) } }); assert.equal(el('outcomeViewModal').hidden, false, 'View links opens the same dialog');
+    el('viewSourceDetails').handlers.click(); assert.equal(el('sourceDetailsModal').hidden, false);
+    assert.match(el('outcomeSources').innerHTML, /Important Academic Notice/); assert.match(el('outcomeSources').innerHTML, /fingerprinted/); assert.match(el('outcomeSources').innerHTML, /adoption\/approval is not verified/); assert.match(el('outcomeSources').innerHTML, /Limitation/);
+    // All counts zero: one honest line with a button that opens the Curriculum Map; counts show 0, not blank.
+    outcomeRows = Array.from({ length: 13 }, (_, i) => IT(i + 1)); selectors.mappingVersionInput.setSelected(version); await settle();
+    assert.equal(el('outcomeZero').hidden, false); assert.match(el('outcomeMatrix').innerHTML, /<td class="csms-ctable__num">0<\/td>/);
+    el('outcomeOpenMap').handlers.click(); assert.equal(el('mappingPanelMap').hidden, false); assert.equal(context.window.location.searchParams.get('tab'), 'map');
+    // Course outcomes: its own deep-linkable tab, the picker starts empty, read-only versions cannot create.
+    tabClick('mappingTabCourse'); await settle();
+    assert.equal(context.window.location.searchParams.get('tab'), 'course'); assert.equal(el('mappingPanelCourse').hidden, false); assert.equal(el('mappingPanelOutcomes').hidden, true);
+    assert.equal(el('cloPlacementSelect').value, '', 'no subject is preselected'); assert.equal(el('cloPlacementSearch').disabled, false);
+    assert.match(el('cloAssessmentContent').innerHTML, /Select a subject to view or add its course learning outcomes/);
+    el('cloPlacementSearch').handlers.focus(); assert.match(el('cloPlacementOptions').innerHTML, /<div class="record-autocomplete-group">1st Year \u00b7 1st Semester<\/div>/, 'grouped by year and semester');
+    el('cloPlacementOptions').handlers.click({ target: { closest: () => ({ dataset: { placement: '101' } }) } }); await settle();
+    assert.equal(el('cloPlacementSelect').value, '101'); assert.match(el('cloAssessmentContent').innerHTML, /No course learning outcomes recorded for this placement/); assert.ok(el('cloAssessmentContent').innerHTML.includes('data-clo-create'));
+    el('cloAssessmentContent').handlers.click({ target: { closest: () => ({ dataset: { cloCreate: '' } }) } });
+    assert.equal(el('cloCreateModal').hidden, false, 'Create CLO opens its own dialog'); assert.equal(el('cloCreateSequence').value, 1, 'next free sequence is pre-filled');
+    assert.ok(!/<details|reference-action-details/.test(el('cloDetail').innerHTML), 'no inner collapsible Create CLO heading');
+    const page = fs.readFileSync('modules/curriculum/pages/subject_mapping.php', 'utf8'); const dialog = page.slice(page.indexOf('<div class="curriculum-modal" id="cloCreateModal"'), page.indexOf('id="sidebarOverlay"'));
+    assert.ok(dialog.includes('class="curriculum-modal"') && !dialog.includes('<details') && (dialog.match(/>Cancel</g) || []).length === 1 && (dialog.match(/>Create CLO</g) || []).length === 1, 'shared dialog shell, one Cancel and one Create CLO, no duplicate Close');
+    cloRows = [{ id: 9, clo_code: 'CLO 2', clo_statement: 'x', sequence_order: 2, record_state: 'active', review_state: 'draft', origin: 'manual' }];
+    el('cloPlacementOptions').handlers.click({ target: { closest: () => ({ dataset: { placement: '102' } }) } }); await settle();
+    el('cloAssessmentContent').handlers.click({ target: { closest: () => ({ dataset: { cloCreate: '' } }) } }); assert.equal(el('cloCreateSequence').value, 3, 'sequence continues after the highest existing number');
+    workspaceEditable = false; el('cloPlacementOptions').handlers.click({ target: { closest: () => ({ dataset: { placement: '103' } }) } }); await settle();
+    assert.ok(!el('cloAssessmentContent').innerHTML.includes('data-clo-create'), 'a read-only version cannot create CLOs'); assert.match(el('cloAssessmentContent').innerHTML, /Read only/);
+    workspaceEditable = true; cloRows = []; outcomeRows = [{ ...IT(1), outcome_text: 'Apply knowledge of computing, science, and mathematics appropriate to the discipline', mapping_count: 2 }]; tabClick('mappingTabMap');
     // Another program: context clears, SHS grade levels are offered.
     selectors.mappingProgramInput.setSelected({ id: 7, program_code: 'STEM', program_name: 'STEM', program_type: 'SHS' }); await settle();
     assert.equal(el('mappingVersionFilter').value, ''); assert.equal(el('mappingBuilderLink').hidden, true);

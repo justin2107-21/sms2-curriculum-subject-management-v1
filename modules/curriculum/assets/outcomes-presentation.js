@@ -5,6 +5,9 @@
     const esc = value => ui.escapeHtml(value == null ? '' : String(value));
     const list = value => Array.isArray(value) ? value : [];
     const labels = {not_assessed:'Not assessed', incomplete:'Incomplete', mapped:'Mapped', unmapped:'Unmapped'};
+    const chipClass = {not_assessed:'csms-chip--draft', incomplete:'csms-chip--under_review', mapped:'csms-chip--approved', unmapped:'csms-chip--archived'};
+    const statusChip = state => '<span class="csms-chip '+(chipClass[state]||'csms-chip--draft')+'">'+esc(labels[state]||state)+'</span>';
+    const FILTERS = [['all','All'],['mapped','Mapped'],['incomplete','Incomplete'],['unmapped','Unmapped'],['not_assessed','Not assessed']];
     const badge = (state, label) => ui.statusBadge(state, label);
     const fact = (label, value) => '<div><dt>'+esc(label)+'</dt><dd>'+esc(value || 'Not recorded')+'</dd></div>';
     const facts = body => '<dl class="record-detail-grid">'+body+'</dl>';
@@ -23,10 +26,20 @@
         const terms=String(query || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
         return list(outcomes).filter(o=>(!coverage||o.coverage_status===coverage)&&terms.every(t=>(o.outcome_code+' '+o.outcome_text).toLowerCase().includes(t)));
     }
-    function overview(data) {
-        const outcomes=list(data.outcomes);
-        return [['Documented outcomes',outcomes.length],['Recorded subject links',list(data.mappings).length],...Object.entries(labels).map(([key,label])=>[label,outcomes.filter(o=>o.coverage_status===key).length,key])].map(([label,value,key])=>'<div>'+(key?badge(key,label):'<span>'+label+'</span>')+'<strong>'+value+'</strong></div>').join('');
+    function searchRows(outcomes, query) {
+        const terms=String(query || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+        return list(outcomes).filter(o=>terms.every(t=>(o.outcome_code+' '+o.outcome_text).toLowerCase().includes(t)));
     }
+    /** Chip counts are taken over the rows that match the search, so the active chip's number always equals the rows in the table. */
+    function chipCounts(outcomes, query) {
+        const rows=searchRows(outcomes,query),counts={all:rows.length};
+        FILTERS.slice(1).forEach(([key])=>{counts[key]=rows.filter(o=>o.coverage_status===key).length;});
+        return counts;
+    }
+    function filterChips(counts, active) {
+        return FILTERS.map(([key,label])=>'<button type="button" class="outcome-chip'+(key===active?' is-active':'')+'" data-outcome-filter="'+key+'" aria-pressed="'+(key===active?'true':'false')+'">'+esc(label)+' <span class="outcome-chip__n">'+Number(counts[key]||0)+'</span></button>').join('');
+    }
+    function allZero(outcomes) { return list(outcomes).length>0&&list(outcomes).every(o=>Number(o.mapping_count)===0); }
     function sources(data) {
         const groups=new Map();
         list(data.outcomes).forEach(o=>{
@@ -34,7 +47,8 @@
             if(!groups.has(key))groups.set(key,[]);groups.get(key).push(o);
         });
         if(!groups.size)return '<p class="mapping-state">No recorded documentary source is available for this version.</p>';
-        return [...groups.values()].map(rows=>{
+        const notice=section('Important Academic Notice','<p><strong>Source:</strong> CHED CMO No. 25, s. 2015, Section 6.3. '+esc(data.limitations?.authenticity||'The supplied scan is fingerprinted; independent registry verification has not been established.')+' Current applicability has not been established. Institutional adoption/approval is not verified.</p><p><strong>Limitation:</strong> '+esc(data.limitations?.mapping||'Curriculum mapping, course outcome alignments, and assessment plans do not establish student outcome attainment, regulatory compliance, or institutional approval.')+'</p>');
+        return notice+[...groups.values()].map(rows=>{
             const first=rows[0],unique=key=>[...new Set(rows.map(o=>o[key]))].join(', ');
             return section('Document Information',facts(fact('Issuing authority',first.issuing_authority)+fact('CMO number and series',first.document_code)+fact('Official recorded title',first.document_title)+fact('Source identifier',first.source_key)))
                 +section('Source Reference',facts(fact('Relevant sections',unique('source_section'))+fact('Printed page references',unique('printed_page'))+fact('PDF page references',unique('pdf_page_index'))))
@@ -43,8 +57,16 @@
                 +section('Detailed Outcome Locations',compactTable(['Outcome','Source section','Printed page','PDF page','Source order'],rows.map(o=>'<tr><th scope="row">'+esc(o.outcome_code)+'</th><td>'+esc(o.source_section)+'</td><td>'+esc(o.printed_page)+'</td><td>'+esc(o.pdf_page_index)+'</td><td>'+esc(o.source_order)+'</td></tr>').join('')));
         }).join('');
     }
-    function outcomeList(rows, editable, selected) {
-        return rows.length ? '<ul class="outcome-browse-list">'+rows.map(o=>'<li'+(Number(selected)===Number(o.id)?' class="is-selected"':'')+'><div><strong class="record-code">'+esc(o.outcome_code)+'</strong> '+badge(o.coverage_status,labels[o.coverage_status])+'<p>'+esc(o.outcome_text)+'</p></div><div class="outcome-row-actions"><span>'+Number(o.mapping_count)+' subject link'+(Number(o.mapping_count)===1?'':'s')+'</span><button type="button" class="view-button" data-outcome-open="'+Number(o.id)+'" aria-haspopup="dialog" aria-controls="outcomeViewModal"><i class="fa-solid fa-eye" aria-hidden="true"></i> View <span class="sr-only">'+esc(o.outcome_code)+'</span></button></div></li>').join('')+'</ul>' : '<p class="mapping-state">No outcomes match these filters.</p>';
+    function outcomeTable(rows, selected) {
+        if(!rows.length)return '<div class="csms-empty" role="status"><i class="fa-solid fa-filter" aria-hidden="true"></i><strong>No outcomes match</strong><span>Change the status filter or the search.</span></div>';
+        return '<div class="csms-page-table"><table class="csms-ctable csms-ctable--outcomes"><thead><tr><th scope="col" class="csms-ctable__code">Code</th><th scope="col">Official outcome</th><th scope="col">Status</th><th scope="col" class="csms-ctable__num">Subjects linked</th><th scope="col" class="csms-ctable__action">Action</th></tr></thead><tbody>'
+            +rows.map(o=>'<tr class="csms-row-click'+(Number(selected)===Number(o.id)?' is-selected':'')+'" tabindex="0" data-outcome-open="'+Number(o.id)+'" aria-haspopup="dialog" aria-label="View links of '+esc(o.outcome_code)+'">'
+                +'<td class="csms-ctable__code"><span class="csms-code">'+esc(o.outcome_code)+'</span></td>'
+                +'<td><span class="outcome-text" title="'+esc(o.outcome_text)+'">'+esc(o.outcome_text)+'</span></td>'
+                +'<td>'+statusChip(o.coverage_status)+'</td>'
+                +'<td class="csms-ctable__num">'+Number(o.mapping_count)+'</td>'
+                +'<td class="csms-ctable__action"><button type="button" class="csms-link" data-outcome-open="'+Number(o.id)+'" aria-haspopup="dialog">View links</button></td></tr>').join('')
+            +'</tbody></table></div>';
     }
     function outcomeDetail(data, id, canManage) {
         const o=list(data.outcomes).find(o=>Number(o.id)===Number(id));if(!o)return '';
@@ -62,12 +84,11 @@
     const planFields=p=>field('assessment_method','Assessment method',p.assessment_method,180,false,'text')+field('planned_task','Planned task',p.planned_task)+field('evidence_description','Planned evidence',p.evidence_description)+field('performance_indicator','Performance indicator / criterion',p.performance_indicator,6000)+field('rubric_or_standard','Rubric / standard (optional)',p.rubric_or_standard);
     function cloWorkspace(data, permission) {
         const p=data.placement,canClo=data.editable&&permission.manageClos,canPlan=data.editable&&permission.managePlans;
-        let html='<div class="mapping-review-header"><div><h4>'+esc(p.subject_code+' / '+p.subject_title)+'</h4><p>'+esc([p.version_label,p.year_level,p.semester].filter(Boolean).join(' / '))+'</p></div>'+badge(data.editable&&(canClo||canPlan)?'editable':'read_only')+'</div>';
+        let html='<div class="course-head"><div><h3>'+esc(p.subject_code+' / '+p.subject_title)+'</h3><p>'+esc([p.version_label,p.year_level,p.semester].filter(Boolean).join(' / '))+'</p></div><div class="course-head__actions">'+badge(data.editable&&(canClo||canPlan)?'editable':'read_only')+(canClo?'<button type="button" class="primary-action-button" data-clo-create><i class="fa-solid fa-plus" aria-hidden="true"></i> Create CLO</button>':'')+'</div></div>';
         if(!data.editable)html+='<p class="mapping-state">Read only: curriculum lifecycle protection.</p>';
         else if(!canClo||!canPlan)html+='<p class="mapping-state">'+(!canClo?'CLOs and alignments are read only: CLO management permission is required. ':'')+(!canPlan?'Assessment plans are read only: assessment plan management permission is required.':'')+'</p>';
-        if(canClo)html+='<div class="card-header-actions"><button type="button" class="button-primary" data-clo-create><i class="fa-solid fa-plus" aria-hidden="true"></i> Create CLO</button></div>';
         const rows=list(data.clos);
-        if(!rows.length)return html+'<p class="mapping-state">No course learning outcomes recorded for this placement.</p>';
+        if(!rows.length)return html+'<div class="csms-empty" role="status"><i class="fa-solid fa-list-check" aria-hidden="true"></i><strong>No course learning outcomes recorded for this placement</strong></div>';
         return html+compactTable(['CLO','Statement','Outcome alignments','Assessment plans','Origin / Review','Actions'],rows.map(c=>{
             const alignments=list(data.alignments).filter(a=>Number(a.clo_id)===Number(c.id));
             const plans=list(data.plans).filter(a=>Number(a.clo_id)===Number(c.id));
@@ -75,10 +96,8 @@
             return '<tr><th scope="row"><span class="record-code">'+esc(c.clo_code)+'</span></th><td>'+esc(c.clo_statement)+'</td><td>'+esc(alignments.filter(a=>a.record_state==='active').map(a=>a.outcome_code).join(', ')||'None recorded')+'</td><td>'+activePlans.length+' active'+(incomplete?' / '+incomplete+' incomplete':'')+(plans.length>activePlans.length?' / '+(plans.length-activePlans.length)+' withdrawn':'')+'</td><td>'+reviewBadges(c)+'</td><td class="row-actions"><button type="button" class="view-button" data-clo-open="'+Number(c.id)+'" aria-haspopup="dialog" aria-controls="cloViewModal"><i class="fa-solid fa-eye" aria-hidden="true"></i> View</button>'+(canClo&&c.record_state==='active'?'<button type="button" class="row-action-button" data-clo-edit="'+Number(c.id)+'"><i class="fa-solid fa-pen" aria-hidden="true"></i> Edit</button>':'')+'</td></tr>';
         }).join(''));
     }
-    function cloCreate(data, permission) {
-        if(!data.editable||!permission.manageClos)return '';
-        return form('clo-create-form','Create CLO',cloFields({}),'Create CLO','',true);
-    }
+    /** Next free CLO sequence of a placement (withdrawn CLOs keep their number, the server refuses a reused one). */
+    function nextCloSequence(data) { return list(data&&data.clos).reduce((max,c)=>Math.max(max,Number(c.sequence_order)||0),0)+1; }
     function cloDetail(data, id, permission, edit=false) {
         const c=list(data.clos).find(c=>Number(c.id)===Number(id));if(!c)return '';
         const active=c.record_state==='active',canClo=data.editable&&permission.manageClos&&active,canPlan=data.editable&&permission.managePlans&&active;
@@ -96,5 +115,5 @@
         if(canPlan)html+=form('clo-plan-form','Create assessment plan',hidden('clo_id',c.id)+planFields({}),'Record planned assessment');
         return html+section('Planning and Review Limitations','<p>'+esc(data.disclaimer)+'</p><p>Inherited records retain their origin and recorded academic review state; inheritance does not establish independent review or institutional approval.</p>');
     }
-    global.OutcomesPresentation={filterOutcomes,overview,sources,outcomeList,outcomeDetail,cloWorkspace,cloDetail,cloCreate};
+    global.OutcomesPresentation={filterOutcomes:(o,q,c)=>searchRows(o,q).filter(r=>!c||c==='all'||r.coverage_status===c),chipCounts,filterChips,allZero,sources,outcomeTable,outcomeDetail,cloWorkspace,cloDetail,nextCloSequence,statusChip};
 }(typeof window==='undefined'?globalThis:window));

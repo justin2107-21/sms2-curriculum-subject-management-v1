@@ -60,7 +60,8 @@ try{
  foreach(['SUBJECT_REQUIREMENT_CREATE','SUBJECT_REQUIREMENT_UPDATE','SUBJECT_REQUIREMENT_REMOVE']as $action)checkHttp((int)$db->query("SELECT COUNT(*) FROM audit_logs WHERE action='$action'")->fetch_row()[0]>0,'HTTP audit '.$action);
 
  $mappingPage=$admin->request('modules/curriculum/pages/subject_mapping.php');status($mappingPage,200,'Mapping page');
- checkHttp(substr_count($mappingPage['body'],'role="tab"')===4,'Existing mapping tabs plus Graduate Outcomes');
+ checkHttp(substr_count($mappingPage['body'],'role="tab"')===5 && str_contains($mappingPage['body'],'id="mappingTabCourse"') && str_contains($mappingPage['body'],'>Course outcomes</button>'),'Mapping tabs: Curriculum Map, Subject Trace, Mapping Review, Graduate Outcomes and Course outcomes');
+checkHttp(!str_contains($mappingPage['body'],'academic-notice') && !str_contains($mappingPage['body'],'outcomeOverview') && !str_contains($mappingPage['body'],'id="outcomeCoverage"') && !str_contains($mappingPage['body'],'Graduate Outcomes Mapping') && !str_contains($mappingPage['body'],'CHED BSIT') && str_contains($mappingPage['body'],'id="outcomeChips"') && str_contains($mappingPage['body'],'Official outcomes from CHED CMO No. 25, s. 2015, Sec. 6.3.') && str_contains($mappingPage['body'],'>Source details</button>') && str_contains($mappingPage['body'],'id="cloCreateModal"') && str_contains($mappingPage['body'],'placeholder="Search code or description"'),'Graduate Outcomes: no stat cards, banner, coverage dropdown or repeated title; description line, chips, search; Create CLO dialog present');
  checkHttp(str_contains($mappingPage['body'],'Graduate Outcomes'),'Graduate Outcomes stays inside Subject Mapping');
  checkHttp(!str_contains($mappingPage['body'],'Relationship View'),'No relationship tab');
  checkHttp(str_contains($mappingPage['body'],'Map subjects to program outcomes.'),'Final subtitle');

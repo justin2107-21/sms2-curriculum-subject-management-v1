@@ -737,3 +737,7 @@ body .csms-program-card:focus-visible { outline: 2px solid #2163c5 !important; o
   .csms-program-card:hover .csms-program-card__arrow, .csms-program-card:focus-visible .csms-program-card__arrow { transform: none; }
   .csms-skeleton { animation: none; }
 }
+
+/* ---- Code font with a clearly distinct zero ("IT01" is never read as "ITO1"): a monospace stack with a slashed zero. ---- */
+.csms-code { font-family: ui-monospace, "Cascadia Mono", "Cascadia Code", Consolas, "SFMono-Regular", Menlo, monospace; font-variant-numeric: slashed-zero tabular-nums; font-feature-settings: "zero" 1, "tnum" 1; font-weight: 600; letter-spacing: .02em; color: var(--csms-code-blue, #2163c5); }
+.csms-info__tip--wide { width: min(30rem, 86vw); line-height: 1.5; }

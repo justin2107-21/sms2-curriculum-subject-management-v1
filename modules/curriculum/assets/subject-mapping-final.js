@@ -44,7 +44,8 @@
     const sourceModal = ui.createModal(el('sourceDetailsModal'));
     const outcomeModal = ui.createModal(el('outcomeViewModal'),{restoreFocus:()=>el('outcomeSearch')});
     const cloModal = ui.createModal(el('cloViewModal'),{restoreFocus:()=>el('cloPlacementSearch')});
-    const academicDialogs = [[sourceModal,'sourceDetailsModal'],[outcomeModal,'outcomeViewModal'],[cloModal,'cloViewModal']];
+    const cloCreateModal = ui.createModal(el('cloCreateModal'),{restoreFocus:()=>el('cloPlacementSearch')});
+    const academicDialogs = [[sourceModal,'sourceDetailsModal'],[outcomeModal,'outcomeViewModal'],[cloModal,'cloViewModal'],[cloCreateModal,'cloCreateModal']];
     function closeAcademicDialogs(except) {
         academicDialogs.forEach(([dialog,id])=>{if(id!==except&&!el(id).hidden)dialog.close();});
     }
@@ -56,6 +57,7 @@
     let reviewIssues = null;
     let contextRequest = 0;
     let selectedOutcome = null;
+    let outcomeFilter = 'all';
     let selectedClo = null;
     let cloData = null;
     const academicSubmissions = new WeakSet();
@@ -235,19 +237,21 @@
         return records;
     }
 
+    const COURSE_EMPTY = '<div class="csms-empty" role="status"><i class="fa-solid fa-list-check" aria-hidden="true"></i><strong>Select a subject to view or add its course learning outcomes</strong></div>';
+    const showCourseEmpty = () => { el('cloAssessmentContent').innerHTML = COURSE_EMPTY; };
+
     async function loadMap() {
         const request = ++state.mapRequest;
         const version = versionIdInput.value;
         state.outcomeRequest++; state.cloRequest++; state.outcomeData=null; selectedOutcome=null; selectedClo=null; cloData=null;
         closeAcademicDialogs();
         el('viewSourceDetails').disabled=true;
-        ['outcomeOverview','outcomeSources','outcomeDetail','outcomeResultCount'].forEach(id => el(id).replaceChildren());
-        el('outcomeVersionScope').textContent = 'Select a version';
+        ['outcomeSources','outcomeDetail'].forEach(id => el(id).replaceChildren());
         cloPlacementAutocomplete.clear(false);
         el('cloPlacementSearch').disabled=true;
-        showPanelState(el('cloAssessmentContent'), 'Select a curriculum version and subject placement.');
+        showCourseEmpty();
         showPanelState(el('outcomeMatrix'), 'Select a BSIT curriculum version to view its recorded outcome mappings.');
-        if (state.currentTab === 'outcomes') loadOutcomes();
+        if (['outcomes', 'course'].includes(state.currentTab)) loadOutcomes();
         state.matrix = null; state.loaded = false; state.reviewLoaded = false; state.allMappings = []; state.requirements = []; state.relationshipRequest = null; state.relationshipsLoaded = false; state.requirementError = '';
         state.mappings.clear(); state.detailRequest++; traceRequest++;
         detailsModal?.close();
@@ -285,7 +289,7 @@
         const request = ++state.outcomeRequest;
         if (!versionId) { state.outcomeData = null; showPanelState(target, 'Select a BSIT curriculum version to view recorded outcomes.'); return; }
         state.outcomeData=null; cloData=null;
-        ['outcomeOverview','outcomeSources','outcomeDetail','outcomeResultCount'].forEach(id=>el(id).replaceChildren());
+        ['outcomeSources','outcomeDetail'].forEach(id=>el(id).replaceChildren());
         el('cloPlacementSearch').disabled=true;
         el('viewSourceDetails').disabled=true;
         if(!el('outcomeViewModal').hidden)showPanelState(el('outcomeDetail'),'Refreshing recorded outcome mappings...');
@@ -311,22 +315,63 @@
         }
     }
 
-    const cloPlacementAutocomplete = ui.createAutocomplete({
-        input:el('cloPlacementSearch'),valueInput:el('cloPlacementSelect'),list:el('cloPlacementOptions'),
-        minimumLength:0,showSuggestionsOnFocus:true,
-        helpText:'Search subject placements in the selected version.',noResultsText:'No matching subject placements.',
-        search:async()=>arr(state.outcomeData?.placements),
-        searchFields:row=>[row.subject_code,row.subject_title,row.year_level,row.semester],
-        getId:row=>row.placement_id,
-        format:row=>({label:row.subject_code+' / '+row.subject_title+' / '+(row.year_level||'Year not set')+' / '+(row.semester||'Term not set'),code:row.subject_code,title:row.subject_title}),
-        onSelect:()=>loadCloWorkspace(),
-        onClear:()=>{state.cloRequest++;cloData=null;selectedClo=null;closeAcademicDialogs();showPanelState(el('cloAssessmentContent'),'Select a subject placement to view its course learning outcomes.');}
-    });
+    // Subject picker of the Course outcomes tab: searchable, grouped by year and semester, starts empty.
+    const cloPlacementAutocomplete = (function () {
+        const input = el('cloPlacementSearch'), hidden = el('cloPlacementSelect'), box = el('cloPlacementOptions'), clearButton = input.parentElement.querySelector('[data-autocomplete-clear]');
+        let shown = [], active = -1, filtering = false;
+        const placements = () => arr(state.outcomeData?.placements);
+        const label = row => row.subject_code + ' / ' + row.subject_title;
+        const groupLabel = row => (row.year_level || 'Year not set') + ' \u00b7 ' + (row.semester || 'Term not set');
+        function open(show) { box.hidden = !show; input.setAttribute('aria-expanded', String(show)); if (!show) { active = -1; input.removeAttribute('aria-activedescendant'); } }
+        function render() {
+            const terms = (filtering ? input.value : '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+            const rows = placements().filter(row => terms.every(t => [row.subject_code, row.subject_title, row.year_level, row.semester].join(' ').toLowerCase().includes(t)));
+            const groups = new Map();
+            rows.forEach(row => { const key = groupLabel(row); if (!groups.has(key)) groups.set(key, []); groups.get(key).push(row); });
+            shown = [];
+            box.innerHTML = rows.length ? [...groups].map(([key, list]) => '<div role="group" aria-label="' + esc(key) + '"><div class="record-autocomplete-group">' + esc(key) + '</div>' + list.map(row => { shown.push(row); return '<button type="button" role="option" class="record-autocomplete-option" id="cloOpt' + Number(row.placement_id) + '" data-placement="' + Number(row.placement_id) + '"><strong>' + esc(row.subject_code) + '</strong> ' + esc(row.subject_title) + '</button>'; }).join('') + '</div>').join('')
+                : '<div class="record-autocomplete-state" role="status">No matching subject placements.</div>';
+            active = -1; open(true);
+        }
+        function highlight(index) {
+            const options = [...box.querySelectorAll('[role="option"]')]; if (!options.length) return;
+            active = (index + options.length) % options.length;
+            options.forEach((option, i) => option.classList.toggle('is-active', i === active));
+            input.setAttribute('aria-activedescendant', options[active].id); options[active].scrollIntoView({ block: 'nearest' });
+        }
+        function setSelected(row, notify) {
+            hidden.value = String(row.placement_id); input.value = label(row); input.classList.add('has-selection'); filtering = false; open(false);
+            if (clearButton) clearButton.hidden = false;
+            if (notify !== false) loadCloWorkspace();
+        }
+        function clear(notify) {
+            hidden.value = ''; input.value = ''; input.classList.remove('has-selection'); filtering = false; open(false);
+            if (clearButton) clearButton.hidden = true;
+            if (notify !== false) { state.cloRequest++; cloData = null; selectedClo = null; closeAcademicDialogs(); showCourseEmpty(); }
+        }
+        input.addEventListener('focus', () => { if (!input.disabled) { filtering = false; render(); } });
+        input.addEventListener('click', () => { if (!input.disabled && box.hidden) { filtering = false; render(); } });
+        input.addEventListener('input', () => { filtering = true; if (!input.value.trim() && hidden.value) clear(true); render(); });
+        input.addEventListener('keydown', event => {
+            if (event.key === 'ArrowDown') { event.preventDefault(); if (box.hidden) render(); highlight(active + 1); }
+            else if (event.key === 'ArrowUp') { event.preventDefault(); if (box.hidden) render(); highlight(active - 1); }
+            else if (event.key === 'Enter' && !box.hidden && active >= 0) { event.preventDefault(); setSelected(shown[active], true); }
+            else if (event.key === 'Escape' && !box.hidden) { event.preventDefault(); open(false); }
+        });
+        box.addEventListener('mousedown', event => event.preventDefault());
+        box.addEventListener('click', event => { const option = event.target.closest('[data-placement]'); if (!option) return; const row = placements().find(r => String(r.placement_id) === option.dataset.placement); if (row) setSelected(row, true); });
+        clearButton?.addEventListener('click', () => { clear(true); input.focus(); });
+        document.addEventListener('click', event => { if (!input.parentElement.contains(event.target)) open(false); });
+        return { setSelected, clear };
+    }());
     function renderOutcomeList() {
         if (!state.outcomeData) return;
-        const rows=window.OutcomesPresentation.filterOutcomes(state.outcomeData.outcomes,el('outcomeSearch').value,el('outcomeCoverage').value);
-        el('outcomeResultCount').textContent=rows.length+' outcomes shown';
-        el('outcomeMatrix').innerHTML=window.OutcomesPresentation.outcomeList(rows,permission.manageOutcomes&&state.outcomeData.context.editable,selectedOutcome);
+        const P = window.OutcomesPresentation, all = arr(state.outcomeData.outcomes), query = el('outcomeSearch').value;
+        const counts = P.chipCounts(all, query);
+        if (!(outcomeFilter in counts)) outcomeFilter = 'all';
+        el('outcomeChips').innerHTML = P.filterChips(counts, outcomeFilter);
+        el('outcomeZero').hidden = !P.allZero(all);
+        el('outcomeMatrix').innerHTML = P.outcomeTable(P.filterOutcomes(all, query, outcomeFilter), selectedOutcome);
     }
     function refreshOutcomeDetails() {
         const data=state.outcomeData,o=arr(data?.outcomes).find(o=>Number(o.id)===selectedOutcome);
@@ -340,7 +385,7 @@
     function refreshCloDetails(edit=false) {
         if(!cloData){if(!el('cloViewModal').hidden)cloModal.close();el('cloDetail').replaceChildren();return false;}
         const c=arr(cloData.clos).find(c=>Number(c.id)===selectedClo);
-        const html=selectedClo==='create'?window.OutcomesPresentation.cloCreate(cloData,permission):window.OutcomesPresentation.cloDetail(cloData,selectedClo,permission,edit);
+        const html=window.OutcomesPresentation.cloDetail(cloData,selectedClo,permission,edit);
         if(!html){if(!el('cloViewModal').hidden)cloModal.close();el('cloDetail').replaceChildren();return false;}
         el('cloViewModalTitle').textContent=c?c.clo_code+' - Course Learning Outcome Details':'Create Course Learning Outcome';
         el('cloViewModalContext').textContent=[cloData.placement.subject_code,cloData.placement.version_label,cloData.placement.year_level,cloData.placement.semester].filter(Boolean).join(' / ');
@@ -349,17 +394,17 @@
     }
     function renderOutcomes() {
         const data=state.outcomeData;if(!data)return;
-        el('outcomeVersionScope').textContent=[data.context.program_code,data.context.curriculum_name,data.context.version_label].join(' / ');
-        el('outcomeOverview').innerHTML=window.OutcomesPresentation.overview(data);
         el('outcomeSources').innerHTML=window.OutcomesPresentation.sources(data);
         const placement=arr(data.placements).find(p=>String(p.placement_id)===el('cloPlacementSelect').value);
         if(placement){cloPlacementAutocomplete.setSelected(placement,false);loadCloWorkspace();}
-        else{cloPlacementAutocomplete.clear(false);cloData=null;selectedClo=null;refreshCloDetails();showPanelState(el('cloAssessmentContent'),'Select a subject placement to view its course learning outcomes.');}
+        else{cloPlacementAutocomplete.clear(false);cloData=null;selectedClo=null;refreshCloDetails();showCourseEmpty();}
         if(!arr(data.outcomes).length){showPanelState(el('outcomeMatrix'),'The source-traceable IT01-IT13 catalog has not been loaded in this environment.');return;}
         renderOutcomeList();refreshOutcomeDetails();
     }
     el('outcomeSearch').addEventListener('input',renderOutcomeList);
-    el('outcomeCoverage').addEventListener('change',renderOutcomeList);
+    el('outcomeChips').addEventListener('click',event=>{const button=event.target.closest('[data-outcome-filter]');if(!button)return;outcomeFilter=button.dataset.outcomeFilter;renderOutcomeList();});
+    el('outcomeOpenMap').addEventListener('click',()=>setTab('map'));
+    el('outcomeMatrix').addEventListener('keydown',event=>{const row=event.target.closest?.('tr[data-outcome-open]');if(!row||event.target!==row||!['Enter',' '].includes(event.key))return;event.preventDefault();row.click();});
     el('viewSourceDetails').addEventListener('click',()=>{
         if(!state.outcomeData||!arr(state.outcomeData.outcomes).length)return;
         closeAcademicDialogs('sourceDetailsModal');
@@ -373,16 +418,37 @@
     });
     el('cloAssessmentContent').addEventListener('click',event=>{
         const button=event.target.closest('[data-clo-open],[data-clo-edit],[data-clo-create]');if(!button||!cloData)return;
-        selectedClo=button.dataset.cloCreate!==undefined?'create':Number(button.dataset.cloOpen||button.dataset.cloEdit);
+        if(button.dataset.cloCreate!==undefined){openCloCreate();return;}
+        selectedClo=Number(button.dataset.cloOpen||button.dataset.cloEdit);
         if(!refreshCloDetails(Boolean(button.dataset.cloEdit)))return;
         closeAcademicDialogs('cloViewModal');cloModal.open();
+    });
+    // Create CLO: its own dialog, sequence pre-filled with the next free number. The code has no stored pattern (no CLO exists yet), so it stays empty with a placeholder.
+    function openCloCreate() {
+        if(!cloData||!cloData.editable||!permission.manageClos)return;
+        const form=el('cloCreateForm');form.reset();ui.clearFormError(form);
+        el('cloCreateSequence').value=window.OutcomesPresentation.nextCloSequence(cloData);
+        el('cloCreateContext').textContent=[cloData.placement.subject_code,cloData.placement.version_label,cloData.placement.year_level,cloData.placement.semester].filter(Boolean).join(' / ');
+        closeAcademicDialogs('cloCreateModal');cloCreateModal.open();
+        const focusFirstEmpty=()=>{const first=[el('cloCreateSequence'),el('cloCreateCode'),el('cloCreateStatement')].find(input=>!String(input.value).trim());(first||el('cloCreateCode')).focus();};
+        // the shared dialog focuses its first control in a requestAnimationFrame; ask for the first empty field after that
+        (typeof requestAnimationFrame==='function'?requestAnimationFrame:fn=>setTimeout(fn,0))(()=>setTimeout(focusFirstEmpty,30));
+    }
+    el('cloCreateForm').addEventListener('submit',async event=>{
+        event.preventDefault();const form=event.currentTarget;
+        if(academicSubmissions.has(form)||!cloData||!cloData.editable||!permission.manageClos)return;
+        const body=new FormData(form);body.set('placement_id',el('cloPlacementSelect').value);body.set('action','clo_create');
+        ui.clearFormError(form);setAcademicSubmitting(form,true);
+        try{const result=await ui.postForm(api.clos,body);ui.showToast(result.message||'Course learning outcome recorded.','success');cloCreateModal.close();selectedClo=Number(result.clo_id)||null;await loadCloWorkspace();}
+        catch(error){ui.showFormError(form,error.message||'Record could not be saved.');}
+        finally{setAcademicSubmitting(form,false);}
     });
 
     async function loadCloWorkspace() {
         const placementId = el('cloPlacementSelect')?.value, target = el('cloAssessmentContent');
         const request=++state.cloRequest, version=versionIdInput.value;
         if (!target) return;
-        if(!placementId){cloData=null;selectedClo=null;refreshCloDetails();showPanelState(target,'Select a subject placement to view its course learning outcomes.');return;}
+        if(!placementId){cloData=null;selectedClo=null;refreshCloDetails();showCourseEmpty();return;}
         if(cloData&&String(cloData.placement.placement_id)!==String(placementId)){cloData=null;selectedClo=null;refreshCloDetails();}
         if(!el('cloViewModal').hidden)showPanelState(el('cloDetail'),'Loading academic planning records...');
         showPanelState(target, 'Loading placement-owned CLO and planned assessment records...');
@@ -649,12 +715,12 @@
     }
 
     function setTab(name, persist = true) {
-        name = ['map','trace','review','outcomes'].includes(name) ? name : 'map';
+        name = ['map','trace','review','outcomes','course'].includes(name) ? name : 'map';
         state.currentTab = name;
-        if(name!=='outcomes')closeAcademicDialogs();
+        if(!['outcomes','course'].includes(name))closeAcademicDialogs();
         if (persist) writeUrl(true);
         updateContextMessage();
-        [['map', 'mappingTabMap', 'mappingPanelMap'], ['trace', 'mappingTabTrace', 'mappingPanelTrace'], ['review', 'mappingTabReview', 'mappingPanelReview'], ['outcomes','mappingTabOutcomes','mappingPanelOutcomes']].forEach(([key, tabId, panelId]) => {
+        [['map', 'mappingTabMap', 'mappingPanelMap'], ['trace', 'mappingTabTrace', 'mappingPanelTrace'], ['review', 'mappingTabReview', 'mappingPanelReview'], ['outcomes','mappingTabOutcomes','mappingPanelOutcomes'], ['course','mappingTabCourse','mappingPanelCourse']].forEach(([key, tabId, panelId]) => {
             const active = key === name;
             el(tabId).classList.toggle('is-active', active);
             el(tabId).setAttribute('aria-selected', String(active));
@@ -662,13 +728,14 @@
             el(panelId).hidden = !active;
         });
         if (name === 'review') loadReview(false);
-        if (name === 'outcomes') loadOutcomes();
+        if (name === 'outcomes' || name === 'course') loadOutcomes();
     }
 
+    const TAB_BY_ID = { mappingTabMap: 'map', mappingTabTrace: 'trace', mappingTabReview: 'review', mappingTabOutcomes: 'outcomes', mappingTabCourse: 'course' };
     function urlTab() {
         const params = new URLSearchParams(window.location.search);
         const name = params.has('tab') ? params.get('tab') : (params.get('outcomes') === '1' ? 'outcomes' : 'map');
-        return ['map','trace','review','outcomes'].includes(name) ? name : 'map';
+        return ['map','trace','review','outcomes','course'].includes(name) ? name : 'map';
     }
     function writeUrl(tabOnly = false) {
         const url = new URL(window.location.href);
@@ -715,7 +782,7 @@
     el('mappingWorkspaceTabs')?.addEventListener('click', event => {
         const tab = event.target.closest('[role="tab"]');
         if (!tab) return;
-        setTab(tab.id === 'mappingTabMap' ? 'map' : tab.id === 'mappingTabTrace' ? 'trace' : tab.id === 'mappingTabOutcomes' ? 'outcomes' : 'review');
+        setTab(TAB_BY_ID[tab.id] || 'map');
     });
     el('mappingWorkspaceTabs')?.addEventListener('keydown', event => {
         const tabs = [...el('mappingWorkspaceTabs').querySelectorAll('[role="tab"]')];
@@ -729,7 +796,7 @@
         else return;
         event.preventDefault();
         const tab = tabs[next];
-        setTab(tab.id === 'mappingTabMap' ? 'map' : tab.id === 'mappingTabTrace' ? 'trace' : tab.id === 'mappingTabOutcomes' ? 'outcomes' : 'review');
+        setTab(TAB_BY_ID[tab.id] || 'map');
         tab.focus();
     });
     el('mappingTraceResults')?.addEventListener('click', event => {

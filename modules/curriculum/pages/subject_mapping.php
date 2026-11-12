@@ -9,7 +9,7 @@ require_permission('curriculum.view');
 
 // Durable, allowlisted workspace state; never used for authorization.
 $requestedTab = $_GET['tab'] ?? (($_GET['outcomes'] ?? '') === '1' ? 'outcomes' : 'map');
-$activeTab = is_string($requestedTab) && in_array($requestedTab, ['map', 'trace', 'review', 'outcomes'], true) ? $requestedTab : 'map';
+$activeTab = is_string($requestedTab) && in_array($requestedTab, ['map', 'trace', 'review', 'outcomes', 'course'], true) ? $requestedTab : 'map';
 $userId = current_user_id();
 $canViewPrograms = $userId !== null && user_can($userId, 'program.view');
 $canViewSubjects = $userId !== null && user_can($userId, 'subject.view');
@@ -92,6 +92,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
         <button type="button" class="<?= $activeTab === 'trace' ? 'is-active' : '' ?>" id="mappingTabTrace" role="tab" tabindex="<?= $activeTab === 'trace' ? '0' : '-1' ?>" aria-selected="<?= $activeTab === 'trace' ? 'true' : 'false' ?>" aria-controls="mappingPanelTrace">Subject Trace</button>
         <button type="button" class="<?= $activeTab === 'review' ? 'is-active' : '' ?>" id="mappingTabReview" role="tab" tabindex="<?= $activeTab === 'review' ? '0' : '-1' ?>" aria-selected="<?= $activeTab === 'review' ? 'true' : 'false' ?>" aria-controls="mappingPanelReview">Mapping Review</button>
         <button type="button" class="<?= $activeTab === 'outcomes' ? 'is-active' : '' ?>" id="mappingTabOutcomes" role="tab" tabindex="<?= $activeTab === 'outcomes' ? '0' : '-1' ?>" aria-selected="<?= $activeTab === 'outcomes' ? 'true' : 'false' ?>" aria-controls="mappingPanelOutcomes">Graduate Outcomes</button>
+        <button type="button" class="<?= $activeTab === 'course' ? 'is-active' : '' ?>" id="mappingTabCourse" role="tab" tabindex="<?= $activeTab === 'course' ? '0' : '-1' ?>" aria-selected="<?= $activeTab === 'course' ? 'true' : 'false' ?>" aria-controls="mappingPanelCourse">Course outcomes</button>
       </nav>
       <section id="mappingPanelMap" class="mapping-workspace-panel csms-panel" role="tabpanel" aria-labelledby="mappingTabMap" <?= $activeTab === 'map' ? '' : 'hidden' ?>>
         <div class="csms-panel__bar">
@@ -119,30 +120,27 @@ require __DIR__ . '/../../../shared/sidebar.php';
         <div class="mapping-review-cards" id="mappingReviewCards"><p class="mapping-state">Loading mapping checks…</p></div>
         <div id="mappingReviewResults"><p class="mapping-state">Select a check to inspect affected records.</p></div>
       </section>
-      <section id="mappingPanelOutcomes" class="mapping-workspace-panel" role="tabpanel" aria-labelledby="mappingTabOutcomes" <?= $activeTab === 'outcomes' ? '' : 'hidden' ?>>
-        <div class="mapping-review-header"><div><p class="eyebrow">CHED BSIT · Section 6.3</p><h2>Graduate Outcomes Mapping</h2><p>Manual curriculum-to-outcome associations for the selected BSIT version.</p></div><span id="outcomeVersionScope">Select a version</span></div>
-        <aside class="curriculum-notice academic-notice" role="note" aria-labelledby="academicNoticeTitle">
-          <i class="fa-solid fa-circle-info" aria-hidden="true"></i><div><strong id="academicNoticeTitle">Important Academic Notice</strong>
-          <p><strong>Source:</strong> CHED CMO No. 25, s. 2015, Section 6.3. The supplied scan is fingerprinted; independent registry verification, current applicability, and institutional adoption/approval have not been established.</p>
-          <p><strong>Limitation:</strong> Curriculum mapping, course outcome alignments, and assessment plans do not establish student outcome attainment, regulatory compliance, or institutional approval.</p></div>
-        </aside>
-        <div id="outcomeOverview" class="program-summary-grid" aria-label="Recorded coverage overview"></div>
-        <div class="card-header-actions"><button type="button" class="secondary-action-button" id="viewSourceDetails" disabled><i class="fa-solid fa-file-lines" aria-hidden="true"></i> View Source Details</button></div>
-        <div class="list-toolbar outcome-toolbar">
-          <label class="search-control"><span class="sr-only">Search graduate outcomes</span><input type="search" id="outcomeSearch" placeholder="Search code or official description" maxlength="200"/></label>
-          <label class="form-field"><span>Coverage</span><select id="outcomeCoverage"><option value="">All coverage states</option><option value="not_assessed">Not assessed</option><option value="incomplete">Incomplete</option><option value="mapped">Mapped</option><option value="unmapped">Unmapped</option></select></label>
-          <span id="outcomeResultCount" role="status"></span>
+      <section id="mappingPanelOutcomes" class="mapping-workspace-panel csms-panel" role="tabpanel" aria-labelledby="mappingTabOutcomes" <?= $activeTab === 'outcomes' ? '' : 'hidden' ?>>
+        <p class="outcome-intro" id="outcomeIntro">Official outcomes from CHED CMO No. 25, s. 2015, Sec. 6.3. Links show curriculum design, not student attainment or compliance.
+          <button type="button" class="csms-link" id="viewSourceDetails" disabled>Source details</button>
+          <span class="csms-info"><button type="button" class="csms-info__btn" aria-label="What the statuses mean" aria-describedby="outcomeStatusTip"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button><span class="csms-info__tip csms-info__tip--wide" role="tooltip" id="outcomeStatusTip"><strong>Mapped</strong>: assessed complete and at least one subject is linked.<br/><strong>Unmapped</strong>: assessed complete and no subject is linked.<br/><strong>Incomplete</strong>: assessed as incomplete; a link added or removed after an assessment also sets this.<br/><strong>Not assessed</strong>: no coverage assessment recorded yet (the default).</span></span>
+        </p>
+        <div class="csms-filter-row outcome-toolbar" id="outcomeToolbar">
+          <div class="outcome-chips" id="outcomeChips" role="group" aria-label="Filter outcomes by status"></div>
+          <label class="csms-search"><span class="sr-only">Search graduate outcomes</span><input type="search" id="outcomeSearch" placeholder="Search code or description" maxlength="200"/></label>
         </div>
+        <div class="outcome-zero" id="outcomeZero" role="status" hidden><span><i class="fa-solid fa-link-slash" aria-hidden="true"></i> <strong>No subjects linked yet</strong></span><button type="button" class="primary-action-button" id="outcomeOpenMap">Open Curriculum Map</button></div>
         <div id="outcomeMatrix" class="outcome-matrix"><p class="mapping-state">Select a BSIT curriculum version to view its recorded outcome mappings.</p></div>
-        <section class="clo-assessment-workspace" aria-labelledby="cloAssessmentHeading">
-          <h3 id="cloAssessmentHeading">Course Learning Outcomes &amp; Planned Assessment</h3>
-          <div class="list-toolbar clo-selection-toolbar"><label class="form-field"><span>Subject placement</span><div class="record-autocomplete">
-            <input type="search" id="cloPlacementSearch" placeholder="Search subject code or title" disabled/><input type="hidden" id="cloPlacementSelect"/>
+      </section>
+      <section id="mappingPanelCourse" class="mapping-workspace-panel csms-panel" role="tabpanel" aria-labelledby="mappingTabCourse" <?= $activeTab === 'course' ? '' : 'hidden' ?>>
+        <div class="csms-filter-row course-toolbar">
+          <div class="record-autocomplete course-picker"><label class="sr-only" for="cloPlacementSearch">Subject placement</label>
+            <input type="search" id="cloPlacementSearch" role="combobox" aria-expanded="false" aria-controls="cloPlacementOptions" aria-autocomplete="list" placeholder="Search a subject by code or title" autocomplete="off" disabled/><input type="hidden" id="cloPlacementSelect"/>
             <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear subject placement" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
             <div class="record-autocomplete-options" id="cloPlacementOptions" role="listbox" aria-label="Subject placements" hidden></div>
-          </div></label></div>
-          <div id="cloAssessmentContent"><p class="mapping-state">Select a curriculum version and subject placement.</p></div>
-        </section>
+          </div>
+        </div>
+        <div id="cloAssessmentContent"><div class="csms-empty" role="status"><i class="fa-solid fa-list-check" aria-hidden="true"></i><strong>Select a subject to view or add its course learning outcomes</strong></div></div>
       </section>
     </section>
 
@@ -220,6 +218,21 @@ require __DIR__ . '/../../../shared/sidebar.php';
     <div class="modal-header"><div><h2 id="mapRemoveTitle">Remove outcome mapping?</h2></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
     <div class="confirmation-body"><div id="mapRemoveMessage"></div><div class="form-error" role="alert" hidden></div></div>
     <div class="modal-actions modal-actions-padded"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="button" class="button-danger" id="mapRemoveConfirm">Remove mapping</button></div>
+  </section>
+</div>
+<div class="curriculum-modal" id="cloCreateModal" hidden aria-hidden="true">
+  <div class="modal-backdrop" data-modal-close></div>
+  <section class="modal-dialog modal-dialog-small" role="dialog" aria-modal="true" aria-labelledby="cloCreateTitle">
+    <div class="modal-header"><div><h2 id="cloCreateTitle">Create course learning outcome</h2><p class="modal-context" id="cloCreateContext"></p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
+    <form class="domain-form" id="cloCreateForm" novalidate>
+      <div class="form-error" role="alert" hidden></div>
+      <div class="form-grid">
+        <label class="form-field"><span>Sequence <strong>*</strong></span><input id="cloCreateSequence" name="sequence_order" type="number" min="1" max="65535" required/></label>
+        <label class="form-field"><span>CLO code <strong>*</strong></span><input id="cloCreateCode" name="clo_code" type="text" maxlength="40" placeholder="e.g. CLO 1" required/></label>
+        <label class="form-field form-field-wide"><span>Course learning outcome <strong>*</strong></span><textarea id="cloCreateStatement" name="clo_statement" rows="4" maxlength="12000" required></textarea></label>
+      </div>
+      <div class="modal-actions"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="submit" class="button-primary">Create CLO</button></div>
+    </form>
   </section>
 </div>
 <div class="sidebar-overlay" id="sidebarOverlay"></div>

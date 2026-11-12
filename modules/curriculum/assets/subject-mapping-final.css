@@ -289,3 +289,40 @@
 .csms-ctable--trace thead th { white-space: nowrap; }
 #mappingTraceResults { display: flex; flex-direction: column; gap: 16px; }
 .mapping-trace-usage > header { padding: 0 4px; }
+
+/* ---- Graduate Outcomes and Course outcomes tabs ---------------------------------------------------------------------------------------- */
+.mapping-content { padding-bottom: 96px; } /* keeps the floating assistant launcher off the last row */
+.outcome-intro { margin: 0 0 10px; font-size: 14px; line-height: 1.5; color: var(--csms-text-secondary, #374151); }
+.outcome-intro .csms-link { margin: 0 4px; }
+.outcome-toolbar { justify-content: space-between; margin-bottom: 10px; }
+.outcome-toolbar .csms-search input[type="search"] { height: 36px; }
+.outcome-toolbar .csms-search { flex: 0 1 18rem; min-width: 12rem; }
+.outcome-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.outcome-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 12px; background: #fff; border: 1px solid var(--csms-border-strong, #cbd5e1); border-radius: 999px; font: inherit; font-size: 14px; font-weight: 600; color: #1f2937; cursor: pointer; }
+.outcome-chip:hover { border-color: #2163c5; }
+.outcome-chip.is-active { background: #e8eefb; border-color: #2163c5; color: #1a3a8c; }
+.outcome-chip:focus-visible { outline: 2px solid #2163c5; outline-offset: 2px; }
+.outcome-chip__n { font-variant-numeric: tabular-nums; font-weight: 700; }
+.outcome-zero { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 0 10px; padding: 6px 12px; background: #f6f7fb; border: 1px dashed var(--csms-border-strong, #cbd5e1); border-radius: 10px; font-size: 14px; color: #1f2937; }
+.outcome-zero[hidden] { display: none; }
+.outcome-zero i { color: #475569; margin-right: 6px; }
+.csms-page-table .csms-ctable--outcomes tbody td { height: 48px; padding-top: 4px; padding-bottom: 4px; vertical-align: middle; line-height: 1.35; }
+.csms-page-table .csms-ctable--outcomes thead th { height: 34px; padding-top: 4px; padding-bottom: 4px; }
+#mappingPanelOutcomes.csms-panel { padding-top: 14px; }
+.outcome-zero .primary-action-button { min-height: 32px; padding-top: 0; padding-bottom: 0; }
+.csms-ctable--outcomes .csms-ctable__code { white-space: nowrap; width: 5.5rem; }
+.csms-ctable--outcomes tr.is-selected { background: #eef3fc; }
+.outcome-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; line-height: 1.35; max-width: 72ch; }
+.course-toolbar { margin-bottom: 4px; }
+.course-picker { flex: 1 1 28rem; max-width: 36rem; position: relative; }
+.course-picker input[type="search"] { width: 100%; box-sizing: border-box; height: 40px; }
+.course-picker .record-autocomplete-options { max-height: 22rem; overflow: auto; }
+.record-autocomplete-group { position: sticky; top: 0; padding: 6px 12px; background: #f6f7fb; border-bottom: 1px solid var(--csms-border, #dfe4ee); font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #475569; }
+.record-autocomplete-option.is-active { background: #eef3fc; }
+.course-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin: 16px 0 12px; }
+.course-head h3 { margin: 0; font-size: 16px; }
+.course-head p { margin: 2px 0 0; font-size: 14px; color: var(--csms-text-secondary, #374151); }
+.course-head__actions { display: flex; align-items: center; gap: 10px; }
+@media (max-width: 1100px) { body .csms-tabs#mappingWorkspaceTabs [role="tab"] { padding-left: 8px; padding-right: 8px; font-size: 14px; } }
+.course-picker .record-autocomplete-option { display: flex; flex-direction: row; align-items: baseline; gap: 10px; padding: 8px 12px; text-align: left; }
+.course-picker .record-autocomplete-option strong { flex: none; min-width: 6.5rem; font-weight: 700; }
