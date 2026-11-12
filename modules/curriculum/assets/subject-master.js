@@ -437,22 +437,26 @@
         const year = $('programYear').value, sem = $('programSemester').value, status = $('programStatus').value;
         const rows = placements.rows.filter(r => (!year || r._year.label === year) && (!sem || r._sem.label === sem) && (!status || r.status === status)
             && (q.length < SEARCH_MIN || String(r.subject_code).toLowerCase().includes(q) || String(r.subject_title).toLowerCase().includes(q)));
-        const t = placements.totals;
-        $('programSummary').textContent = t ? t.subjects + (t.subjects === 1 ? ' subject' : ' subjects') + ' · ' + num(t.units) + ' units of all placements · ' + num(t.required_units) + ' units of required placements' : '';
         $('programEmpty').hidden = placements.rows.length !== 0;
         $('programNoMatch').hidden = !(placements.rows.length && rows.length === 0);
         $('programTableWrap').hidden = rows.length === 0;
-        $('programRows').innerHTML = rows.map(r => '<tr class="csms-row-click" tabindex="0" data-subject="' + Number(r.id) + '" aria-haspopup="dialog" aria-label="Open ' + esc(r.subject_code) + '">' +
-            '<td title="' + esc(r.year_level ?? '') + '">' + esc(r._year.label) + '</td><td title="' + esc(r.semester ?? '') + '">' + esc(r._sem.label) + '</td>' +
+        // One table per year level (rows are already sorted by year, then semester).
+        const groups = [];
+        rows.forEach(r => { const g = groups[groups.length - 1]; if (g && g.label === r._year.label) g.rows.push(r); else groups.push({ label: r._year.label, rows: [r] }); });
+        const rowHtml = r => '<tr class="csms-row-click" tabindex="0" data-subject="' + Number(r.id) + '" aria-haspopup="dialog" aria-label="Open ' + esc(r.subject_code) + '">' +
+            '<td title="' + esc(r.semester ?? '') + '">' + esc(r._sem.label) + '</td>' +
             '<td><strong class="csms-ctable__code">' + esc(r.subject_code) + '</strong></td><td class="subject-title-cell">' + esc(r.subject_title) + '</td>' +
-            '<td class="csms-ctable__num">' + esc(num(r.units)) + '</td><td>' + (Number(r.is_required) === 1 ? 'Required' : 'Optional') + '</td><td>' + statusChip(r.status) + '</td></tr>').join('');
+            '<td class="csms-ctable__num">' + esc(num(r.units)) + '</td><td>' + (Number(r.is_required) === 1 ? 'Required' : 'Optional') + '</td><td>' + statusChip(r.status) + '</td></tr>';
+        $('programTableWrap').innerHTML = groups.map(g => '<section class="subject-year-group" aria-label="' + esc(g.label) + '"><h3 class="subject-year-group__title">' + esc(g.label) + '</h3>' +
+            '<div class="csms-page-table table-scroll" tabindex="0" aria-label="Scrollable placements, ' + esc(g.label) + '"><table class="csms-ctable"><thead><tr><th>Semester</th><th>Code</th><th>Title</th><th class="csms-ctable__num">Units</th><th>Required</th><th>Status</th></tr></thead><tbody>' +
+            g.rows.map(rowHtml).join('') + '</tbody></table></div></section>').join('');
         if (placements.loaded) writeCurrent(false);
     }
     $('programSearch2').addEventListener('input', ui.debounce(renderPlacements, 300));
     ['programYear', 'programSemester', 'programStatus'].forEach(id => $(id).addEventListener('change', renderPlacements));
     $('programRetry').addEventListener('click', loadPlacements);
-    $('programRows').addEventListener('click', event => { const tr = event.target.closest('[data-subject]'); if (tr) openDetails(Number(tr.dataset.subject)); });
-    $('programRows').addEventListener('keydown', event => { if (event.target.matches?.('[data-subject]') && ['Enter', ' '].includes(event.key)) { event.preventDefault(); openDetails(Number(event.target.dataset.subject)); } });
+    $('programTableWrap').addEventListener('click', event => { const tr = event.target.closest('[data-subject]'); if (tr) openDetails(Number(tr.dataset.subject)); });
+    $('programTableWrap').addEventListener('keydown', event => { if (event.target.matches?.('[data-subject]') && ['Enter', ' '].includes(event.key)) { event.preventDefault(); openDetails(Number(event.target.dataset.subject)); } });
 
     // ---------- the one dialog (details, create, edit) ----------
     const dialogEl = $('subjectDialog');

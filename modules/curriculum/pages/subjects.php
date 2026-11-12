@@ -119,7 +119,6 @@ require __DIR__ . '/../../../shared/sidebar.php';
           <div class="csms-empty" id="programLoading" role="status" hidden><i class="fa-solid fa-spinner" aria-hidden="true"></i><strong>Loading placements…</strong></div>
           <div class="csms-empty" id="programError" role="alert" hidden><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><strong>Placements could not be loaded</strong><span id="programErrorText"></span><button type="button" class="button-muted" id="programRetry">Retry</button></div>
           <div id="programBody" hidden>
-            <p class="csms-panel__note" id="programSummary" role="status"></p>
             <div class="csms-filter-row">
               <label class="csms-search"><span class="sr-only">Search subject code or title</span><input type="search" id="programSearch2" maxlength="100" placeholder="Search code or title"/></label>
               <select class="csms-select" id="programYear" aria-label="Year level"><option value="">All year levels</option></select>
@@ -128,12 +127,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
             </div>
             <div class="csms-empty" id="programNoMatch" role="status" hidden><i class="fa-solid fa-filter" aria-hidden="true"></i><strong>No placements match these filters</strong><span>Change the search or a filter.</span></div>
             <div class="csms-empty" id="programEmpty" role="status" hidden><i class="fa-solid fa-book" aria-hidden="true"></i><strong>No subjects placed in this version</strong><span>Place subjects from Curriculum Builder or Subject Mapping.</span></div>
-            <div class="csms-page-table table-scroll" id="programTableWrap" tabindex="0" aria-label="Scrollable placements" hidden>
-              <table class="csms-ctable">
-                <thead><tr><th>Year</th><th>Semester</th><th>Code</th><th>Title</th><th class="csms-ctable__num">Units</th><th>Required</th><th>Status</th></tr></thead>
-                <tbody id="programRows"></tbody>
-              </table>
-            </div>
+            <div class="subject-year-tables" id="programTableWrap" hidden></div>
           </div>
         </div>
 

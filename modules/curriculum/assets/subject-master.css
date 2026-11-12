@@ -35,7 +35,8 @@
 .csms-ctable .csms-sub { display: block; font-size: 12px; color: #667085; margin-top: 2px; }
 .csms-row-click { cursor: pointer; }
 .csms-ctable__num .csms-sub { white-space: nowrap; }
-#programSummary { margin: 0 0 12px; }
+.subject-year-tables { display: flex; flex-direction: column; gap: 18px; margin-top: 12px; }
+.subject-year-group__title { margin: 0 0 8px; font-size: 16px; font-weight: 700; color: var(--csms-text, #1f2937); }
 .subject-title-cell { max-width: 32rem; overflow-wrap: anywhere; }
 
 /* One row: the search box (capped width), the level control directly beside it, the record count at the far right. It wraps below 1024px. */
@@ -102,3 +103,13 @@
 .subject-lock i { color: #2163c5; margin-right: 6px; }
 .subject-section-title { margin: 14px 0 6px; font-size: 14px; }
 @media (max-width: 720px) { .subject-form-grid { grid-template-columns: 1fr; } .subject-form-grid .form-field, .subject-form-grid .form-field.is-third { grid-column: 1 / -1; } }
+
+/* Year tables share one column grid so the columns line up from one year to the next. */
+.subject-year-group .csms-ctable { table-layout: fixed; width: 100%; }
+.subject-year-group .csms-ctable th:nth-child(1) { width: 15%; }
+.subject-year-group .csms-ctable th:nth-child(2) { width: 14%; }
+.subject-year-group .csms-ctable th:nth-child(4) { width: 8%; }
+.subject-year-group .csms-ctable th:nth-child(5) { width: 12%; }
+.subject-year-group .csms-ctable th:nth-child(6) { width: 12%; }
+.subject-drill + .mapping-workspace-panel { margin-top: 0; }
+#viewProgram .csms-filter-row { margin-top: 0; }
