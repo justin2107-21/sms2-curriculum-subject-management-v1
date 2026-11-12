@@ -123,3 +123,9 @@ Next free migration is **033** (032 is the Compliance rule library). The Grade W
 - **Order:** inside College and SHS, programs with an Active version come first, then Draft, then other curricula, then programs without a curriculum, then by code (SQL ranking on the same status buckets and read scope as the chip).
 - **Gap** between the search row and the first group heading reduced.
 - **Opened program / unplaced list:** the search box row is hidden; one top row holds the back link, the Program > Curriculum > Version context and Export (far right, shown once placements load).
+
+### Prototype data finalized (2026-11-13; `scripts/prototype-data-finalize.php`)
+- **Programs:** 15 college programs and 17 SHS strands (flat entries, no TVL parent; where the team gave no longer name the name is the code) loaded or name-corrected through `AcademicProgramService`. The list is **team-provided, not client-confirmed** (client Q2 unanswered). `sms_db` now has 33 programs (15 college, 18 SHS with the older `ICT`).
+- **Real BSIT curriculum** (id 46, the one with 52 placed subjects; its only version "CMO No. 62" is **Draft**, not Active) renamed to name "BSIT 2026", code BSIT-2026 (client Q1). `tests/bsit_reads.php` and `database/seeds/bsit_dataset.php` still look for the old code BSIT-DEMO-2026 (the former already fails per `docs/prerequisite-configuration-verification.md`).
+- **NSTP1 is a prerequisite of NSTP2** (client Q6; 1st Year 1st Semester before 2nd Semester) in that version.
+- **Removed:** curricula "123" (2 versions, 2 placements) and the BSCRIM demo curriculum CRIMINALISM (version "ROTC", 2 placements), program ASD, the DM102/SA101 equivalency row. Each in its own transaction with an audit entry per row. Kept and listed in `SESSION_HANDOFF.md`.
