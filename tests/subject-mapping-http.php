@@ -63,7 +63,7 @@ try{
  checkHttp(substr_count($mappingPage['body'],'role="tab"')===4,'Existing mapping tabs plus Graduate Outcomes');
  checkHttp(str_contains($mappingPage['body'],'Graduate Outcomes'),'Graduate Outcomes stays inside Subject Mapping');
  checkHttp(!str_contains($mappingPage['body'],'Relationship View'),'No relationship tab');
- checkHttp(str_contains($mappingPage['body'],'Organize subjects within curriculum versions.'),'Final subtitle');
+ checkHttp(str_contains($mappingPage['body'],'Map subjects to program outcomes.'),'Final subtitle');
  status($guest->api('assignment','mapping_list',['curriculum_version_id'=>1]),401,'Mapping guest rejected');
  $placement=['academic_program_id'=>1,'curriculum_id'=>1,'curriculum_version_id'=>1,'subject_id'=>4,'year_level'=>'2nd Year','semester'=>'2nd Semester','is_required'=>'0'];
  foreach(['map_subject','update_mapping','remove'] as $action){
