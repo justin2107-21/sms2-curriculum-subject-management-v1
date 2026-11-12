@@ -26,7 +26,7 @@ ok((int)$one('SELECT COUNT(*) FROM reported_offerings') === 0 && (int)$one('SELE
 
 // Not added.
 ok((int)$one('SELECT COUNT(*) FROM compliance_rules') === 0, 'no compliance rule');
-ok((int)$db->query("SHOW TABLES LIKE 'compliance_library_rules'")->num_rows === 0, 'the rule library (migration 032) is not applied, so no library rule and no SHS or DepEd rule exists');
+ok($db->query("SHOW TABLES LIKE 'compliance_library_rules'")->num_rows === 0 || (int)$one("SELECT COUNT(*) FROM compliance_library_rules WHERE applies_to_kind = 'senior_high' OR evaluation_mode = 'pending_bcp' OR rule_code LIKE 'DO0%'") === 0, 'no SHS, DepEd or pending library rule exists (the rule library, if applied, holds only the listed college rules)');
 ok((int)$one('SELECT COUNT(*) FROM curriculum_elective_groups') === 1, 'no elective group was added (only the earlier archived GE group)');
 ok((int)$one('SELECT COUNT(*) FROM curriculum_version_subject_outcomes') === 0, 'no subject-to-outcome link was imported');
 ok((int)$one('SELECT COUNT(*) FROM subject_equivalencies') === 1, 'no equivalency was added');

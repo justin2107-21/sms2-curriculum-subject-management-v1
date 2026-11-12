@@ -211,9 +211,9 @@ try {
     $catalog = ComplianceLibraryCatalog::rules();
     $seed = function () use ($library, $catalog, $refIds): array { $o = []; foreach ($catalog as $rule) $o[$rule['rule_code']] = $library->upsert($rule, $rule['reference_code'] === null ? null : $refIds[$rule['reference_code']]); return $o; };
     $one = $seed();
-    ok(count($one) === 10 && array_unique(array_values($one)) === ['created'], 'Seed: 10 library rules created');
+    ok(count($one) === 11 && array_unique(array_values($one)) === ['created'], 'Seed: 11 library rules created (the catalog now holds the professional-electives rule)');
     $two = $seed();
-    ok(array_unique(array_values($two)) === ['unchanged'] && (int)$db->query('SELECT COUNT(*) FROM compliance_library_rules')->fetch_row()[0] === 10, 'Seed: a second pass changes nothing (idempotent), still 10 rows');
+    ok(array_unique(array_values($two)) === ['unchanged'] && (int)$db->query('SELECT COUNT(*) FROM compliance_library_rules')->fetch_row()[0] === 11, 'Seed: a second pass changes nothing (idempotent), still 11 rows');
     $row = fn(string $code) => $db->query("SELECT * FROM compliance_library_rules WHERE rule_code='$code'")->fetch_assoc();
     ok($row('CMO25-BSIT-MIN-UNITS')['source_page'] === '10' && $row('CMO39-PE')['source_page'] === null && $row('DO017-T9-ACADEMIC')['source_page'] === '16' && $row('DO015-T10-GRADING')['source_page'] === '14', 'Pages recorded only where given (PE and NSTP: none)');
     ok($row('BCP-NSTP1-PREREQ-NSTP2')['compliance_reference_id'] === null && $row('BCP-NSTP1-PREREQ-NSTP2')['source_class'] === 'client_reply' && str_contains($row('BCP-NSTP1-PREREQ-NSTP2')['source_label'], 'not a published policy'), 'Client reply: no reference, labelled "not a published policy"');
@@ -227,7 +227,7 @@ try {
     ok($bsit['status'] === 201, 'Run on the BSIT version');
     $bsitRun = $bsit['json']['run'];
     $titles = array_column($bsitRun['results'], 'rule_name_snapshot');
-    ok(count($bsitRun['results']) === 5 && in_array('BSIT minimum total units (CMO 25 s.2015 Art. V Sec. 8.1)', $titles, true) && !array_filter($titles, fn($t) => str_contains($t, 'Senior High')) && !array_filter($titles, fn($t) => str_contains($t, 'units by component')), 'BSIT: the 146 rule + the four all-college rules; no DepEd rule, no display-only rule');
+    ok(count($bsitRun['results']) === 6 && in_array('BSIT minimum total units (CMO 25 s.2015 Art. V Sec. 8.1)', $titles, true) && !array_filter($titles, fn($t) => str_contains($t, 'Senior High')) && !array_filter($titles, fn($t) => str_contains($t, 'units by component')), 'BSIT: the 146 rule, the professional-electives rule + the four all-college rules; no DepEd rule, no display-only rule');
     $byTitle = array_column($bsitRun['results'], null, 'rule_name_snapshot');
     $units = $byTitle['BSIT minimum total units (CMO 25 s.2015 Art. V Sec. 8.1)'];
     ok($units['result_label'] === 'Not met' && str_contains($units['actual_value_snapshot'], 'units of all placements: 12') && str_contains($units['actual_value_snapshot'], 'units of required placements:') && str_contains($units['explanation'], 'Elective units count toward the total only up to the required amount.')
@@ -235,8 +235,8 @@ try {
     $ge = $byTitle['General education minimum units (CMO 20 s.2013 Sec. 3)'];
     ok($ge['result_label'] === 'Cannot determine from stored data' && str_contains($ge['missing_data_text'], 'no category') && $ge['source_page'] === '5-6', 'GE: Cannot determine, the missing data is named (no stored category)');
     $nstp = $byTitle['NSTP 1 is a prerequisite of NSTP 2 (BCP reply)'];
-    ok($nstp['result_label'] === 'Cannot determine from stored data' && $nstp['reference_code'] === null && $nstp['source_class'] === 'client_reply' && str_contains($nstp['source_label'], 'not a published policy') && str_contains($nstp['missing_data_text'], 'NSTP subjects cannot be identified'), 'NSTP prerequisite (client reply): Cannot determine, names the missing data, labelled as a reply');
-    ok($bsitRun['not_met_count'] === 1 && $bsitRun['cannot_determine_count'] === 4 && $bsitRun['met_count'] === 0 && $bsitRun['pending_count'] === 0 && $bsitRun['rules_evaluated'] === 5, 'BSIT counts: 1 Not met, 4 Cannot determine, 0 Met, 0 pending');
+    ok($nstp['result_label'] === 'Cannot determine from stored data' && $nstp['reference_code'] === null && $nstp['source_class'] === 'client_reply' && str_contains($nstp['source_label'], 'not a published policy') && str_contains($nstp['missing_data_text'], 'recognised only by the codes NSTP1 and NSTP2'), 'NSTP prerequisite (client reply): Cannot determine, names the missing data, labelled as a reply');
+    ok($bsitRun['not_met_count'] === 1 && $bsitRun['cannot_determine_count'] === 5 && $bsitRun['met_count'] === 0 && $bsitRun['pending_count'] === 0 && $bsitRun['rules_evaluated'] === 6, 'BSIT counts: 1 Not met, 5 Cannot determine, 0 Met, 0 pending');
     $bscs = $run($manager, 5)['json']['run'];
     ok(count($bscs['results']) === 4 && !array_filter($bscs['results'], fn($r) => str_contains($r['rule_name_snapshot'], 'BSIT minimum')), 'Non-BSIT college program: only the four all-college rules');
     $shs = $run($manager, 6);
@@ -250,7 +250,7 @@ try {
 
     // No double counting, unconfirmed sources, deactivation.
     $db->query("INSERT INTO compliance_rules(compliance_reference_id,rule_name,rule_type,description,numeric_value,academic_program_id,technical_status,created_by) VALUES({$refIds['CMO 25 s.2015']},'Legacy BSIT 146','MIN_TOTAL_UNITS','',146,3,'active',1)");
-    ok(count($run($manager, 4)['json']['run']['results']) === 5, 'A legacy custom rule with the same source, program and number is not counted twice');
+    ok(count($run($manager, 4)['json']['run']['results']) === 6, 'A legacy custom rule with the same source, program and number is not counted twice');
     $db->query("UPDATE compliance_references SET verification_status='draft' WHERE id={$refIds['CMO 25 s.2015']}");
     ok(count($run($manager, 4)['json']['run']['results']) === 4, 'A library rule whose source is not confirmed is not checked');
     $db->query("UPDATE compliance_references SET verification_status='verified' WHERE id={$refIds['CMO 25 s.2015']}");
@@ -259,9 +259,9 @@ try {
     // Rule library list and the new endpoints.
     $all = $api($manager, 'rule_list', ['per_page' => 100]);
     $origins = array_count_values(array_column($all['json']['rules'], 'origin'));
-    ok($all['status'] === 200 && ($origins['library'] ?? 0) === 10 && ($origins['custom'] ?? 0) === 4 && $all['json']['pagination']['total_records'] === 14, 'Rule list: library and custom rules together, each with an origin (10 + 4)');
-    ok($api($manager, 'rule_list', ['origin' => 'library'])['json']['pagination']['total_records'] === 10 && $api($manager, 'rule_list', ['origin' => 'custom'])['json']['pagination']['total_records'] === 4 && $api($manager, 'rule_list', ['origin' => 'x'])['status'] === 422, 'Origin filter (and a bad value is refused)');
-    ok($api($manager, 'rule_list', ['applies_to' => 'senior_high'])['json']['pagination']['total_records'] === 3 && $api($manager, 'rule_list', ['applies_to' => 'all_college'])['json']['pagination']['total_records'] === 5 && $api($manager, 'rule_list', ['applies_to' => 'program'])['json']['pagination']['total_records'] === 6, 'Applies-to filter: senior high 3, all college 5 (3 public + 2 reply), one program 6 (2 library + 4 custom)');
+    ok($all['status'] === 200 && ($origins['library'] ?? 0) === 11 && ($origins['custom'] ?? 0) === 4 && $all['json']['pagination']['total_records'] === 15, 'Rule list: library and custom rules together, each with an origin (11 + 4)');
+    ok($api($manager, 'rule_list', ['origin' => 'library'])['json']['pagination']['total_records'] === 11 && $api($manager, 'rule_list', ['origin' => 'custom'])['json']['pagination']['total_records'] === 4 && $api($manager, 'rule_list', ['origin' => 'x'])['status'] === 422, 'Origin filter (and a bad value is refused)');
+    ok($api($manager, 'rule_list', ['applies_to' => 'senior_high'])['json']['pagination']['total_records'] === 3 && $api($manager, 'rule_list', ['applies_to' => 'all_college'])['json']['pagination']['total_records'] === 5 && $api($manager, 'rule_list', ['applies_to' => 'program'])['json']['pagination']['total_records'] === 7, 'Applies-to filter: senior high 3, all college 5 (3 public + 2 reply), one program 7 (3 library + 4 custom)');
     ok($api($manager, 'rule_list', ['rule_type' => 'SHS_HOURS'])['json']['pagination']['total_records'] === 2 && $api($manager, 'rule_list', ['search' => 'nstp'])['json']['pagination']['total_records'] === 3 && $api($manager, 'rule_list', ['per_page' => 10])['json']['pagination']['total_pages'] === 2, 'Type filter, search and server-side paging over both tables');
     $lib = array_column($all['json']['rules'], null, 'rule_code')['CMO25-BSIT-MIN-UNITS'];
     $get = $api($manager, 'library_rule_get', ['id' => $lib['id']]);
@@ -272,13 +272,13 @@ try {
     $off = $api($manager, 'library_rule_active', ['id' => $lib['id'], 'active' => '0'], 'POST');
     ok($off['status'] === 200 && $off['json']['rule']['technical_status'] === 'inactive' && (int)$db->query("SELECT COUNT(*) FROM audit_logs WHERE action='COMPLIANCE_LIBRARY_RULE_ACTIVE'")->fetch_row()[0] === $before + 1, 'Manager deactivates a library rule (audited)');
     ok($api($manager, 'library_rule_active', ['id' => $lib['id'], 'active' => '7'], 'POST')['status'] === 422, 'A bad active flag is refused');
-    ok(count($run($manager, 4)['json']['run']['results']) === 4, 'A deactivated library rule is not checked');
+    ok(count($run($manager, 4)['json']['run']['results']) === 5, 'A deactivated library rule is not checked');
     $api($manager, 'library_rule_active', ['id' => $lib['id'], 'active' => '1'], 'POST');
     ok($row('CMO25-BSIT-MIN-UNITS')['title'] === 'BSIT minimum total units (CMO 25 s.2015 Art. V Sec. 8.1)' && (int)$row('CMO25-BSIT-MIN-UNITS')['active'] === 1 && json_decode($row('CMO25-BSIT-MIN-UNITS')['parameters_json'], true) === ['min_units' => 146], 'Library values are unchanged by deactivating and activating');
 
     // Read scope on the new results.
     $bsitRunId = (int)$db->query('SELECT MAX(id) FROM compliance_validation_runs WHERE curriculum_version_id=4')->fetch_row()[0];
-    ok($api($restricted, 'run_get', ['id' => $bsitRunId])['status'] === 404 && $api($viewer, 'run_get', ['id' => $bsitRunId])['status'] === 200 && count($api($viewer, 'run_get', ['id' => $bsitRunId])['json']['run']['results']) === 4, 'run_get: library results follow the same read scope');
+    ok($api($restricted, 'run_get', ['id' => $bsitRunId])['status'] === 404 && $api($viewer, 'run_get', ['id' => $bsitRunId])['status'] === 200 && count($api($viewer, 'run_get', ['id' => $bsitRunId])['json']['run']['results']) === 5, 'run_get: library results follow the same read scope');
 
     // Consumers: Builder target, Dashboard, Export, CIMF.
     $svc = new CurriculumVersionService($db);
