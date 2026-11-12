@@ -69,7 +69,7 @@ $SOURCES = [
     'CMO 46 s.2012' => ['other',
         'No section or page locator: attached as the outcomes-based and typology-based quality-assurance policy that CMO 25 Sec. 6.4 refers to.'],
     'CHED Handbook on Typology, OBE and ISA' => ['other',
-        'No section or page locator: attached as the CHED handbook on typology, outcomes-based education and institutional sustainability assessment (2014), the framework behind the outcomes map.'],
+        'Locators (checked on the local file, 2026-11-13): printed pp. 32-33, Preparing a Curriculum Map and Table 7 (a sample map of courses against outcomes, with the legends L/P/O or I/P/D, or simply a check where a course leads to an outcome); Annex 3, printed p. 79 (sample curriculum maps from the Nursing program). Table 7 is a generic business-program sample, not a BSIT map. Framework for the outcomes map; institutional adoption is not verified.'],
 ];
 
 // ---------------------------------------------------------------- the version

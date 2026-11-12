@@ -21,7 +21,7 @@ ok((int)$one("SELECT COUNT(*) FROM curriculum_versions WHERE UPPER(TRIM(version_
 ok((int)$one("SELECT COUNT(*) FROM curricula WHERE UPPER(curriculum_code) = 'COMP11'") === 0 && (int)$one("SELECT COUNT(*) FROM academic_programs WHERE UPPER(program_code) = 'ICT'") === 1, 'the curriculum COMP11 is gone and the program ICT stays');
 ok((int)$one("SELECT COUNT(*) FROM subjects WHERE subject_code IN ('BPM101','CAP101') AND status = 'active'") === 2
     && (int)$one("SELECT COUNT(*) FROM curriculum_version_subjects p JOIN subjects s ON s.id = p.subject_id WHERE p.curriculum_version_id = $vid AND s.subject_code IN ('BPM101','CAP101')") === 2, 'BPM101 and CAP101 are Active and still placed');
-ok((int)$one("SELECT COUNT(*) FROM subjects WHERE subject_code IN ('ROTC','GE 2')") === 2, 'ROTC and GE 2 are kept (the removal conditions are not met)');
+ok((int)$one("SELECT COUNT(*) FROM subjects WHERE subject_code = 'ROTC'") === 0 && (int)$one("SELECT COUNT(*) FROM subjects WHERE subject_code = 'GE 2'") === 1, 'ROTC was removed (not in the dataset, unreferenced); GE 2 is kept');
 ok((int)$one("SELECT COUNT(*) FROM audit_logs WHERE action IN ('CURRICULUM_VERSION_RENAME','CURRICULUM_VERSION_DELETE','CURRICULUM_DELETE','SUBJECT_UPDATE')") >= 5, 'the decisions wrote audit entries');
 
 // Sources
@@ -32,7 +32,7 @@ ok(($by['CMO 25 s.2015']['p'] ?? '') === 'school_curriculum' && ($by['CMO 25 s.2
 ok(count(array_filter($links, fn($l) => $l['p'] === 'school_curriculum')) === 1, 'exactly one source is the curriculum source');
 ok(str_contains($by['CMO 25 s.2015']['n'], 'Sec. 8.1') && str_contains($by['CMO 25 s.2015']['n'], '146') && str_contains($by['CMO 25 s.2015']['n'], 'IT01-IT13'), 'CMO 25 carries the Sec. 8.1 and IT01-IT13 locators');
 ok(str_contains($by['CMO 20 s.2013']['n'], 'Sec. 3') && str_contains($by['CMO 39 s.2021']['n'], 'Sec. 6.1') && str_contains($by['RA 9163']['n'], 'Sec. 6') && str_contains($by['Advisory on CMO 20 (2019)']['n'], 'p. 1'), 'CMO 20, CMO 39, RA 9163 and the advisory carry verified locators');
-ok(str_contains($by['Revised IRR of RA 9163']['n'], 'No section or page locator') && str_contains($by['CMO 46 s.2012']['n'], 'No section or page locator') && str_contains($by['CHED Handbook on Typology, OBE and ISA']['n'], 'No section or page locator'), 'sources whose locator could not be verified say so');
+ok(str_contains($by['Revised IRR of RA 9163']['n'], 'No section or page locator') && str_contains($by['CMO 46 s.2012']['n'], 'No section or page locator') && str_contains($by['CHED Handbook on Typology, OBE and ISA']['n'], 'printed pp. 32-33') && str_contains($by['CHED Handbook on Typology, OBE and ISA']['n'], 'Annex 3, printed p. 79'), 'the Handbook carries its verified pages; sources whose locator could not be verified say so');
 ok(count(array_filter($links, fn($l) => preg_match('/BCP (has )?(approved|adopted)|adopted by BCP|approved by BCP|is compliant|complies/i', (string)$l['n']))) === 0, 'no note claims BCP approval, adoption or compliance');
 ok((int)$one("SELECT COUNT(*) FROM curriculum_version_subject_snapshots") === 0, 'snapshot capture was not touched');
 ok((int)$one("SELECT COUNT(*) FROM compliance_rules") === 0, 'no compliance rule was created');
