@@ -1,10 +1,11 @@
 /* CHED/DepEd Compliance Validator: only what the shared components do not already cover. */
-.compliance-note, .compliance-evidence-note { display: flex; gap: 8px; align-items: flex-start; margin: 0 0 12px; color: #475467; font-size: 13px; line-height: 1.45; }
-.compliance-note i, .compliance-evidence-note i { color: #2163c5; margin-top: 2px; }
+.compliance-evidence-note { display: flex; gap: 8px; align-items: flex-start; margin: 0 0 12px; color: #475467; font-size: 13px; line-height: 1.45; }
+.compliance-evidence-note i { color: #2163c5; margin-top: 2px; }
 .compliance-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #344054; white-space: nowrap; }
 .compliance-counts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 4px 0 12px; }
 .compliance-counts__total { font-size: 13px; color: #344054; margin-right: 4px; }
-.compliance-section { margin: 16px 0 6px; font-size: 14px; }
+.compliance-section { margin: 0; font-size: 14px; }
+.compliance-section-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 16px 0 6px; }
 .compliance-none { color: #667085; font-size: 13px; margin: 0; }
 .compliance-detail { margin: 0 0 8px; }
 .compliance-dialog { max-width: 560px; width: 100%; }
@@ -16,3 +17,18 @@
 .csms-row-click { cursor: pointer; }
 #complianceContextBar[hidden], .compliance-content [hidden] { display: none !important; }
 @media (max-width: 720px) { .compliance-form-grid { grid-template-columns: 1fr; } }
+/* Filter row: one line from 1280px up, the same 12px to the table as Equivalency; wraps with the same spacing below that. */
+.compliance-content .csms-filter-row .csms-search { flex: 1 1 10rem; min-width: 7rem; max-width: 18rem; }
+.compliance-content .csms-filter-row { gap: 8px; }
+.compliance-content .csms-filter-row .csms-select { width: auto; flex: 0 0 auto; min-width: 0; padding: 0 30px 0 10px; text-overflow: ellipsis; }
+.compliance-content #ruleType, .compliance-content #ruleStatus, .compliance-content #sourceStatus { width: 8rem; }
+.compliance-content #ruleOrigin { width: 7.5rem; }
+.compliance-content #ruleApplies, .compliance-content #sourceType { width: 9rem; }
+.compliance-content .csms-select[id$="PerPage"] { width: 6rem; }
+.compliance-content .csms-filter-row .csms-filter-row__summary { margin-left: auto; }
+.compliance-content [data-panel] .csms-filter-row ~ :is(.csms-page-table, .csms-empty, .compliance-counts, #resultsBody) { margin-top: 12px; }
+@media (min-width: 1280px) { .compliance-content .csms-filter-row { flex-wrap: nowrap; } }
+/* The (i) next to the title must not make the header taller than the Electives Manager header. */
+.compliance-content .mapping-workspace-header .page-title .csms-info { vertical-align: middle; }
+.compliance-content .mapping-workspace-header .page-title .csms-info__btn { width: 24px; height: 24px; }
+.compliance-content .mapping-workspace-header > :not(:first-child) { white-space: nowrap; }

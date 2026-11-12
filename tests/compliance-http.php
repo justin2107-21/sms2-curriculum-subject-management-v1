@@ -84,6 +84,10 @@ try {
     ok($page['status'] === 200 && str_contains($body, 'CHED/DepEd Compliance Validator'), 'Page: title');
     foreach (['results', 'rules', 'sources', 'history'] as $view) ok(str_contains($body, 'data-view="' . $view . '"'), "Page: segmented view $view");
     ok(str_contains($body, 'Rules come from the sources listed on each rule. Results show what the stored curriculum data does or does not show. They are not an official CHED, DepEd or institutional determination.'), 'Page: csms-info text');
+    $headerHtml = substr($body, strpos($body, 'mapping-workspace-header'), strpos($body, 'mapping-workspace-shell') - strpos($body, 'mapping-workspace-header'));
+    ok(str_contains($headerHtml, 'CHED/DepEd Compliance Validator') && str_contains($headerHtml, 'csms-info__tip') && str_contains($headerHtml, 'They are not an official CHED, DepEd or institutional determination.') && str_contains($headerHtml, 'id="ruleAdd"') && str_contains($headerHtml, 'id="sourceAdd"'), 'Header: title, (i) tooltip with the determination text, and the Add rule / Add source buttons at the top right');
+    ok(!str_contains($headerHtml, 'csms-tabs') && strpos($body, 'class="csms-tabs"') !== false && strpos($body, 'class="csms-tabs"') < strpos($body, 'id="complianceContextBar"'), 'Tabs are not inside the header and come before the context bar');
+    ok(!str_contains($body, 'Results are internal decision-support output only') && !str_contains($body, 'Evidence is a locator'), 'The long disclaimer line and the evidence line are gone from the page');
     ok(!preg_match('/\bcompliant\b/i', $body), 'Page: no verdict word');
     ok(!stripos($body, 'official BCP'), 'Page: no "official BCP policy"');
     ok(!preg_match('/mapping-filter-card|read-only-pill|curriculum-notice|list-toolbar/', $body) && !preg_match('/domain-card|domain-table/', file_get_contents(__DIR__ . '/../modules/curriculum/pages/compliance_validator.php')), 'Page: no retired classes');
@@ -305,6 +309,7 @@ try {
     $js = file_get_contents(__DIR__ . '/../modules/curriculum/assets/compliance-validator.js');
     ok(!preg_match('/Internal Compliance Status|\bcompliant\b|official BCP/i', $js . file_get_contents(__DIR__ . '/../modules/curriculum/pages/compliance_validator.php')), 'Page code: no old status wording, no verdict word');
     ok(str_contains($js, 'Cannot determine from stored data') && str_contains($js, 'Source confirmed'), 'JS uses the new wording');
+    ok(str_contains($js, "const EVIDENCE_TEXT = 'Evidence is a locator and fingerprint recorded by a person. It is not a stored document.'") && str_contains($js, "evidenceHead('evidenceTipDetail'") && str_contains($js, "evidenceHead('evidenceTipForm'"), 'The evidence sentence lives in the source detail dialog and the add/edit source dialog as a csms-info');
 } finally {
     foreach ($clients as $c) $c->close();
     if (is_resource($server)) { proc_terminate($server); proc_close($server); }

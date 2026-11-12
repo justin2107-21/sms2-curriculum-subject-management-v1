@@ -48,21 +48,20 @@ require __DIR__ . '/../../../shared/sidebar.php';
   <main class="content curriculum-content mapping-content compliance-content" id="complianceWorkspace"
         data-compliance-api="../http/compliance_actions.php" data-view="<?= $e($view) ?>"
         data-can-run="<?= $canRun ? '1' : '0' ?>" data-can-manage="<?= $canManage ? '1' : '0' ?>" data-can-verify="<?= $canVerify ? '1' : '0' ?>">
-    <div class="page-title-bar curriculum-title-bar">
+    <div class="mapping-workspace-header">
       <div>
-        <h1 class="page-title"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> CHED/DepEd Compliance Validator <span class="csms-info"><button type="button" class="csms-info__btn" aria-label="About the Compliance Validator" aria-describedby="complianceInfoTip"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button><span class="csms-info__tip" role="tooltip" id="complianceInfoTip">Rules come from the sources listed on each rule. Results show what the stored curriculum data does or does not show. They are not an official CHED, DepEd or institutional determination.</span></span></h1>
+        <h1 class="page-title">CHED/DepEd Compliance Validator <span class="csms-info"><button type="button" class="csms-info__btn" aria-label="About the Compliance Validator" aria-describedby="complianceInfoTip"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button><span class="csms-info__tip" role="tooltip" id="complianceInfoTip">Rules come from the sources listed on each rule. Results show what the stored curriculum data does or does not show. They are not an official CHED, DepEd or institutional determination.</span></span></h1>
         <p class="page-subtitle">Check a curriculum version against the rules and sources recorded in this system.</p>
-        <nav class="csms-segmented module-views" id="complianceViews" aria-label="Views of the Compliance Validator">
-          <?php foreach ($views as $key => $label): ?><a href="?view=<?= $e($key) ?>" data-view="<?= $e($key) ?>" class="<?= $key === $view ? 'is-active' : '' ?>"<?= $key === $view ? ' aria-current="page"' : '' ?>><?= $e($label) ?></a><?php endforeach; ?>
-        </nav>
       </div>
-      <div class="card-header-actions">
-        <?php if (!$canRun && !$canManage): ?><span class="csms-chip csms-chip--draft">Read-only for your role</span><?php endif; ?>
-      </div>
+      <?php if ($canManage): ?><button type="button" class="primary-action-button" id="ruleAdd" hidden><i class="fa-solid fa-plus" aria-hidden="true"></i> Add rule</button>
+      <button type="button" class="primary-action-button" id="sourceAdd" hidden><i class="fa-solid fa-plus" aria-hidden="true"></i> Add source</button><?php endif; ?>
+      <?php if (!$canRun && !$canManage): ?><span class="csms-chip csms-chip--draft">Read-only for your role</span><?php endif; ?>
     </div>
-    <p class="compliance-note" role="note"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Results are internal decision-support output only. They are not official CHED, DepEd, or Bestlink College approval, certification, or legal advice.</p>
 
     <section class="mapping-workspace-shell">
+      <nav class="csms-tabs" id="complianceViews" role="tablist" aria-label="Views of the Compliance Validator">
+        <?php foreach ($views as $key => $label): ?><button type="button" data-view="<?= $e($key) ?>" role="tab" aria-selected="<?= $key === $view ? 'true' : 'false' ?>"<?= $key === $view ? '' : ' tabindex="-1"' ?>><?= $e($label) ?></button><?php endforeach; ?>
+      </nav>
       <section class="mapping-context-bar" id="complianceContextBar" aria-label="Curriculum context">
         <?php foreach (['program' => 'Program / Strand', 'curriculum' => 'Curriculum', 'version' => 'Curriculum Version'] as $key => $label): ?>
         <div class="mapping-context-field"><label for="<?= $key ?>Search"><?= $label ?></label><div class="record-autocomplete">
@@ -107,7 +106,6 @@ require __DIR__ . '/../../../shared/sidebar.php';
             <select class="csms-select" id="ruleStatus" aria-label="Rule status"><option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select>
             <label class="compliance-check"><input type="checkbox" id="ruleDemo"/> Include demo rules</label>
             <select class="csms-select" id="rulePerPage" aria-label="Rows per page"><option value="10">10 rows</option><option value="20" selected>20 rows</option><option value="50">50 rows</option><option value="100">100 rows</option></select>
-            <?php if ($canManage): ?><button type="button" class="primary-action-button" id="ruleAdd"><i class="fa-solid fa-plus" aria-hidden="true"></i> Add rule</button><?php endif; ?>
             <span class="csms-filter-row__summary" id="ruleCount" role="status">0 records</span>
           </div>
           <div class="csms-empty" id="ruleEmpty" role="status" hidden><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i><strong>No rules recorded yet</strong><span>A rule is checked against a version only when its source has been confirmed.</span></div>
@@ -127,10 +125,8 @@ require __DIR__ . '/../../../shared/sidebar.php';
             <select class="csms-select" id="sourceStatus" aria-label="Source status"><option value="">All statuses</option><option value="draft">Draft</option><option value="verified">Source confirmed</option><option value="inactive">Inactive</option></select>
             <label class="compliance-check"><input type="checkbox" id="sourceDemo"/> Include demo sources</label>
             <select class="csms-select" id="sourcePerPage" aria-label="Rows per page"><option value="10">10 rows</option><option value="20" selected>20 rows</option><option value="50">50 rows</option><option value="100">100 rows</option></select>
-            <?php if ($canManage): ?><button type="button" class="primary-action-button" id="sourceAdd"><i class="fa-solid fa-plus" aria-hidden="true"></i> Add source</button><?php endif; ?>
             <span class="csms-filter-row__summary" id="sourceCount" role="status">0 records</span>
           </div>
-          <p class="compliance-evidence-note"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Evidence is a locator and fingerprint recorded by a person. It is not a stored document.</p>
           <div class="csms-empty" id="sourceEmpty" role="status" hidden><i class="fa-solid fa-book" aria-hidden="true"></i><strong>No sources recorded yet</strong><span>Record a CHED or DepEd document here before adding rules that rely on it.</span></div>
           <div class="csms-empty" id="sourceNoMatch" role="status" hidden><i class="fa-solid fa-filter" aria-hidden="true"></i><strong>No sources match these filters</strong><span>Change the search or a filter.</span></div>
           <div class="csms-empty" id="sourceError" role="alert" hidden><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><strong>Sources could not be loaded</strong><span id="sourceErrorText"></span></div>

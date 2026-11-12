@@ -93,17 +93,20 @@
         if (!VIEWS.includes(view)) view = 'results';
         state.view = view;
         VIEWS.forEach(name => { $('view' + name.charAt(0).toUpperCase() + name.slice(1)).hidden = name !== view; });
-        document.querySelectorAll('#complianceViews a').forEach(link => {
+        document.querySelectorAll('#complianceViews [role="tab"]').forEach(link => {
             const active = link.dataset.view === view;
-            link.classList.toggle('is-active', active);
-            if (active) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');
+            link.setAttribute('aria-selected', active ? 'true' : 'false');
+            if (active) link.removeAttribute('tabindex'); else link.setAttribute('tabindex', '-1');
         });
         $('complianceContextBar').hidden = !['results', 'history'].includes(view);
+        // The add buttons live in the page header (like Create Elective Group in Electives Manager) and belong to one view each.
+        if ($('ruleAdd')) $('ruleAdd').hidden = view !== 'rules';
+        if ($('sourceAdd')) $('sourceAdd').hidden = view !== 'sources';
         if (push) writeUrl({}, true);
         if (view === 'results') loadResultsContext();
         else lists[view].load(true);
     }
-    document.querySelectorAll('#complianceViews a').forEach(link => link.addEventListener('click', event => { event.preventDefault(); if (link.dataset.view !== state.view) { Object.values(lists).forEach(list => list.reset()); showView(link.dataset.view, true); } }));
+    document.querySelectorAll('#complianceViews [role="tab"]').forEach(link => link.addEventListener('click', event => { event.preventDefault(); if (link.dataset.view !== state.view) { Object.values(lists).forEach(list => list.reset()); showView(link.dataset.view, true); } }));
 
     // ---------- generic server-side list (search 2 characters, filters, page size, paging, empty states) ----------
     function makeList(config) {
@@ -276,7 +279,7 @@
 
     // ---------- dialog shell (read-only details, and the create / edit forms) ----------
     const dialogEl = $('complianceDialog');
-    const dialog = ui.createModal(dialogEl, { restoreFocus: () => $('complianceViews').querySelector('a.is-active') });
+    const dialog = ui.createModal(dialogEl, { restoreFocus: () => $('complianceViews').querySelector('[role="tab"][aria-selected="true"]') });
     const form = $('complianceForm');
     function setDialog(title, context, body, buttons, wide) {
         $('complianceDialogTitle').textContent = title;
@@ -300,6 +303,8 @@
     $('complianceDialogX').addEventListener('click', closeDialog);
     $('complianceBackdrop').addEventListener('click', closeDialog);
     dialogEl.addEventListener('keydown', event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeDialog(); } }, true);
+    const EVIDENCE_TEXT = 'Evidence is a locator and fingerprint recorded by a person. It is not a stored document.';
+    const evidenceHead = (id, label) => '<div class="compliance-section-row"><h3 class="compliance-section">' + label + '</h3><span class="csms-info"><button type="button" class="csms-info__btn" aria-label="About evidence" aria-describedby="' + id + '"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button><span class="csms-info__tip" role="tooltip" id="' + id + '">' + esc(EVIDENCE_TEXT) + '</span></span></div>';
     const detail = rows => '<dl class="csms-detail-list compliance-detail">' + rows.filter(Boolean).map(([label, value]) => '<dt>' + esc(label) + '</dt><dd>' + value + '</dd>').join('') + '</dl>';
     const field = (label, control, hint) => '<label class="form-field"><span>' + esc(label) + '</span>' + control + (hint ? '<small>' + esc(hint) + '</small>' : '') + '</label>';
     const select = (name, options, current) => '<select class="csms-select" name="' + name + '">' + Object.entries(options).map(([value, label]) => '<option value="' + esc(value) + '"' + (String(current) === value ? ' selected' : '') + '>' + esc(label) + '</option>').join('') + '</select>';
@@ -418,7 +423,7 @@
                 ['Year', esc(ref.reference_year || '—') + (ref.effective_date ? ' <span class="csms-sub">effective ' + esc(ref.effective_date) + '</span>' : '')], ['Kind', esc(SOURCE_KINDS[ref.source_kind] || ref.source_kind)],
                 ['Source status', chip(SOURCE_STATUS[ref.verification_status] || SOURCE_STATUS.draft)], ['Link', ref.source_url ? '<a href="' + esc(ref.source_url) + '" target="_blank" rel="noopener noreferrer">' + esc(ref.source_url) + '</a>' : '—'],
                 ref.notes ? ['Notes', esc(ref.notes)] : null, ['Rules using it', Number(ref.rule_count || 0)]
-            ]) + '<h3 class="compliance-section">Evidence</h3><p class="compliance-evidence-note"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Evidence is a locator and fingerprint recorded by a person. It is not a stored document. A source is confirmed only after a recorded, confirmed document-identity assessment; institutional adoption is not assessed.</p>' +
+            ]) + evidenceHead('evidenceTipDetail', 'Evidence') + '<p class="compliance-evidence-note"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> A source is confirmed only after a recorded, confirmed document-identity assessment; institutional adoption is not assessed.</p>' +
                 (events ? '<div class="csms-page-table table-scroll" tabindex="0" aria-label="Evidence events"><table class="csms-ctable"><thead><tr><th>Recorded</th><th>About</th><th>Result</th><th>Locator and fingerprint</th><th>Rationale</th></tr></thead><tbody>' + events + '</tbody></table></div>' : '<p class="compliance-none">No evidence has been recorded for this source yet.</p>'),
             [closeButton, canVerify ? { html: '<i class="fa-solid fa-stamp" aria-hidden="true"></i> Record evidence', click: () => openEvidenceForm(ref) } : null, canManage ? { html: '<i class="fa-solid fa-pen" aria-hidden="true"></i> Edit source', click: () => openSourceForm(ref) } : null].filter(Boolean), true);
             dialog.open();
@@ -429,7 +434,7 @@
         const edit = Boolean(ref);
         const statuses = edit ? { draft: 'Draft', verified: 'Source confirmed', inactive: 'Inactive' } : { draft: 'Draft', inactive: 'Inactive' };
         state.dialog = { kind: 'sourceForm', reference: ref, submit: () => submitForm(edit ? 'reference_update' : 'reference_create', edit ? { id: ref.id, supersedes_reference_id: ref.supersedes_reference_id || '' } : {}) };
-        setDialog(edit ? 'Edit source' : 'Add source', '', errorBox + '<p class="compliance-evidence-note"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> A new source starts as Draft. "Source confirmed" is reached by recording a confirmed document-identity evidence assessment.</p>' +
+        setDialog(edit ? 'Edit source' : 'Add source', '', errorBox + evidenceHead('evidenceTipForm', 'About evidence') + '<p class="compliance-evidence-note"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> A new source starts as Draft. "Source confirmed" is reached by recording a confirmed document-identity evidence assessment.</p>' +
             '<div class="compliance-form-grid">' + field('Category', select('reference_type', CATEGORIES, ref?.reference_type || 'CHED')) + field('Document kind', select('source_kind', SOURCE_KINDS, ref?.source_kind || 'regulatory_document')) +
             field('Code (for example CMO 25 s.2015)', '<input type="text" name="reference_code" maxlength="120" value="' + esc(ref?.reference_code || '') + '"/>') + field('Title', '<input type="text" name="title" maxlength="255" value="' + esc(ref?.title || '') + '"/>') +
             field('Issuing body', '<input type="text" name="issuing_body" maxlength="180" value="' + esc(ref?.issuing_body || '') + '"/>') + field('Effective date (optional)', '<input type="date" name="effective_date" value="' + esc(ref?.effective_date || '') + '"/>') +
