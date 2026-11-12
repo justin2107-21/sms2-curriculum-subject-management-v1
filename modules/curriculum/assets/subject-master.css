@@ -44,12 +44,11 @@
 /* Opened program (or the unplaced list): no search box; back button, context bar and Export share the top of the page. */
 #subjectWorkspace[data-view="program"] .subject-toolbar, #subjectWorkspace[data-view="unplaced"] .subject-toolbar { display: none; }
 #subjectWorkspace[data-view="cards"] .subject-drill { display: none; }
-.subject-drill { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin: 20px 0 0; }
+.subject-drill { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px 16px; margin: 12px 0 0; }
 .subject-drill > .subject-back-row, .subject-drill > .mapping-context-bar { margin: 0; }
-.subject-drill > .subject-back-row { flex: 1 1 100%; }
-.subject-drill > .mapping-context-bar { flex: 0 1 760px; min-width: 0; }
-.subject-drill__export { margin-left: auto; white-space: nowrap; }
-@media (max-width: 720px) { .subject-drill__export { margin-left: 0; } }
+.subject-drill > .subject-back-row { grid-column: 1; grid-row: 1; }
+.subject-drill > .mapping-context-bar { grid-column: 1 / -1; grid-row: 2; justify-self: start; width: min(100%, 760px); min-width: 0; }
+.subject-drill__export { grid-column: 2; grid-row: 1; white-space: nowrap; }
 .subject-toolbar__cards { display: contents; }
 .subject-toolbar__count { margin-left: auto; font-size: 14px; color: #475569; white-space: nowrap; }
 .subject-toolbar .csms-search { display: block; flex: 0 1 11rem; min-width: 8rem; }
