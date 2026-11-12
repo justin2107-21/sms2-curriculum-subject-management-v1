@@ -1,6 +1,6 @@
 <?php
-// Subjects (Subject Master): the master list of subjects. Two views of one page: All subjects (server-side, any number of subjects) and
-// By program (the placements of one curriculum version). Old addresses keep working: ?program_id= opens By program, ?subject_id= opens the details.
+// Subjects (Subject Master). No screen lists every subject: the page is program and strand cards, one curriculum version (the table view), or a capped
+// search result. Old addresses keep working: ?program_id= opens a program's subjects, ?subject_id= opens the subject's details.
 require_once __DIR__ . '/../../../shared/bootstrap.php';
 if (!is_authenticated()) {
     header('Location: ../../../auth/signin.php');
@@ -24,8 +24,8 @@ $canCreate = $can('subject.create');
 $canUpdate = $can('subject.update');
 $canPlace = $canCreate && $canBrowse && $can('curriculum.update');
 $canExport = $can('curriculum_export.view');
-$view = (string)($_GET['view'] ?? ($requestedProgramId !== '' ? 'program' : 'all'));
-if (!in_array($view, ['all', 'program'], true) || ($view === 'program' && !$canBrowse)) $view = 'all';
+$view = (string)($_GET['view'] ?? ($requestedProgramId !== '' ? 'program' : 'cards'));
+if (!in_array($view, ['cards', 'program', 'unplaced'], true) || ($view !== 'cards' && !$canBrowse)) $view = 'cards';
 $e = static fn($value): string => htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
 $v = static fn(string $file): int => (int)filemtime(__DIR__ . '/' . $file);
 ?>
@@ -64,13 +64,15 @@ require __DIR__ . '/../../../shared/sidebar.php';
     </div>
 
     <section class="mapping-workspace-shell">
-      <nav class="csms-tabs" id="subjectViews" role="tablist" aria-label="Subject views">
-        <button type="button" role="tab" data-view="all" aria-selected="<?= $view === 'all' ? 'true' : 'false' ?>"<?= $view === 'all' ? '' : ' tabindex="-1"' ?>>All subjects</button>
-        <?php if ($canBrowse): ?><button type="button" role="tab" data-view="program" aria-selected="<?= $view === 'program' ? 'true' : 'false' ?>"<?= $view === 'program' ? '' : ' tabindex="-1"' ?>>By program</button><?php endif; ?>
-      </nav>
+      <div class="subject-find">
+        <label class="sr-only" for="subjectFind">Find a subject by code or title</label>
+        <i class="fa-solid fa-magnifying-glass subject-find__icon" aria-hidden="true"></i>
+        <input type="search" id="subjectFind" class="subject-find__input" maxlength="100" placeholder="Find a subject by code or title" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="findResults" aria-autocomplete="list"/>
+        <div class="subject-find__panel" id="findResults" role="listbox" aria-label="Matching subjects" hidden></div>
+      </div>
 
       <?php if ($canBrowse): ?>
-      <p class="subject-back-row" id="programBackRow" hidden><a class="button-muted" id="programBack" href="subjects.php?view=program"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> All programs</a></p>
+      <p class="subject-back-row" id="programBackRow" hidden><a class="button-muted" id="programBack" href="subjects.php"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> All programs</a></p>
       <section class="mapping-context-bar" id="subjectContextBar" aria-label="Curriculum context" hidden>
         <?php foreach (['program' => 'Program / Strand', 'curriculum' => 'Curriculum', 'version' => 'Curriculum Version'] as $key => $label): ?>
         <div class="mapping-context-field"><label for="<?= $key ?>Search"><?= $label ?></label><div class="record-autocomplete">
@@ -85,63 +87,30 @@ require __DIR__ . '/../../../shared/sidebar.php';
       <?php endif; ?>
 
       <section class="mapping-workspace-panel csms-panel" aria-label="Subjects">
-        <!-- All subjects -->
-        <div id="viewAll" data-panel="all" hidden>
-          <div class="csms-filter-row">
-            <label class="csms-search"><span class="sr-only">Search subject code or title</span><input type="search" id="subjectSearch" maxlength="100" placeholder="Search code or title"/></label>
-            <select class="csms-select" id="subjectStatus" aria-label="Status"><option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select>
-            <?php if ($canBrowse): ?>
-            <label class="sr-only" for="subjectProgram">Program or strand</label>
-            <select id="subjectProgram" class="subject-program-select"><option value="all">All programs</option></select>
-            <select class="csms-select" id="subjectPlaced" aria-label="Placement"><option value="">All placements</option><option value="placed">Placed</option><option value="unplaced">Not placed anywhere</option></select>
-            <?php endif; ?>
-            <select class="csms-select" id="subjectPerPage" aria-label="Rows per page"><option value="10">10 rows</option><option value="20" selected>20 rows</option><option value="50">50 rows</option><option value="100">100 rows</option></select>
-            <span class="csms-filter-row__summary" id="subjectCount" role="status">0 records</span>
+        <!-- Program and strand cards -->
+        <div id="viewCards" data-panel="cards" hidden>
+          <div class="csms-filter-row subject-card-controls">
+            <div class="program-tabs" id="cardLevel" role="group" aria-label="Program level">
+              <button type="button" class="program-tab" data-level="all" aria-pressed="true">All</button>
+              <button type="button" class="program-tab" data-level="college" aria-pressed="false">College programs</button>
+              <button type="button" class="program-tab" data-level="shs" aria-pressed="false">SHS strands</button>
+            </div>
+            <label class="csms-search" id="cardFilterWrap" hidden><span class="sr-only">Filter programs</span><input type="search" id="cardFilter" maxlength="100" placeholder="Filter programs"/></label>
+            <span class="csms-filter-row__summary" id="cardCount" role="status"></span>
           </div>
-          <div class="csms-filter-row subject-chips" id="subjectChips" aria-label="Active filters" hidden></div>
-          <div class="csms-empty" id="subjectLoading" role="status"><i class="fa-solid fa-spinner" aria-hidden="true"></i><strong>Loading subjects…</strong></div>
-          <div class="csms-empty" id="subjectEmpty" role="status" hidden><i class="fa-solid fa-book" aria-hidden="true"></i><strong>No subjects yet</strong><span><?= $canCreate ? 'Create the first subject with New subject.' : 'Subjects appear here when they are created.' ?></span></div>
-          <div class="csms-empty" id="subjectNoMatch" role="status" hidden><i class="fa-solid fa-filter" aria-hidden="true"></i><strong>No subjects match these filters</strong><span>Change the search or a filter.</span><button type="button" class="button-muted" id="subjectClearFilters">Clear filters</button></div>
-          <div class="csms-empty" id="subjectError" role="alert" hidden><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><strong>Subjects could not be loaded</strong><span id="subjectErrorText"></span><button type="button" class="button-muted" id="subjectRetry">Retry</button></div>
-          <div class="csms-page-table table-scroll" id="subjectTableWrap" tabindex="0" aria-label="Scrollable subjects" hidden>
-            <table class="csms-ctable">
-              <thead><tr>
-                <th aria-sort="none"><button type="button" class="subject-sort" data-sort="code">Code</button></th>
-                <th aria-sort="none"><button type="button" class="subject-sort" data-sort="title">Title</button></th>
-                <th class="csms-ctable__num" aria-sort="none"><button type="button" class="subject-sort" data-sort="units">Units</button></th>
-                <th aria-sort="none"><button type="button" class="subject-sort" data-sort="status">Status</button></th>
-                <?php if ($canBrowse): ?><th class="csms-ctable__num" aria-sort="none"><button type="button" class="subject-sort" data-sort="usage">Used in</button></th><?php endif; ?>
-                <th class="csms-ctable__action"><span class="sr-only">Actions</span></th></tr></thead>
-              <tbody id="subjectRows"></tbody>
-            </table>
+          <div class="csms-program-grid" id="cardLoading" aria-busy="true" aria-label="Loading programs"></div>
+          <div class="csms-empty" id="cardError" role="alert" hidden><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><strong>Programs could not be loaded</strong><span id="cardErrorText"></span><button type="button" class="button-muted" id="cardRetry">Retry</button></div>
+          <div class="csms-empty" id="cardNoMatch" role="status" hidden><i class="fa-solid fa-filter" aria-hidden="true"></i><strong>No programs match this filter</strong><span>Change the filter or the level.</span><button type="button" class="button-muted" id="cardClear">Clear filter</button></div>
+          <div class="subject-card-groups" id="cardGroups" hidden>
+            <section data-group="college" aria-labelledby="cardHeadCollege"><h2 class="csms-program-group__head" id="cardHeadCollege">College degree programs <span class="csms-chip csms-chip--type" id="cardCountCollege"></span></h2><div class="csms-program-grid" id="cardGridCollege"></div><p class="csms-program-group__empty" id="cardEmptyCollege" hidden>No college degree programs recorded yet.</p></section>
+            <section data-group="shs" aria-labelledby="cardHeadShs"><h2 class="csms-program-group__head" id="cardHeadShs">SHS strands <span class="csms-chip csms-chip--type" id="cardCountShs"></span></h2><div class="csms-program-grid" id="cardGridShs"></div><p class="csms-program-group__empty" id="cardEmptyShs" hidden>No SHS strands recorded yet.</p></section>
+            <section id="unplacedSection" hidden aria-label="Subjects not placed in any curriculum"><div class="csms-program-grid" id="unplacedGrid"></div></section>
           </div>
-          <div class="pagination-bar" id="subjectPagination" hidden></div>
         </div>
 
-        <!-- By program -->
+        <!-- Subjects of one curriculum version -->
         <div id="viewProgram" data-panel="program" hidden>
-          <div id="programCardsView" hidden>
-            <div class="csms-filter-row">
-              <label class="csms-search"><span class="sr-only">Search programs and strands by code or name</span><input type="search" id="cardSearch" maxlength="100" placeholder="Search code or name"/></label>
-              <div class="program-tabs" id="cardLevel" role="group" aria-label="Program level">
-                <button type="button" class="program-tab" data-level="all" aria-pressed="true">All</button>
-                <button type="button" class="program-tab" data-level="college" aria-pressed="false">College programs</button>
-                <button type="button" class="program-tab" data-level="shs" aria-pressed="false">SHS strands</button>
-              </div>
-              <span class="csms-filter-row__summary" id="cardCount" role="status"></span>
-            </div>
-            <div class="csms-empty" id="cardLoading" role="status"><i class="fa-solid fa-spinner" aria-hidden="true"></i><strong>Loading programs…</strong></div>
-            <div class="csms-empty" id="cardEmpty" role="status" hidden><i class="fa-solid fa-graduation-cap" aria-hidden="true"></i><strong>No programs yet</strong><span>Programs appear here when they are created in Academic Programs.</span></div>
-            <div class="csms-empty" id="cardNoMatch" role="status" hidden><i class="fa-solid fa-filter" aria-hidden="true"></i><strong>No programs match these filters</strong><span>Change the search or the level.</span><button type="button" class="button-muted" id="cardClear">Clear filters</button></div>
-            <div class="csms-empty" id="cardError" role="alert" hidden><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><strong>Programs could not be loaded</strong><span id="cardErrorText"></span><button type="button" class="button-muted" id="cardRetry">Retry</button></div>
-            <div id="cardGroups" class="subject-card-groups" hidden>
-              <section data-group="college" aria-labelledby="cardHeadCollege" hidden><h2 class="subject-group-heading" id="cardHeadCollege">College degree programs <span class="csms-chip csms-chip--type" id="cardCountCollege"></span></h2><div class="subject-card-grid" id="cardGridCollege"></div></section>
-              <section data-group="shs" aria-labelledby="cardHeadShs" hidden><h2 class="subject-group-heading" id="cardHeadShs">SHS strands <span class="csms-chip csms-chip--type" id="cardCountShs"></span></h2><div class="subject-card-grid" id="cardGridShs"></div></section>
-            </div>
-            <div class="pagination-bar" id="cardPagination" hidden></div>
-          </div>
-          <div id="programTableView" hidden>
-          <div class="csms-empty" id="programNoVersion" role="status"><i class="fa-solid fa-bullseye" aria-hidden="true"></i><strong>No curriculum version selected</strong><span>Use the context bar above to pick a curriculum version.</span></div>
+          <div class="csms-empty" id="programNoVersion"><i class="fa-solid fa-bullseye" aria-hidden="true"></i><strong>No curriculum version selected</strong><span>Use the context bar above to pick a curriculum version.</span></div>
           <div class="csms-empty" id="programLoading" role="status" hidden><i class="fa-solid fa-spinner" aria-hidden="true"></i><strong>Loading placements…</strong></div>
           <div class="csms-empty" id="programError" role="alert" hidden><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><strong>Placements could not be loaded</strong><span id="programErrorText"></span><button type="button" class="button-muted" id="programRetry">Retry</button></div>
           <div id="programBody" hidden>
@@ -162,7 +131,33 @@ require __DIR__ . '/../../../shared/sidebar.php';
               </table>
             </div>
           </div>
+        </div>
+
+        <!-- Subjects not placed in any curriculum (paged) -->
+        <div id="viewUnplaced" data-panel="unplaced" hidden>
+          <div class="csms-filter-row">
+            <label class="csms-search"><span class="sr-only">Search subject code or title</span><input type="search" id="subjectSearch" maxlength="100" placeholder="Search code or title"/></label>
+            <select class="csms-select" id="subjectStatus" aria-label="Status"><option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select>
+            <select class="csms-select" id="subjectPerPage" aria-label="Rows per page"><option value="10">10 rows</option><option value="20" selected>20 rows</option><option value="50">50 rows</option><option value="100">100 rows</option></select>
+            <span class="csms-filter-row__summary" id="subjectCount" role="status">0 records</span>
           </div>
+          <div class="csms-filter-row subject-chips" id="subjectChips" aria-label="Active filters" hidden></div>
+          <div class="csms-empty" id="subjectLoading" role="status"><i class="fa-solid fa-spinner" aria-hidden="true"></i><strong>Loading subjects…</strong></div>
+          <div class="csms-empty" id="subjectEmpty" role="status" hidden><i class="fa-solid fa-circle-check" aria-hidden="true"></i><strong>Every subject is placed in a curriculum</strong><span>Subjects that no curriculum version uses appear here.</span></div>
+          <div class="csms-empty" id="subjectNoMatch" role="status" hidden><i class="fa-solid fa-filter" aria-hidden="true"></i><strong>No subjects match these filters</strong><span>Change the search or a filter.</span><button type="button" class="button-muted" id="subjectClearFilters">Clear filters</button></div>
+          <div class="csms-empty" id="subjectError" role="alert" hidden><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><strong>Subjects could not be loaded</strong><span id="subjectErrorText"></span><button type="button" class="button-muted" id="subjectRetry">Retry</button></div>
+          <div class="csms-page-table table-scroll" id="subjectTableWrap" tabindex="0" aria-label="Scrollable subjects" hidden>
+            <table class="csms-ctable">
+              <thead><tr>
+                <th aria-sort="none"><button type="button" class="subject-sort" data-sort="code">Code</button></th>
+                <th aria-sort="none"><button type="button" class="subject-sort" data-sort="title">Title</button></th>
+                <th class="csms-ctable__num" aria-sort="none"><button type="button" class="subject-sort" data-sort="units">Units</button></th>
+                <th aria-sort="none"><button type="button" class="subject-sort" data-sort="status">Status</button></th>
+                <th class="csms-ctable__action"><span class="sr-only">Actions</span></th></tr></thead>
+              <tbody id="subjectRows"></tbody>
+            </table>
+          </div>
+          <div class="pagination-bar" id="subjectPagination" hidden></div>
         </div>
       </section>
     </section>
@@ -185,7 +180,6 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 <script src="../assets/curriculum-common.js?v=<?= $v('../assets/curriculum-common.js') ?>"></script>
 <script src="../../../js/csms-menu.js?v=<?= $v('../../../js/csms-menu.js') ?>"></script>
-<script src="../../../js/csms-program-picker.js?v=<?= $v('../../../js/csms-program-picker.js') ?>"></script>
 <script src="../assets/subject-master.js?v=<?= $v('../assets/subject-master.js') ?>"></script>
 </body>
 </html>

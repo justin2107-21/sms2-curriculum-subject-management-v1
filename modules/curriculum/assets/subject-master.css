@@ -14,7 +14,6 @@
 .subject-master-content [data-panel] .csms-filter-row ~ :is(.csms-page-table, .csms-empty, #programBody > .csms-page-table) { margin-top: 12px; }
 .subject-master-content .subject-chips { margin-top: 8px; }
 @media (min-width: 1280px) { .subject-master-content .csms-filter-row { flex-wrap: nowrap; } .subject-master-content .subject-chips { flex-wrap: wrap; } }
-.subject-master-content .csms-tabs + .mapping-context-bar { margin-top: 16px; }
 .subject-master-content .mapping-workspace-header { flex-wrap: nowrap; }
 .subject-master-content .mapping-workspace-header > :not(:first-child) { white-space: nowrap; }
 #subjectStatus { width: 8rem; }
@@ -39,20 +38,31 @@
 #programSummary { margin: 0 0 12px; }
 .subject-title-cell { max-width: 32rem; overflow-wrap: anywhere; }
 
-/* Program and strand cards (the shared csms-card, four per row at 1440). */
-.subject-card-groups { display: flex; flex-direction: column; gap: 20px; margin-top: 16px; }
-.subject-group-heading { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; font-size: 18px; }
-.subject-card-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
-.subject-card { gap: 6px; padding: 16px 18px; color: inherit; text-decoration: none; min-width: 0; }
-.subject-card:hover { border-color: var(--csms-navy, #1a3a8c); }
-.subject-card:focus-visible { outline: 3px solid var(--csms-focus, #2563eb); outline-offset: 2px; }
-.subject-card__code { font-size: 18px; font-weight: 700; color: var(--csms-code-blue, #2163c5); }
-.subject-card__name { font-size: 14px; font-weight: 600; color: var(--csms-text, #1f2937); overflow-wrap: anywhere; }
-.subject-card__meta { font-size: 13px; color: var(--csms-text-secondary, #374151); }
-@media (max-width: 1279px) { .subject-card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (max-width: 899px) { .subject-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 560px) { .subject-card-grid { grid-template-columns: 1fr; } }
+/* The search box (the way into any subject) and its capped result panel. */
+.subject-find { position: relative; margin: 20px 0 0; }
+.subject-find ~ .mapping-workspace-panel, .subject-find ~ .subject-back-row { margin-top: 20px; }
+.subject-find__icon { position: absolute; left: 18px; top: 19px; font-size: 16px; color: #475569; pointer-events: none; }
+.subject-master-content .subject-find__input { width: 100%; box-sizing: border-box; height: 54px; min-height: 54px; padding: 0 18px 0 48px; font: inherit; font-size: 16px; color: var(--csms-text, #1f2937); background: #fff; border: 1px solid var(--csms-border-strong, #cbd5e1); border-radius: 12px; box-shadow: var(--csms-shadow-sm, 0 1px 3px rgba(15, 23, 42, .06)); }
+.subject-master-content .subject-find__input:focus-visible { outline: 2px solid #2163c5; outline-offset: 2px; border-color: #2163c5; }
+.subject-find__panel { position: absolute; z-index: 50; left: 0; right: 0; top: calc(100% + 6px); max-height: 60vh; overflow: auto; padding: 6px; background: #fff; border: 1px solid var(--csms-border, #dfe4ee); border-radius: 12px; box-shadow: 0 12px 28px rgba(15, 23, 42, .14); }
+.subject-find__note { margin: 0; padding: 12px; font-size: 14px; color: #475569; }
+.subject-find__note--top { position: sticky; top: -6px; z-index: 1; margin: -6px -6px 4px; border-bottom: 1px solid var(--csms-border, #dfe4ee); border-radius: 12px 12px 0 0; background: #f6f7fb; }
+.subject-hit { display: flex; align-items: center; justify-content: space-between; gap: 14px; width: 100%; padding: 10px 12px; border: 0; border-radius: 8px; background: none; font: inherit; text-align: left; cursor: pointer; color: inherit; }
+.subject-hit:hover, .subject-hit.is-active { background: #eef3fc; }
+.subject-hit:focus-visible { outline: 2px solid #2163c5; outline-offset: -2px; }
+.subject-hit__main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.subject-hit__code { color: #2163c5; font-size: 15px; }
+.subject-hit__title { font-size: 14px; color: var(--csms-text, #1f2937); overflow-wrap: anywhere; }
+.subject-hit__meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px 10px; font-size: 13px; color: #475569; flex: 0 1 auto; }
+.subject-hit__units { white-space: nowrap; }
+.subject-hit__used { max-width: 22rem; text-align: right; }
+@media (max-width: 720px) { .subject-hit { flex-direction: column; align-items: flex-start; } .subject-hit__meta { justify-content: flex-start; } .subject-hit__used { text-align: left; } }
+
+/* The cards page: groups with the shared csms-program-card (see css/csms-components.css). */
+.subject-card-groups { display: flex; flex-direction: column; gap: 26px; margin-top: 18px; }
+#cardLoading { margin-top: 18px; }
 #cardLevel { flex: 0 0 auto; }
+.subject-card-controls { margin-top: 0; }
 
 /* Dialog. */
 .subject-dialog { max-width: 640px; width: 100%; }

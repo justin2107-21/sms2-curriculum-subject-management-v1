@@ -1,8 +1,8 @@
 (function () {
     'use strict';
 
-    // Subjects (Subject Master). Two views of one page: All subjects (server-side listing, paging, sorting and filters; ready for
-    // thousands of subjects) and By program (the placements of one curriculum version). One shared dialog for details, create and edit.
+    // Subjects (Subject Master). No screen lists every subject: the page is program and strand cards, one curriculum version (the table view)
+    // or a capped search result. The "not placed anywhere" card opens a paged list. One shared dialog serves details, create and edit.
     // Nothing here trusts stored values: unexpected years or semesters are shown as "Unassigned", and a failing request shows the
     // empty-state error with Retry, never a raw script error.
     const root = document.getElementById('subjectWorkspace');
@@ -14,12 +14,14 @@
     const api = root.dataset.subjectApi;
     const canCreate = root.dataset.canCreate === '1', canUpdate = root.dataset.canUpdate === '1', canPlace = root.dataset.canPlace === '1';
     const canBrowse = root.dataset.canBrowse === '1', canExport = root.dataset.canExport === '1';
-    const SEARCH_MIN = 2;
+    const SEARCH_MIN = 2, FIND_MAX = 20, CARD_FILTER_MIN_CARDS = 12;
     const PER_PAGE = ['10', '20', '50', '100'];
-    const SORTS = ['code', 'title', 'units', 'status', 'usage'];
-    const state = { view: root.dataset.view === 'program' && canBrowse ? 'program' : 'all', dialog: null, programs: new Map(), ctx: [null, null, null], programTicket: 0 };
+    const SORTS = ['code', 'title', 'units', 'status'];
+    const VIEWS = ['cards', 'program', 'unplaced'];
+    const state = { view: VIEWS.includes(root.dataset.view) && (root.dataset.view === 'cards' || canBrowse) ? root.dataset.view : 'cards', dialog: null, programs: new Map(), ctx: [null, null, null], programTicket: 0 };
     const list = { page: 1, sort: '', direction: 'asc', request: 0, records: new Map(), loaded: false };
     const placements = { rows: [], totals: null, loaded: false };
+    const cards = { level: 'all', request: 0, loaded: false, total: 0 };
 
     // ---------- small helpers ----------
     const num = value => ui.formatUnits(value);
@@ -47,66 +49,188 @@
         ? '<span class="csms-sub">' + num(row.lecture_units) + ' lecture · ' + num(row.laboratory_units) + ' lab</span>' : '';
 
     // ---------- the address (view, filters, sort and page) ----------
-    const OWN = ['view', 'q', 'status', 'program', 'placed', 'sort', 'dir', 'per_page', 'page', 'pq', 'year', 'sem', 'pst', 'subject_id', 'cq', 'lvl', 'cpage'];
+    const OWN = ['view', 'q', 'status', 'sort', 'dir', 'per_page', 'page', 'pq', 'year', 'sem', 'pst', 'subject_id', 'cf', 'lvl'];
     function writeUrl(extra, push) {
         const params = new URLSearchParams(window.location.search);
         OWN.forEach(key => params.delete(key));
-        params.set('view', state.view);
-        Object.entries(extra || {}).forEach(([key, value]) => { if (value !== '' && value !== null && value !== undefined && !(key === 'per_page' && String(value) === '20') && !((key === 'page' || key === 'cpage') && Number(value) <= 1) && !(key === 'dir' && value === 'asc')) params.set(key, String(value)); });
-        const url = window.location.pathname + '?' + params.toString();
+        if (state.view !== 'cards') params.set('view', state.view);
+        Object.entries(extra || {}).forEach(([key, value]) => { if (value !== '' && value !== null && value !== undefined && !(key === 'per_page' && String(value) === '20') && !(key === 'page' && Number(value) <= 1) && !(key === 'dir' && value === 'asc')) params.set(key, String(value)); });
+        const query = params.toString();
+        const url = window.location.pathname + (query ? '?' + query : '');
         if (url !== window.location.pathname + window.location.search) window.history[push ? 'pushState' : 'replaceState'](null, '', url);
     }
-    const allExtra = () => ({ q: $('subjectSearch').value.trim(), status: $('subjectStatus').value, program: programValue(), placed: $('subjectPlaced')?.value || '', sort: list.sort, dir: list.direction, per_page: $('subjectPerPage').value, page: list.page });
+    const unplacedExtra = () => ({ q: $('subjectSearch').value.trim(), status: $('subjectStatus').value, sort: list.sort, dir: list.direction, per_page: $('subjectPerPage').value, page: list.page });
     const programExtra = () => ({ pq: $('programSearch2').value.trim(), year: $('programYear').value, sem: $('programSemester').value, pst: $('programStatus').value });
-    const cardExtra = () => ({ cq: $('cardSearch').value.trim(), lvl: cards.level === 'all' ? '' : cards.level, cpage: cards.page });
-    function writeCurrent(push) { writeUrl(state.view === 'all' ? allExtra() : (cascade ? programExtra() : cardExtra()), push); }
+    const cardExtra = () => ({ cf: $('cardFilter').value.trim(), lvl: cards.level === 'all' ? '' : cards.level });
+    function writeCurrent(push) { writeUrl(state.view === 'unplaced' ? unplacedExtra() : state.view === 'program' ? programExtra() : cardExtra(), push); }
     function readUrl() {
         const p = new URLSearchParams(window.location.search);
         $('subjectSearch').value = p.get('q') || '';
         $('subjectStatus').value = ['active', 'inactive'].includes(p.get('status')) ? p.get('status') : '';
-        if ($('subjectPlaced')) $('subjectPlaced').value = ['placed', 'unplaced'].includes(p.get('placed')) ? p.get('placed') : '';
         $('subjectPerPage').value = PER_PAGE.includes(p.get('per_page')) ? p.get('per_page') : '20';
         list.sort = SORTS.includes(p.get('sort')) ? p.get('sort') : '';
         list.direction = p.get('dir') === 'desc' ? 'desc' : 'asc';
         list.page = Math.max(1, parseInt(p.get('page'), 10) || 1);
-        state.pendingProgram = p.get('program') || '';
-        $('cardSearch').value = p.get('cq') || '';
-        cards.level = ['college', 'shs'].includes(p.get('lvl')) ? p.get('lvl') : 'all';
-        cards.page = Math.max(1, parseInt(p.get('cpage'), 10) || 1);
         $('programSearch2').value = p.get('pq') || '';
         state.pendingYear = p.get('year') || ''; state.pendingSemester = p.get('sem') || '';
         $('programStatus').value = ['active', 'inactive'].includes(p.get('pst')) ? p.get('pst') : '';
+        $('cardFilter').value = p.get('cf') || '';
+        cards.level = ['college', 'shs'].includes(p.get('lvl')) ? p.get('lvl') : 'all';
     }
-    const programValue = () => { const v = $('subjectProgram')?.value || ''; return v === 'all' ? '' : v; };
 
-    // ---------- views ----------
+    // ---------- views (no tabs: cards, one version, or the unplaced list) ----------
     function showView(view, push) {
-        if (view === 'program' && !canBrowse) view = 'all';
+        if (view !== 'cards' && !canBrowse) view = 'cards';
+        if (view === 'program' && !cascade) view = 'cards';
         state.view = view;
-        $('viewAll').hidden = view !== 'all';
-        $('viewProgram').hidden = view !== 'program';
-        const table = view === 'program' && Boolean(cascade);
+        const table = view === 'program';
+        $('viewCards').hidden = view !== 'cards';
+        $('viewProgram').hidden = !table;
+        $('viewUnplaced').hidden = view !== 'unplaced';
         if ($('subjectContextBar')) $('subjectContextBar').hidden = !table;
-        if ($('programBackRow')) $('programBackRow').hidden = !table;
-        $('programCardsView').hidden = !(view === 'program' && !cascade);
-        $('programTableView').hidden = !table;
-        document.querySelectorAll('#subjectViews [role="tab"]').forEach(tab => {
-            const active = tab.dataset.view === view;
-            tab.setAttribute('aria-selected', active ? 'true' : 'false');
-            if (active) tab.removeAttribute('tabindex'); else tab.setAttribute('tabindex', '-1');
-        });
+        if ($('programBackRow')) $('programBackRow').hidden = !(table || view === 'unplaced');
         writeCurrent(push);
-        if (view === 'all') loadList(); else if (cascade) loadPlacements(); else loadCards();
+        if (view === 'unplaced') loadList(); else if (table) loadPlacements(); else loadCards();
     }
-    document.querySelectorAll('#subjectViews [role="tab"]').forEach(tab => tab.addEventListener('click', () => { if (tab.dataset.view !== state.view) showView(tab.dataset.view, true); }));
-    document.getElementById('subjectViews').addEventListener('keydown', event => {
-        if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
-        const tabs = [...document.querySelectorAll('#subjectViews [role="tab"]')];
-        const next = tabs[(tabs.indexOf(document.activeElement) + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length];
-        next?.focus(); next?.click();
-    });
 
-    // ---------- All subjects ----------
+    // ---------- global search: a capped result panel (at most 20 subjects) ----------
+    const find = { request: 0, items: [], active: -1 };
+    const findInput = $('subjectFind'), findPanel = $('findResults');
+    function closeFind() { findPanel.hidden = true; findInput.setAttribute('aria-expanded', 'false'); find.active = -1; findInput.removeAttribute('aria-activedescendant'); }
+    function findRow(row, index) {
+        const usage = row.usage_count === null || row.usage_count === undefined ? null : Number(row.usage_count);
+        const programs = Array.isArray(row.program_context) && row.program_context.length ? ' · ' + row.program_context.join(', ') : '';
+        const used = usage === null ? '' : usage === 0 ? 'Not placed in any curriculum' : 'Used in ' + usage + (usage === 1 ? ' version' : ' versions') + programs;
+        return '<button type="button" class="subject-hit" role="option" id="findOption' + index + '" data-id="' + Number(row.id) + '" aria-selected="false">' +
+            '<span class="subject-hit__main"><strong class="subject-hit__code">' + esc(row.subject_code) + '</strong><span class="subject-hit__title">' + esc(row.subject_title) + '</span></span>' +
+            '<span class="subject-hit__meta"><span class="subject-hit__units">' + esc(num(row.units)) + ' units</span>' + statusChip(row.status) + (used ? '<span class="subject-hit__used">' + esc(used) + '</span>' : '') + '</span></button>';
+    }
+    async function runFind() {
+        const q = findInput.value.trim();
+        if (q.length < SEARCH_MIN) { closeFind(); return; }
+        const ticket = ++find.request;
+        findPanel.hidden = false; findInput.setAttribute('aria-expanded', 'true');
+        findPanel.innerHTML = '<p class="subject-find__note" role="status">Searching…</p>';
+        try {
+            const payload = await ui.fetchJson(api, { action: 'list', search: q, per_page: FIND_MAX, page: 1 });
+            if (ticket !== find.request) return;
+            const total = Number(payload.pagination.total_records);
+            find.items = payload.subjects || [];
+            find.active = -1;
+            if (!find.items.length) { findPanel.innerHTML = '<p class="subject-find__note" role="status">No subject matches “' + esc(q) + '”.</p>'; return; }
+            findPanel.innerHTML = (total > FIND_MAX ? '<p class="subject-find__note subject-find__note--top" role="status">Showing the first ' + FIND_MAX + '. Refine your search (' + total + ' matches)</p>' : '') + find.items.map(findRow).join('');
+        } catch (error) {
+            if (ticket !== find.request) return;
+            findPanel.innerHTML = '<p class="subject-find__note" role="alert">The search could not be completed. ' + esc(friendly(error)) + '</p>';
+        }
+    }
+    function setActive(index) {
+        const rows = [...findPanel.querySelectorAll('.subject-hit')];
+        if (!rows.length) return;
+        find.active = (index + rows.length) % rows.length;
+        rows.forEach((row, i) => { row.setAttribute('aria-selected', i === find.active ? 'true' : 'false'); row.classList.toggle('is-active', i === find.active); });
+        rows[find.active].scrollIntoView({ block: 'nearest' });
+        findInput.setAttribute('aria-activedescendant', rows[find.active].id);
+    }
+    findInput.addEventListener('input', ui.debounce(() => { if (findInput.value.trim().length === 1) return; runFind(); }, 300));
+    findInput.addEventListener('keydown', event => {
+        if (event.key === 'ArrowDown') { event.preventDefault(); if (findPanel.hidden) runFind(); else setActive(find.active + 1); }
+        else if (event.key === 'ArrowUp') { event.preventDefault(); setActive(find.active - 1); }
+        else if (event.key === 'Enter') { const rows = findPanel.querySelectorAll('.subject-hit'); const row = rows[find.active >= 0 ? find.active : 0]; if (row && !findPanel.hidden) { event.preventDefault(); openFromFind(Number(row.dataset.id)); } }
+        else if (event.key === 'Escape') { closeFind(); }
+    });
+    findInput.addEventListener('focus', () => { if (findInput.value.trim().length >= SEARCH_MIN && findPanel.querySelector('.subject-hit, .subject-find__note')) { findPanel.hidden = false; findInput.setAttribute('aria-expanded', 'true'); } });
+    findPanel.addEventListener('mousedown', event => event.preventDefault());
+    findPanel.addEventListener('click', event => { const row = event.target.closest('.subject-hit'); if (row) openFromFind(Number(row.dataset.id)); });
+    document.addEventListener('click', event => { if (!event.target.closest('.subject-find')) closeFind(); });
+    function openFromFind(id) { closeFind(); openDetails(id); }
+
+    // ---------- program and strand cards ----------
+    const ICON = { college: 'fa-graduation-cap', shs: 'fa-book-open-reader' };
+    const STATUS_CHIPS = { active: ['Active', 'csms-chip--active'], draft: ['Draft', 'csms-chip--draft'], approved: ['Approved', 'csms-chip--approved'], in_review: ['In review', 'csms-chip--under_review'], returned: ['Returned', 'csms-chip--returned'], archived: ['Archived', 'csms-chip--archived'] };
+    const YEAR_LABEL = { 1: 'Y1', 2: 'Y2', 3: 'Y3', 4: 'Y4', 11: 'G11', 12: 'G12' };
+    function skeletonCard() {
+        return '<div class="csms-program-card csms-program-card--loading" aria-hidden="true"><span class="csms-program-card__top"><span class="csms-skeleton" style="width:40px;height:40px"></span><span class="csms-skeleton" style="width:60px;height:20px"></span></span>' +
+            '<span class="csms-skeleton" style="width:45%;height:30px"></span><span class="csms-skeleton" style="width:90%;height:14px"></span><span class="csms-skeleton" style="width:100%;height:40px"></span><span class="csms-skeleton" style="width:60%;height:20px"></span></div>';
+    }
+    function cardHref(program) { return 'subjects.php?view=program&program_id=' + Number(program.id); }
+    function barsHtml(program) {
+        const entries = Object.entries(program.year_counts || {});
+        const max = Math.max(0, ...entries.map(([, n]) => Number(n)));
+        if (!max) return '';
+        const alt = 'Subjects per year level: ' + entries.map(([k, n]) => (YEAR_LABEL[k] || k) + ' ' + n).join(', ');
+        return '<span class="csms-program-card__bars" role="img" aria-label="' + esc(alt) + '">' + entries.map(([k, n]) => '<span class="csms-program-card__bar" aria-hidden="true"><i style="height:' + Math.max(4, Math.round(Number(n) / max * 100)) + '%"></i>' + (YEAR_LABEL[k] || k) + '</span>').join('') + '</span>';
+    }
+    function cardHtml(program) {
+        const level = program.level === 'shs' ? 'shs' : 'college';
+        const head = '<span class="csms-program-card__top"><span class="csms-program-card__icon" aria-hidden="true"><i class="fa-solid ' + ICON[level] + '"></i></span><span class="csms-program-card__level csms-chip">' + (level === 'shs' ? 'SHS' : 'College') + '</span></span>' +
+            '<span class="csms-program-card__code">' + esc(program.program_code) + '</span><span class="csms-program-card__name">' + esc(program.program_name) + '</span>';
+        const muted = Number(program.curriculum_count) === 0;
+        const body = muted ? '<p class="csms-program-card__none">No curriculum yet</p>' :
+            '<span class="csms-program-card__stats">' + [['subject_count', 'Subjects'], ['curriculum_count', 'Curricula'], ['version_count', 'Versions']].map(([k, label]) => '<span class="csms-program-card__stat"><strong>' + Number(program[k]) + '</strong><small>' + label + '</small></span>').join('') + '</span>' +
+            '<span class="csms-program-card__statuses">' + Object.entries(program.version_statuses || {}).map(([k, n]) => STATUS_CHIPS[k] ? '<span class="csms-chip ' + STATUS_CHIPS[k][1] + '">' + n + ' ' + STATUS_CHIPS[k][0] + '</span>' : '').join('') + '</span>' + barsHtml(program);
+        return '<a class="csms-program-card csms-program-card--' + level + (muted ? ' csms-program-card--muted' : '') + '" href="' + cardHref(program) + '" aria-label="Open subjects of ' + esc(program.program_code) + '">' + head + body +
+            '<span class="csms-program-card__foot">Open subjects <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></span></a>';
+    }
+    function unplacedCardHtml(count) {
+        return '<a class="csms-program-card csms-program-card--muted" href="subjects.php?view=unplaced" aria-label="Open the ' + count + ' subjects not placed in any curriculum">' +
+            '<span class="csms-program-card__top"><span class="csms-program-card__icon" aria-hidden="true"><i class="fa-solid fa-box-open"></i></span></span>' +
+            '<span class="csms-program-card__big">' + count + '</span><span class="csms-program-card__name">Not placed in any curriculum</span>' +
+            '<span class="csms-program-card__foot">Open subjects <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></span></a>';
+    }
+    function cardStates(which, message) {
+        $('cardLoading').hidden = which !== 'loading';
+        $('cardError').hidden = which !== 'error';
+        $('cardNoMatch').hidden = which !== 'nomatch';
+        $('cardGroups').hidden = which !== 'list';
+        if (which === 'error') $('cardErrorText').textContent = message || '';
+    }
+    async function loadCards() {
+        const ticket = ++cards.request;
+        document.querySelectorAll('#cardLevel [data-level]').forEach(b => b.setAttribute('aria-pressed', b.dataset.level === cards.level ? 'true' : 'false'));
+        $('cardLoading').innerHTML = skeletonCard().repeat(4);
+        cardStates('loading');
+        const params = { action: 'program_cards', page: 1, per_page: 100 };
+        const q = $('cardFilter').value.trim();
+        if (q.length >= SEARCH_MIN) params.search = q;
+        if (cards.level !== 'all') params.level = cards.level;
+        try {
+            const payload = await ui.fetchJson(api, params);
+            if (ticket !== cards.request) return;
+            cards.loaded = true;
+            cards.total = Number(payload.pagination.total_records);
+            (payload.programs || []).forEach(p => state.programs.set(String(p.id), { id: p.id, code: p.program_code, name: p.program_name, level: p.level }));
+            ui.setCount($('cardCount'), cards.total);
+            if (cards.total > 100) $('cardCount').textContent = '100 of ' + cards.total + ' programs';
+            $('cardFilterWrap').hidden = !(cards.total > CARD_FILTER_MIN_CARDS || q.length >= SEARCH_MIN);
+            const unplaced = Number(payload.unplaced_count) || 0;
+            if (!payload.programs.length) { cardStates(q.length >= SEARCH_MIN || cards.level !== 'all' ? 'nomatch' : 'list'); }
+            else cardStates('list');
+            ['college', 'shs'].forEach(level => {
+                const rows = (payload.programs || []).filter(p => p.level === level);
+                const section = document.querySelector('#cardGroups [data-group="' + level + '"]');
+                const hiddenByLevel = cards.level !== 'all' && cards.level !== level;
+                section.hidden = hiddenByLevel;
+                const key = level === 'college' ? 'College' : 'Shs';
+                $('cardGrid' + key).innerHTML = rows.map(cardHtml).join('');
+                $('cardCount' + key).textContent = payload.groups[level];
+                $('cardEmpty' + key).hidden = rows.length !== 0 || q.length >= SEARCH_MIN;
+            });
+            const showUnplaced = unplaced > 0 && cards.level === 'all' && q.length < SEARCH_MIN && canBrowse;
+            $('unplacedSection').hidden = !showUnplaced;
+            $('unplacedGrid').innerHTML = showUnplaced ? unplacedCardHtml(unplaced) : '';
+            if (q.length >= SEARCH_MIN && !payload.programs.length) cardStates('nomatch');
+        } catch (error) {
+            if (ticket !== cards.request) return;
+            cardStates('error', friendly(error));
+        }
+    }
+    $('cardFilter').addEventListener('input', ui.debounce(() => { if ($('cardFilter').value.trim().length === 1) return; writeCurrent(false); loadCards(); }, 300));
+    $('cardLevel').addEventListener('click', event => { const b = event.target.closest('[data-level]'); if (!b || b.dataset.level === cards.level) return; cards.level = b.dataset.level; writeCurrent(true); loadCards(); });
+    $('cardClear').addEventListener('click', () => { $('cardFilter').value = ''; cards.level = 'all'; writeCurrent(true); loadCards(); });
+    $('cardRetry').addEventListener('click', loadCards);
+
+    // ---------- the unplaced list (paged; the same table, sort and row actions) ----------
     function listStates(which, message) {
         $('subjectLoading').hidden = which !== 'loading';
         $('subjectEmpty').hidden = which !== 'empty';
@@ -116,14 +240,12 @@
         $('subjectPagination').hidden = which !== 'list';
         if (which === 'error') $('subjectErrorText').textContent = message || '';
     }
-    const filtering = () => Boolean($('subjectSearch').value.trim().length >= SEARCH_MIN || $('subjectStatus').value || programValue() || $('subjectPlaced')?.value);
+    const filtering = () => Boolean($('subjectSearch').value.trim().length >= SEARCH_MIN || $('subjectStatus').value);
     function listParams() {
-        const out = { action: 'list', page: list.page, per_page: $('subjectPerPage').value };
+        const out = { action: 'list', page: list.page, per_page: $('subjectPerPage').value, placed: 'unplaced' };
         const q = $('subjectSearch').value.trim();
         if (q.length >= SEARCH_MIN) out.search = q;
         if ($('subjectStatus').value) out.status = $('subjectStatus').value;
-        if (programValue()) out.academic_program_id = programValue();
-        if ($('subjectPlaced')?.value) out.placed = $('subjectPlaced').value;
         if (list.sort) { out.sort = list.sort; out.direction = list.direction; }
         return out;
     }
@@ -139,19 +261,15 @@
         const q = $('subjectSearch').value.trim();
         if (q.length >= SEARCH_MIN) chips.push(['search', 'Search: ' + q]);
         if ($('subjectStatus').value) chips.push(['status', $('subjectStatus').value === 'active' ? 'Active' : 'Inactive']);
-        if (programValue()) chips.push(['program', 'Program: ' + (state.programs.get(programValue())?.code || programValue())]);
-        if ($('subjectPlaced')?.value) chips.push(['placed', $('subjectPlaced').value === 'placed' ? 'Placed' : 'Not placed anywhere']);
         const box = $('subjectChips');
         box.hidden = chips.length === 0;
         box.innerHTML = chips.map(([field, label]) => '<button type="button" class="csms-chip csms-chip--type subject-chip" data-clear="' + field + '" aria-label="Remove filter ' + esc(label) + '">' + esc(label) + ' <i class="fa-solid fa-xmark" aria-hidden="true"></i></button>').join('') +
             (chips.length > 1 ? '<button type="button" class="button-muted subject-chip" data-clear="all">Clear all</button>' : '');
     }
     function rowHtml(row) {
-        const usage = row.usage_count === null || row.usage_count === undefined ? null : Number(row.usage_count);
         return '<tr class="csms-row-click" tabindex="0" data-row="' + Number(row.id) + '" aria-haspopup="dialog" aria-label="Open ' + esc(row.subject_code) + '">' +
             '<td><strong class="csms-ctable__code">' + esc(row.subject_code) + '</strong></td><td class="subject-title-cell">' + esc(row.subject_title) + '</td>' +
             '<td class="csms-ctable__num">' + esc(num(row.units)) + unitsSub(row) + '</td><td>' + statusChip(row.status) + '</td>' +
-            (canBrowse ? '<td class="csms-ctable__num">' + (usage === null ? '—' : usage + (usage === 0 ? '<span class="csms-sub">Not placed</span>' : '')) + '</td>' : '') +
             '<td class="csms-ctable__action"><button type="button" class="csms-rowmenu" data-menu="' + Number(row.id) + '" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for ' + esc(row.subject_code) + '"><i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i></button></td></tr>';
     }
     async function loadList() {
@@ -177,10 +295,9 @@
     }
     const reload = () => { list.page = 1; writeCurrent(false); loadList(); };
     $('subjectSearch').addEventListener('input', ui.debounce(() => { if ($('subjectSearch').value.trim().length === 1) return; reload(); }, 300));
-    ['subjectStatus', 'subjectPlaced', 'subjectPerPage'].forEach(id => $(id)?.addEventListener('change', reload));
-    $('subjectProgram')?.addEventListener('change', reload);
+    ['subjectStatus', 'subjectPerPage'].forEach(id => $(id).addEventListener('change', reload));
     $('subjectRetry').addEventListener('click', () => { list.loaded = false; loadList(); });
-    function clearFilters() { $('subjectSearch').value = ''; $('subjectStatus').value = ''; if ($('subjectPlaced')) $('subjectPlaced').value = ''; if ($('subjectProgram')) { $('subjectProgram').value = 'all'; syncProgramPicker(); } reload(); }
+    function clearFilters() { $('subjectSearch').value = ''; $('subjectStatus').value = ''; reload(); }
     $('subjectClearFilters').addEventListener('click', clearFilters);
     $('subjectChips').addEventListener('click', event => {
         const button = event.target.closest('[data-clear]'); if (!button) return;
@@ -188,8 +305,6 @@
         if (field === 'all') return clearFilters();
         if (field === 'search') $('subjectSearch').value = '';
         else if (field === 'status') $('subjectStatus').value = '';
-        else if (field === 'placed') $('subjectPlaced').value = '';
-        else if (field === 'program') { $('subjectProgram').value = 'all'; syncProgramPicker(); }
         reload();
     });
     document.querySelectorAll('.subject-sort').forEach(button => {
@@ -199,37 +314,13 @@
             list.sort = button.dataset.sort; list.page = 1; writeCurrent(true); loadList();
         });
     });
-    window.addEventListener('popstate', () => { readUrl(); syncProgramPicker(); const view = new URLSearchParams(window.location.search).get('view'); showView(view === 'program' && canBrowse ? 'program' : 'all', false); });
+    window.addEventListener('popstate', () => { readUrl(); const view = new URLSearchParams(window.location.search).get('view'); showView(VIEWS.includes(view) ? view : 'cards', false); });
     $('subjectRows').addEventListener('click', event => {
         const menu = event.target.closest('[data-menu]');
         if (menu) { const row = list.records.get(Number(menu.dataset.menu)); if (row) rowMenu?.open(menu, menuItems(row)); return; }
         const tr = event.target.closest('[data-row]'); if (tr) openDetails(Number(tr.dataset.row));
     });
     $('subjectRows').addEventListener('keydown', event => { if (event.target.matches?.('[data-row]') && ['Enter', ' '].includes(event.key)) { event.preventDefault(); openDetails(Number(event.target.dataset.row)); } });
-
-    // Program picker (shared, searchable). Its option list comes from the server; the select stays the value holder.
-    let pickerReady = false;
-    function syncProgramPicker() { const select = $('subjectProgram'); if (!select) return; if (pickerReady) { select.dispatchEvent(new Event('csms:picker-sync')); } }
-    async function loadPrograms() {
-        const select = $('subjectProgram');
-        if (!select) return;
-        try {
-            const payload = await ui.fetchJson(api, { action: 'program_filter_options' });
-            const groups = new Map();
-            (payload.programs || []).forEach(program => {
-                state.programs.set(String(program.id), program);
-                if (!groups.has(program.group)) { const group = document.createElement('optgroup'); group.label = program.group; groups.set(program.group, group); select.appendChild(group); }
-                const option = new Option(program.code + ' — ' + program.name + (program.inactive ? ' (Inactive)' : ''), String(program.id));
-                Object.assign(option.dataset, { code: program.code, name: program.name, level: program.level });
-                if (program.inactive) option.dataset.inactive = '1';
-                groups.get(program.group).appendChild(option);
-            });
-            select.value = state.pendingProgram && state.programs.has(state.pendingProgram) ? state.pendingProgram : 'all';
-            window.CsmsProgramPicker?.enhance(select);
-            pickerReady = true;
-            renderChips();
-        } catch (error) { /* the list works without the program filter */ }
-    }
 
     // ---------- the row menu ----------
     const rowMenu = window.CsmsMenu ? window.CsmsMenu.create($('subjectRowMenu'), {
@@ -352,59 +443,6 @@
     $('programRows').addEventListener('click', event => { const tr = event.target.closest('[data-subject]'); if (tr) openDetails(Number(tr.dataset.subject)); });
     $('programRows').addEventListener('keydown', event => { if (event.target.matches?.('[data-subject]') && ['Enter', ' '].includes(event.key)) { event.preventDefault(); openDetails(Number(event.target.dataset.subject)); } });
 
-    // ---------- By program: program and strand cards ----------
-    const cards = { page: 1, level: 'all', request: 0 };
-    function cardStates(which, message) {
-        $('cardLoading').hidden = which !== 'loading';
-        $('cardEmpty').hidden = which !== 'empty';
-        $('cardNoMatch').hidden = which !== 'nomatch';
-        $('cardError').hidden = which !== 'error';
-        $('cardGroups').hidden = which !== 'list';
-        $('cardPagination').hidden = which !== 'list';
-        if (which === 'error') $('cardErrorText').textContent = message || '';
-    }
-    function cardHtml(program) {
-        const subjects = Number(program.subject_count), curricula = Number(program.curriculum_count);
-        const meta = curricula === 0 ? 'No curriculum yet' : subjects + (subjects === 1 ? ' subject' : ' subjects') + ' · ' + curricula + (curricula === 1 ? ' curriculum' : ' curricula');
-        return '<a class="csms-card subject-card" href="subjects.php?view=program&program_id=' + Number(program.id) + '" aria-label="Open ' + esc(program.program_code) + ', ' + esc(meta) + '">' +
-            '<span class="subject-card__code">' + esc(program.program_code) + '</span><span class="subject-card__name">' + esc(program.program_name) + '</span><span class="subject-card__meta">' + esc(meta) + '</span></a>';
-    }
-    async function loadCards() {
-        const ticket = ++cards.request;
-        document.querySelectorAll('#cardLevel [data-level]').forEach(b => b.setAttribute('aria-pressed', b.dataset.level === cards.level ? 'true' : 'false'));
-        cardStates('loading');
-        const params = { action: 'program_cards', page: cards.page, per_page: 60 };
-        const q = $('cardSearch').value.trim();
-        if (q.length >= SEARCH_MIN) params.search = q;
-        if (cards.level !== 'all') params.level = cards.level;
-        try {
-            const payload = await ui.fetchJson(api, params);
-            if (ticket !== cards.request) return;
-            const total = Number(payload.pagination.total_records);
-            ui.setCount($('cardCount'), total);
-            if (Number(payload.pagination.page) !== cards.page) cards.page = Number(payload.pagination.page);
-            if (!payload.programs.length) { cardStates(q.length >= SEARCH_MIN || cards.level !== 'all' ? 'nomatch' : 'empty'); return; }
-            ['college', 'shs'].forEach(level => {
-                const rows = payload.programs.filter(p => p.level === level);
-                const section = document.querySelector('#cardGroups [data-group="' + level + '"]');
-                section.hidden = rows.length === 0;
-                $(level === 'college' ? 'cardGridCollege' : 'cardGridShs').innerHTML = rows.map(cardHtml).join('');
-                $(level === 'college' ? 'cardCountCollege' : 'cardCountShs').textContent = payload.groups[level];
-            });
-            ui.renderPagination($('cardPagination'), payload.pagination, page => { cards.page = page; writeCurrent(true); loadCards(); });
-            $('cardPagination').hidden = Number(payload.pagination.total_pages) <= 1;
-            cardStates('list');
-            $('cardPagination').hidden = Number(payload.pagination.total_pages) <= 1;
-        } catch (error) {
-            if (ticket !== cards.request) return;
-            cardStates('error', friendly(error));
-        }
-    }
-    $('cardSearch').addEventListener('input', ui.debounce(() => { if ($('cardSearch').value.trim().length === 1) return; cards.page = 1; writeCurrent(false); loadCards(); }, 300));
-    $('cardLevel').addEventListener('click', event => { const b = event.target.closest('[data-level]'); if (!b || b.dataset.level === cards.level) return; cards.level = b.dataset.level; cards.page = 1; writeCurrent(true); loadCards(); });
-    $('cardClear').addEventListener('click', () => { $('cardSearch').value = ''; cards.level = 'all'; cards.page = 1; writeCurrent(true); loadCards(); });
-    $('cardRetry').addEventListener('click', loadCards);
-
     // ---------- the one dialog (details, create, edit) ----------
     const dialogEl = $('subjectDialog');
     const dialog = ui.createModal(dialogEl, { restoreFocus: () => document.querySelector('#subjectViews [aria-selected="true"]') });
@@ -487,7 +525,7 @@
             await ui.postForm(api, data); ui.showToast('Subject activated.', 'success'); await refreshAll();
         } catch (error) { ui.showToast(friendly(error), 'error'); }
     }
-    async function refreshAll() { await Promise.all([state.view === 'all' || list.loaded ? loadList() : null, placements.loaded ? loadPlacements() : null].filter(Boolean)); }
+    async function refreshAll() { await Promise.all([state.view === 'unplaced' ? loadList() : null, state.view === 'cards' && cards.loaded ? loadCards() : null, placements.loaded ? loadPlacements() : null].filter(Boolean)); }
 
     function formFields(subject) {
         return '<div class="subject-form-grid">' +
@@ -584,12 +622,18 @@
     };
 
     // ---------- start ----------
+    async function loadProgramNames() {
+        // The names of programs, for the bar's prefill when a program is opened by address.
+        if (!canBrowse) return;
+        try {
+            const payload = await ui.fetchJson(api, { action: 'program_filter_options' });
+            (payload.programs || []).forEach(program => state.programs.set(String(program.id), { id: program.id, code: program.code, name: program.name, level: program.level }));
+        } catch (error) { /* the cards still work */ }
+    }
     async function start() {
         readUrl();
-        listStates('loading');
         const programFromUrl = new URLSearchParams(window.location.search).get('program_id');
-        if (canBrowse && state.view === 'program' && programFromUrl) { initCascade(); resolveContext(programFromUrl); }
-        await loadPrograms();
+        if (canBrowse && state.view === 'program' && programFromUrl) { initCascade(); await loadProgramNames(); resolveContext(programFromUrl); }
         showView(state.view, false);
         const open = Number(root.dataset.openSubject);
         if (open > 0) openDetails(open);

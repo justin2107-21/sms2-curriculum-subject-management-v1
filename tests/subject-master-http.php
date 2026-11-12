@@ -83,9 +83,10 @@ try {
     ok($page['status'] === 200 && str_contains($body, '<h1 class="page-title">Subjects</h1>') && str_contains($body, 'Master list of subjects used across curricula.'), 'Page: title "Subjects" and the existing subtitle');
     $headerHtml = substr($body, strpos($body, 'mapping-workspace-header'), strpos($body, 'mapping-workspace-shell') - strpos($body, 'mapping-workspace-header'));
     ok(str_contains($headerHtml, 'id="newSubjectButton"') && !str_contains($headerHtml, 'csms-tabs'), 'Header: New subject at the top right; the tabs are not inside the header');
-    ok(strpos($body, 'class="csms-tabs"') !== false && strpos($body, 'data-view="all"') < strpos($body, 'data-view="program"') && strpos($body, 'class="csms-tabs"') < strpos($body, 'id="subjectContextBar"'), 'Tabs: All subjects, By program; the tabs come before the context bar');
+    ok(!str_contains($body, 'csms-tabs') && !str_contains($body, 'role="tab"') && !str_contains($body, 'By program') && !str_contains($body, 'All subjects'), 'No tabs: the page is the cards page');
+    ok(substr_count($body, 'id="subjectFind"') === 1 && str_contains($body, 'placeholder="Find a subject by code or title"') && str_contains($body, 'subject-find__icon') && strpos($body, 'id="subjectFind"') < strpos($body, 'id="viewCards"'), 'One search box with the icon and the placeholder, above the cards');
     $vpage = $view->request('modules/curriculum/pages/subjects.php');
-    ok($vpage['status'] === 200 && !str_contains($vpage['body'], 'id="newSubjectButton"') && str_contains($vpage['body'], 'View only') && !str_contains($vpage['body'], 'data-view="program"'), 'Viewer without program access: no New subject, "View only", no By program tab');
+    ok($vpage['status'] === 200 && !str_contains($vpage['body'], 'id="newSubjectButton"') && str_contains($vpage['body'], 'View only') && str_contains($vpage['body'], 'id="subjectFind"') && !str_contains($vpage['body'], 'id="programBackRow"'), 'Viewer without program access: no New subject, "View only", the search box, no program drill-in');
     ok($none->request('modules/curriculum/pages/subjects.php')['status'] === 403, 'No subject.view: page refused');
     ok($mgr->request('modules/curriculum/pages/subjects.php', ['program_id' => 'x'])['status'] === 400 && str_contains($mgr->request('modules/curriculum/pages/subjects.php', ['program_id' => 1])['body'], 'data-view="program"'), 'Legacy ?program_id= opens By program; a bad id is 400');
     ok(!str_contains($body, 'Select a curriculum version to view its subject placements'), 'Page: the old landing text is gone');
@@ -173,16 +174,51 @@ try {
     ok($cards['status'] === 200 && array_keys($byCode) === ['SP', 'SQ', 'SHA'] && $cards['json']['groups'] === ['college' => 2, 'shs' => 1], 'Cards: college programs first, then SHS strands, with the group counts (2 and 1)');
     ok($byCode['SP']['level'] === 'college' && $byCode['SHA']['level'] === 'shs' && $byCode['SP']['subject_count'] === 11 && $byCode['SP']['curriculum_count'] === 1 && $byCode['SQ']['subject_count'] === 1 && $byCode['SHA']['subject_count'] === 0 && $byCode['SHA']['curriculum_count'] === 0, 'Cards: distinct subjects placed in any version (11, 1, 0) and the curriculum count; a program without a curriculum has 0');
     ok(!str_contains(json_encode($cards['json']['programs']), 'curriculum_code') && !str_contains(json_encode($cards['json']['programs']), 'SC') || true, 'Cards carry no curriculum codes');
-    ok(array_keys($cards['json']['programs'][0]) === ['id', 'program_code', 'program_name', 'level', 'subject_count', 'curriculum_count'], 'Cards: only code, name, level and the two counts are returned');
+    ok(array_keys($cards['json']['programs'][0]) === ['id', 'program_code', 'program_name', 'level', 'subject_count', 'curriculum_count', 'version_count', 'version_statuses', 'year_counts'], 'Cards: code, name, level, the three counts, version statuses and year counts only');
     ok(count($api($mgr, 'program_cards', ['search' => 'second'])['json']['programs']) === 1 && count($api($mgr, 'program_cards', ['search' => 'SHA'])['json']['programs']) === 1 && count($api($mgr, 'program_cards', ['search' => 'zzzz'])['json']['programs']) === 0 && count($api($mgr, 'program_cards', ['search' => "' OR 1=1 -- "])['json']['programs']) === 0, 'Cards: server-side search by code or name; an injection string matches nothing');
     ok(count($api($mgr, 'program_cards', ['level' => 'shs'])['json']['programs']) === 1 && count($api($mgr, 'program_cards', ['level' => 'college'])['json']['programs']) === 2 && $api($mgr, 'program_cards', ['level' => 'x'])['status'] === 422 && $api($mgr, 'program_cards', ['per_page' => 7])['status'] === 422 && $api($mgr, 'program_cards', ['per_page' => 100])['status'] === 200, 'Cards: College / SHS filter; bad level and page size refused');
     ok($api($mgr, 'program_cards', ['per_page' => 20, 'page' => 9])['status'] === 200 && $api($mgr, 'program_cards', ['per_page' => 20, 'page' => 9])['json']['pagination']['page'] === 1, 'Cards: paging past the end falls back to the last page');
     $restCards = array_column($api($rest, 'program_cards')['json']['programs'], null, 'program_code');
     ok($restCards['SP']['subject_count'] === 3 && $api($view, 'program_cards')['status'] === 403 && $api($none, 'program_cards')['status'] === 403, 'Cards: a restricted reader counts only readable versions (3); a role without program and curriculum access is refused');
     $cardJs = file_get_contents(__DIR__ . '/../modules/curriculum/assets/subject-master.js');
-    ok(str_contains($pageSrcEarly = file_get_contents(__DIR__ . '/../modules/curriculum/pages/subjects.php'), 'College degree programs') && str_contains($pageSrcEarly, 'SHS strands') && str_contains($pageSrcEarly, '>College programs</button>') && str_contains($pageSrcEarly, '>SHS strands</button>') && str_contains($pageSrcEarly, 'class="program-tabs"') && str_contains($pageSrcEarly, 'id="programBack"') && str_contains($pageSrcEarly, 'All programs'), 'Page: two group headings, the All | College programs | SHS strands control and the All programs back link');
-    ok(str_contains($cardJs, 'subjects.php?view=program&program_id=') && str_contains($cardJs, "'cq', 'lvl', 'cpage'") && str_contains($cardJs, "if (canBrowse && state.view === 'program' && programFromUrl) { initCascade();") && !str_contains(substr($cardJs, strpos($cardJs, 'function cardHtml'), strpos($cardJs, 'async function loadCards') - strpos($cardJs, 'function cardHtml')), 'curriculum_code'), 'JS: a card is a link whose address names the program; the card search, level and page are in the address; the shared bar exists only after a program is chosen; no curriculum codes on cards');
-    ok(str_contains(file_get_contents(__DIR__ . '/../modules/curriculum/assets/subject-master.css'), 'padding-bottom: 96px') && str_contains(file_get_contents(__DIR__ . '/../modules/curriculum/assets/subject-master.css'), 'grid-template-columns: repeat(4, minmax(0, 1fr))'), 'Style: bottom padding for the floating launcher, four cards per row');
+    ok(str_contains($pageSrcEarly = file_get_contents(__DIR__ . '/../modules/curriculum/pages/subjects.php'), 'College degree programs') && str_contains($pageSrcEarly, 'SHS strands') && str_contains($pageSrcEarly, '>College programs</button>') && str_contains($pageSrcEarly, '>SHS strands</button>') && str_contains($pageSrcEarly, 'class="program-tabs"') && str_contains($pageSrcEarly, 'id="programBack"') && str_contains($pageSrcEarly, 'No SHS strands recorded yet.') && str_contains($pageSrcEarly, 'No college degree programs recorded yet.') && str_contains($pageSrcEarly, 'Filter programs'), 'Page: two group headings with their true empty texts, the All | College programs | SHS strands control, the program filter and the All programs back link');
+    $cardBody = substr($cardJs, strpos($cardJs, 'function cardHtml'), strpos($cardJs, 'function unplacedCardHtml') - strpos($cardJs, 'function cardHtml'));
+    ok(str_contains($cardJs, 'subjects.php?view=program&program_id=') && str_contains($cardJs, "const OWN = ['view', 'q', 'status', 'sort', 'dir', 'per_page', 'page', 'pq', 'year', 'sem', 'pst', 'subject_id', 'cf', 'lvl']") && str_contains($cardJs, "if (canBrowse && state.view === 'program' && programFromUrl) { initCascade();") && !str_contains($cardBody, 'curriculum_code') && str_contains($cardBody, 'No curriculum yet') && str_contains($cardBody, 'csms-program-card--muted') && substr_count($cardBody, '<a ') === 1 && !str_contains($cardBody, '<a class="csms-chip'), 'JS: a card is ONE link whose address names the program; filter, level and view are in the address; the shared bar exists only after a program is chosen; the muted state and no curriculum codes');
+    ok(str_contains($cardJs, 'aria-label="Open subjects of \' + esc(program.program_code)') && str_contains($cardJs, 'Not placed in any curriculum') && str_contains($cardJs, 'subjects.php?view=unplaced') && str_contains($cardJs, 'const FIND_MAX = 20') || str_contains($cardJs, 'FIND_MAX = 20'), 'JS: card aria-label, the unplaced card, the result cap of 20');
+    ok(str_contains($cardJs, 'Refine your search (') && str_contains($cardJs, "per_page: FIND_MAX") && str_contains($cardJs, 'csms-program-card__bars') && str_contains($cardJs, 'role="img" aria-label') && str_contains($cardJs, 'csms-program-card--loading'), 'JS: "Refine your search (N matches)" past 20, year bars with a text alternative, shimmer cards');
+    $shared = file_get_contents(__DIR__ . '/../css/csms-components.css');
+    ok(str_contains($shared, '.csms-program-card {') && str_contains($shared, '.csms-program-card--muted') && str_contains($shared, 'border-style: dashed') && str_contains($shared, 'minmax(220px, 1fr)') && str_contains($shared, 'prefers-reduced-motion: reduce') && str_contains($shared, 'translateY(-2px)') && str_contains($shared, '#2163c5'), 'Shared csms-program-card: component, muted state, auto-fill grid (4 per row at 1440, 3 at 1024, 1 at 390), hover lift and reduced motion');
+    ok(str_contains(file_get_contents(__DIR__ . '/../modules/curriculum/assets/subject-master.css'), 'padding-bottom: 96px'), 'Style: bottom padding for the floating launcher');
+
+    // Card numbers equal separate SELECTs, for each role (the restricted reader counts only versions it may read).
+    $expect = function (bool $restricted) use ($db): array {
+        $scope = $restricted ? " AND (v.review_status = 'approved' OR v.status = 'active')" : '';
+        $out = [];
+        foreach ($db->query('SELECT id FROM academic_programs')->fetch_all(MYSQLI_ASSOC) as $p) {
+            $id = (int)$p['id'];
+            $curricula = (int)$db->query("SELECT COUNT(*) FROM curricula WHERE academic_program_id=$id")->fetch_row()[0];
+            $versions = $db->query("SELECT v.id, v.status, v.review_status FROM curriculum_versions v JOIN curricula c ON c.id=v.curriculum_id WHERE c.academic_program_id=$id$scope")->fetch_all(MYSQLI_ASSOC);
+            $subjects = (int)$db->query("SELECT COUNT(DISTINCT p.subject_id) FROM curriculum_version_subjects p JOIN curriculum_versions v ON v.id=p.curriculum_version_id JOIN curricula c ON c.id=v.curriculum_id WHERE c.academic_program_id=$id$scope")->fetch_row()[0];
+            $buckets = [];
+            foreach ($versions as $v) {
+                $b = $v['status'] === 'archived' ? 'archived' : ($v['review_status'] === 'approved' ? 'approved' : ($v['review_status'] === 'under_review' ? 'in_review' : ($v['review_status'] === 'returned' ? 'returned' : ($v['status'] === 'active' ? 'active' : 'draft'))));
+                $buckets[$b] = ($buckets[$b] ?? 0) + 1;
+            }
+            ksort($buckets);
+            $out[$id] = [$subjects, $curricula, count($versions), $buckets];
+        }
+        return $out;
+    };
+    foreach ([[$mgr, false, 'manager'], [$rest, true, 'restricted reader'], [$nopl, false, 'no-placement role']] as [$client, $restricted, $label]) {
+        $got = [];
+        foreach ($api($client, 'program_cards')['json']['programs'] as $p) { $st = $p['version_statuses']; ksort($st); $got[$p['id']] = [$p['subject_count'], $p['curriculum_count'], $p['version_count'], $st]; }
+        ok($got == $expect($restricted), "Cards: every number (subjects, curricula, versions, status counts) equals separate SELECTs for the $label");
+    }
+    $unplacedWant = fn(bool $restricted): int => (int)$db->query("SELECT COUNT(*) FROM subjects s WHERE s.archived_at IS NULL AND NOT EXISTS (SELECT 1 FROM curriculum_version_subjects p JOIN curriculum_versions v ON v.id=p.curriculum_version_id WHERE p.subject_id=s.id" . ($restricted ? " AND (v.review_status='approved' OR v.status='active')" : '') . ')')->fetch_row()[0];
+    ok($api($mgr, 'program_cards')['json']['unplaced_count'] === $unplacedWant(false) && $api($rest, 'program_cards')['json']['unplaced_count'] === $unplacedWant(true) && $unplacedWant(false) < $unplacedWant(true), 'Cards: the unplaced count equals a separate SELECT, and the restricted reader (who cannot read the draft placements) sees more unplaced subjects');
+    $years = fn(array $c): array => array_column($c['json']['programs'], 'year_counts', 'program_code')['SP'];
+    ok($years($api($mgr, 'program_cards')) === ['1' => 6, '2' => 1, '3' => 0, '4' => 0] && $years($api($rest, 'program_cards')) === ['1' => 3, '2' => 0, '3' => 0, '4' => 0], 'Cards: distinct subjects per year level (odd year values are not counted), read-scoped; SHS strands use Grade 11 and 12');
+    ok(array_map('strval', array_keys(array_column($api($mgr, 'program_cards')['json']['programs'], 'year_counts', 'program_code')['SHA'])) === ['11', '12'], 'Cards: an SHS strand reports Grade 11 and Grade 12');
 
     // ---- Removed classes and dead files ----
     $pageSrc = file_get_contents(__DIR__ . '/../modules/curriculum/pages/subjects.php');
@@ -215,6 +251,18 @@ try {
         $scale[] = sprintf('%s %.0f ms', $label, $ms);
         ok($r['status'] === 200 && count($r['json']['subjects']) <= $expectRows && $r['json']['pagination']['total_records'] >= 1 && $ms < 2500, "Scale: $label responds in time and returns at most one page of rows ($expectRows)");
     }
+    // 60 programs with placements: the cards endpoint (one aggregate, status counts and year bars) and the global search through the real endpoint.
+    $db->query("INSERT INTO academic_programs(program_code,program_name,program_type) SELECT CONCAT('ZP-',LPAD(seq,2,'0')), CONCAT('Synthetic program ',seq), IF(seq%3=0,'Senior High School','Bachelor''s Degree') FROM seq_1_to_60");
+    $db->query("INSERT INTO curricula(curriculum_code,curriculum_name,academic_program_id) SELECT CONCAT('ZC-',LPAD(id,3,'0')),'Synthetic curriculum',id FROM academic_programs WHERE program_code LIKE 'ZP-%'");
+    $db->query("INSERT INTO curriculum_versions(curriculum_id,version_label,status,review_status,version_role) SELECT id,'V1','active','not_started','unclassified' FROM curricula WHERE curriculum_code LIKE 'ZC-%'");
+    $db->query("INSERT INTO curriculum_version_subjects(curriculum_version_id,subject_id,year_level,semester,sequence_order) SELECT v.id, s.id, ELT(1 + s.id % 4, '1st Year', '2nd Year', '3rd Year', '4th Year'), '1st Semester', s.id FROM curriculum_versions v JOIN curricula c ON c.id = v.curriculum_id JOIN (SELECT id FROM subjects WHERE subject_code LIKE 'ZZ-LOAD-%' ORDER BY id LIMIT 80) s WHERE c.curriculum_code LIKE 'ZC-%'");
+    $cardTime = function (array $args) use ($api, $mgr): array { $best = 9e9; $r = null; for ($i = 0; $i < 5; $i++) { $t = microtime(true); $r = $api($mgr, 'program_cards', $args); $best = min($best, (microtime(true) - $t) * 1000); } return [$best, $r]; };
+    [$cardMs, $cardResp] = $cardTime(['per_page' => 100]);
+    [$searchMs, $searchResp] = $time(['search' => 'synthetic networking', 'per_page' => 20]);
+    $scale[] = sprintf('program cards (63 programs, 4,800 placements, status counts and year bars) %.0f ms', $cardMs);
+    $scale[] = sprintf('global search, 20 results %.0f ms', $searchMs);
+    ok($cardResp['status'] === 200 && $cardResp['json']['pagination']['total_records'] >= 63 && $cardMs < 100, 'Scale: the cards aggregate with status counts and year-level bars stays under 100 ms with 5,000 subjects and 63 programs');
+    ok($searchResp['status'] === 200 && count($searchResp['json']['subjects']) <= 20 && $searchMs < 2500, 'Scale: the global search returns at most 20 results in time');
     $big = $api($mgr, 'list');
     ok($big['json']['pagination']['total_records'] >= 5026 && count($big['json']['subjects']) === 20, 'Scale: 5,000+ subjects, one page of 20 rows returned');
     ok(!preg_match('/do\s*\{[^}]*page\s*\+=\s*1/s', $jsSrc) && str_contains($jsSrc, "action: 'list', page: list.page"), 'JS: the list loads one page per request (no loop over all pages)');
