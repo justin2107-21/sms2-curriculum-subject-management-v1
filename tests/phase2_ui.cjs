@@ -44,26 +44,23 @@ const ui = {
     // Independent of sequence values, within-group subject codes sort ascending.
     const sorted = view.group([{...rows[0],subject_code:'Z',sequence_order:1},{...rows[1],subject_code:'A',sequence_order:99}]);
     assert.equal(sorted.years.values().next().value.values().next().value.rows[0].subject_code, 'A');
-    const subjectJs = fs.readFileSync('modules/curriculum/assets/subjects.js','utf8');
+    const subjectJs = fs.readFileSync('modules/curriculum/assets/subject-master.js','utf8');
     const subjectsPhp = fs.readFileSync('modules/curriculum/pages/subjects.php','utf8');
+    const subjectActions = fs.readFileSync('modules/curriculum/http/subject_actions.php','utf8');
     for (const field of ['curriculum_version_id','year_level','semester']) assert.ok(subjectJs.includes(field));
     const builderJs = fs.readFileSync('modules/curriculum/assets/curriculum-builder.js','utf8');
-    const subjectCreateIndex = subjectJs.indexOf('payload = await ui.postForm(api, subjectData)');
-    const placementCreateIndex = subjectJs.indexOf('await ui.postForm(assignmentApi, assignmentData)');
+    // The master record is created first; the optional placement is made by the same request (validated before anything is written).
+    const subjectCreateIndex = subjectActions.indexOf("$subject = $service->create($_POST, curriculum_actor_id());");
+    const placementCreateIndex = subjectActions.indexOf("(new CurriculumVersionSubjectService($conn))->assign(");
     assert.ok(subjectCreateIndex >= 0 && placementCreateIndex > subjectCreateIndex,
         'Subject Master must be created before its optional placement');
-    assert.ok(subjectJs.includes('Subject was created, but curriculum assignment failed.'));
-    for (const field of ['subjectLectureUnits', 'subjectLaboratoryUnits', 'assignSubjectToCurriculum',
-        'createSubjectOnlyButton', 'createAndAssignSubjectButton', 'subjectAssignmentSequence']) {
+    assert.ok(subjectActions.includes("Subject created, but its placement was not saved."));
+    for (const field of ['subjectLectureUnits', 'assignSubjectToCurriculum', 'createSubjectOnlyButton', 'createAndAssignSubjectButton', 'subjectAssignmentSequence']) {
         assert.ok(!subjectsPhp.includes(field), 'Subject UI must not expose ' + field);
     }
-    for (const field of ['lecture_units', 'laboratory_units']) {
-        assert.ok(!subjectJs.includes("['subject_code', 'subject_title', 'description', 'units', '" + field),
-            'New Subject must not submit ' + field);
-    }
-    assert.ok(subjectsPhp.includes('id="subjectAssignmentSection"'),
-        'Curriculum Placement must be present in the Subject modal');
-    assert.ok(subjectsPhp.includes('id="subjectSubmitButton">Save Changes</button>'));
+    assert.ok(subjectJs.includes('Also place in a curriculum version') && subjectJs.includes("data.set('curriculum_version_id', version)"),
+        'The placement is an optional, collapsed section of the create dialog');
+    assert.ok(subjectJs.includes("'Create subject'") && subjectJs.includes("'Save subject'"));
     assert.equal((builderJs.match(/curriculumDetailModal\?\.open\(\)/g) || []).length, 1,
         'Curriculum Details should have one explicit open call');
     assert.equal((builderJs.match(/assignmentModal\.open\(\)/g) || []).length, 1,

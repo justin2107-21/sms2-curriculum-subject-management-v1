@@ -28,7 +28,7 @@ class SubjectService
 
     public function list(array $input): array
     {
-        $query = DomainValidator::listQuery($input, ['active', 'inactive']);
+        $query = DomainValidator::subjectList($input);
         $query['curriculum_version_id'] = DomainValidator::optionalPositiveId($input['curriculum_version_id'] ?? null, 'Curriculum version');
         $query['academic_program_id'] = DomainValidator::optionalPositiveId($input['academic_program_id'] ?? null, 'Academic program');
         $query['curriculum_id'] = DomainValidator::optionalPositiveId($input['curriculum_id'] ?? null, 'Curriculum');
@@ -38,8 +38,57 @@ class SubjectService
             throw new DomainNotFoundException('Curriculum version not found.');
         }
         $query['_include_placement_context'] = ($input['_include_placement_context'] ?? false) === true;
+        $query['_include_usage'] = ($input['_include_usage'] ?? true) === true;
         $result = $this->subjects->paginate($query);
         return ['subjects' => $result['records'], 'pagination' => $result['pagination']];
+    }
+
+    /** Read-only details: the record, where it is placed (read scope applied) and whether the guard would allow an edit. */
+    public function detail(int $id, bool $withUsage): array
+    {
+        $subject = $this->get($id);
+        $subject['placements'] = [];
+        $subject['editable'] = true;
+        $subject['reason_code'] = null;
+        $subject['reason_text'] = null;
+        if ($subject['archived_at'] !== null) {
+            $subject['editable'] = false;
+            $subject['reason_code'] = 'archived';
+            $subject['reason_text'] = 'This subject is archived. Restore it from Settings > Archives before editing.';
+        } else {
+            $locked = $this->subjects->lockedVersionsFor($id);
+            if ($locked) {
+                $names = array_map(static fn(array $v): string => $v['program_code'] . ' / ' . $v['curriculum_code'] . ' / ' . $v['version_label'], array_slice($locked, 0, 3));
+                $subject['editable'] = false;
+                $subject['reason_code'] = 'protected_version';
+                $subject['reason_text'] = 'Its details are locked because it is placed in a version that cannot be edited: ' . implode('; ', $names) . (count($locked) > 3 ? ' and ' . (count($locked) - 3) . ' more' : '') . '.';
+            }
+        }
+        if ($withUsage) {
+            $subject['placements'] = array_map(static function (array $p): array {
+                return ['placement_id' => (int)$p['placement_id'], 'program_code' => $p['program_code'], 'curriculum_code' => $p['curriculum_code'], 'curriculum_version_id' => (int)$p['curriculum_version_id'],
+                    'version_label' => $p['version_label'], 'version_status' => $p['version_status'], 'review_status' => $p['review_status'], 'year_level' => $p['year_level'], 'semester' => $p['semester'], 'is_required' => (int)$p['is_required'],
+                    'version_editable' => CurriculumVersionEditPolicy::isEditable($p)];
+            }, $this->subjects->placementsFor($id));
+        }
+        return $subject;
+    }
+
+    /** Placements of one version with the filters of the By program tab, plus whole-version totals (units of all placements and of required placements). */
+    public function versionPlacements(array $input): array
+    {
+        $versionId = DomainValidator::positiveId($input['curriculum_version_id'] ?? null, 'Curriculum version');
+        if (!(new CurriculumVersionRepository($this->db))->findById($versionId)) {
+            throw new DomainNotFoundException('Curriculum version not found.');
+        }
+        $filters = [
+            'search' => DomainValidator::optionalString($input, 'search', 'Search', 100),
+            'status' => DomainValidator::optionalString($input, 'status', 'Status', 30),
+        ];
+        if ($filters['status'] !== null && !in_array($filters['status'], ['active', 'inactive'], true)) {
+            throw new DomainValidationException('Invalid technical record status filter.');
+        }
+        return ['placements' => $this->subjects->versionPlacements($versionId, $filters), 'totals' => $this->subjects->versionTotals($versionId)];
     }
 
     public function contexts(array $input): array

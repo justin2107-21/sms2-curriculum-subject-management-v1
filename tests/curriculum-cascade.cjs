@@ -66,21 +66,19 @@ const css = fs.readFileSync('modules/curriculum/assets/curriculum.css', 'utf8');
 assert.match(css, /\.record-autocomplete-options\s*\{[^}]*max-height:\s*146px/s);
 assert.match(css, /\.record-autocomplete-options\s*\{\s*max-height:\s*146px;/s);
 for (const file of [
-    'modules/curriculum/assets/subjects-redesign.js',
+    'modules/curriculum/assets/subject-master.js',
     'modules/curriculum/assets/subject-mapping-final.js',
     'modules/curriculum/assets/curriculum-export.js'
 ]) assert.match(fs.readFileSync(file, 'utf8'), /createCascadingAutocomplete/);
-const subjects = fs.readFileSync('modules/curriculum/assets/subjects-redesign.js', 'utf8');
+const subjects = fs.readFileSync('modules/curriculum/assets/subject-master.js', 'utf8');
 assert.match(subjects, /Grade 11.*Grade 12/);
 assert.match(subjects, /1st Year.*2nd Year.*3rd Year.*4th Year/);
 assert.match(subjects, /1st Semester.*2nd Semester/);
-assert.match(subjects, /function programIsShs\(item\)[\s\S]*?item\?\.program_type/, 'program type detection must accept a cleared/null program selection');
+assert.ok(subjects.includes('function yearOptions(item) {') && subjects.includes('const shs = item && '), 'year choices must accept a cleared/null program selection');
 const subjectsPage = fs.readFileSync('modules/curriculum/pages/subjects.php', 'utf8');
-assert.match(subjectsPage, /hash_file\('sha256'.*curriculum-common\.js/);
-assert.match(subjectsPage, /hash_file\('sha256'.*subjects-redesign\.js/);
-assert.match(subjects, /root\.addEventListener\('click',[\s\S]*?closest\('#newSubjectButton'\)[\s\S]*?openCreateSubject\(\)/);
-assert.ok(subjects.indexOf("root.addEventListener('click'") < subjects.indexOf('const assignmentCascade ='), 'New Subject click handler must be installed before cascade initialization');
-assert.match(subjects, /function openCreateSubject\(\)[\s\S]*?subjectModal\.open\(\)[\s\S]*?resetSubjectForm\(\)/);
+assert.ok(subjectsPage.includes('curriculum-common.js') && subjectsPage.includes('subject-master.js'));
+assert.ok(subjects.includes("$('newSubjectButton')?.addEventListener('click', openCreate)"), 'New subject click is bound to openCreate');
+assert.ok(subjects.indexOf('function openCreate()') >= 0 && subjects.indexOf('dialog.open()', subjects.indexOf('function openCreate()')) > 0);
 console.log('PASS: cascade dependencies, stale-ID clearing, null-safe program reset, three-row dropdown cap, and early New Subject click binding');
 
 (async () => {

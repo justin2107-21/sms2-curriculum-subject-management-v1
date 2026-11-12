@@ -1,0 +1,60 @@
+/* Subjects (Subject Master): header, tabs, filter row, table, chips, menu, empty states and the dialog shell come from the shared csms-*
+   components and the curriculum dialog classes; only what has no shared class is here (same approach as Equivalency and Compliance). */
+.subject-master-content { min-width: 0; }
+.subject-master-content [hidden], #subjectDialog [hidden] { display: none !important; }
+
+/* Filter row: one line from 1280px up, 12px to the table (as Equivalency); wraps with the same spacing below that. */
+.subject-master-content .csms-filter-row { gap: 8px; }
+.subject-master-content .csms-filter-row .csms-search { flex: 1 1 10rem; min-width: 7rem; max-width: 18rem; }
+.subject-master-content .csms-filter-row .csms-select { width: auto; flex: 0 0 auto; min-width: 0; padding: 0 30px 0 10px; text-overflow: ellipsis; }
+.subject-master-content .csms-filter-row .csms-filter-row__summary { margin-left: auto; }
+.subject-master-content [data-panel] .csms-filter-row ~ :is(.csms-page-table, .csms-empty, #programBody > .csms-page-table) { margin-top: 12px; }
+.subject-master-content .subject-chips { margin-top: 8px; }
+@media (min-width: 1280px) { .subject-master-content .csms-filter-row { flex-wrap: nowrap; } .subject-master-content .subject-chips { flex-wrap: wrap; } }
+.subject-master-content .csms-tabs + .mapping-context-bar { margin-top: 16px; }
+.subject-master-content .mapping-workspace-header { flex-wrap: nowrap; }
+.subject-master-content .mapping-workspace-header > :not(:first-child) { white-space: nowrap; }
+#subjectStatus { width: 8rem; }
+#subjectPlaced { width: 10.5rem; }
+#subjectPerPage { width: 6rem; }
+
+/* Shared searchable program picker inside the filter row. */
+.subject-program-select + .csms-picker { display: inline-block; flex: 0 0 auto; }
+.subject-master-content .csms-picker__trigger { width: 14rem; height: 40px; border-radius: 8px; font-size: 14px; }
+.subject-master-content .csms-picker__panel { left: 0; right: auto; }
+
+.subject-chip { gap: 6px; border: 0; cursor: pointer; font-family: inherit; }
+.subject-chip:hover { filter: brightness(.95); }
+.subject-chip:focus-visible, .subject-sort:focus-visible { outline: 3px solid var(--csms-focus, #2563eb); outline-offset: 1px; }
+
+/* Sortable headers: a plain button that inherits the header text style; the sort state is an arrow icon only. */
+.subject-sort { padding: 0; margin: 0; border: 0; background: none; font: inherit; color: inherit; text-align: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.subject-sort__icon { font-size: 11px; color: var(--csms-text, #1f2937); }
+.csms-ctable .csms-sub { display: block; font-size: 12px; color: #667085; margin-top: 2px; }
+.csms-row-click { cursor: pointer; }
+.csms-ctable__num .csms-sub { white-space: nowrap; }
+#programSummary { margin: 0 0 12px; }
+.subject-title-cell { max-width: 32rem; overflow-wrap: anywhere; }
+
+/* Dialog. */
+.subject-dialog { max-width: 640px; width: 100%; }
+.subject-dialog.subject-dialog--wide { max-width: 760px; }
+.subject-form-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px 14px; }
+.subject-form-grid .form-field { grid-column: span 3; margin: 0; }
+.subject-form-grid .form-field.is-third { grid-column: span 2; }
+.subject-form-grid .form-field.is-full { grid-column: 1 / -1; }
+.subject-form-grid .form-field > span, .subject-form-grid .form-field > label > span { display: block; margin-bottom: 4px; font-size: 13px; font-weight: 600; color: var(--csms-text-secondary, #374151); }
+.subject-form-grid input, .subject-form-grid select, .subject-form-grid textarea { width: 100%; box-sizing: border-box; }
+.subject-form-grid textarea { min-height: 52px; resize: vertical; }
+.subject-detail { margin: 0 0 8px; }
+.subject-section-toggle { display: flex; align-items: center; gap: 8px; margin: 10px 0 0; padding: 6px 0; border: 0; background: none; font: inherit; font-weight: 600; color: var(--csms-navy, #1a3a8c); cursor: pointer; }
+.subject-section-toggle:focus-visible { outline: 3px solid var(--csms-focus, #2563eb); outline-offset: 2px; border-radius: 4px; }
+.subject-placement-fields { margin-top: 6px; }
+.subject-placement-bar { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 14px; margin-bottom: 10px; }
+.subject-placement-bar .form-field { margin: 0; min-width: 0; }
+.subject-placement-bar .form-field > label > span { display: block; margin-bottom: 4px; font-size: 13px; font-weight: 600; color: var(--csms-text-secondary, #374151); }
+.subject-placement-bar .record-autocomplete { display: block; position: relative; }
+.subject-lock { margin: 0 0 10px; font-size: 13px; color: #475467; }
+.subject-lock i { color: #2163c5; margin-right: 6px; }
+.subject-section-title { margin: 14px 0 6px; font-size: 14px; }
+@media (max-width: 720px) { .subject-form-grid { grid-template-columns: 1fr; } .subject-form-grid .form-field, .subject-form-grid .form-field.is-third { grid-column: 1 / -1; } }

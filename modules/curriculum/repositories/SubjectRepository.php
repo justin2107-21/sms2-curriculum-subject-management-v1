@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/RepositoryQuery.php';
+require_once __DIR__ . '/../services/CurriculumVersionEditPolicy.php';
 
 class SubjectRepository
 {
@@ -52,6 +53,12 @@ class SubjectRepository
             $params[] = $query['status'];
         }
 
+        // Placements a reader may see: restricted roles never count draft or unapproved versions.
+        $scopeSql = CurriculumReadScope::sql('sv');
+        $usageFrom = 'FROM curriculum_version_subjects sp JOIN curriculum_versions sv ON sv.id = sp.curriculum_version_id WHERE sp.subject_id = subjects.id' . ($scopeSql !== '' ? ' AND ' . $scopeSql : '');
+        if (($query['placed'] ?? null) === 'placed') $conditions[] = "EXISTS (SELECT 1 $usageFrom)";
+        if (($query['placed'] ?? null) === 'unplaced') $conditions[] = "NOT EXISTS (SELECT 1 $usageFrom)";
+
         $placementConditions = ['p.subject_id = subjects.id'];
         if (($query['_exclude_placement_version'] ?? null) !== null) {
             $conditions[] = 'NOT EXISTS (SELECT 1 FROM curriculum_version_subjects placed WHERE placed.subject_id = subjects.id AND placed.curriculum_version_id = ?)';
@@ -93,15 +100,24 @@ class SubjectRepository
         $pagination = RepositoryQuery::pagination($total, $query['page'], $query['per_page']);
         $rankParams = [];
         $searchOrder = RepositoryQuery::searchOrder(['subject_code', 'subject_title'], $query['search'] ?? null, $rankParams);
+        $sortColumns = ['code' => 'subject_code', 'title' => 'subject_title', 'units' => 'units', 'status' => 'status', 'usage' => 'usage_count'];
+        if (($query['sort'] ?? null) !== null) {
+            // Mapped column names only; the direction was validated to asc or desc.
+            $orderBy = $sortColumns[$query['sort']] . ' ' . (($query['direction'] ?? 'asc') === 'desc' ? 'DESC' : 'ASC') . ', subject_code ASC, id ASC';
+            $rankParams = [];
+        } else {
+            $orderBy = $searchOrder . 'subject_code ASC, id ASC';
+        }
         $listParams = array_merge($params, $rankParams);
         $listParams[] = $pagination['per_page'];
         $listParams[] = $pagination['offset'];
         $stmt = RepositoryQuery::execute(
             $this->db,
             'SELECT id, subject_code, subject_title, description, units, lecture_units,
-                    laboratory_units, status, created_at, updated_at
+                    laboratory_units, status, created_at, updated_at,
+                    ' . (($query['_include_usage'] ?? true) ? "(SELECT COUNT(*) $usageFrom)" : 'NULL') . ' AS usage_count
              FROM subjects' . $where . '
-             ORDER BY ' . $searchOrder . 'subject_code ASC, id ASC LIMIT ? OFFSET ?',
+             ORDER BY ' . $orderBy . ' LIMIT ? OFFSET ?',
             $types . str_repeat('s', count($rankParams)) . 'ii',
             $listParams
         );
@@ -161,6 +177,62 @@ class SubjectRepository
         unset($pagination['offset']);
 
         return ['records' => $rows, 'pagination' => $pagination];
+    }
+
+    /** Where a subject is placed, with the version's lifecycle state (read scope applied). */
+    public function placementsFor(int $subjectId): array
+    {
+        $scope = CurriculumReadScope::sql('v');
+        return $this->rows('SELECT p.id AS placement_id, p.year_level, p.semester, p.is_required, v.id AS curriculum_version_id, v.version_label, v.status AS version_status,
+                    v.review_status, v.version_role, v.baseline_version_id, c.id AS curriculum_id, c.curriculum_code, ap.id AS academic_program_id, ap.program_code
+                FROM curriculum_version_subjects p JOIN curriculum_versions v ON v.id = p.curriculum_version_id JOIN curricula c ON c.id = v.curriculum_id
+                JOIN academic_programs ap ON ap.id = c.academic_program_id WHERE p.subject_id = ?' . ($scope !== '' ? ' AND ' . $scope : '') . '
+                ORDER BY ap.program_code, c.curriculum_code, v.version_label, p.id', 'i', [$subjectId]);
+    }
+
+    /** Placements of a subject in versions that cannot be edited (all of them, regardless of the reader's scope). */
+    public function lockedVersionsFor(int $subjectId): array
+    {
+        return array_values(array_filter($this->rows('SELECT DISTINCT v.id, v.status, v.review_status, v.version_role, v.baseline_version_id, v.version_label, c.curriculum_code, ap.program_code
+                FROM curriculum_version_subjects p JOIN curriculum_versions v ON v.id = p.curriculum_version_id JOIN curricula c ON c.id = v.curriculum_id
+                JOIN academic_programs ap ON ap.id = c.academic_program_id WHERE p.subject_id = ?', 'i', [$subjectId]), static fn(array $v): bool => !CurriculumVersionEditPolicy::isEditable($v)));
+    }
+
+    /** All placements of one version, filtered, for the By program tab (a version holds tens to a few hundred placements). */
+    public function versionPlacements(int $versionId, array $filters): array
+    {
+        $conditions = ['p.curriculum_version_id = ?'];
+        $types = 'i';
+        $params = [$versionId];
+        if ($filters['search'] !== null) {
+            $conditions[] = '(' . RepositoryQuery::searchColumn('s.subject_code') . " LIKE ? ESCAPE '=' OR " . RepositoryQuery::searchColumn('s.subject_title') . " LIKE ? ESCAPE '=')";
+            $pattern = RepositoryQuery::likePattern($filters['search']);
+            $types .= 'ss';
+            array_push($params, $pattern, $pattern);
+        }
+        if ($filters['status'] !== null) {
+            $conditions[] = 's.status = ?';
+            $types .= 's';
+            $params[] = $filters['status'];
+        }
+        return $this->rows('SELECT p.id AS placement_id, p.year_level, p.semester, p.sequence_order, p.is_required, s.id, s.subject_code, s.subject_title, s.units, s.status
+                FROM curriculum_version_subjects p JOIN subjects s ON s.id = p.subject_id WHERE ' . implode(' AND ', $conditions) . '
+                ORDER BY p.year_level IS NULL, p.year_level, p.semester IS NULL, p.semester, p.sequence_order IS NULL, p.sequence_order, s.subject_code, p.id LIMIT 1000', $types, $params);
+    }
+
+    public function versionTotals(int $versionId): array
+    {
+        $row = $this->rows('SELECT COUNT(*) AS placements, COUNT(DISTINCT p.subject_id) AS subjects, COALESCE(SUM(s.units), 0) AS units, COALESCE(SUM(CASE WHEN p.is_required = 1 THEN s.units ELSE 0 END), 0) AS required_units
+                FROM curriculum_version_subjects p JOIN subjects s ON s.id = p.subject_id WHERE p.curriculum_version_id = ?', 'i', [$versionId])[0];
+        return ['placements' => (int)$row['placements'], 'subjects' => (int)$row['subjects'], 'units' => (string)$row['units'], 'required_units' => (string)$row['required_units']];
+    }
+
+    private function rows(string $sql, string $types = '', array $params = []): array
+    {
+        $stmt = RepositoryQuery::execute($this->db, $sql, $types, $params);
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return $rows;
     }
 
     public function placementVersions(array $query, array $filters = []): array

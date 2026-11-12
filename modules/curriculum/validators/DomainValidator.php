@@ -177,6 +177,33 @@ class DomainValidator
         ];
     }
 
+    /** Subject Master list: sort whitelist, page sizes 10/20/50/100, placed filter. Nothing here reaches SQL except mapped column names. */
+    public static function subjectList(array $input): array
+    {
+        $perPage = filter_var($input['per_page'] ?? 20, FILTER_VALIDATE_INT);
+        if ($perPage === false || !in_array((int)$perPage, [10, 20, 50, 100], true)) {
+            throw new DomainValidationException('Per page must be 10, 20, 50 or 100.');
+        }
+        $query = self::listQuery(array_merge($input, ['per_page' => 20]), ['active', 'inactive']);
+        $query['per_page'] = (int)$perPage;
+        $sort = self::optionalString($input, 'sort', 'Sort', 20);
+        if ($sort !== null && !in_array($sort, ['code', 'title', 'units', 'status', 'usage'], true)) {
+            throw new DomainValidationException('Invalid sort column.');
+        }
+        $direction = strtolower((string)(self::optionalString($input, 'direction', 'Direction', 4) ?? 'asc'));
+        if (!in_array($direction, ['asc', 'desc'], true)) {
+            throw new DomainValidationException('Invalid sort direction.');
+        }
+        $placed = self::optionalString($input, 'placed', 'Placement filter', 10);
+        if ($placed !== null && !in_array($placed, ['placed', 'unplaced'], true)) {
+            throw new DomainValidationException('Invalid placement filter.');
+        }
+        $query['sort'] = $sort;
+        $query['direction'] = $direction;
+        $query['placed'] = $placed;
+        return $query;
+    }
+
     public static function curriculum(array $input): array
     {
         return [
