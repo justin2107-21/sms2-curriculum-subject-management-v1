@@ -41,7 +41,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <div class="main">
   <?php require __DIR__ . '/../../../shared/topbar.php'; ?>
   <main class="content curriculum-content mapping-content export-content" id="curriculumExportWorkspace"
-        data-export-api="../http/export_actions.php" data-print-page="curriculum_print.php">
+        data-export-api="../http/export_actions.php">
     <div class="page-title-bar curriculum-title-bar">
       <div><h1 class="page-title">Curriculum Export</h1><p class="page-subtitle">Download the stored curriculum as CSV or PDF, or print it. Generated from stored curriculum data.</p></div>
     </div>
@@ -66,20 +66,23 @@ require __DIR__ . '/../../../shared/sidebar.php';
     <section class="mapping-workspace-panel csms-panel" aria-label="Curriculum export">
       <div class="csms-empty" id="exportEmpty" role="status"><i class="fa-solid fa-bullseye" aria-hidden="true"></i><strong>No curriculum version selected</strong><span>Use the context bar above to pick a curriculum version.</span></div>
       <div id="exportPanel" hidden>
-        <div class="export-preview-heading"><div><h2 id="exportPreviewTitle">Curriculum Structure</h2><p id="exportPreviewSummary" class="export-preview-summary" role="status"></p></div></div>
-        <div class="csms-filter-row">
+        <div class="csms-card export-summary-card"><h2 id="exportPreviewTitle">Curriculum Structure</h2><p id="exportPreviewSummary" class="export-preview-summary" role="status"></p></div>
+        <div class="csms-filter-row export-toolbar">
           <select class="csms-select" id="exportYear" aria-label="Year level" disabled><option value="">All year levels</option></select>
           <select class="csms-select" id="exportSemester" aria-label="Semester or term" disabled><option value="">All semesters / terms</option></select>
           <button type="button" class="primary-action-button" id="downloadCurriculumCsv" disabled><i class="fa-solid fa-file-csv" aria-hidden="true"></i> Download CSV</button>
           <button type="button" class="primary-action-button" id="downloadCurriculumPdf" disabled><i class="fa-solid fa-file-pdf" aria-hidden="true"></i> Download PDF</button>
           <button type="button" class="button-muted" id="printCurriculumExport" disabled><i class="fa-solid fa-print" aria-hidden="true"></i> Print</button>
         </div>
-        <p class="export-protect-row"><label><input type="checkbox" id="exportProtect"/> Protect with password</label> <span class="csms-info"><button type="button" class="csms-info__btn" aria-label="About password protection" aria-describedby="exportProtectInfoTip"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button><span class="csms-info__tip" role="tooltip" id="exportProtectInfoTip">Applies to Download CSV and Download PDF: you get a ZIP encrypted with AES-256 that contains the file. Open it with 7-Zip, WinRAR or WinZip. As far as we know, Windows File Explorer cannot open AES-encrypted ZIPs, so 7-Zip is the safe choice. The password is used once and is not stored: if it is lost the file cannot be opened and the export must be generated again. Use at least <?= (int)CurriculumExportService::MIN_EXPORT_PASSWORD ?> characters. Print is not affected.</span></span></p>
-        <div id="exportProtectFields" hidden>
-          <label class="form-field" for="exportPassword"><span>Password</span><input type="password" id="exportPassword" autocomplete="new-password" minlength="<?= (int)CurriculumExportService::MIN_EXPORT_PASSWORD ?>" maxlength="<?= (int)CurriculumExportService::MAX_EXPORT_PASSWORD ?>"/></label>
-          <label class="form-field" for="exportPasswordConfirm"><span>Confirm password</span><input type="password" id="exportPasswordConfirm" autocomplete="new-password" maxlength="<?= (int)CurriculumExportService::MAX_EXPORT_PASSWORD ?>"/></label>
-          <p class="mapping-context-message" id="exportPasswordError" role="alert" hidden></p>
+        <div class="export-protect">
+          <p class="export-protect-row"><label><input type="checkbox" id="exportProtect"/> Protect with password</label> <span class="csms-info"><button type="button" class="csms-info__btn" aria-label="About password protection" aria-describedby="exportProtectInfoTip"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button><span class="csms-info__tip" role="tooltip" id="exportProtectInfoTip">Applies to Download CSV and Download PDF: you get a ZIP encrypted with AES-256 that contains the file. Open it with 7-Zip, WinRAR or WinZip. As far as we know, Windows File Explorer cannot open AES-encrypted ZIPs, so 7-Zip is the safe choice. The password is used once and is not stored: if it is lost the file cannot be opened and the export must be generated again. Use at least <?= (int)CurriculumExportService::MIN_EXPORT_PASSWORD ?> characters. Print is not affected.</span></span></p>
+          <div class="export-protect-fields" id="exportProtectFields" hidden>
+            <label class="form-field" for="exportPassword"><span>Password</span><span class="export-pw"><input type="password" id="exportPassword" name="csms_export_secret" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other" aria-describedby="exportPasswordHint"/><button type="button" class="export-pw__toggle" data-pw-toggle="exportPassword" aria-label="Show password" aria-pressed="false"><i class="fa-solid fa-eye" aria-hidden="true"></i></button></span></label>
+            <label class="form-field" for="exportPasswordConfirm"><span>Confirm password</span><span class="export-pw"><input type="password" id="exportPasswordConfirm" name="csms_export_secret_confirm" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other"/><button type="button" class="export-pw__toggle" data-pw-toggle="exportPasswordConfirm" aria-label="Show confirmation" aria-pressed="false"><i class="fa-solid fa-eye" aria-hidden="true"></i></button></span></label>
+            <small class="export-pw-hint" id="exportPasswordHint"><?= (int)CurriculumExportService::MIN_EXPORT_PASSWORD ?>-<?= (int)CurriculumExportService::MAX_EXPORT_PASSWORD ?> characters</small>
+          </div>
         </div>
+        <p class="export-error" id="exportPasswordError" role="alert" hidden></p>
         <p class="export-action-status" id="exportActionStatus" role="status" aria-live="polite"></p>
         <div id="curriculumExportPreview" class="export-report-host"></div>
       </div>

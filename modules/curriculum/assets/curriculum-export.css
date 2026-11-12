@@ -6,6 +6,25 @@
 
 .export-content { padding-bottom: 36px; }
 
+/* Layout groups: summary card, then the toolbar (shared csms-filter-row spacing), then the compact protect line, then the preview. */
+.export-summary-card { gap: 4px; margin-bottom: var(--csms-space-4, 16px); }
+.export-summary-card h2 { color: var(--csms-text, #1f2937); font-size: 18px; margin: 0; }
+.export-preview-summary { color: var(--export-muted); font-size: 14px; margin: 0; }
+.export-toolbar { margin-bottom: var(--csms-space-3, 12px); }
+.export-protect { margin-bottom: var(--csms-space-3, 12px); }
+.export-protect-row { align-items: center; display: flex; gap: var(--csms-space-2, 8px); margin: 0; }
+.export-protect-row label { align-items: center; cursor: pointer; display: inline-flex; gap: var(--csms-space-2, 8px); }
+.export-protect-fields { align-items: start; display: grid; gap: var(--csms-space-2, 8px) var(--csms-space-3, 12px); grid-template-columns: repeat(2, minmax(0, 18rem)); margin-top: var(--csms-space-2, 8px); }
+.export-protect-fields .form-field { margin: 0; }
+.export-pw { display: block; position: relative; }
+.export-pw input { box-sizing: border-box; padding-right: 40px; width: 100%; }
+.export-pw__toggle { background: none; border: 0; border-radius: var(--csms-radius-sm, 6px); color: var(--csms-text-secondary, #374151); cursor: pointer; height: 32px; position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 32px; }
+.export-pw__toggle:focus-visible { outline: 3px solid var(--csms-focus, #2563eb); outline-offset: 1px; }
+.export-pw-hint { color: var(--export-muted); grid-column: 1 / -1; }
+.export-error { background: #fdecec; border: 1px solid #f3b8b8; border-radius: var(--csms-radius-md, 8px); color: #8a1c1c; font-size: 14px; margin: 0 0 var(--csms-space-3, 12px); padding: 8px 12px; }
+.export-error[hidden] { display: none; }
+@media (max-width: 600px) { .export-protect-fields { grid-template-columns: 1fr; } }
+
 .export-action-status { color: #66748a; font-size: var(--csms-text-xs, .75rem); }
 
 .export-preview-shell {
@@ -14,18 +33,6 @@
   border-radius: 12px;
   overflow: hidden;
 }
-
-.export-preview-heading {
-  align-items: center;
-  background: #fff;
-  border-bottom: 1px solid #dce4ee;
-  display: flex;
-  justify-content: space-between;
-  padding: 15px 18px;
-}
-
-.export-preview-heading h2 { color: #0f2f69; font-size: 1.02rem; }
-.export-report-host { padding: 24px; }
 
 .export-empty-state {
   align-items: center;
@@ -42,13 +49,16 @@
 .export-empty-state h3 { color: #445269; font-size: .94rem; margin-bottom: 6px; }
 .export-empty-state p { font-size: .76rem; line-height: 1.55; max-width: 430px; }
 
+.export-report-host { background: #e9eef5; border: 1px solid #d7e0eb; border-radius: var(--csms-radius-surface, 12px); overflow: hidden; padding: 12px; }
+
 .export-report {
   background: #fff;
-  box-shadow: 0 4px 18px rgba(31, 45, 69, .11);
+  border-radius: var(--csms-radius-md, 8px);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, .08);
   color: var(--export-ink);
   margin: 0 auto;
-  max-width: 1120px;
-  padding: 36px 40px;
+  max-width: none;
+  padding: 18px 20px;
 }
 
 .export-report-header { border-bottom: 3px solid var(--sms2-sidebar-blue); margin-bottom: 20px; padding-bottom: 15px; }
@@ -84,9 +94,9 @@
 }
 .export-table-scroll::-webkit-scrollbar { display: none; height: 0; width: 0; }
 
-.export-report-table { border-collapse: collapse; min-width: 760px; width: 100%; }
+.export-report-table { border-collapse: collapse; min-width: 0; width: 100%; }
 .export-report-table th,
-.export-report-table td { border: 1px solid #dfe5ed; font-size: var(--csms-text-xs, .75rem); padding: 7px 8px; text-align: left; vertical-align: top; }
+.export-report-table td { border: 1px solid #dfe5ed; font-size: var(--csms-text-xs, .75rem); padding: 4px 8px; text-align: left; vertical-align: top; }
 .export-report-table th { background: #f1f5f9; color: #4c5b70; font-size: var(--csms-text-xs, .75rem); letter-spacing: .035em; text-transform: uppercase; }
 .export-report-table td { color: #2f3d52; }
 .export-report-table .number-cell { text-align: right; white-space: nowrap; }
@@ -118,20 +128,16 @@
 
 /* Compact curriculum document shared by the live preview and print endpoint. */
 .export-context-picker { margin: 14px 0 14px; overflow: visible; position: relative; z-index: 4; }
-.export-preview-heading { align-items:flex-start; }
-.export-preview-heading .eyebrow { color:var(--sms2-sidebar-blue); font-weight:800; letter-spacing:.07em; text-transform:uppercase; }
-.export-preview-heading h2 { color:var(--export-ink); font-size:1.05rem; margin:4px 0; }
-.export-preview-summary { color:var(--export-muted); font-size:.75rem; }
-.export-document-header { border:0; border-bottom:1px solid var(--export-line); margin:0 0 20px; padding:4px 0 18px; text-align:center; }
+.export-document-header { border:0; border-bottom:1px solid var(--export-line); margin:0 0 12px; padding:0 0 10px; text-align:center; }
 .export-document-header > p { color:#1c5cae; font-size:.76rem; font-weight:800; letter-spacing:.06em; margin:0 0 10px; text-transform:uppercase; }
 .export-document-header h1 { color:var(--export-ink); font-size:1.35rem; font-weight:500; margin:0 0 8px; }
 .export-document-header > div { color:var(--export-muted); font-size:.76rem; }
 .export-document-header h2 { color:#263449; font-size:.95rem; margin:12px 0 0; }
 .export-document-header h3 { color:#263449; font-size:.95rem; margin:8px 0 0; }
 .export-document-header .export-print-summary { color:var(--export-muted); font-size:var(--csms-text-xs, .75rem); font-weight:400; letter-spacing:0; margin:8px 0 0; text-transform:none; }
-.export-year { margin:20px 0 0; }
+.export-year { margin:12px 0 0; }
 .export-year > h2, .export-year > h3 { border-bottom:1px solid var(--export-line); color:var(--export-ink); font-size:.98rem; padding-bottom:7px; }
-.export-semester { margin:13px 0 0; }
+.export-semester { margin:8px 0 0; }
 .export-semester > h3, .export-semester > h4 { color:#334155; font-size:.8rem; margin:0 0 7px; }
 .export-subtotal { color:#536176; font-size:var(--csms-text-xs, .75rem); margin:6px 0 0; text-align:right; }
 .export-year-total { color:#334155; font-size:var(--csms-text-xs, .75rem); margin:8px 0 0; text-align:right; }
@@ -146,15 +152,15 @@
 .export-report-table tfoot th { background:#f8fafc; border:1px solid #dfe5ed; color:#34445b; font-size:var(--csms-text-xs, .75rem); padding:7px 8px; text-align:left; }
 
 @media (max-width: 900px) {
-  .export-report-host { padding: 16px; }
-  .export-report { padding: 28px 24px; }
+  .export-report-host { padding: 8px; }
+  .export-report { padding: 14px 12px; }
 }
 
 @media (max-width: 680px) {
   .export-context-summary,
   .export-unit-summary { grid-template-columns: 1fr; }
-  .export-report-host { padding: 10px; }
-  .export-report { padding: 22px 15px; }
+  .export-report-host { padding: 6px; }
+  .export-report { padding: 12px 10px; }
   .export-report-title { font-size: 1.15rem; }
   .export-screen-toolbar { padding: 10px 12px; }
 }
@@ -162,6 +168,12 @@
 @media print {
   @page { margin: 13mm 11mm; size: auto; }
   html, body { background: #fff !important; }
+  /* Printing from the Export page: only the preview document (current year / semester selection) is printed. */
+  .sidebar, .csms-sidebar, .topbar, .sidebar-overlay, #csmsCimfLauncher, #csmsCimfPanel, .page-title-bar, .export-context-picker, #exportEmpty,
+  .export-summary-card, .export-toolbar, .export-protect, .export-error, .export-action-status { display: none !important; }
+  .main { margin: 0 !important; padding: 0 !important; width: auto !important; }
+  .export-content, .export-content .mapping-workspace-shell, .export-content .mapping-workspace-panel { background: none !important; border: 0 !important; box-shadow: none !important; margin: 0 !important; padding: 0 !important; }
+  .export-report-host { background: none; border: 0; border-radius: 0; overflow: visible; padding: 0; }
   .export-screen-toolbar { display: none !important; }
   .export-print-body { padding: 0; }
   .export-print-body > .export-report,

@@ -6,7 +6,6 @@
     if (!workspace || !ui) return;
 
     const endpoint = workspace.dataset.exportApi;
-    const printPage = workspace.dataset.printPage;
     const ids = ['exportProgram', 'exportCurriculum', 'exportVersion'];
     const inputIds = ['exportProgramSearch', 'exportCurriculumSearch', 'exportVersionSearch'];
     const listIds = ['exportProgramOptions', 'exportCurriculumOptions', 'exportVersionOptions'];
@@ -128,7 +127,7 @@
         const currentRequest = ++requestId;
         setActionsEnabled(false);
         clearPreview('Loading curriculum…');
-        status.textContent = '';
+        setStatus('');
         try {
             const payload = await ui.fetchJson(endpoint, Object.assign({ action: 'preview' }, params()));
             if (currentRequest !== requestId) return;
@@ -154,23 +153,45 @@
     const protectBox = document.getElementById('exportProtect'), protectFields = document.getElementById('exportProtectFields');
     const passwordInput = document.getElementById('exportPassword'), confirmInput = document.getElementById('exportPasswordConfirm');
     const passwordError = document.getElementById('exportPasswordError');
-    const MIN_PASSWORD = Number(passwordInput.getAttribute('minlength')) || 10;
+    const MIN_PASSWORD = 10, MAX_PASSWORD = 128;
     function passwordProblem() {
         const pw = passwordInput.value, again = confirmInput.value;
         if (!pw) return 'Enter a password to protect the export.';
         if (!pw.trim()) return 'The password cannot be only spaces.';
         if (pw.length < MIN_PASSWORD) return 'The password must be at least ' + MIN_PASSWORD + ' characters.';
+        if (pw.length > MAX_PASSWORD) return 'The password must be at most ' + MAX_PASSWORD + ' characters.';
         if (!again) return 'Confirm the password.';
         if (pw !== again) return 'The password and its confirmation do not match.';
         return '';
     }
+    // Inline, visible message next to the buttons. Every refusal goes through here: a click is never a silent no-op.
     function showPasswordError(message) { passwordError.textContent = message; passwordError.hidden = !message; }
-    function clearPasswords() { passwordInput.value = ''; confirmInput.value = ''; }
+    function clearPasswords() {
+        passwordInput.value = ''; confirmInput.value = '';
+        document.querySelectorAll('[data-pw-toggle]').forEach(button => setReveal(button, false));
+    }
+    function setReveal(button, show) {
+        const input = document.getElementById(button.dataset.pwToggle);
+        if (input) input.type = show ? 'text' : 'password';
+        button.setAttribute('aria-pressed', show ? 'true' : 'false');
+        const icon = button.querySelector('i');
+        if (icon) icon.className = show ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
+    }
+    document.querySelectorAll('[data-pw-toggle]').forEach(button => button.addEventListener('click', () => setReveal(button, button.getAttribute('aria-pressed') !== 'true')));
     protectBox.addEventListener('change', () => {
         protectFields.hidden = !protectBox.checked;
         showPasswordError('');
         if (!protectBox.checked) clearPasswords(); else passwordInput.focus();
     });
+    [passwordInput, confirmInput].forEach(input => input.addEventListener('input', () => showPasswordError('')));
+
+    // Status line: resets on the next action and fades by itself, so "PDF downloaded." never goes stale.
+    let statusTimer = null;
+    function setStatus(text, fadeMs) {
+        clearTimeout(statusTimer);
+        status.textContent = text;
+        if (text && fadeMs) statusTimer = setTimeout(() => { status.textContent = ''; }, fadeMs);
+    }
 
     const FORMATS = {
         csv: { action: 'download_csv', label: 'CSV', type: /^text\/csv\b/i, button: csvButton },
@@ -178,15 +199,21 @@
     };
     async function download(kind) {
         const format = FORMATS[kind];
-        if (!ready() || !dataset || Number(dataset.summary.total_subjects) === 0) return;
+        setStatus('');
+        if (!ready() || !dataset || Number(dataset.summary.total_subjects) === 0) {
+            showPasswordError('Select a curriculum version with subjects before downloading.');
+            return;
+        }
         const protect = protectBox.checked;
         if (protect) {
             const problem = passwordProblem();
             showPasswordError(problem);
-            if (problem) { (passwordInput.value.length < MIN_PASSWORD ? passwordInput : confirmInput).focus(); return; }
+            if (problem) { (passwordInput.value.length < MIN_PASSWORD || passwordInput.value.length > MAX_PASSWORD ? passwordInput : confirmInput).focus(); return; }
+        } else {
+            showPasswordError('');
         }
         setActionsEnabled(false);
-        status.textContent = protect ? 'Generating password-protected ' + format.label + ' ZIP…' : 'Generating ' + format.label + '…';
+        setStatus(protect ? 'Generating password-protected ' + format.label + ' ZIP…' : 'Generating ' + format.label + '…');
         const form = new FormData();
         form.set('action', format.action);
         Object.entries(params()).forEach(([key, value]) => form.set(key, value));
@@ -209,24 +236,23 @@
             link.click();
             link.remove();
             URL.revokeObjectURL(url);
-            status.textContent = protect ? 'Protected ZIP downloaded. Keep the password safe: it cannot be recovered.' : format.label + ' downloaded.';
             ui.showToast(protect ? 'Protected ' + format.label + ' ZIP downloaded.' : 'Curriculum ' + format.label + ' downloaded.', 'success');
-            if (protect) { clearPasswords(); showPasswordError(''); }
+            clearPasswords();
+            showPasswordError('');
+            setStatus(protect ? 'Protected ZIP downloaded. Keep the password safe: it cannot be recovered.' : format.label + ' downloaded.', 8000);
         } catch (error) {
-            if (protect) showPasswordError(error.message);
+            showPasswordError(error.message);
             ui.showToast(error.message, 'error');
-            status.textContent = 'The ' + format.label + ' could not be generated.';
+            setStatus('');
         } finally { setActionsEnabled(ready()); }
     }
 
-    function openPrintView() {
-        if (!ready() || !dataset || Number(dataset.summary.total_subjects) === 0) return;
-        const url = new URL(printPage, window.location.href);
-        Object.entries(params()).forEach(([key, value]) => url.searchParams.set(key, value));
-        const printWindow = window.open(url.toString(), '_blank');
-        if (!printWindow) ui.showToast('Allow pop-ups to open the print view.', 'warning');
+    // Prints the current selection from this page: the print stylesheet hides everything except the preview document.
+    function printCurrent() {
+        if (!ready() || !dataset || Number(dataset.summary.total_subjects) === 0) { showPasswordError('Select a curriculum version with subjects before printing.'); return; }
+        showPasswordError('');
+        window.print();
     }
-
     const cascade = ui.createCascadingAutocomplete({
         levels: [
             {
@@ -254,7 +280,8 @@
             ++requestId;
             setActionsEnabled(false);
             dataset = null;
-            status.textContent = '';
+            setStatus('');
+            showPasswordError('');
             if (index < 2 || action !== 'select') {
                 ++scopeRequestId;
                 yearSelect.value = '';
@@ -275,7 +302,7 @@
     semesterSelect.addEventListener('change', generatePreview);
     csvButton.addEventListener('click', () => download('csv'));
     pdfButton.addEventListener('click', () => download('pdf'));
-    printButton.addEventListener('click', openPrintView);
+    printButton.addEventListener('click', printCurrent);
     inputs.forEach(input => input.addEventListener('input', function () {
         ++requestId;
         dataset = null;
