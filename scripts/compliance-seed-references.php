@@ -4,7 +4,7 @@
 //   Dry run (default, writes nothing):
 //     php scripts/compliance-seed-references.php
 //   Apply (after a backup):
-//     php scripts/compliance-seed-references.php --apply --confirm-database=<database name> --actor-user-id=<id>
+//     php scripts/compliance-seed-references.php --apply --confirm-database=<database name> --actor-user-id=<id> [--only-rules=CODE,CODE]
 //
 // Needs DB_NAME (and DB_* if not default) in the environment. The actor must be an active user holding compliance.reference.verify
 // and compliance.manage (Super Admin). The script is idempotent: sources that exist are skipped, library rules are upserted by rule_code
@@ -83,6 +83,8 @@ foreach ($sources as $s) $existing[$s[0]] = $one($conn, 'SELECT id, verification
 $library = new ComplianceLibraryRepository($conn);
 $libraryReady = $library->available();
 $catalog = ComplianceLibraryCatalog::rules();
+// --only-rules=CODE,CODE limits the library rules that are seeded (the owner's reduced scope); without it every catalog rule is seeded as before.
+if (isset($options['only-rules'])) { $only = array_filter(array_map('trim', explode(',', (string)$options['only-rules']))); $unknown = array_diff($only, array_column($catalog, 'rule_code')); if ($unknown) $fail('Unknown rule code: ' . implode(', ', $unknown)); $catalog = array_values(array_filter($catalog, fn($r) => in_array($r['rule_code'], $only, true))); }
 $referenceId = static function (?string $code) use ($one, $conn): ?int {
     if ($code === null) return null;
     $row = $one($conn, 'SELECT id FROM compliance_references WHERE reference_code = ? ORDER BY id LIMIT 1', 's', [$code]);

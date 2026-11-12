@@ -145,12 +145,83 @@ class ComplianceValidationService
                 $minimum = (string)($parameters['min_units'] ?? '0');
                 $met = $this->compareDecimal((string)$totals['total_units'], $minimum) >= 0;
                 return [$met ? 'PASS' : 'FAIL', $this->unitsBoth($totals),
-                    ($met ? 'The unit total of all placements meets the minimum.' : 'The unit total of all placements is below the minimum.') . ' ' . self::ELECTIVE_NOTE, null];
+                    ($met ? 'The unit total of all placements meets the minimum.' : 'The unit total of all placements is below the minimum.') . ' ' . self::ELECTIVE_NOTE . ' Electives are not categorised, so the total is not reduced for elective units above the required 12.', null];
+            case 'PE_UNITS':
+                return $this->evaluateByCodes($rule, $parameters, $totals, 'PE', fn(array $found, string $codes) => $this->peResult($found, $parameters, $codes));
+            case 'NSTP_REQUIREMENT':
+                return $this->evaluateByCodes($rule, $parameters, $totals, 'NSTP', fn(array $found, string $codes) => $this->nstpResult($found, $parameters, $codes));
             case 'NSTP_PREREQUISITE':
-                return ['NOT_EVALUATED', null, 'The prerequisite between NSTP subjects cannot be checked from stored data.', 'NSTP subjects cannot be identified: stored subjects have no category.'];
+                return $this->nstpPrerequisiteResult($parameters, $totals);
+            case 'PROF_ELECTIVE_UNITS':
+                return ['NOT_EVALUATED', null, 'The units of professional electives cannot be checked from stored data.', 'No professional-elective category or group is stored: the Electives Manager models one "choose N" pool per term, not a unit requirement across terms.'];
             default:
                 return ['NOT_EVALUATED', null, 'This rule cannot be checked from stored data.', self::MISSING_CATEGORY];
         }
+    }
+
+    /** Placements of the version whose subject code is one of the codes named in the rule parameters (no category is stored; the codes come from the team dataset). */
+    private function placedByCodes(int $versionId, array $codes): array
+    {
+        if (!$codes) return [];
+        $in = implode(',', array_fill(0, count($codes), '?'));
+        $stmt = $this->db->prepare("SELECT s.subject_code, s.units, p.year_level, p.semester, p.subject_id FROM curriculum_version_subjects p JOIN subjects s ON s.id = p.subject_id WHERE p.curriculum_version_id = ? AND UPPER(REPLACE(s.subject_code, ' ', '')) IN ($in)");
+        $types = 'i' . str_repeat('s', count($codes)); $values = array_merge([$versionId], array_map(fn($c) => strtoupper(str_replace(' ', '', (string)$c)), $codes));
+        $stmt->bind_param($types, ...$values); $stmt->execute();
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
+        return $rows;
+    }
+
+    private function evaluateByCodes(array $rule, array $parameters, array $totals, string $label, callable $judge): array
+    {
+        $codes = array_values(array_map('strval', $parameters['codes'] ?? []));
+        $found = $this->placedByCodes((int)$totals['version_id'], $codes);
+        $list = implode(', ', $codes);
+        if (count($found) < count($codes)) {
+            return ['NOT_EVALUATED', null, "The $label subjects named by this rule ($list) are not all placed in this version, so the rule cannot be checked from stored data.", "Stored subjects have no category; $label subjects are recognised only by the codes $list."];
+        }
+        return $judge($found, $list);
+    }
+
+    private function termKey(string $year, string $semester): ?int
+    {
+        if (!preg_match('/(\d+)/', $year, $y) || !preg_match('/(\d+)/', $semester, $s)) return null;
+        return ((int)$y[1]) * 10 + (int)$s[1];
+    }
+
+    private function peResult(array $found, array $parameters, string $codes): array
+    {
+        $units = 0.0; $term = [];
+        foreach ($found as $row) { $units += (float)$row['units']; $term[strtoupper(str_replace(' ', '', $row['subject_code']))] = $this->termKey((string)$row['year_level'], (string)$row['semester']); }
+        $needed = (float)($parameters['units'] ?? 8);
+        $unitsOk = abs($units - $needed) < 0.001;
+        $orderOk = true;
+        foreach ([['PE1', 'PE3'], ['PE1', 'PE4'], ['PE2', 'PE3'], ['PE2', 'PE4']] as [$first, $later]) {
+            if (!isset($term[$first], $term[$later]) || $term[$first] === null || $term[$later] === null || $term[$first] >= $term[$later]) $orderOk = false;
+        }
+        $actual = 'PE units found: ' . $this->formatDecimal((string)$units) . ' (' . $codes . '); PE 1 and PE 2 placed before PE 3 and PE 4: ' . ($orderOk ? 'yes' : 'no');
+        $text = 'PE subjects are recognised by their codes (' . $codes . '), not by a stored category. ';
+        return [($unitsOk && $orderOk) ? 'PASS' : 'FAIL', $actual, $text . ($unitsOk ? 'The PE units equal the required ' . $this->formatDecimal((string)$needed) . '.' : 'The PE units differ from the required ' . $this->formatDecimal((string)$needed) . '.') . ' ' . ($orderOk ? 'PE 1 and PE 2 are placed in earlier terms than PE 3 and PE 4.' : 'PE 1 and PE 2 are not all placed in earlier terms than PE 3 and PE 4.'), null];
+    }
+
+    private function nstpResult(array $found, array $parameters, string $codes): array
+    {
+        $units = 0.0; foreach ($found as $row) $units += (float)$row['units'];
+        $needed = (float)($parameters['units'] ?? 6);
+        $ok = abs($units - $needed) < 0.001;
+        return [$ok ? 'PASS' : 'FAIL', 'NSTP units found: ' . $this->formatDecimal((string)$units) . ' (' . $codes . ')',
+            'NSTP subjects are recognised by their codes (' . $codes . '), not by a stored category. The NSTP units ' . ($ok ? 'equal' : 'differ from') . ' the ' . $this->formatDecimal((string)$needed) . ' units of the CMO 25 BSIT table. RA 9163 gives the requirement (NSTP is a requisite for graduation, one component, two semesters); the 6 units come from the CMO 25 table only.', null];
+    }
+
+    private function nstpPrerequisiteResult(array $parameters, array $totals): array
+    {
+        $first = (string)($parameters['required'] ?? 'NSTP1'); $second = (string)($parameters['target'] ?? 'NSTP2');
+        $placed = $this->placedByCodes((int)$totals['version_id'], [$first, $second]);
+        if (count($placed) < 2) return ['NOT_EVALUATED', null, "The prerequisite between $first and $second cannot be checked: both subjects are not placed in this version.", 'Stored subjects have no category; the subjects are recognised only by the codes ' . $first . ' and ' . $second . '.'];
+        $ids = []; foreach ($placed as $row) $ids[strtoupper(str_replace(' ', '', $row['subject_code']))] = (int)$row['subject_id'];
+        $stmt = $this->db->prepare("SELECT COUNT(*) FROM curriculum_subject_requirements WHERE curriculum_version_id = ? AND subject_id = ? AND required_subject_id = ? AND requirement_type = 'prerequisite'");
+        $version = (int)$totals['version_id']; $target = $ids[strtoupper($second)]; $required = $ids[strtoupper($first)];
+        $stmt->bind_param('iii', $version, $target, $required); $stmt->execute(); $has = (int)$stmt->get_result()->fetch_row()[0]; $stmt->close();
+        return [$has ? 'PASS' : 'FAIL', "$first is " . ($has ? '' : 'not ') . "a stored prerequisite of $second", ($has ? "The stored prerequisite rules include $first as a prerequisite of $second." : "The stored prerequisite rules do not include $first as a prerequisite of $second.") . ' This is the BCP reply (questionnaire Q6), not a published policy.', null];
     }
 
     private function libraryDuplicatesCustom(array $custom, array $libraryRules, array $context): bool
@@ -189,6 +260,7 @@ class ComplianceValidationService
         }
 
         $totals = $this->validations->curriculumTotals($versionId);
+        $totals['version_id'] = $versionId;
         $summary = $this->emptySummary();
         $this->db->begin_transaction();
         try {
