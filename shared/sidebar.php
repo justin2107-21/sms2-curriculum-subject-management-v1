@@ -25,7 +25,7 @@ $sidebarCurriculum = [
     ['Electives Manager', $sidebarPages . 'electives_manager.php', 'fa-layer-group', ['electives-manager'], 'elective.view', true],
     ['Academic Strand/<wbr>Course Assignment', $sidebarPages . 'program_centric_assignment.php', 'fa-share-nodes', ['program-assignment-program', 'program-assignment-subject'], 'program_assignment.view', true],
     ['Subject Offering History', $sidebarPages . 'subject_history_view.php', 'fa-clock-rotate-left', ['subject-history-subject', 'subject-history-curriculum'], 'subject_history.view', true],
-    ['Subject Equivalency Tool', $sidebarPages . 'subject_comparison.php', 'fa-right-left', ['subject-equivalency-comparison', 'subject-equivalency-records'], 'equivalency.view', true],
+    ['Subject Equivalency Tool', $sidebarPages . 'subject_equivalency.php', 'fa-right-left', ['subject-equivalency'], 'equivalency.view', true],
     ['Grade Weighting Setup', $sidebarPages . 'grade_weighting_setup.php', 'fa-chart-pie', ['grade-weighting'], 'grade_weighting.view', true],
     ['CHED / DepEd Compliance Validator', $sidebarPages . 'validate_curriculum.php', 'fa-shield-halved', ['compliance-validate', 'compliance-rules', 'compliance-references', 'compliance-history'], 'compliance.view', true],
     ['Curriculum Export Tool', $sidebarPages . 'curriculum_export.php', 'fa-file-export', ['curriculum-export'], 'curriculum_export.view', true],

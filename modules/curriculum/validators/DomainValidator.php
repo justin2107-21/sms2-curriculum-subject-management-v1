@@ -305,6 +305,9 @@ class DomainValidator
         return ['subject_a_id' => $subjectAId, 'subject_b_id' => $subjectBId];
     }
 
+    public const EQUIVALENCY_REASON_MIN = 10;
+    public const EQUIVALENCY_REASON_MAX = 4000;
+
     public static function subjectEquivalencyReview(array $input): array
     {
         $decision = self::requiredString(
@@ -316,7 +319,17 @@ class DomainValidator
         if (!in_array($decision, ['equivalent', 'not_equivalent', 'needs_review'], true)) {
             throw new DomainValidationException('Invalid equivalency review decision.');
         }
-        $remarks = self::optionalString($input, 'remarks', 'Remarks', 4000);
+        // A reason is required for every create and update (existing rows without one stay readable).
+        $rawRemarks = $input['remarks'] ?? '';
+        if (!is_scalar($rawRemarks) && $rawRemarks !== null) throw new DomainValidationException('Reason must be text.');
+        $remarks = trim((string)$rawRemarks);
+        $length = mb_strlen($remarks, 'UTF-8');
+        if ($length < self::EQUIVALENCY_REASON_MIN) {
+            throw new DomainValidationException('Enter a reason for this decision of at least ' . self::EQUIVALENCY_REASON_MIN . ' characters.');
+        }
+        if ($length > self::EQUIVALENCY_REASON_MAX) {
+            throw new DomainValidationException('The reason must be at most ' . self::EQUIVALENCY_REASON_MAX . ' characters.');
+        }
         return ['decision_status' => $decision, 'remarks' => $remarks];
     }
 
@@ -330,10 +343,12 @@ class DomainValidator
             20
         );
         if ($decision !== null
-            && !in_array($decision, ['equivalent', 'not_equivalent', 'needs_review'], true)) {
+            && !in_array($decision, ['equivalent', 'not_equivalent', 'needs_review', 'archived'], true)) {
             throw new DomainValidationException('Invalid equivalency decision filter.');
         }
-        $query['decision_status'] = $decision;
+        // "archived" is a filter on archived records, not a decision value.
+        $query['archived'] = $decision === 'archived';
+        $query['decision_status'] = $decision === 'archived' ? null : $decision;
         return $query;
     }
 

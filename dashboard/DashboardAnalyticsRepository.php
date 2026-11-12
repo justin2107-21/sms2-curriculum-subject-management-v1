@@ -505,17 +505,6 @@ final class DashboardAnalyticsRepository
              ORDER BY a.id DESC LIMIT ?", $types . 'i', [...$params, $limit]);
     }
 
-    public function pendingEquivalencies(int $limit): array
-    {
-        return $this->rows(
-            "SELECT e.created_at, a.subject_code, b.subject_code AS equivalent_code
-             FROM subject_equivalencies AS e
-             JOIN subjects AS a ON a.id = e.subject_id
-             JOIN subjects AS b ON b.id = e.equivalent_subject_id
-             WHERE e.decision_status = 'pending' AND e.archived_at IS NULL
-             ORDER BY e.id LIMIT ?", 'i', [$limit]);
-    }
-
     /** Versions this user owns: last submitter, otherwise creator. */
     public function myVersions(int $userId, ?int $programId): array
     {

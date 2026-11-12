@@ -1,470 +1,393 @@
 (function () {
     'use strict';
 
+    // Subject Equivalency Tool: one page. The records table is the main view; one dialog records, edits or shows a
+    // decision with the stored evidence of both subjects side by side. Decisions are human-only; CIMF only explains.
     const workspace = document.getElementById('subjectEquivalencyWorkspace');
     const ui = window.CurriculumUI;
     if (!workspace || !ui) return;
 
+    const $ = id => document.getElementById(id);
+    const esc = ui.escapeHtml;
     const endpoint = workspace.dataset.equivalencyApi;
-    const canManage = workspace.dataset.canManageEquivalency === '1';
-    const recordColumnCount = Number(workspace.dataset.recordColumnCount || 6);
-    const state = {
-        comparisonRequest: 0, recordRequest: 0, recordPage: 1,
-        records: new Map(), comparison: null,
+    const canManage = workspace.dataset.canManage === '1';
+    const REASON_MIN = Number(workspace.dataset.reasonMin) || 10;
+    const REASON_MAX = Number(workspace.dataset.reasonMax) || 4000;
+    const PREREQUISITE_LIMIT = 5;
+    const DECISIONS = {
+        equivalent: ['Equivalent', 'csms-chip--approved'],
+        not_equivalent: ['Not equivalent', 'csms-chip--returned'],
+        needs_review: ['Needs review', 'csms-chip--under_review']
     };
-    const elements = {
-        comparisonPanel: document.getElementById('comparisonPanel'),
-        recordsPanel: document.getElementById('recordsPanel'),
-        subjectASearch: document.getElementById('subjectASearch'),
-        subjectASelect: document.getElementById('subjectASelect'),
-        subjectBSearch: document.getElementById('subjectBSearch'),
-        subjectBSelect: document.getElementById('subjectBSelect'),
-        compareButton: document.getElementById('compareSubjectsButton'),
-        headerRecordDecision: document.getElementById('headerRecordDecision'),
-        reviewWithCimf: document.getElementById('reviewWithCimf'),
-        summary: document.getElementById('equivalencySummary'),
-        existingPairMessage: document.getElementById('existingPairMessage'),
-        clearComparison: document.getElementById('clearSubjectComparison'),
-        comparisonMessage: document.getElementById('comparisonMessage'),
-        comparisonRows: document.getElementById('comparisonRows'),
-        subjectAHeader: document.getElementById('subjectAHeader'),
-        subjectBHeader: document.getElementById('subjectBHeader'),
-        subjectAUsageTitle: document.getElementById('subjectAUsageTitle'),
-        subjectBUsageTitle: document.getElementById('subjectBUsageTitle'),
-        subjectAUsage: document.getElementById('subjectAUsage'),
-        subjectBUsage: document.getElementById('subjectBUsage'),
-        recordSearch: document.getElementById('equivalencySearch'),
-        recordStatus: document.getElementById('equivalencyStatus'),
-        recordPerPage: document.getElementById('equivalencyPerPage'),
-        clearFilters: document.getElementById('clearEquivalencyFilters'),
-        recordRows: document.getElementById('equivalencyRows'),
-        recordCount: document.getElementById('equivalencyCount'),
-        recordPagination: document.getElementById('equivalencyPagination'),
-    };
-    const isComparisonView = Boolean(elements.comparisonPanel);
-    const reviewForm = document.getElementById('equivalencyReviewForm');
-    const reviewModal = ui.createModal(document.getElementById('equivalencyReviewModal'));
-    const detailsModal = ui.createModal(document.getElementById('equivalencyDetailsModal'));
-    const archiveModal = ui.createModal(document.getElementById('equivalencyArchiveModal'));
-    window.CSMSPageCIMFContext = () => ({subject_a_id:state.comparison?.subject_a.id || elements.subjectASelect?.value || '',subject_b_id:state.comparison?.subject_b.id || elements.subjectBSelect?.value || ''});
-    window.CSMSPageCIMFStoredDecision = () => state.comparison?.existing_equivalency || null;
-    let archiveRecordId = null;
-    let subjectAAutocomplete;
-    let subjectBAutocomplete;
-    function autocompleteOptions(side) {
-        const isA = side === 'a';
-        const input = isA ? elements.subjectASearch : elements.subjectBSearch;
-        const valueInput = isA ? elements.subjectASelect : elements.subjectBSelect;
-        const list = document.getElementById(isA ? 'subjectAOptions' : 'subjectBOptions');
-        const other = isA ? () => subjectBAutocomplete : () => subjectAAutocomplete;
-        return {
-            input,
-            valueInput,
-            list,
-            helpText: isA ? 'Choose the first subject to compare.' : 'Choose a different subject to compare.',
-            selectedText: 'Subject selected.',
-            loadingText: 'Searching Subject Master…',
-            noResultsText: 'No matching subjects found.',
-            errorText: 'Subject Master records could not be loaded.',
-            search: async function (query) {
-                const payload = await ui.fetchJson(endpoint, {
-                    action: 'subject_search', page: 1, per_page: 20, search: query
-                });
-                return (payload.subjects || []).filter(function (subject) {
-                    return Number(subject.id) !== Number(other()?.getSelectedId() || 0);
-                });
-            },
-            getId: subject => subject.id,
-            format: subject => ({ label: subjectLabel(subject), code: subject.subject_code,
-                title: subject.subject_title }),
-            onError: error => ui.showToast(error.message || 'Subject Master records could not be loaded.', 'error'),
-            onSelect: function (subject, id) {
-                if (other()?.getSelectedId() === id) other().clear();
-                synchronizeSelectors();
-            }
-        };
-    }
-    subjectAAutocomplete = ui.createAutocomplete(autocompleteOptions('a'));
-    subjectBAutocomplete = ui.createAutocomplete(autocompleteOptions('b'));
+    const state = { records: new Map(), page: 1, request: 0, compareRequest: 0, loaded: false,
+        mode: 'create', record: null, comparison: null, archiveId: null };
 
-    function subjectLabel(subject) {
-        return String(subject.subject_code || '') + ' — ' + String(subject.subject_title || '');
-    }
+    const dialogElement = $('equivalencyDialog');
+    const dialog = ui.createModal(dialogElement, { restoreFocus: () => $('equivalencySearch') });
+    const archiveDialog = ui.createModal($('equivalencyArchiveDialog'));
+    const form = $('equivalencyForm');
+    const decisionFields = $('equivalencyDecisionFields');
+    const decisionSelect = $('equivalencyDecision');
+    const reasonInput = $('equivalencyReason');
+    const saveButton = $('equivalencySave');
 
-    function setTableMessage(rows, columns, message, isError) {
-        rows.innerHTML = '<tr><td colspan="' + columns + '" class="empty-cell' +
-            (isError ? ' error-cell' : '') + '">' + ui.escapeHtml(message) + '</td></tr>';
+    // ---------- shared formatting ----------
+    function decisionChip(record) {
+        if (record.archived_at) return '<span class="csms-chip csms-chip--archived">Archived</span>';
+        const [label, css] = DECISIONS[record.decision_status] || ['Needs review', 'csms-chip--under_review'];
+        return '<span class="csms-chip ' + css + '">' + esc(label) + '</span>';
     }
-
-    function synchronizeSelectors() {
-        updateCompareButton();
-        clearRenderedComparison('Select Compare Subjects to review the selected pair.');
-    }
-
-    function updateCompareButton() {
-        const subjectAId = subjectAAutocomplete?.getSelectedId();
-        const subjectBId = subjectBAutocomplete?.getSelectedId();
-        elements.compareButton.disabled = !(subjectAId && subjectBId && subjectAId !== subjectBId);
-        if (elements.headerRecordDecision) elements.headerRecordDecision.disabled = elements.compareButton.disabled ||
-            !state.comparison || Boolean(state.comparison.existing_equivalency?.archived_at);
-        if (elements.reviewWithCimf) elements.reviewWithCimf.disabled = elements.compareButton.disabled || !state.comparison;
-    }
-
-    function clearRenderedComparison(message) {
-        state.comparison = null;
-        elements.comparisonMessage.textContent = message || 'Select two subjects to review their stored fields.';
-        elements.subjectAHeader.textContent = 'Subject A';
-        elements.subjectBHeader.textContent = 'Subject B';
-        setTableMessage(elements.comparisonRows, 4, 'No subjects selected for comparison.', false);
-        const hiddenNote = document.getElementById('comparisonHiddenNote'); if (hiddenNote) hiddenNote.hidden = true;
-        renderUsage(elements.subjectAUsage, null);
-        renderUsage(elements.subjectBUsage, null);
-        elements.subjectAUsageTitle.textContent = 'Subject A Usage';
-        elements.subjectBUsageTitle.textContent = 'Subject B Usage';
-        if (elements.summary) elements.summary.hidden = true;
-        if (elements.existingPairMessage) elements.existingPairMessage.hidden = true;
-        if (elements.headerRecordDecision) elements.headerRecordDecision.disabled = true;
-        if (elements.reviewWithCimf) elements.reviewWithCimf.disabled = true;
-    }
-
-    function displayValue(field, value) {
-        if (value === null || value === undefined || value === '') return 'Not Available';
-        if (['units', 'lecture_units', 'laboratory_units'].includes(field)) return ui.formatUnits(value);
-        return String(value);
-    }
-
-    function resultBadge(result, field) {
-        const labels = { same: ['fa-check', 'Same'], different: ['fa-not-equal', 'Different'],
-            not_available: ['fa-minus', 'Not Available'] };
-        const safe = Object.prototype.hasOwnProperty.call(labels, result) ? result : 'not_available';
-        const label = safe === 'same' && field === 'units' ? 'Same Unit Value' : labels[safe][1];
-        return '<span class="equivalency-result-badge equivalency-result-' + safe.replaceAll('_', '-') +
-            '"><i class="fa-solid ' + labels[safe][0] + '" aria-hidden="true"></i> ' + label + '</span>';
-    }
-
-    function renderUsage(container, usage) {
-        if (!usage) {
-            container.innerHTML = '<p class="equivalency-empty-context">Compare subjects to view bounded curriculum usage.</p>';
-            return;
-        }
-        const summary = usage.summary || {};
-        let markup = '<div class="equivalency-usage-summary"><div><strong>' + Number(summary.placements || 0) +
-            '</strong><span>Placements</span></div><div><strong>' + Number(summary.programs || 0) +
-            '</strong><span>Programs</span></div><div><strong>' + Number(summary.curricula || 0) +
-            '</strong><span>Curricula</span></div><div><strong>' + Number(summary.curriculum_versions || 0) +
-            '</strong><span>Versions</span></div></div>';
-        const assignments = usage.program_assignments || [];
-        if (assignments.length) {
-            markup += '<p class="equivalency-usage-programs"><strong>Programs:</strong> ' +
-                assignments.map(function (program) {
-                    return ui.escapeHtml(program.program_code) + ' — ' + ui.escapeHtml(program.program_name);
-                }).join('; ') + '</p>';
-        }
-        const records = usage.records || [];
-        if (!records.length) {
-            markup += '<p class="equivalency-empty-context equivalency-usage-empty">No stored curriculum placements found.</p>';
-        } else {
-            markup += '<ul class="equivalency-usage-list">' + records.map(function (record) {
-                return '<li><strong>' + ui.escapeHtml(record.program_code) + '</strong> / ' +
-                    ui.escapeHtml(record.curriculum_code) + ' / ' + ui.escapeHtml(record.version_label) +
-                    ' <span>· ' + ui.escapeHtml(record.year_level || 'Year not recorded') + ' · ' +
-                    ui.escapeHtml(record.semester || 'Semester not recorded') + ' · ' +
-                    ui.escapeHtml(record.version_status) + '</span></li>';
-            }).join('') + '</ul>';
-        }
-        container.innerHTML = markup;
-    }
-
-    function renderComparison(payload) {
-        state.comparison = payload;
-        const subjectA = payload.subject_a;
-        const subjectB = payload.subject_b;
-        elements.summary.hidden = false;
-        [['A', subjectA], ['B', subjectB]].forEach(function ([side, subject]) {
-            document.getElementById('summary' + side + 'Code').textContent = subject.subject_code;
-            document.getElementById('summary' + side + 'Title').textContent = subject.subject_title;
-            document.getElementById('summary' + side + 'Units').textContent = displayValue('units', subject.units) + ' units';
-            document.getElementById('summary' + side + 'Status').textContent = subject.status || 'Not Available';
-        });
-        elements.subjectAHeader.textContent = subjectA.subject_code;
-        elements.subjectBHeader.textContent = subjectB.subject_code;
-        elements.comparisonMessage.textContent = subjectLabel(subjectA) + ' compared with ' + subjectLabel(subjectB) + '.';
-        const allDifferences = payload.differences || [];
-        const shown = allDifferences.filter(difference => difference.result !== 'not_available');
-        const hiddenCount = allDifferences.length - shown.length;
-        elements.comparisonRows.innerHTML = shown.map(function (difference) {
-            const wide = difference.field === 'description' ? ' equivalency-description-value' : '';
-            const identity = ['subject_code', 'subject_title'].includes(difference.field);
-            const codeClass = difference.field === 'subject_code' ? ' class="csms-ctable__code"' : '';
-            return '<tr><td><span class="equivalency-field-label">' + ui.escapeHtml(difference.label) +
-                '</span></td><td' + codeClass + '><span class="equivalency-field-value' + wide + '">' +
-                ui.escapeHtml(displayValue(difference.field, difference.subject_a)) +
-                '</span></td><td' + codeClass + '><span class="equivalency-field-value' + wide + '">' +
-                ui.escapeHtml(displayValue(difference.field, difference.subject_b)) +
-                '</span></td><td>' + (identity ? '' : resultBadge(difference.result, difference.field)) + '</td></tr>';
-        }).join('');
-        const note = document.getElementById('comparisonHiddenNote');
-        if (note) {
-            note.hidden = hiddenCount === 0;
-            note.textContent = hiddenCount + (hiddenCount === 1 ? ' field is' : ' fields are') + ' not recorded for either subject and ' + (hiddenCount === 1 ? 'is' : 'are') + ' not shown.';
-        }
-        elements.subjectAUsageTitle.textContent = subjectA.subject_code + ' Usage';
-        elements.subjectBUsageTitle.textContent = subjectB.subject_code + ' Usage';
-        renderUsage(elements.subjectAUsage, payload.usage?.subject_a);
-        renderUsage(elements.subjectBUsage, payload.usage?.subject_b);
-        if (elements.headerRecordDecision) {
-            elements.headerRecordDecision.disabled = Boolean(payload.existing_equivalency?.archived_at);
-            elements.headerRecordDecision.title = payload.existing_equivalency?.archived_at
-                ? 'This subject pair has an archived equivalency record.' : '';
-        }
-        if (elements.reviewWithCimf) elements.reviewWithCimf.disabled = false;
-        if (elements.existingPairMessage) {
-            const existing = payload.existing_equivalency;
-            elements.existingPairMessage.hidden = !existing;
-            const view = document.getElementById('viewExistingEquivalency');
-            const edit = document.getElementById('editExistingEquivalency');
-            if (view) view.onclick = function () { showDetails(existing); };
-            if (edit) {
-                edit.hidden = Boolean(existing?.archived_at);
-                edit.onclick = function () { if (!existing?.archived_at) openReview(existing); };
-            }
-        }
-    }
-
-    async function compareSubjects() {
-        const subjectAId = subjectAAutocomplete?.getSelectedId();
-        const subjectBId = subjectBAutocomplete?.getSelectedId();
-        if (!subjectAId || !subjectBId || subjectAId === subjectBId) return;
-        const requestId = ++state.comparisonRequest;
-        elements.compareButton.disabled = true;
-        elements.compareButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Comparing...';
-        try {
-            const payload = await ui.fetchJson(endpoint, {
-                action: 'compare', subject_a_id: subjectAId, subject_b_id: subjectBId,
-            });
-            if (requestId === state.comparisonRequest) renderComparison(payload);
-        } catch (error) {
-            if (requestId === state.comparisonRequest) {
-                clearRenderedComparison(error.message);
-                setTableMessage(elements.comparisonRows, 4, error.message, true);
-                ui.showToast(error.message, 'error');
-            }
-        } finally {
-            if (requestId === state.comparisonRequest) {
-                elements.compareButton.innerHTML = '<i class="fa-solid fa-scale-balanced" aria-hidden="true"></i> Compare Subjects';
-                updateCompareButton();
-            }
-        }
-    }
-
+    function decisionLabel(status) { return (DECISIONS[status] || ['Needs review'])[0]; }
     function reviewerName(record) {
-        const fullName = [record.reviewer_first_name, record.reviewer_last_name]
-            .filter(Boolean).join(' ').trim();
-        return fullName || record.reviewer_username || 'Pending review';
+        return [record.reviewer_first_name, record.reviewer_last_name].filter(Boolean).join(' ').trim() || record.reviewer_username || 'Not recorded';
     }
-
-    function decisionLabel(status) {
-        return { pending: 'Decision Required', equivalent: 'Equivalent', not_equivalent: 'Not Equivalent',
-            needs_review: 'Needs Further Review' }[status] || 'Needs Further Review';
-    }
-
-    function decisionBadge(status) {
-        const safe = ['equivalent', 'not_equivalent', 'needs_review'].includes(status)
-            ? status : 'needs_review';
-        return '<span class="equivalency-decision-badge equivalency-decision-' +
-            safe.replaceAll('_', '-') + '">' + ui.escapeHtml(decisionLabel(safe)) + '</span>';
-    }
-
     function dateTime(value) {
-        if (!value) return '-';
+        if (!value) return 'Not recorded';
         const date = new Date(String(value).replace(' ', 'T'));
         if (Number.isNaN(date.getTime())) return String(value);
-        return new Intl.DateTimeFormat(undefined, {
-            year: 'numeric', month: 'short', day: 'numeric',
-            hour: 'numeric', minute: '2-digit'
-        }).format(date);
+        return new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(date);
     }
-
+    const notRecorded = '<span class="csms-sub">Not recorded</span>';
     function subjectCell(code, title) {
-        return '<span class="equivalency-subject-label"><strong class="csms-ctable__code">' + ui.escapeHtml(code) +
-            '</strong><span>' + ui.escapeHtml(title) + '</span></span>';
+        return '<strong class="csms-ctable__code">' + esc(code) + '</strong><span class="csms-sub">' + esc(title) + '</span>';
     }
+    function pairLabel(record) { return record.subject_a_code + ' and ' + record.subject_b_code; }
+
+    // ---------- records table ----------
+    function showListState(which, message) {
+        $('equivalencyLoading').hidden = which !== 'loading';
+        $('equivalencyEmpty').hidden = which !== 'empty';
+        $('equivalencyError').hidden = which !== 'error';
+        $('equivalencyList').hidden = !['list', 'nomatch'].includes(which);
+        $('equivalencyNoMatch').hidden = which !== 'nomatch';
+        $('equivalencyTableWrap').hidden = which !== 'list';
+        $('equivalencyPagination').hidden = which !== 'list';
+        if (which === 'error') $('equivalencyErrorText').textContent = message || '';
+    }
+    function filtersActive() { return Boolean($('equivalencySearch').value.trim() || $('equivalencyStatus').value); }
 
     function recordRow(record) {
         const id = Number(record.id);
-        const menu = '<td class="csms-ctable__action"><button type="button" class="csms-rowmenu" data-menu="' + id + '" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for ' +
-            ui.escapeHtml(record.subject_a_code) + ' and ' + ui.escapeHtml(record.subject_b_code) + '"><i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i></button></td>';
-        return '<tr class="csms-row-click" tabindex="0" data-row="' + id + '" aria-haspopup="dialog" aria-label="View equivalency record for ' + ui.escapeHtml(record.subject_a_code) + ' and ' + ui.escapeHtml(record.subject_b_code) + '"><td>' + subjectCell(record.subject_a_code, record.subject_a_title) +
-            '</td><td>' + subjectCell(record.subject_b_code, record.subject_b_title) +
-            '</td><td>' + decisionBadge(record.decision_status) +
-            '</td><td><span class="equivalency-reviewer">' + ui.escapeHtml(reviewerName(record)) +
-            '</span></td><td>' + ui.escapeHtml(dateTime(record.reviewed_at)) + '</td>' + (canManage && !record.archived_at ? menu : '<td class="csms-ctable__action"></td>') + '</tr>';
+        const reason = String(record.remarks || '').trim();
+        return '<tr class="csms-row-click" tabindex="0" data-row="' + id + '" aria-haspopup="dialog" aria-label="View the decision for ' + esc(pairLabel(record)) + '">' +
+            '<td>' + subjectCell(record.subject_a_code, record.subject_a_title) + '</td>' +
+            '<td>' + subjectCell(record.subject_b_code, record.subject_b_title) + '</td>' +
+            '<td>' + decisionChip(record) + (record.archived_at ? '<span class="csms-sub">' + esc(decisionLabel(record.decision_status)) + '</span>' : '') + '</td>' +
+            '<td>' + (reason ? '<span class="equivalency-reason" title="' + esc(reason) + '">' + esc(reason) + '</span>' : '<span class="csms-sub">No reason recorded</span>') + '</td>' +
+            '<td>' + esc(reviewerName(record)) + '</td><td>' + esc(dateTime(record.reviewed_at)) + '</td>' +
+            '<td class="csms-ctable__action"><button type="button" class="csms-rowmenu" data-menu="' + id + '" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for ' + esc(pairLabel(record)) + '"><i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i></button></td></tr>';
     }
 
     async function loadRecords(page) {
-        state.recordPage = page || 1;
-        const requestId = ++state.recordRequest;
-        setTableMessage(elements.recordRows, recordColumnCount, 'Loading equivalency records...', false);
+        state.page = page || 1;
+        const request = ++state.request;
+        if (!state.loaded) showListState('loading');
         try {
-            const payload = await ui.fetchJson(endpoint, {
-                action: 'list', page: state.recordPage,
-                per_page: elements.recordPerPage?.value || 20,
-                search: elements.recordSearch.value.trim(),
-                decision_status: elements.recordStatus.value,
-            });
-            if (requestId !== state.recordRequest) return;
+            const payload = await ui.fetchJson(endpoint, { action: 'list', page: state.page, per_page: $('equivalencyPerPage').value,
+                search: $('equivalencySearch').value.trim(), decision_status: $('equivalencyStatus').value });
+            if (request !== state.request) return;
+            state.loaded = true;
             state.records.clear();
-            (payload.equivalencies || []).forEach(function (record) {
-                state.records.set(Number(record.id), record);
-            });
-            ui.setCount(elements.recordCount, Number(payload.pagination.total_records));
-            if (!payload.equivalencies.length) {
-                setTableMessage(elements.recordRows, recordColumnCount,
-                    'No subject equivalency records found.', false);
-            } else {
-                elements.recordRows.innerHTML = payload.equivalencies.map(recordRow).join('');
+            const rows = payload.equivalencies || [];
+            rows.forEach(record => state.records.set(Number(record.id), record));
+            ui.setCount($('equivalencyCount'), Number(payload.pagination?.total_records || 0));
+            if (!rows.length) { showListState(filtersActive() ? 'nomatch' : 'empty'); return; }
+            $('equivalencyRows').innerHTML = rows.map(recordRow).join('');
+            ui.renderPagination($('equivalencyPagination'), payload.pagination, loadRecords);
+            showListState('list');
+        } catch (error) {
+            if (request !== state.request) return;
+            showListState('error', error.message);
+        }
+    }
+
+    // ---------- subject pickers ----------
+    const pickers = {};
+    function pickerOptions(side) {
+        const other = side === 'A' ? 'B' : 'A';
+        return {
+            input: $('subject' + side + 'Search'), valueInput: $('subject' + side + 'Select'), list: $('subject' + side + 'Options'),
+            helpText: 'Choose a Subject Master record.', selectedText: 'Subject selected.', loadingText: 'Searching Subject Master…',
+            noResultsText: 'No matching subjects found.', errorText: 'Subject Master records could not be loaded.',
+            search: async query => ((await ui.fetchJson(endpoint, { action: 'subject_search', page: 1, per_page: 20, search: query })).subjects || [])
+                .filter(subject => String(subject.id) !== String(pickers[other]?.getSelectedId() || '')),
+            getId: subject => subject.id,
+            format: subject => ({ label: subject.subject_code + ' — ' + subject.subject_title, code: subject.subject_code, title: subject.subject_title }),
+            onSelect: pickersChanged, onClear: pickersChanged
+        };
+    }
+    pickers.A = ui.createAutocomplete(pickerOptions('A'));
+    pickers.B = ui.createAutocomplete(pickerOptions('B'));
+    function setPickersEnabled(enabled) {
+        ['A', 'B'].forEach(side => {
+            $('subject' + side + 'Search').disabled = !enabled;
+            const clear = $('subject' + side + 'Search').parentElement.querySelector('[data-autocomplete-clear]');
+            if (clear && !enabled) clear.hidden = true;
+        });
+    }
+    function setPicker(side, id, code, title) {
+        pickers[side]?.setSelected({ id, subject_code: code, subject_title: title }, false);
+    }
+    function pickersChanged() {
+        if (state.mode !== 'create') return;
+        state.record = null;
+        loadComparison();
+    }
+
+    // ---------- evidence comparison ----------
+    function compareMarker(same) {
+        if (same === null) return '<span class="csms-sub">Not comparable</span>';
+        return same ? '<span class="csms-chip csms-chip--inactive">Same</span>' : '<span class="csms-chip csms-chip--type">Differs</span>';
+    }
+    function blank(value) { return value === null || value === undefined || String(value).trim() === ''; }
+    function prerequisiteCell(rows) {
+        if (!rows.length) return notRecorded;
+        const shown = rows.slice(0, PREREQUISITE_LIMIT).map(row => '<li><strong class="csms-ctable__code">' + esc(row.subject_code) + '</strong> ' + esc(row.subject_title) +
+            ' <span class="csms-sub">' + esc(row.requirement_type) + ', as placed in ' + esc(row.versions) + '</span></li>').join('');
+        const more = rows.length > PREREQUISITE_LIMIT ? '<li class="csms-sub">+' + (rows.length - PREREQUISITE_LIMIT) + ' more</li>' : '';
+        return '<ul class="equivalency-list">' + shown + more + '</ul>';
+    }
+    function prerequisiteKey(rows) { return rows.map(row => row.requirement_type + ':' + row.subject_code).sort().join('|'); }
+
+    function renderComparison(payload) {
+        const a = payload.subject_a, b = payload.subject_b;
+        $('evidenceHeadA').innerHTML = '<span class="csms-ctable__code">' + esc(a.subject_code) + '</span>';
+        $('evidenceHeadB').innerHTML = '<span class="csms-ctable__code">' + esc(b.subject_code) + '</span>';
+        const unitFields = ['units', 'lecture_units', 'laboratory_units'];
+        const rows = (payload.differences || []).map(diff => {
+            const show = value => blank(value) ? notRecorded : esc(unitFields.includes(diff.field) ? ui.formatUnits(value) : (diff.field === 'status' ? String(value).charAt(0).toUpperCase() + String(value).slice(1) : value));
+            const cellClass = diff.field === 'subject_code' ? ' class="csms-ctable__code"' : (diff.field === 'description' ? ' class="equivalency-long"' : '');
+            const same = diff.result === 'not_available' ? null : diff.result === 'same';
+            return '<tr><th scope="row">' + esc(diff.label) + '</th><td' + cellClass + '>' + show(diff.subject_a) + '</td><td' + cellClass + '>' + show(diff.subject_b) + '</td><td>' + compareMarker(same) + '</td></tr>';
+        });
+        const preA = payload.prerequisites?.subject_a || [], preB = payload.prerequisites?.subject_b || [];
+        rows.push('<tr><th scope="row">Prerequisites</th><td>' + prerequisiteCell(preA) + '</td><td>' + prerequisiteCell(preB) + '</td><td>' +
+            compareMarker(!preA.length && !preB.length ? null : prerequisiteKey(preA) === prerequisiteKey(preB)) + '</td></tr>');
+        const ua = payload.usage?.subject_a?.summary || {}, ub = payload.usage?.subject_b?.summary || {};
+        [['placements', 'Placements'], ['programs', 'Programs'], ['curricula', 'Curricula'], ['curriculum_versions', 'Curriculum versions']].forEach(([key, label]) => {
+            const x = Number(ua[key] || 0), y = Number(ub[key] || 0);
+            rows.push('<tr><th scope="row">' + label + '</th><td class="csms-ctable__num">' + x + '</td><td class="csms-ctable__num">' + y + '</td><td>' + compareMarker(x === y) + '</td></tr>');
+        });
+        $('comparisonRows').innerHTML = rows.join('');
+        const hidden = Number(ua.hidden_placements || 0) + Number(ub.hidden_placements || 0);
+        $('comparisonScopeNote').hidden = !(payload.scope_restricted && hidden > 0);
+        $('comparisonScopeNote').textContent = hidden + (hidden === 1 ? ' draft or unapproved placement is' : ' draft or unapproved placements are') + ' hidden for your role.';
+    }
+
+    function showComparisonState(which) {
+        $('comparisonEmpty').hidden = which !== 'empty';
+        $('comparisonLoading').hidden = which !== 'loading';
+        $('comparisonResult').hidden = which !== 'result';
+    }
+
+    async function loadComparison() {
+        const a = $('subjectASelect').value, b = $('subjectBSelect').value;
+        state.comparison = null;
+        $('equivalencyCimf').disabled = true;
+        setNotice('');
+        updateSave();
+        if (!a || !b || a === b) { showComparisonState('empty'); applyMode(); return; }
+        const request = ++state.compareRequest;
+        showComparisonState('loading');
+        try {
+            const payload = await ui.fetchJson(endpoint, { action: 'compare', subject_a_id: a, subject_b_id: b });
+            if (request !== state.compareRequest) return;
+            state.comparison = payload;
+            renderComparison(payload);
+            showComparisonState('result');
+            $('equivalencyCimf').disabled = !window.CSMSCIMF;
+            const existing = payload.existing_equivalency;
+            if (state.mode === 'create' && existing) {
+                // The pair already has a record: open it instead of creating a duplicate.
+                state.record = existing;
+                state.mode = existing.archived_at || !canManage ? 'view' : 'edit';
+                fillDecision(existing);
+                setNotice(existing.archived_at
+                    ? 'This pair has an archived decision. Restore it to change the decision.'
+                    : 'This pair already has a decision (' + decisionLabel(existing.decision_status) + ', ' + dateTime(existing.reviewed_at) + '). You are editing that record.');
             }
-            ui.renderPagination(elements.recordPagination, payload.pagination, loadRecords);
+            applyMode();
         } catch (error) {
-            if (requestId !== state.recordRequest) return;
-            setTableMessage(elements.recordRows, recordColumnCount, error.message, true);
-            ui.showToast(error.message, 'error');
+            if (request !== state.compareRequest) return;
+            showComparisonState('empty');
+            ui.showFormError(form, error.message);
         }
     }
 
-    function setReviewRequirements() {
-        if (!reviewForm) return;
-        const decision = document.getElementById('equivalencyDecision').value;
-        document.getElementById('equivalencyRemarks').required = false;
+    // ---------- dialog modes ----------
+    function setNotice(text) { $('equivalencyNotice').textContent = text; $('equivalencyNotice').hidden = !text; }
+    function reasonProblem() {
+        const length = reasonInput.value.trim().length;
+        if (length < REASON_MIN) return 'Enter a reason of at least ' + REASON_MIN + ' characters.';
+        if (length > REASON_MAX) return 'The reason must be at most ' + REASON_MAX + ' characters.';
+        return '';
+    }
+    function showReasonError(message) { $('equivalencyReasonError').textContent = message; $('equivalencyReasonError').hidden = !message; reasonInput.setAttribute('aria-invalid', message ? 'true' : 'false'); }
+    function updateCounter() { $('equivalencyReasonCount').textContent = String(reasonInput.value.trim().length); }
+    function updateSave() {
+        if (!saveButton) return;
+        saveButton.disabled = !state.comparison || !['create', 'edit'].includes(state.mode);
+    }
+    function fillDecision(record) {
+        $('equivalencyRecordId').value = record ? record.id : '';
+        decisionSelect.value = record && DECISIONS[record.decision_status] ? record.decision_status : '';
+        reasonInput.value = record?.remarks || '';
+        updateCounter();
+        showReasonError('');
+    }
+    function renderViewDetails(record) {
+        const reason = String(record?.remarks || '').trim();
+        $('equivalencyViewDetails').innerHTML = record ? [
+            ['Decision', decisionChip(record) + (record.archived_at ? ' <span class="csms-sub">' + esc(decisionLabel(record.decision_status)) + ', archived ' + esc(dateTime(record.archived_at)) + '</span>' : '')],
+            ['Reason', reason ? esc(reason) : '<span class="csms-sub">No reason recorded</span>'],
+            ['Reviewed by', esc(reviewerName(record))],
+            ['Reviewed at', esc(dateTime(record.reviewed_at))],
+            ['Last updated', esc(dateTime(record.updated_at))]
+        ].map(([label, value]) => '<dt>' + esc(label) + '</dt><dd>' + value + '</dd>').join('') : '';
+    }
+    function applyMode() {
+        const mode = state.mode, record = state.record;
+        const titles = { create: 'Record decision', edit: 'Edit decision', view: 'Equivalency decision' };
+        $('equivalencyDialogTitle').textContent = titles[mode];
+        $('equivalencyDialogContext').textContent = record ? record.subject_a_code + ' — ' + record.subject_a_title + ' and ' + record.subject_b_code + ' — ' + record.subject_b_title : 'Mutual equivalency between two Subject Master records.';
+        setPickersEnabled(mode === 'create');
+        decisionFields.hidden = mode === 'view' || !canManage;
+        $('equivalencyViewDetails').hidden = mode !== 'view' || !record;
+        if (mode === 'view') renderViewDetails(record);
+        $('equivalencyCancel').textContent = mode === 'view' ? 'Close' : 'Cancel';
+        if (saveButton) saveButton.hidden = mode === 'view';
+        if ($('equivalencyEdit')) $('equivalencyEdit').hidden = !(mode === 'view' && record && !record.archived_at);
+        if ($('equivalencyRestore')) $('equivalencyRestore').hidden = !(record && record.archived_at);
+        if (mode === 'edit' && record && !String(record.remarks || '').trim()) setNotice('This record has no reason yet. Add one to save the decision.');
+        updateSave();
     }
 
-    function openReview(record) {
-        if (!canManage || !reviewModal || !reviewForm) return;
-        ui.clearFormError(reviewForm);
-        reviewForm.reset();
-        const fromComparison = !record && state.comparison;
-        if (!record && !fromComparison) return;
-        const subjectA = fromComparison ? state.comparison.subject_a : null;
-        const subjectB = fromComparison ? state.comparison.subject_b : null;
-        const current = record || (fromComparison ? state.comparison.existing_equivalency : null);
-        const subjectAId = current ? current.subject_id : subjectA.id;
-        const subjectBId = current ? current.equivalent_subject_id : subjectB.id;
-        const subjectALabel = current
-            ? current.subject_a_code + ' - ' + current.subject_a_title : subjectLabel(subjectA);
-        const subjectBLabel = current
-            ? current.subject_b_code + ' - ' + current.subject_b_title : subjectLabel(subjectB);
-        document.getElementById('equivalencyRecordId').value = current ? current.id : '';
-        document.getElementById('equivalencySubjectAId').value = subjectAId;
-        document.getElementById('equivalencySubjectBId').value = subjectBId;
-        document.getElementById('equivalencySubjectALabel').textContent = subjectALabel;
-        document.getElementById('equivalencySubjectBLabel').textContent = subjectBLabel;
-        document.getElementById('equivalencyReviewContext').textContent =
-            subjectALabel + ' compared with ' + subjectBLabel;
-        document.getElementById('equivalencyDecision').value =
-            current && current.decision_status !== 'pending' ? current.decision_status : '';
-        document.getElementById('equivalencyRemarks').value = current?.remarks || '';
-        document.getElementById('equivalencyReviewTitle').textContent = current
-            ? 'Edit Equivalency Decision' : 'Record Equivalency Decision';
-        document.getElementById('saveEquivalencyButton').textContent = 'Save Decision';
-        setReviewRequirements();
-        reviewModal.open();
+    function openDialog(mode, record) {
+        if (mode !== 'view' && !canManage) mode = 'view';
+        state.mode = mode;
+        state.record = record || null;
+        state.comparison = null;
+        ui.clearFormError(form);
+        setNotice('');
+        fillDecision(record || null);
+        pickers.A?.clear(false);
+        pickers.B?.clear(false);
+        if (record) {
+            setPicker('A', record.subject_id, record.subject_a_code, record.subject_a_title);
+            setPicker('B', record.equivalent_subject_id, record.subject_b_code, record.subject_b_title);
+        }
+        applyMode();
+        showComparisonState('empty');
+        dialog.open();
+        loadComparison();
     }
 
-    async function submitReview(event) {
+    async function submitDecision(event) {
         event.preventDefault();
-        if (!reviewForm.reportValidity()) return;
-        ui.clearFormError(reviewForm);
-        const data = new FormData(reviewForm);
-        const isUpdate = Boolean(data.get('id'));
+        if (!canManage || !['create', 'edit'].includes(state.mode)) return;
+        ui.clearFormError(form);
+        if (!decisionSelect.value) { ui.showFormError(form, 'Select a decision.'); decisionSelect.focus(); return; }
+        const problem = reasonProblem();
+        showReasonError(problem);
+        if (problem) { reasonInput.focus(); return; }
+        const data = new FormData();
+        const isUpdate = state.mode === 'edit' && state.record;
         data.set('action', isUpdate ? 'update' : 'create');
-        ui.setFormSubmitting(reviewForm, true, isUpdate ? 'Saving...' : 'Creating...');
+        if (isUpdate) data.set('id', state.record.id);
+        data.set('subject_a_id', $('subjectASelect').value);
+        data.set('subject_b_id', $('subjectBSelect').value);
+        data.set('decision_status', decisionSelect.value);
+        data.set('remarks', reasonInput.value.trim());
+        ui.setFormSubmitting(form, true, 'Saving…');
         try {
             const payload = await ui.postForm(endpoint, data);
-            reviewModal.close();
+            dialog.close();
             ui.showToast(payload.message, isUpdate ? 'updated' : 'success');
-            if (elements.recordRows) await loadRecords(state.recordPage);
-            if (state.comparison) await compareSubjects();
+            await loadRecords(state.page);
         } catch (error) {
-            ui.showFormError(reviewForm, error.message);
+            ui.showFormError(form, error.message);
         } finally {
-            ui.setFormSubmitting(reviewForm, false);
+            ui.setFormSubmitting(form, false);
+            updateSave();
         }
     }
 
-    function showDetails(record) {
-        const detail = document.getElementById('equivalencyDetails');
-        const pairs = [
-            ['Subject A', record.subject_a_code + ' — ' + record.subject_a_title],
-            ['Subject B', record.subject_b_code + ' — ' + record.subject_b_title],
-            ['Decision', decisionLabel(record.decision_status)],
-            ['Review Notes', record.remarks || '—'],
-            ['Reviewed By', reviewerName(record)],
-            ['Reviewed At', dateTime(record.reviewed_at)],
-            ['Last Updated', dateTime(record.updated_at)],
-        ];
-        detail.innerHTML = pairs.map(([label, value]) => '<dt>' + ui.escapeHtml(label) + '</dt><dd' + (label.startsWith('Subject') ? ' class="csms-ctable__code"' : '') + '>' + ui.escapeHtml(value) + '</dd>').join('');
-        detailsModal.open();
-    }
-
-    function reviewWithCimf() { if (state.comparison) window.CSMSCIMF?.open('review'); }
-
-    async function archiveSelected() {
-        if (!archiveRecordId) return;
+    async function postAction(action, id) {
         const data = new FormData();
-        data.set('action', 'archive'); data.set('id', archiveRecordId);
+        data.set('action', action);
+        data.set('id', id);
+        const payload = await ui.postForm(endpoint, data);
+        ui.showToast(payload.message, 'success');
+        await loadRecords(state.page);
+        return payload;
+    }
+    async function restore(id) {
         try {
-            const payload = await ui.postForm(endpoint, data);
-            archiveModal.close(); archiveRecordId = null;
-            ui.showToast(payload.message, 'success'); await loadRecords(state.recordPage);
+            const payload = await postAction('restore', id);
+            if (!dialogElement.hidden && payload.equivalency) { state.record = payload.equivalency; state.mode = 'view'; setNotice(''); applyMode(); }
         } catch (error) { ui.showToast(error.message, 'error'); }
     }
 
-    elements.subjectASearch?.addEventListener('input', synchronizeSelectors);
-    elements.subjectBSearch?.addEventListener('input', synchronizeSelectors);
-    elements.compareButton?.addEventListener('click', compareSubjects);
-    elements.clearComparison?.addEventListener('click', function () {
-        subjectAAutocomplete?.clear();
-        subjectBAutocomplete?.clear();
-        clearRenderedComparison();
-        updateCompareButton();
+    // ---------- CIMF: advice beside the dialog, never written into the reason ----------
+    window.CSMSPageCIMFContext = () => ({ subject_a_id: $('subjectASelect').value || '', subject_b_id: $('subjectBSelect').value || '' });
+    window.CSMSPageCIMFStoredDecision = () => state.comparison?.existing_equivalency || null;
+    const cimfPanel = $('csmsCimfPanel');
+    function setCimfBeside(on) { document.body.classList.toggle('equivalency-cimf-beside', Boolean(on)); }
+    if (cimfPanel) new MutationObserver(() => { if (cimfPanel.hidden) setCimfBeside(false); }).observe(cimfPanel, { attributes: true, attributeFilter: ['hidden'] });
+    $('equivalencyCimf').addEventListener('click', () => {
+        if (!window.CSMSCIMF || !state.comparison) return;
+        setCimfBeside(true);
+        window.CSMSCIMF.updateContext?.();
+        window.CSMSCIMF.open('review');
     });
-    elements.headerRecordDecision?.addEventListener('click', function () { openReview(null); });
-    elements.reviewWithCimf?.addEventListener('click', reviewWithCimf);
+    dialogElement.querySelectorAll('[data-modal-close]').forEach(button => button.addEventListener('click', () => setCimfBeside(false)));
+    dialogElement.addEventListener('keydown', event => { if (event.key === 'Escape') setCimfBeside(false); });
 
-    const reloadRecords = ui.debounce(function () { loadRecords(1); }, 300);
-    elements.recordSearch?.addEventListener('input', reloadRecords);
-    elements.recordStatus?.addEventListener('change', function () { loadRecords(1); });
-    elements.recordPerPage?.addEventListener('change', function () { loadRecords(1); });
-    elements.clearFilters?.addEventListener('click', function () {
-        elements.recordSearch.value = '';
-        elements.recordStatus.value = '';
-        loadRecords(1);
+    // ---------- events ----------
+    form.addEventListener('submit', submitDecision);
+    reasonInput.addEventListener('input', () => { updateCounter(); if (!$('equivalencyReasonError').hidden) showReasonError(reasonProblem()); });
+    $('equivalencyEdit')?.addEventListener('click', () => { if (!state.record) return; state.mode = 'edit'; fillDecision(state.record); applyMode(); decisionSelect.focus(); });
+    $('equivalencyRestore')?.addEventListener('click', () => { if (state.record) restore(state.record.id); });
+    document.querySelectorAll('#recordDecisionButton, [data-record-decision]').forEach(button => button.addEventListener('click', () => openDialog('create', null)));
+    $('equivalencyArchiveConfirm')?.addEventListener('click', async () => {
+        if (!state.archiveId) return;
+        try { await postAction('archive', state.archiveId); archiveDialog.close(); }
+        catch (error) { ui.showToast(error.message, 'error'); }
+        state.archiveId = null;
     });
-    const rowMenu = elements.recordRows && window.CsmsMenu ? window.CsmsMenu.create(document.getElementById('equivalencyRowMenu'), {
-        esc: ui.escapeHtml,
-        onSelect: function (action, data) {
+
+    const reload = ui.debounce(() => loadRecords(1), 300);
+    $('equivalencySearch').addEventListener('input', reload);
+    $('equivalencyStatus').addEventListener('change', () => loadRecords(1));
+    $('equivalencyPerPage').addEventListener('change', () => loadRecords(1));
+
+    const rowMenu = window.CsmsMenu ? window.CsmsMenu.create($('equivalencyRowMenu'), {
+        esc,
+        onSelect(action, data) {
             const record = state.records.get(Number(data.record));
             if (!record) return;
-            if (action === 'edit') openReview(record);
-            else if (action === 'archive') { archiveRecordId = Number(record.id); archiveModal.open(); }
+            if (action === 'view') openDialog('view', record);
+            else if (action === 'edit') openDialog('edit', record);
+            else if (action === 'archive') { state.archiveId = Number(record.id); archiveDialog?.open(); }
+            else if (action === 'restore') restore(record.id);
         }
     }) : null;
-    elements.recordRows?.addEventListener('click', function (event) {
-        const menuButton = event.target.closest('[data-menu]');
-        if (menuButton) { rowMenu?.open(menuButton, [{ action: 'edit', label: 'Edit decision', data: { record: menuButton.dataset.menu } }, { action: 'archive', label: 'Archive', danger: true, data: { record: menuButton.dataset.menu } }]); return; }
-        const row = event.target.closest('[data-row]');
-        if (row) showDetails(state.records.get(Number(row.dataset.row)));
-    });
-    elements.recordRows?.addEventListener('keydown', function (event) {
-        if (event.target.matches?.('[data-row]') && ['Enter', ' '].includes(event.key)) { event.preventDefault(); showDetails(state.records.get(Number(event.target.dataset.row))); }
-    });
-    document.getElementById('confirmArchiveEquivalency')?.addEventListener('click', archiveSelected);
-    document.getElementById('equivalencyDecision')?.addEventListener('change', setReviewRequirements);
-    reviewForm?.addEventListener('submit', submitReview);
-
-    if (isComparisonView) {
-        clearRenderedComparison();
-    } else {
-        loadRecords(1);
+    function menuItems(record) {
+        const data = { record: record.id };
+        const items = [{ action: 'view', label: 'View', data }];
+        if (canManage && !record.archived_at) items.push({ action: 'edit', label: 'Edit decision', data }, { action: 'archive', label: 'Archive', danger: true, data });
+        if (canManage && record.archived_at) items.push({ action: 'restore', label: 'Restore', data });
+        return items;
     }
+    $('equivalencyRows').addEventListener('click', event => {
+        const menuButton = event.target.closest('[data-menu]');
+        if (menuButton) { const record = state.records.get(Number(menuButton.dataset.menu)); if (record) rowMenu?.open(menuButton, menuItems(record)); return; }
+        const row = event.target.closest('[data-row]');
+        if (row) openDialog('view', state.records.get(Number(row.dataset.row)));
+    });
+    $('equivalencyRows').addEventListener('keydown', event => {
+        if (event.target.matches?.('[data-row]') && ['Enter', ' '].includes(event.key)) { event.preventDefault(); openDialog('view', state.records.get(Number(event.target.dataset.row))); }
+    });
+
+    loadRecords(1);
 }());

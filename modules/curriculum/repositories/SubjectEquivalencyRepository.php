@@ -50,7 +50,8 @@ class SubjectEquivalencyRepository
 
     public function paginate(array $query): array
     {
-        $conditions = ["equivalencies.archived_at IS NULL", "equivalencies.decision_status <> 'pending'"];
+        // The archived filter shows archived records only; otherwise active records. Pending rows are never created and stay hidden.
+        $conditions = [$query['archived'] ? 'equivalencies.archived_at IS NOT NULL' : 'equivalencies.archived_at IS NULL', "equivalencies.decision_status <> 'pending'"];
         $types = '';
         $params = [];
         if ($query['search'] !== null) {
@@ -162,7 +163,24 @@ class SubjectEquivalencyRepository
         if (!$changed) throw new DomainConflictException('This equivalency record is already archived.');
     }
 
-    public function usageContext(int $subjectId): array
+    public function restore(int $id): void
+    {
+        $stmt = $this->db->prepare(
+            'UPDATE subject_equivalencies SET archived_at = NULL, archived_by = NULL
+             WHERE id = ? AND archived_at IS NOT NULL'
+        );
+        $stmt->bind_param('i', $id);
+        $stmt->execute();
+        $changed = $stmt->affected_rows > 0;
+        $stmt->close();
+        if (!$changed) throw new DomainConflictException('This equivalency record is not archived.');
+    }
+
+    /**
+     * Placement usage of one subject. $scopeSql is CurriculumReadScope::sql('versions'): constant SQL, never user input.
+     * When it is not empty, placements in versions outside the reader's scope are left out and counted in hidden_placements.
+     */
+    public function usageContext(int $subjectId, string $scopeSql = ''): array
     {
         $joins = ' FROM curriculum_version_subjects AS placements
                    INNER JOIN curriculum_versions AS versions
@@ -170,7 +188,7 @@ class SubjectEquivalencyRepository
                    INNER JOIN curricula ON curricula.id = versions.curriculum_id
                    INNER JOIN academic_programs AS programs
                       ON programs.id = curricula.academic_program_id
-                   WHERE placements.subject_id = ?';
+                   WHERE placements.subject_id = ?' . ($scopeSql !== '' ? ' AND ' . $scopeSql : '');
         $summaryStmt = RepositoryQuery::execute(
             $this->db,
             'SELECT COUNT(*) AS placements,
@@ -218,7 +236,7 @@ class SubjectEquivalencyRepository
                 INNER JOIN curriculum_versions versions ON versions.id = placements.curriculum_version_id
                 INNER JOIN curricula ON curricula.id = versions.curriculum_id
                 INNER JOIN academic_programs programs ON programs.id = curricula.academic_program_id
-                WHERE placements.subject_id = ?
+                WHERE placements.subject_id = ?' . ($scopeSql !== '' ? ' AND ' . $scopeSql : '') . '
                 UNION
                 SELECT programs.program_code
                 FROM program_subject_assignments assignments
@@ -234,7 +252,39 @@ class SubjectEquivalencyRepository
             $summary[$key] = (int)$summary[$key];
         }
         $summary['programs'] = $programCount;
+        $summary['hidden_placements'] = 0;
+        if ($scopeSql !== '') {
+            $allStmt = RepositoryQuery::execute($this->db, 'SELECT COUNT(*) AS total FROM curriculum_version_subjects WHERE subject_id = ?', 'i', [$subjectId]);
+            $summary['hidden_placements'] = max(0, (int)$allStmt->get_result()->fetch_assoc()['total'] - $summary['placements']);
+            $allStmt->close();
+        }
         return ['summary' => $summary, 'program_assignments' => $programAssignments, 'records' => $records];
+    }
+
+    /**
+     * Prerequisites / corequisites of a subject as placed in curriculum versions (union across versions, same scope as usage).
+     * One row per required subject and type, with the version labels it appears in.
+     */
+    public function prerequisites(int $subjectId, string $scopeSql = ''): array
+    {
+        $stmt = RepositoryQuery::execute(
+            $this->db,
+            'SELECT requirements.requirement_type, required.subject_code, required.subject_title,
+                    GROUP_CONCAT(DISTINCT CONCAT(curricula.curriculum_code, \' \', versions.version_label)
+                                 ORDER BY curricula.curriculum_code, versions.version_label SEPARATOR \', \') AS versions
+             FROM curriculum_subject_requirements AS requirements
+             INNER JOIN subjects AS required ON required.id = requirements.required_subject_id
+             INNER JOIN curriculum_versions AS versions ON versions.id = requirements.curriculum_version_id
+             INNER JOIN curricula ON curricula.id = versions.curriculum_id
+             WHERE requirements.subject_id = ?' . ($scopeSql !== '' ? ' AND ' . $scopeSql : '') . '
+             GROUP BY requirements.requirement_type, required.id, required.subject_code, required.subject_title
+             ORDER BY requirements.requirement_type, required.subject_code',
+            'i',
+            [$subjectId]
+        );
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return $rows;
     }
 
     private function detailSelect(): string
@@ -244,7 +294,7 @@ class SubjectEquivalencyRepository
                        equivalencies.decision_status, equivalencies.remarks,
                        equivalencies.reviewed_by, equivalencies.reviewed_at,
                        equivalencies.created_by, equivalencies.created_at,
-                       equivalencies.updated_at, equivalencies.archived_at,
+                       equivalencies.updated_at, equivalencies.archived_at, equivalencies.archived_by,
                        subject_a.subject_code AS subject_a_code,
                        subject_a.subject_title AS subject_a_title,
                        subject_b.subject_code AS subject_b_code,

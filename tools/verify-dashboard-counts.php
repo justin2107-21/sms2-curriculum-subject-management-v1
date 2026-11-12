@@ -204,7 +204,6 @@ foreach ([null, (int)one("SELECT c.academic_program_id FROM curricula c JOIN cur
                 $validated = (int)one("SELECT COUNT(*) FROM curriculum_versions v JOIN curricula c ON c.id=v.curriculum_id WHERE v.review_status='under_review' AND v.status<>'archived' AND EXISTS (SELECT 1 FROM compliance_validation_runs r WHERE r.curriculum_version_id=v.id)" . $pc($programId));
                 check($R, $scope, 'Compliance under review: versions with a run', $cd['total_rows'] ?? 0, $validated);
                 check($R, $scope, 'Awaiting my review list', count($L['awaiting_review']['data']['items'] ?? []), min(5, $awaiting));
-                check($R, $scope, 'Pending equivalency list', count($L['pending_equivalency']['data']['items'] ?? []), min(5, (int)one("SELECT COUNT(*) FROM subject_equivalencies WHERE decision_status='pending' AND archived_at IS NULL")));
                 check($R, $scope, 'My recent decisions list', count($L['my_decisions']['data']['items'] ?? []), min(5, (int)one("SELECT COUNT(*) FROM curriculum_version_review_events e JOIN curriculum_versions v ON v.id=e.curriculum_version_id JOIN curricula c ON c.id=v.curriculum_id WHERE e.actor_user_id=$uid AND e.action IN ('approve','return')" . $pc($programId))));
                 break;
 

@@ -27,7 +27,7 @@ if (!function_exists('ui_sidebar')) {
             ['Electives Manager', $page('electives_manager.php'), 'collection', 'electives-manager', 'elective.view'],
             ['Academic Strand/Course Assignment', $page('program_centric_assignment.php'), 'share', 'program-assignment-program,program-assignment-subject', 'program_assignment.view'],
             ['Subject Offering History', $page('subject_history_view.php'), 'clock-history', 'subject-history-subject,subject-history-curriculum', 'subject_history.view'],
-            ['Subject Equivalency Tool', $page('subject_comparison.php'), 'arrow-left-right', 'subject-equivalency-comparison,subject-equivalency-records', 'equivalency.view'],
+            ['Subject Equivalency Tool', $page('subject_equivalency.php'), 'arrow-left-right', 'subject-equivalency', 'equivalency.view'],
             ['Grade Weighting Setup', $page('grade_weighting_setup.php'), 'pie-chart', 'grade-weighting', 'grade_weighting.view'],
             ['CHED / DepEd Compliance Validator', $page('validate_curriculum.php'), 'shield-check', 'compliance-validate,compliance-rules,compliance-references,compliance-history', 'compliance.view'],
             ['Curriculum Export Tool', $page('curriculum_export.php'), 'file-earmark-arrow-down', 'curriculum-export', 'curriculum_export.view'],

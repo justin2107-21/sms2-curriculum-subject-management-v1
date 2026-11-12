@@ -74,7 +74,7 @@ try {
     runtimeResponse($viewer->api('version','list',$args+['academic_program_id'=>$f['other_program_id']]),422,'cross-program context rejected');
     runtimeResponse($viewer->request('dashboard/analytics.php',['version_id'=>$f['revision_version_id'],'program_id'=>$f['other_program_id']]),422,'forged dashboard program rejected');
     runtimeResponse($viewer->request('dashboard/analytics.php',['version_id'=>$f['revision_version_id']],'POST'),405,'analytics stay GET-only');
-    $pages=['curricula','subject_mapping','prerequisite_configuration','electives_manager','program_centric_assignment','subject_history_view','subject_comparison','grade_weighting_setup','validate_curriculum','curriculum_export'];
+    $pages=['curricula','subject_mapping','prerequisite_configuration','electives_manager','program_centric_assignment','subject_history_view','subject_equivalency','grade_weighting_setup','validate_curriculum','curriculum_export'];
     foreach($pages as $page) {
         $r=$viewer->request('modules/curriculum/pages/'.$page.'.php',['program_id'=>$f['program_id'],'curriculum_id'=>$f['curriculum_id'],'version_id'=>$f['revision_version_id']]);
         runtimeResponse($r,200,'authenticated navigation '.$page);

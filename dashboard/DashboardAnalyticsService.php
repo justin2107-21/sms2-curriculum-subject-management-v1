@@ -257,10 +257,6 @@ final class DashboardAnalyticsService
             'awaiting_review' => $this->meta('Awaiting my review', 'list', self::CURRICULA, '', $this->listOf(array_map(fn($r) => [
                 'primary' => $this->versionName($r), 'secondary' => 'Submitted by ' . $this->person($r), 'meta' => $r['submitted_at'],
             ], array_slice($awaiting, 0, 5)), 'Nothing is waiting for your review.')),
-            'pending_equivalency' => $this->meta('Pending equivalency decisions', 'list', 'modules/curriculum/pages/equivalency_records.php', '',
-                $this->allow('equivalency.manage') ? $this->listOf(array_map(static fn($r) => [
-                    'primary' => $r['subject_code'] . ' and ' . $r['equivalent_code'], 'secondary' => 'Pending decision', 'meta' => $r['created_at'],
-                ], $this->repo->pendingEquivalencies(5)), 'None pending.') : DashboardShaper::empty()),
             'my_decisions' => $this->meta('My recent decisions', 'list', self::CURRICULA, '', $this->listOf(array_map(fn($r) => [
                 'primary' => $this->versionName($r), 'secondary' => ($r['action'] === 'approve' ? 'Approved' : 'Returned') . ': ' . ($r['comments'] ?: 'no reason recorded'), 'meta' => $r['created_at'],
             ], $this->repo->myDecisions($this->userId, $this->programId, 5)), 'No decisions yet.')),

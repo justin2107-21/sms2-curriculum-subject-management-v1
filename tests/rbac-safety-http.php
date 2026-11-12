@@ -109,7 +109,7 @@ try {
         'admin/permissions.php' => ['sa' => 200, 'ad' => 403, 'st' => 403, 'of' => 403, 'fa' => 403],
         'admin/settings.php' => ['sa' => 200, 'ad' => 403, 'st' => 403, 'of' => 403, 'fa' => 403],
         'admin/audit_logs.php' => ['sa' => 200, 'ad' => 200, 'st' => 403, 'of' => 403, 'fa' => 403],
-        'modules/curriculum/pages/equivalency_records.php' => ['sa' => 200, 'ad' => 200, 'st' => 200, 'of' => 200, 'fa' => 403],
+        'modules/curriculum/pages/subject_equivalency.php' => ['sa' => 200, 'ad' => 200, 'st' => 200, 'of' => 200, 'fa' => 403],
         'modules/curriculum/pages/curriculum_export.php' => ['sa' => 200, 'ad' => 200, 'st' => 200, 'of' => 200, 'fa' => 403],
         'modules/curriculum/pages/grade_weighting_setup.php' => ['sa' => 200, 'ad' => 200, 'st' => 200, 'of' => 200, 'fa' => 403],
         'modules/curriculum/pages/subject_mapping.php' => ['sa' => 200, 'ad' => 200, 'st' => 200, 'of' => 200, 'fa' => 200]];

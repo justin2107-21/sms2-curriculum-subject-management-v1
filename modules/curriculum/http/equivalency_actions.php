@@ -43,6 +43,12 @@ try {
             $service->archive($id, curriculum_actor_id());
             json_response(true, 'Equivalency record archived. Historical data was retained.');
 
+        case 'restore':
+            curriculum_require_mutation('equivalency.manage');
+            $id = DomainValidator::positiveId($_POST['id'] ?? null, 'Subject equivalency');
+            $record = $service->restore($id, curriculum_actor_id());
+            json_response(true, 'Equivalency record restored.', ['equivalency' => $record]);
+
         default:
             json_response(false, 'Unknown action.', [], 400);
     }

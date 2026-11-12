@@ -4,6 +4,7 @@ require_once __DIR__ . '/../validators/DomainValidator.php';
 require_once __DIR__ . '/../repositories/SubjectRepository.php';
 require_once __DIR__ . '/../repositories/SubjectEquivalencyRepository.php';
 require_once __DIR__ . '/../../../shared/audit.php';
+require_once __DIR__ . '/CurriculumReadScope.php';
 
 class SubjectEquivalencyService
 {
@@ -54,14 +55,22 @@ class SubjectEquivalencyService
             $pair['subject_a_id'],
             $pair['subject_b_id']
         );
+        // Same read scope as Assignment / Electives: a reader without curriculum.view_unapproved sees usage and
+        // prerequisites from approved (or, by setting, active) versions only. CIMF receives this same scoped payload.
+        $scope = CurriculumReadScope::sql('versions');
         return [
             'subject_a' => $subjectA,
             'subject_b' => $subjectB,
             'differences' => $this->objectiveDifferences($subjectA, $subjectB),
             'usage' => [
-                'subject_a' => $this->equivalencies->usageContext($pair['subject_a_id']),
-                'subject_b' => $this->equivalencies->usageContext($pair['subject_b_id']),
+                'subject_a' => $this->equivalencies->usageContext($pair['subject_a_id'], $scope),
+                'subject_b' => $this->equivalencies->usageContext($pair['subject_b_id'], $scope),
             ],
+            'prerequisites' => [
+                'subject_a' => $this->equivalencies->prerequisites($pair['subject_a_id'], $scope),
+                'subject_b' => $this->equivalencies->prerequisites($pair['subject_b_id'], $scope),
+            ],
+            'scope_restricted' => $scope !== '',
             'existing_equivalency' => $this->equivalencies->findByPair($lowerId, $higherId),
         ];
     }
@@ -89,10 +98,11 @@ class SubjectEquivalencyService
             if (($subjectA['archived_at'] ?? null) !== null || ($subjectB['archived_at'] ?? null) !== null) {
                 throw new DomainValidationException('Archived subjects cannot receive a current equivalency decision.');
             }
-            if ($this->equivalencies->findByPair($subjectId, $equivalentSubjectId)) {
-                throw new DomainConflictException(
-                    'An equivalency record already exists for these subjects.'
-                );
+            $existingPair = $this->equivalencies->findByPair($subjectId, $equivalentSubjectId);
+            if ($existingPair) {
+                throw new DomainConflictException($existingPair['archived_at'] !== null
+                    ? 'An archived equivalency record already exists for these subjects. Restore it to change the decision.'
+                    : 'An equivalency record already exists for these subjects. Edit that record instead.');
             }
             $id = $this->equivalencies->create(
                 $data,
@@ -155,7 +165,10 @@ class SubjectEquivalencyService
                 [
                     'subject_id' => (int)$existing['subject_id'],
                     'equivalent_subject_id' => (int)$existing['equivalent_subject_id'],
+                    'old_decision_status' => (string)$existing['decision_status'],
                     'decision_status' => $review['decision_status'],
+                    // Only whether the reason changed; the reason text itself is not copied into the audit log.
+                    'remarks_changed' => trim((string)($existing['remarks'] ?? '')) !== $review['remarks'],
                 ]
             );
             $record = $this->equivalencies->findById($id);
@@ -188,6 +201,29 @@ class SubjectEquivalencyService
             $this->db->rollback();
             throw $error;
         }
+    }
+
+    public function restore(int $id, int $actorId): array
+    {
+        $this->db->begin_transaction();
+        try {
+            $existing = $this->equivalencies->findByIdForUpdate($id);
+            if (!$existing) throw new DomainNotFoundException('Subject equivalency record not found.');
+            $this->equivalencies->restore($id);
+            audit_log_required(
+                'SUBJECT_EQUIVALENCY_RESTORE', 'subject_equivalency', $id,
+                'Archived subject equivalency record restored.',
+                ['subject_id' => (int)$existing['subject_id'],
+                 'equivalent_subject_id' => (int)$existing['equivalent_subject_id'],
+                 'decision_status' => (string)$existing['decision_status']]
+            );
+            $record = $this->equivalencies->findById($id);
+            $this->db->commit();
+        } catch (Throwable $error) {
+            $this->db->rollback();
+            throw $error;
+        }
+        return $record;
     }
 
     private function canonicalPair(int $subjectAId, int $subjectBId): array

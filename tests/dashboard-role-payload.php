@@ -11,7 +11,7 @@ $expected = [
     'uitest.superadmin' => ['super_admin', ['active_accounts', 'password_change', 'audit_7d', 'awaiting'], ['accounts_by_role', 'audit_weekly', 'pipeline'], ['rbac_changes', 'password_accounts']],
     'uitest.admin' => ['admin', ['programs', 'curricula', 'approved', 'awaiting'], ['pipeline', 'completeness', 'programs_by_level'], ['recently_approved', 'export_log', 'no_curriculum']],
     'uitest.staff' => ['staff', ['my_drafts', 'returned', 'waiting', 'failing'], ['term_load', 'prerequisite_health', 'compliance_working', 'units_by_category'], ['returned_list', 'my_drafts', 'needs_attention']],
-    'uitest.acadoffice' => ['acad_office', ['awaiting_mine', 'avg_days', 'approved_month', 'returned_month'], ['review_outcomes', 'decision_split', 'pipeline', 'compliance_under_review'], ['awaiting_review', 'pending_equivalency', 'my_decisions']],
+    'uitest.acadoffice' => ['acad_office', ['awaiting_mine', 'avg_days', 'approved_month', 'returned_month'], ['review_outcomes', 'decision_split', 'pipeline', 'compliance_under_review'], ['awaiting_review', 'my_decisions']],
     'uitest.acadfaculty' => ['acad_faculty', ['approved', 'outcomes', 'my_subjects'], ['outcome_coverage', 'term_load', 'units_by_category'], ['approved_curricula', 'recently_approved']],
 ];
 $forbidden = [

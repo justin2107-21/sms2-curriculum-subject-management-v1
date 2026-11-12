@@ -134,7 +134,7 @@ try {
     foreach($conn->query("SELECT ur.role_id,p.id AS permission_id FROM user_roles ur JOIN permissions p ON p.name='compliance.reference.verify' WHERE ur.user_id=$adminUser")->fetch_all(MYSQLI_ASSOC) as $grant){$key=(int)$grant['role_id'].':'.(int)$grant['permission_id'];if(!isset($priorGrants[$key]))$temporaryTask3PermissionGrants[]=[(int)$grant['role_id'],(int)$grant['permission_id']];}
     $pages = ['academic_programs','curricula','subjects','subject_mapping','prerequisite_configuration','electives_manager',
         'program_centric_assignment','subject_centric_assignment','subject_history_view','curriculum_history_view',
-        'subject_comparison','equivalency_records','grade_weighting_setup','validate_curriculum','compliance_rules',
+        'subject_equivalency','grade_weighting_setup','validate_curriculum','compliance_rules',
         'compliance_references','validation_history','curriculum_export'];
     foreach ($pages as $page) {
         $response = $admin->request('modules/curriculum/pages/' . $page . '.php');

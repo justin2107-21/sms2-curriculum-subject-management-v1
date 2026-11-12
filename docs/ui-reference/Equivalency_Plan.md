@@ -1,7 +1,17 @@
 # Subject Equivalency Tool: slice 0 (read-only audit and plan)
 
-Status: **plan only. Nothing is built, no code or schema changed.** Written 2026-11-12, branch `ui-redesign-pilot`.
+Status: slice 0 (this audit) written 2026-11-12. **Slice 1 built 2026-11-12, see "Slice 1: done" below; sections 1-7 describe the page *before* slice 1.** Slices 2-4 not started. Branch `ui-redesign-pilot`.
 Module name is fixed: **Subject Equivalency Tool**. Evidence: code read; `sms_db_uitest` queried read-only; `sms_db` counts only.
+
+## Slice 1: done (no schema change, no migration)
+
+- **One page, no tabs.** `pages/subject_equivalency.php` is the page; `subject_comparison.php` and `equivalency_records.php` redirect (302) to it with their query string. The `_module_views.php` switcher entry is gone; sidebars point to `subject_equivalency.php` (nav key `subject-equivalency`). Title "Subject Equivalency Tool", one subtitle, `csms-info`: "Advisory record. A decision never changes placements or credits automatically." No Program > Curriculum > Version bar.
+- **Records table is the main view:** `csms-filter-row` (search, Decision select with an "Archived" option, rows per page, "N records"), `csms-ctable` with Subject A, Subject B, Decision (`csms-chip`: Equivalent `--approved`, Not equivalent `--returned`, Needs review `--under_review`, Archived `--archived`), Reason (2-line clamp; "No reason recorded" muted), Reviewed by, Reviewed at; `csms-menu` row actions View / Edit decision / Archive, or Restore on archived rows (manage only). `csms-empty` for loading, no records (with Record decision for managers), no match and load error. No blank rows.
+- **One dialog** (the same `curriculum-modal` / `modal-dialog` shell as Assignment and Offering History) for record, edit and view: two `record-autocomplete` pickers, an evidence table that always shows every row (code, title, description, total / lecture / lab units, technical status, prerequisites, placements, programs, curricula, versions; "Not recorded" when empty), a "Same" / "Differs" chip per row (no score), Decision and a **required Reason** (counter, inline error). A pair that already has a record opens that record (edit, or read-only with Restore if archived). Row click opens the dialog read-only; non-managers only ever get read-only. "Review with CIMF" is inside the dialog: the CIMF panel opens beside it (above it at 1024 px and narrower) and nothing is copied into the reason.
+- **Server:** reason required on create and update (trimmed, 10-4,000 characters; `DomainValidator::EQUIVALENCY_REASON_MIN/MAX`); old rows without a reason stay readable, editing them needs one. New `restore` action (POST, CSRF, `equivalency.manage`, audit `SUBJECT_EQUIVALENCY_RESTORE`). Update audit now stores `old_decision_status`, `decision_status` and `remarks_changed` (never the reason text). Duplicate pair message says "Edit that record" or, for an archived pair, "Restore it". `list` accepts `decision_status=archived`.
+- **Read scope:** `compare` (and therefore CIMF `stored_usage`) applies `CurriculumReadScope::sql('versions')` to usage and prerequisites, like Assignment / Electives. A role without `curriculum.view_unapproved` sees approved-version usage only and a note "N draft or unapproved placements are hidden for your role".
+- **Removed:** the dashboard "Pending equivalency decisions" list and `pendingEquivalencies()` (the DB CHECK still allows `pending`); the old two-view CSS/JS (`equivalency-selector-card`, summary / usage cards, existing-record block, `mapping-fixed-context`, hand-built header actions, page-specific badges). `equivalency_cimf_actions.php` stays a 410 stub.
+- **Test:** `tests/equivalency-http.php` (53 checks, disposable schema and server).
 
 ## 1. The page today
 

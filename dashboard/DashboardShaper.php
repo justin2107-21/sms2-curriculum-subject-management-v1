@@ -348,7 +348,7 @@ final class DashboardShaper
         'compliance_validation_run' => 'modules/curriculum/pages/validation_history.php',
         'compliance_rule' => 'modules/curriculum/pages/compliance_rules.php',
         'compliance_reference' => 'modules/curriculum/pages/compliance_references.php',
-        'subject_equivalency' => 'modules/curriculum/pages/equivalency_records.php',
+        'subject_equivalency' => 'modules/curriculum/pages/subject_equivalency.php',
     ];
 
     /**
