@@ -1,6 +1,6 @@
 # Subject Equivalency Tool: slice 0 (read-only audit and plan)
 
-Status: slice 0 (this audit) written 2026-11-12. **Slice 1 built 2026-11-12, see "Slice 1: done" below; sections 1-7 describe the page *before* slice 1.** Slices 2-4 not started. Branch `ui-redesign-pilot`.
+Status: slice 0 (this audit) written 2026-11-12. **Slices 1 and 1b built 2026-11-12, see "Slice 1: done" and "Slice 1b: done" below; sections 1-7 describe the page *before* slice 1.** Slices 2-4 not started. Branch `ui-redesign-pilot`.
 Module name is fixed: **Subject Equivalency Tool**. Evidence: code read; `sms_db_uitest` queried read-only; `sms_db` counts only.
 
 ## Slice 1: done (no schema change, no migration)
@@ -12,6 +12,33 @@ Module name is fixed: **Subject Equivalency Tool**. Evidence: code read; `sms_db
 - **Read scope:** `compare` (and therefore CIMF `stored_usage`) applies `CurriculumReadScope::sql('versions')` to usage and prerequisites, like Assignment / Electives. A role without `curriculum.view_unapproved` sees approved-version usage only and a note "N draft or unapproved placements are hidden for your role".
 - **Removed:** the dashboard "Pending equivalency decisions" list and `pendingEquivalencies()` (the DB CHECK still allows `pending`); the old two-view CSS/JS (`equivalency-selector-card`, summary / usage cards, existing-record block, `mapping-fixed-context`, hand-built header actions, page-specific badges). `equivalency_cimf_actions.php` stays a 410 stub.
 - **Test:** `tests/equivalency-http.php` (53 checks, disposable schema and server).
+
+## Slice 1b: done (layout, compact dialogs, scalable filters; one optional migration written, not applied)
+
+- **Page shell** is now the same markup as Subject Offering History (`mapping-workspace-shell` > `mapping-workspace-panel csms-panel`): the filter row lines up with the page title and the table card is full width; the extra inset card is gone. No context bar.
+- **Everything server-side.** `list` takes `search` (code or title of EITHER subject, minimum 2 characters), `decision_status`, `status` (active default, archived, all), `academic_program_id` (either subject placed in the program, or actively assigned to it; placements respect the read scope), `reviewed_by`, `reviewed_from` / `reviewed_to` (validated dates, inclusive end day), `reason` (has / missing), `sort` (whitelist: subject_a, subject_b, decision, reviewed_at; default reviewed_at desc, tiebreak on id), `direction`, `page`, `per_page` (10, 20, 50 or 100; anything else is a 422). Step 1 selects only the ids of the page, step 2 loads those rows; the total is a separate COUNT. `filter_options` returns the reviewers (users who reviewed a record, max 100) and the programs (max 200). The page keeps filter, sort, page and page size in the URL (`?q=&decision=&status=&program=&reviewer=&from=&to=&reason=&sort=&dir=&page=&per_page=`), debounces search 300 ms, aborts older requests, and shows removable chips, "Clear all", the count, and two different empty states (none recorded vs no match, with Clear filters). Sortable headers carry `aria-sort`.
+- **Subject pickers** search the server with a 2-character minimum and LIMIT 20 ("Showing the first 20 of N matches. Keep typing to narrow."); the Subject Master is never preloaded.
+- **Evidence table (5 rows):** Description, Units (total · Lec · Lab), Technical status, Prerequisites (max 3 plus "+N more"; "None in placed curricula" / "Not placed"), Used in (placements · programs · curricula · versions). Same / Differs only on the first four, "Not comparable" when a side is missing. Soft advisory warning row when one subject is a prerequisite or corequisite of the other in a version the reader may see. Record dialog: pickers, evidence, Decision (1/3) and Reason (2/3) on one row, sticky footer. Read-only dialog: decision block (csms-detail-list), subjects as plain text, evidence; managers get Edit decision / Archive (Restore when archived) in the footer.
+- **Scale test** (disposable clone only; 2,000 synthetic `ZZ-LOAD-` subjects, 4 programs; the clone was dropped): best of three requests, ms, over HTTP.
+
+| Request | 5,000 records | 50,000 records |
+|---|---|---|
+| no filter (20 rows) | 20 | 111-160 |
+| page size 100 | 37 | 95-119 |
+| search by code / broad title | 70 / 80 | 219-244 / 204-242 |
+| very broad search | 34 | 188-203 |
+| decision, status, reviewer | 14-17 | 26-65 |
+| reason = missing | 27 | 191-210 |
+| date range | 25 | 149-180 |
+| program (placements + assignments), manager / restricted | 194 / 196 | 161-199 / 162-172 |
+| deepest page, Reviewed at / Subject A | 27 / 38 | 104-138 / 329-433 |
+| sort by Subject A / B / Decision / Reviewed at | 30-41 | 215-250 / 209-232 / 31-51 / 96-114 |
+| search + program + decision + reviewer + sort | 82 | 183-298 |
+
+  Target about 300 ms at 50,000: met everywhere except the deepest page sorted by Subject A (about 330-430 ms: a filesort over ~45k rows joined to `subjects`). A first version of the program filter used a per-row IN subquery and took 1.8 s at 50,000; it was rewritten as a derived table joined once per side (about 10x faster).
+- **Index decision:** none is required. EXPLAIN shows the default list using `idx_subject_equivalencies_active_decision` plus a filesort of about 25k candidate rows, subject lookups using `uq_subject_equivalencies_pair` and `PRIMARY`, and the program query using `idx_curricula_academic_program_id`, `idx_curriculum_versions_curriculum_id`, `uq_curriculum_version_subject`. One optional index helps: `(archived_at, reviewed_at, id)` measured at 50,000: default list 111 -> 50 ms, date range 176 -> 39, reason missing 194 -> 95, Reviewed at ascending 114 -> 34. Written as **`database/migrations/031_equivalency_list_index.sql`** (030 stays reserved for Electives) with `database/rollbacks/031_rollback.sql`, and declared in `database/legacy_baseline.php` (pinned checksum), because `subject_equivalencies` is a baseline table. NOT applied to `sms_db` or `sms_db_uitest`; applied and rolled back only on a throwaway clone table. To apply later: back up `sms_db`, then `php database/deploy.php` (the journaled runner applies 031 only). To undo: `database/rollbacks/031_rollback.sql`, then delete the 031 row from `schema_migrations`.
+- **Data counts (counts only):** `sms_db_uitest` 2 equivalency records (2 active, 0 archived); `sms_db` 2 records (1 active, 1 archived). CC101 / CC104 is NOT archived in `sms_db_uitest` and IS archived in `sms_db`.
+- **Tests:** `tests/equivalency-http.php` now 87 checks (each filter, program filter with read scope, sort whitelist, page-size cap, invalid dates, picker limits, filter options, prerequisite link data and scope).
 
 ## 1. The page today
 

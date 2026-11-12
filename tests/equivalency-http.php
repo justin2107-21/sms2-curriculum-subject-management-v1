@@ -51,6 +51,15 @@ try {
     foreach ([[1, 1, 1], [2, 2, 1], [3, 4, 1], [4, 1, 2], [5, 3, 2]] as [$pid, $sid, $vid])
         $db->query("INSERT INTO curriculum_version_subjects(id,curriculum_version_id,subject_id,year_level,semester) VALUES($pid,$vid,$sid,'1st Year','1st Semester')");
     $db->query("INSERT INTO curriculum_subject_requirements(curriculum_version_id,subject_id,required_subject_id,requirement_type) VALUES(1,1,4,'prerequisite'),(2,1,3,'prerequisite')");
+    // Slice 1b fixture: Q101 requires Q102 (corequisite, approved v1); in the draft v2 Q201 requires Q202 (Q202 is also placed in v2).
+    $db->query("INSERT INTO curriculum_version_subjects(id,curriculum_version_id,subject_id,year_level,semester) VALUES(6,2,4,'1st Year','1st Semester')");
+    $db->query("INSERT INTO curriculum_subject_requirements(curriculum_version_id,subject_id,required_subject_id,requirement_type) VALUES(1,1,2,'corequisite'),(2,3,4,'prerequisite')");
+    // Program 2 has only a draft version that places Q201; program 3 actively assigns Q202 (assignments are program-level, not version data).
+    $db->query("INSERT INTO academic_programs(id,program_code,program_name) VALUES(2,'QP2','Draft-only Program'),(3,'QP3','Assignment Program')");
+    $db->query("INSERT INTO curricula(id,curriculum_code,curriculum_name,academic_program_id) VALUES(2,'QC2','Draft-only Curriculum',2)");
+    $db->query("INSERT INTO curriculum_versions(id,curriculum_id,version_label,status,review_status) VALUES(3,2,'DRAFT3','draft','not_started')");
+    $db->query("INSERT INTO curriculum_version_subjects(id,curriculum_version_id,subject_id,year_level,semester) VALUES(7,3,3,'1st Year','1st Semester')");
+    $db->query("INSERT INTO program_subject_assignments(academic_program_id,subject_id,status) VALUES(3,4,'active')");
 
     $socket = stream_socket_server('tcp://127.0.0.1:0', $errno, $errstr); $address = stream_socket_get_name($socket, false); fclose($socket);
     $env = $envBefore; $env['DB_NAME'] = $name; $env['APP_ENV'] = 'development'; $env['SMS_SESSION_COOKIE_SECURE'] = '0'; unset($env['CSMS_FACULTY_READ_SCOPE']);
@@ -129,7 +138,7 @@ try {
     ok($viewer->api('equivalency', 'archive', ['id' => $id], 'POST')['status'] === 403, 'Viewer cannot archive');
     ok($manager->api('equivalency', 'archive', ['id' => $id], 'POST')['status'] === 200 && $audit('SUBJECT_EQUIVALENCY_ARCHIVE') === 1, 'Archive works and is audited');
     $active = $manager->api('equivalency', 'list')['json']['equivalencies'] ?? [];
-    $archived = $manager->api('equivalency', 'list', ['decision_status' => 'archived'])['json']['equivalencies'] ?? [];
+    $archived = $manager->api('equivalency', 'list', ['status' => 'archived'])['json']['equivalencies'] ?? [];
     ok(!in_array($id, array_map('intval', array_column($active, 'id')), true) && in_array($id, array_map('intval', array_column($archived, 'id')), true), 'Archived filter lists the archived record; the default list does not');
     $r = $manager->api('equivalency', 'create', $pair + ['remarks' => $reason], 'POST');
     ok($r['status'] === 409 && str_contains($r['json']['message'] ?? '', 'Restore it'), 'Creating an archived pair points to Restore');
@@ -146,15 +155,68 @@ try {
     $cmp = $manager->api('equivalency', 'compare', ['subject_a_id' => 1, 'subject_b_id' => 2]);
     $u = $cmp['json']['usage']['subject_a']['summary'];
     ok($cmp['status'] === 200 && (int)$u['placements'] === 2 && (int)$u['hidden_placements'] === 0 && $cmp['json']['scope_restricted'] === false, 'Manager sees both placements of Q101 (approved and draft)');
-    ok(count($cmp['json']['prerequisites']['subject_a']) === 2, 'Manager sees prerequisites from both versions');
+    ok($cmp['json']['prerequisites']['subject_a']['total'] === 3, 'Manager sees prerequisites from both versions (and the corequisite link)');
     ok(count($cmp['json']['differences']) === 7, 'Compare returns all seven stored fields');
     $cmp = $viewer->api('equivalency', 'compare', ['subject_a_id' => 1, 'subject_b_id' => 2]);
     $u = $cmp['json']['usage']['subject_a']['summary'];
     ok($cmp['status'] === 200 && (int)$u['placements'] === 1 && (int)$u['curriculum_versions'] === 1 && (int)$u['hidden_placements'] === 1 && $cmp['json']['scope_restricted'] === true, 'Restricted viewer: draft placement hidden and counted');
     ok(!str_contains($cmp['body'], 'DRAFT2') && !str_contains($cmp['body'], 'Draft Prereq'), 'Restricted viewer: no draft version label or draft-only prerequisite in the response');
-    ok(count($cmp['json']['prerequisites']['subject_a']) === 1 && $cmp['json']['prerequisites']['subject_a'][0]['subject_code'] === 'Q202', 'Restricted viewer: prerequisites from the approved version only');
+    ok($cmp['json']['prerequisites']['subject_a']['total'] === 2 && $cmp['json']['prerequisites']['subject_a']['rows'][0]['subject_code'] === 'Q102', 'Restricted viewer: prerequisites from the approved version only (draft-only Q201 left out)');
     ok($faculty->api('equivalency', 'compare', ['subject_a_id' => 1, 'subject_b_id' => 2])['status'] === 403, 'No equivalency.view: compare refused');
 
+    // ---- Slice 1b: server-side filters, sort, page size, dates, program scope, picker, filter options ----
+    // Records now: (1,2) active by user 1 with a reason; (3,4) legacy not_equivalent by user 1 without a reason; add (1,3) needs_review by user 2, no reason, 2025-01-15; (2,4) archived equivalent.
+    $db->query("INSERT INTO subject_equivalencies(subject_id,equivalent_subject_id,decision_status,remarks,reviewed_by,reviewed_at,created_by) VALUES(1,3,'needs_review',NULL,2,'2025-01-15 12:00:00',2)");
+    $db->query("INSERT INTO subject_equivalencies(subject_id,equivalent_subject_id,decision_status,remarks,reviewed_by,reviewed_at,created_by,archived_at,archived_by) VALUES(2,4,'equivalent','Archived test pair, reviewed long ago.',1,'2025-03-01 09:00:00',1,NOW(),1)");
+    $list = fn(FoundationHttpClient $c, array $args = []) => $c->api('equivalency', 'list', $args);
+    $codes = fn(array $r): array => array_map(fn($x) => $x['subject_a_code'] . '/' . $x['subject_b_code'], $r['json']['equivalencies'] ?? []);
+    $total = fn(array $r): int => (int)($r['json']['pagination']['total_records'] ?? -1);
+    ok($total($list($manager)) === 3 && $total($list($manager, ['status' => 'archived'])) === 1 && $total($list($manager, ['status' => 'all'])) === 4, 'Status filter: active (default) 3, archived 1, all 4');
+    ok($list($manager, ['status' => 'bogus'])['status'] === 422, 'Invalid status rejected');
+    ok($total($list($manager, ['decision_status' => 'needs_review'])) === 2 && $list($manager, ['decision_status' => 'pending'])['status'] === 422, 'Decision filter works; unknown decision rejected');
+    ok($total($list($manager, ['search' => 'Q101'])) === 2 && $total($list($manager, ['search' => 'draft prereq'])) === 2, 'Search matches the code or title of EITHER subject (case-insensitive)');
+    ok($total($list($manager, ['search' => '%%'])) === 0 && $list($manager, ['search' => 'q'])['status'] === 422, 'Search treats wildcards literally; one character is rejected (minimum 2)');
+    ok($total($list($manager, ['reason' => 'has'])) === 1 && $total($list($manager, ['reason' => 'missing'])) === 2 && $list($manager, ['reason' => 'maybe'])['status'] === 422, 'Reason filter: has 1, missing 2; invalid value rejected');
+    ok($total($list($manager, ['reviewed_by' => 2])) === 1 && $list($manager, ['reviewed_by' => 'x'])['status'] === 422, 'Reviewed by filter works; invalid id rejected');
+    ok($total($list($manager, ['reviewed_from' => '2025-01-01', 'reviewed_to' => '2025-01-31'])) === 1 && $total($list($manager, ['reviewed_from' => '2026-01-01'])) === 2, 'Reviewed date range (inclusive end day) works');
+    foreach ([['reviewed_from' => '2025-02-30'], ['reviewed_to' => 'yesterday'], ['reviewed_from' => '2026-02-01', 'reviewed_to' => '2026-01-01']] as $bad)
+        ok($list($manager, $bad)['status'] === 422, 'Invalid dates rejected: ' . json_encode($bad));
+    ok($total($list($manager, ['decision_status' => 'needs_review', 'status' => 'all', 'reason' => 'has'])) === 1, 'Filters combine (AND)');
+    // Program filter and read scope
+    ok($total($list($manager, ['academic_program_id' => 1])) === 3 && $total($list($manager, ['academic_program_id' => 2])) === 2, 'Program filter: placements in the program (manager sees the draft-only program 2: records with Q201)');
+    ok($total($list($viewer, ['academic_program_id' => 2])) === 0 && $total($list($viewer, ['academic_program_id' => 1])) === 3, 'Program filter respects read scope: a restricted role does not match draft-only placements');
+    ok($total($list($manager, ['academic_program_id' => 3])) === 1 && $total($list($viewer, ['academic_program_id' => 3])) === 1, 'Program filter also matches an active program assignment');
+    ok($list($manager, ['academic_program_id' => 0])['status'] === 422, 'Invalid program id rejected');
+    // Sort whitelist, direction, stable order, page size cap
+    ok($list($manager, ['sort' => 'remarks'])['status'] === 422 && $list($manager, ['sort' => 'id; DROP TABLE users'])['status'] === 422 && $list($manager, ['direction' => 'sideways'])['status'] === 422, 'Sort: unknown column or direction rejected');
+    $asc = $codes($list($manager, ['sort' => 'subject_a', 'direction' => 'asc'])); $desc = $codes($list($manager, ['sort' => 'subject_a', 'direction' => 'desc']));
+    ok($asc === array_reverse($desc) && $asc === ['Q101/Q102', 'Q101/Q201', 'Q201/Q202'], 'Sort by Subject A works in both directions (stable tiebreak on id)');
+    foreach (['subject_b', 'decision', 'reviewed_at'] as $col) ok($list($manager, ['sort' => $col, 'direction' => 'asc'])['status'] === 200, "Sort by $col accepted");
+    $default = $codes($list($manager));
+    ok($default[count($default) - 1] === 'Q101/Q201', 'Default order is Reviewed at, newest first (the 2025 record is last)');
+    ok($list($manager, ['per_page' => 100])['status'] === 200 && $list($manager, ['per_page' => 101])['status'] === 422 && $list($manager, ['per_page' => 5])['status'] === 422, 'Page size: 100 allowed, 101 and 5 rejected');
+    $p2 = $list($manager, ['per_page' => 10, 'page' => 99]);
+    ok($p2['status'] === 200 && (int)$p2['json']['pagination']['page'] === 1, 'A page past the end falls back to the last page');
+    // Picker search and filter options
+    $s = $manager->api('equivalency', 'subject_search', ['search' => 'Q1']);
+    ok($s['status'] === 200 && count($s['json']['subjects']) === 2 && $s['json']['needs_more_characters'] === false, 'Subject picker: server-side search returns matches');
+    $s = $manager->api('equivalency', 'subject_search', ['search' => 'Q']);
+    ok($s['status'] === 200 && $s['json']['subjects'] === [] && $s['json']['needs_more_characters'] === true, 'Subject picker: one character returns nothing (never preloads the Subject Master)');
+    $s = $manager->api('equivalency', 'subject_search', []);
+    ok($s['status'] === 200 && $s['json']['subjects'] === [], 'Subject picker: no search text returns nothing');
+    $fo = $viewer->api('equivalency', 'filter_options');
+    ok($fo['status'] === 200 && count($fo['json']['reviewers']) === 2 && count($fo['json']['programs']) === 3, 'Filter options: reviewers who reviewed a record and the programs');
+    ok($faculty->api('equivalency', 'filter_options')['status'] === 403, 'Filter options need equivalency.view');
+    // Prerequisite warning data (advisory) and read scope
+    $c = $manager->api('equivalency', 'compare', ['subject_a_id' => 1, 'subject_b_id' => 2])['json'];
+    ok(count($c['requirement_links']) === 1 && (int)$c['requirement_links'][0]['subject_id'] === 1 && (int)$c['requirement_links'][0]['required_subject_id'] === 2 && $c['requirement_links'][0]['requirement_type'] === 'corequisite' && str_contains($c['requirement_links'][0]['versions'], 'APPROVED1'), 'Compare returns the corequisite link (A requires B) with its version');
+    $c = $manager->api('equivalency', 'compare', ['subject_a_id' => 4, 'subject_b_id' => 3])['json'];
+    ok(count($c['requirement_links']) === 1 && (int)$c['requirement_links'][0]['subject_id'] === 3 && str_contains($c['requirement_links'][0]['versions'], 'DRAFT2'), 'Link in the other direction (either order of A and B) is found');
+    $v = $viewer->api('equivalency', 'compare', ['subject_a_id' => 3, 'subject_b_id' => 4]);
+    ok($v['status'] === 200 && $v['json']['requirement_links'] === [] && !str_contains($v['body'], 'DRAFT2'), 'Restricted viewer: a link that exists only in a draft version is not returned');
+    $c = $manager->api('equivalency', 'compare', ['subject_a_id' => 1, 'subject_b_id' => 2])['json'];
+    ok(count($c['prerequisites']['subject_a']['rows']) <= 3 && isset($c['prerequisites']['subject_a']['total']), 'Prerequisites: at most 3 rows plus a total');
+    ok(count($c['usage']['subject_a']['records']) <= 10, 'Usage contexts are capped at 10');
     // ---- Dashboard: the dead pending list is gone ----
     $svc = file_get_contents(__DIR__ . '/../dashboard/DashboardAnalyticsService.php') . file_get_contents(__DIR__ . '/../dashboard/DashboardAnalyticsRepository.php');
     ok(!str_contains($svc, 'pending_equivalency') && !str_contains($svc, 'pendingEquivalencies'), 'Dashboard: pending equivalency list removed');

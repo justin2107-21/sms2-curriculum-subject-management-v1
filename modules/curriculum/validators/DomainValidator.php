@@ -333,25 +333,61 @@ class DomainValidator
         return ['decision_status' => $decision, 'remarks' => $remarks];
     }
 
+    public const EQUIVALENCY_SORTS = ['subject_a', 'subject_b', 'decision', 'reviewed_at'];
+    public const EQUIVALENCY_PAGE_SIZES = [10, 20, 50, 100];
+    public const EQUIVALENCY_SEARCH_MIN = 2;
+
+    /** Every list parameter is validated here; anything unknown is rejected, never ignored silently. */
     public static function subjectEquivalencyQuery(array $input): array
     {
-        $query = self::listQuery($input);
-        $decision = self::optionalString(
-            $input,
-            'decision_status',
-            'Decision status',
-            20
-        );
-        if ($decision !== null
-            && !in_array($decision, ['equivalent', 'not_equivalent', 'needs_review', 'archived'], true)) {
+        $page = filter_var($input['page'] ?? 1, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($page === false) throw new DomainValidationException('Page must be a positive integer.');
+        $perPage = filter_var($input['per_page'] ?? 20, FILTER_VALIDATE_INT);
+        if ($perPage === false || !in_array((int)$perPage, self::EQUIVALENCY_PAGE_SIZES, true)) {
+            throw new DomainValidationException('Per page must be 10, 20, 50 or 100.');
+        }
+        $search = self::optionalString($input, 'search', 'Search', 100);
+        if ($search !== null && mb_strlen($search, 'UTF-8') < self::EQUIVALENCY_SEARCH_MIN) {
+            throw new DomainValidationException('Search needs at least ' . self::EQUIVALENCY_SEARCH_MIN . ' characters.');
+        }
+        $decision = self::optionalString($input, 'decision_status', 'Decision status', 20);
+        if ($decision !== null && !in_array($decision, ['equivalent', 'not_equivalent', 'needs_review'], true)) {
             throw new DomainValidationException('Invalid equivalency decision filter.');
         }
-        // "archived" is a filter on archived records, not a decision value.
-        $query['archived'] = $decision === 'archived';
-        $query['decision_status'] = $decision === 'archived' ? null : $decision;
-        return $query;
+        $status = self::optionalString($input, 'status', 'Status', 20) ?? 'active';
+        if (!in_array($status, ['active', 'archived', 'all'], true)) {
+            throw new DomainValidationException('Status must be active, archived or all.');
+        }
+        $reason = self::optionalString($input, 'reason', 'Reason filter', 20);
+        if ($reason !== null && !in_array($reason, ['has', 'missing'], true)) {
+            throw new DomainValidationException('Reason filter must be has or missing.');
+        }
+        $programId = self::optionalString($input, 'academic_program_id', 'Program', 20);
+        $programId = $programId === null ? null : self::positiveId($programId, 'Program');
+        $reviewedBy = self::optionalString($input, 'reviewed_by', 'Reviewed by', 20);
+        $reviewedBy = $reviewedBy === null ? null : self::positiveId($reviewedBy, 'Reviewed by');
+        $dates = [];
+        foreach (['reviewed_from' => 'Reviewed from', 'reviewed_to' => 'Reviewed to'] as $key => $label) {
+            $value = self::optionalString($input, $key, $label, 10);
+            if ($value !== null) {
+                $date = DateTime::createFromFormat('!Y-m-d', $value);
+                if (!$date || $date->format('Y-m-d') !== $value) throw new DomainValidationException($label . ' must be a valid date (YYYY-MM-DD).');
+            }
+            $dates[$key] = $value;
+        }
+        if ($dates['reviewed_from'] !== null && $dates['reviewed_to'] !== null && $dates['reviewed_from'] > $dates['reviewed_to']) {
+            throw new DomainValidationException('Reviewed from must not be after Reviewed to.');
+        }
+        $sort = self::optionalString($input, 'sort', 'Sort', 20) ?? 'reviewed_at';
+        if (!in_array($sort, self::EQUIVALENCY_SORTS, true)) throw new DomainValidationException('Cannot sort by that column.');
+        $direction = self::optionalString($input, 'direction', 'Sort direction', 4) ?? 'desc';
+        if (!in_array($direction, ['asc', 'desc'], true)) throw new DomainValidationException('Sort direction must be asc or desc.');
+        return [
+            'page' => (int)$page, 'per_page' => (int)$perPage, 'search' => $search, 'decision_status' => $decision, 'status' => $status,
+            'reason' => $reason, 'academic_program_id' => $programId, 'reviewed_by' => $reviewedBy,
+            'reviewed_from' => $dates['reviewed_from'], 'reviewed_to' => $dates['reviewed_to'], 'sort' => $sort, 'direction' => $direction,
+        ];
     }
-
     public static function subjectRequirement(array $input): array
     {
         $rawType = $input['requirement_type'] ?? '';

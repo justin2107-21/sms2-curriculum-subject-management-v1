@@ -48,18 +48,33 @@ class SubjectEquivalencyRepository
         return $row ? $this->findById((int)$row['id']) : null;
     }
 
-    public function paginate(array $query): array
+    /** Sortable columns (whitelist). Value: [SQL expression, needs the subject joins]. */
+    private const SORTS = [
+        'subject_a' => ['subject_a.subject_code', true],
+        'subject_b' => ['subject_b.subject_code', true],
+        'decision' => ['equivalencies.decision_status', false],
+        'reviewed_at' => ['equivalencies.reviewed_at', false],
+    ];
+
+    /**
+     * Filters, sort, total and one page, all in SQL. Step 1 selects only the ids of the page (filtered, sorted, LIMIT);
+     * step 2 loads those rows with their subjects and reviewer. $scopeSql is CurriculumReadScope::sql('versions').
+     */
+    public function paginate(array $query, string $scopeSql = ''): array
     {
-        // The archived filter shows archived records only; otherwise active records. Pending rows are never created and stay hidden.
-        $conditions = [$query['archived'] ? 'equivalencies.archived_at IS NOT NULL' : 'equivalencies.archived_at IS NULL', "equivalencies.decision_status <> 'pending'"];
+        $conditions = [];
         $types = '';
         $params = [];
+        $status = $query['status'] ?? 'active';
+        if ($status === 'active') $conditions[] = 'equivalencies.archived_at IS NULL';
+        elseif ($status === 'archived') $conditions[] = 'equivalencies.archived_at IS NOT NULL';
+        $conditions[] = "equivalencies.decision_status <> 'pending'";
         if ($query['search'] !== null) {
-            $conditions[] = "(" . RepositoryQuery::searchColumn('subject_a.subject_code') . " LIKE ? ESCAPE '='
-                              OR " . RepositoryQuery::searchColumn('subject_a.subject_title') . " LIKE ? ESCAPE '='
-                              OR " . RepositoryQuery::searchColumn('subject_b.subject_code') . " LIKE ? ESCAPE '='
-                              OR " . RepositoryQuery::searchColumn('subject_b.subject_title') . " LIKE ? ESCAPE '=')";
+            // Matching subjects are found first (small table); the pair table is then probed through its subject indexes.
             $pattern = RepositoryQuery::likePattern($query['search']);
+            $match = 'SELECT id FROM subjects WHERE ' . RepositoryQuery::searchColumn('subject_code') . " LIKE ? ESCAPE '=' OR "
+                . RepositoryQuery::searchColumn('subject_title') . " LIKE ? ESCAPE '='";
+            $conditions[] = "(equivalencies.subject_id IN ($match) OR equivalencies.equivalent_subject_id IN ($match))";
             $types .= 'ssss';
             array_push($params, $pattern, $pattern, $pattern, $pattern);
         }
@@ -68,36 +83,112 @@ class SubjectEquivalencyRepository
             $types .= 's';
             $params[] = $query['decision_status'];
         }
-        $where = $conditions ? ' WHERE ' . implode(' AND ', $conditions) : '';
-        $joins = $this->detailJoins();
-        $countStmt = RepositoryQuery::execute(
-            $this->db,
-            'SELECT COUNT(*) AS total' . $joins . $where,
-            $types,
-            $params
-        );
+        if ($query['reviewed_by'] !== null) {
+            $conditions[] = 'equivalencies.reviewed_by = ?';
+            $types .= 'i';
+            $params[] = $query['reviewed_by'];
+        }
+        if ($query['reviewed_from'] !== null) {
+            $conditions[] = 'equivalencies.reviewed_at >= ?';
+            $types .= 's';
+            $params[] = $query['reviewed_from'] . ' 00:00:00';
+        }
+        if ($query['reviewed_to'] !== null) {
+            $conditions[] = 'equivalencies.reviewed_at < DATE_ADD(?, INTERVAL 1 DAY)';
+            $types .= 's';
+            $params[] = $query['reviewed_to'];
+        }
+        if ($query['reason'] === 'has') $conditions[] = "(equivalencies.remarks IS NOT NULL AND TRIM(equivalencies.remarks) <> '')";
+        elseif ($query['reason'] === 'missing') $conditions[] = "(equivalencies.remarks IS NULL OR TRIM(equivalencies.remarks) = '')";
+        $where = ' WHERE ' . implode(' AND ', $conditions);
+
+        [$sortExpression, $needsSubjects] = self::SORTS[$query['sort']];
+        $direction = $query['direction'] === 'asc' ? 'ASC' : 'DESC';
+        $source = 'subject_equivalencies AS equivalencies';
+        $sourceTypes = $types;
+        $sourceParams = $params;
+        $alias = 'equivalencies';
+        $filteredWhere = $where;
+        if ($query['academic_program_id'] !== null) {
+            // Either subject placed in the program (read scope applies to the versions) or actively assigned to it. The program's
+            // subject ids are one derived table joined once per side and the two result sets are merged; a per-row IN subquery
+            // over the pair table measured about 10 times slower at 50,000 records.
+            $programSubjects = 'SELECT placements.subject_id FROM curriculum_version_subjects placements
+                    INNER JOIN curriculum_versions versions ON versions.id = placements.curriculum_version_id
+                    INNER JOIN curricula ON curricula.id = versions.curriculum_id
+                    WHERE curricula.academic_program_id = ?' . ($scopeSql !== '' ? ' AND ' . $scopeSql : '') . '
+                    UNION SELECT assignments.subject_id FROM program_subject_assignments assignments
+                    WHERE assignments.academic_program_id = ? AND assignments.status = \'active\'';
+            $side = static fn(string $column): string => 'SELECT equivalencies.id, equivalencies.subject_id, equivalencies.equivalent_subject_id, equivalencies.decision_status, equivalencies.reviewed_at
+                FROM subject_equivalencies AS equivalencies INNER JOIN (' . $programSubjects . ') AS program_subjects ON program_subjects.subject_id = equivalencies.' . $column . $where;
+            $source = '(' . $side('subject_id') . ' UNION ' . $side('equivalent_subject_id') . ') AS picked';
+            $programId = $query['academic_program_id'];
+            $sourceTypes = 'ii' . $types . 'ii' . $types;
+            $sourceParams = array_merge([$programId, $programId], $params, [$programId, $programId], $params);
+            $alias = 'picked';
+            $filteredWhere = '';
+        }
+        $sortExpression = str_replace('equivalencies.', $alias . '.', $sortExpression);
+        $subjectJoins = $needsSubjects
+            ? " INNER JOIN subjects AS subject_a ON subject_a.id = $alias.subject_id
+                INNER JOIN subjects AS subject_b ON subject_b.id = $alias.equivalent_subject_id" : '';
+
+        $countStmt = RepositoryQuery::execute($this->db, 'SELECT COUNT(*) AS total FROM ' . $source . $filteredWhere, $sourceTypes, $sourceParams);
         $total = (int)$countStmt->get_result()->fetch_assoc()['total'];
         $countStmt->close();
         $pagination = RepositoryQuery::pagination($total, $query['page'], $query['per_page']);
 
-        $rankParams = [];
-        $searchOrder = RepositoryQuery::searchOrder(['subject_a.subject_code', 'subject_a.subject_title', 'subject_b.subject_code', 'subject_b.subject_title'], $query['search'] ?? null, $rankParams);
-        $listParams = array_merge($params, $rankParams);
-        $listParams[] = $pagination['per_page'];
-        $listParams[] = $pagination['offset'];
-        $stmt = RepositoryQuery::execute(
+        $idStmt = RepositoryQuery::execute(
             $this->db,
-            $this->detailSelect() . $where .
-            ' ORDER BY ' . $searchOrder . 'equivalencies.updated_at DESC, equivalencies.id DESC LIMIT ? OFFSET ?',
-            $types . str_repeat('s', count($rankParams)) . 'ii',
-            $listParams
+            "SELECT $alias.id FROM $source" . $subjectJoins . $filteredWhere .
+            " ORDER BY $sortExpression $direction, $alias.id $direction LIMIT ? OFFSET ?",
+            $sourceTypes . 'ii',
+            array_merge($sourceParams, [$pagination['per_page'], $pagination['offset']])
         );
-        $records = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();
+        $ids = array_map('intval', array_column($idStmt->get_result()->fetch_all(MYSQLI_ASSOC), 'id'));
+        $idStmt->close();
+        $records = [];
+        if ($ids) {
+            $stmt = RepositoryQuery::execute(
+                $this->db,
+                $this->detailSelect() . ' WHERE equivalencies.id IN (' . implode(',', array_fill(0, count($ids), '?')) . ')',
+                str_repeat('i', count($ids)),
+                $ids
+            );
+            $byId = [];
+            foreach ($stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row) $byId[(int)$row['id']] = $row;
+            $stmt->close();
+            foreach ($ids as $id) if (isset($byId[$id])) $records[] = $byId[$id];
+        }
         unset($pagination['offset']);
+        $pagination['sort'] = $query['sort'];
+        $pagination['direction'] = strtolower($direction);
         return ['records' => $records, 'pagination' => $pagination];
     }
+    /** Users who reviewed at least one record (for the "Reviewed by" filter), limited. */
+    public function reviewers(int $limit = 100): array
+    {
+        $stmt = RepositoryQuery::execute(
+            $this->db,
+            'SELECT users.id, users.username, users.first_name, users.last_name FROM users
+             WHERE EXISTS (SELECT 1 FROM subject_equivalencies AS e WHERE e.reviewed_by = users.id)
+             ORDER BY users.last_name, users.first_name, users.username LIMIT ?',
+            'i',
+            [$limit]
+        );
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return $rows;
+    }
 
+    /** Programs for the Program filter (small table), limited. */
+    public function programOptions(int $limit = 200): array
+    {
+        $stmt = RepositoryQuery::execute($this->db, 'SELECT id, program_code, program_name FROM academic_programs ORDER BY program_code LIMIT ?', 'i', [$limit]);
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return $rows;
+    }
     public function create(
         array $data,
         int $createdBy,
@@ -262,31 +353,55 @@ class SubjectEquivalencyRepository
     }
 
     /**
-     * Prerequisites / corequisites of a subject as placed in curriculum versions (union across versions, same scope as usage).
-     * One row per required subject and type, with the version labels it appears in.
+     * Prerequisites / corequisites of a subject as placed in curriculum versions (union across versions, same scope as usage):
+     * the first $limit rows (one per required subject and type, with the version labels) and the total count.
      */
-    public function prerequisites(int $subjectId, string $scopeSql = ''): array
+    public function prerequisites(int $subjectId, string $scopeSql = '', int $limit = 3): array
     {
+        $from = ' FROM curriculum_subject_requirements AS requirements
+                  INNER JOIN subjects AS required ON required.id = requirements.required_subject_id
+                  INNER JOIN curriculum_versions AS versions ON versions.id = requirements.curriculum_version_id
+                  INNER JOIN curricula ON curricula.id = versions.curriculum_id
+                  WHERE requirements.subject_id = ?' . ($scopeSql !== '' ? ' AND ' . $scopeSql : '');
+        $countStmt = RepositoryQuery::execute($this->db, 'SELECT COUNT(DISTINCT requirements.requirement_type, requirements.required_subject_id) AS total' . $from, 'i', [$subjectId]);
+        $total = (int)$countStmt->get_result()->fetch_assoc()['total'];
+        $countStmt->close();
         $stmt = RepositoryQuery::execute(
             $this->db,
             'SELECT requirements.requirement_type, required.subject_code, required.subject_title,
                     GROUP_CONCAT(DISTINCT CONCAT(curricula.curriculum_code, \' \', versions.version_label)
-                                 ORDER BY curricula.curriculum_code, versions.version_label SEPARATOR \', \') AS versions
+                                 ORDER BY curricula.curriculum_code, versions.version_label SEPARATOR \', \') AS versions' . $from . '
+             GROUP BY requirements.requirement_type, required.id, required.subject_code, required.subject_title
+             ORDER BY requirements.requirement_type, required.subject_code LIMIT ?',
+            'ii',
+            [$subjectId, $limit]
+        );
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return ['rows' => $rows, 'total' => $total];
+    }
+
+    /** Where one subject is a prerequisite or corequisite of the other (either direction), in versions the reader may see. */
+    public function requirementBetween(int $firstId, int $secondId, string $scopeSql = ''): array
+    {
+        $stmt = RepositoryQuery::execute(
+            $this->db,
+            'SELECT requirements.subject_id, requirements.required_subject_id, requirements.requirement_type,
+                    GROUP_CONCAT(DISTINCT CONCAT(curricula.curriculum_code, \' \', versions.version_label) ORDER BY curricula.curriculum_code, versions.version_label SEPARATOR \', \') AS versions
              FROM curriculum_subject_requirements AS requirements
-             INNER JOIN subjects AS required ON required.id = requirements.required_subject_id
              INNER JOIN curriculum_versions AS versions ON versions.id = requirements.curriculum_version_id
              INNER JOIN curricula ON curricula.id = versions.curriculum_id
-             WHERE requirements.subject_id = ?' . ($scopeSql !== '' ? ' AND ' . $scopeSql : '') . '
-             GROUP BY requirements.requirement_type, required.id, required.subject_code, required.subject_title
-             ORDER BY requirements.requirement_type, required.subject_code',
-            'i',
-            [$subjectId]
+             WHERE ((requirements.subject_id = ? AND requirements.required_subject_id = ?) OR (requirements.subject_id = ? AND requirements.required_subject_id = ?))'
+            . ($scopeSql !== '' ? ' AND ' . $scopeSql : '') . '
+             GROUP BY requirements.subject_id, requirements.required_subject_id, requirements.requirement_type
+             ORDER BY requirements.subject_id LIMIT 4',
+            'iiii',
+            [$firstId, $secondId, $secondId, $firstId]
         );
         $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
         return $rows;
     }
-
     private function detailSelect(): string
     {
         return 'SELECT equivalencies.id, equivalencies.subject_id,

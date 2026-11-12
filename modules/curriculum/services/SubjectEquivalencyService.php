@@ -20,8 +20,14 @@ class SubjectEquivalencyService
     public function list(array $input): array
     {
         $query = DomainValidator::subjectEquivalencyQuery($input);
-        $result = $this->equivalencies->paginate($query);
+        // The Program filter respects the read scope: a restricted reader matches placements in approved versions only.
+        $result = $this->equivalencies->paginate($query, CurriculumReadScope::sql('versions'));
         return ['equivalencies' => $result['records'], 'pagination' => $result['pagination']];
+    }
+
+    public function filterOptions(): array
+    {
+        return ['reviewers' => $this->equivalencies->reviewers(), 'programs' => $this->equivalencies->programOptions()];
     }
 
     public function get(int $id): array
@@ -35,9 +41,13 @@ class SubjectEquivalencyService
 
     public function searchSubjects(array $input): array
     {
-        $query = DomainValidator::listQuery($input, ['active', 'inactive']);
+        // Picker search: never preloads the Subject Master. Fewer than two characters returns nothing; at most 20 rows.
+        $query = DomainValidator::listQuery(['search' => $input['search'] ?? null, 'page' => 1, 'per_page' => 20], ['active', 'inactive']);
+        if ($query['search'] === null || mb_strlen($query['search'], 'UTF-8') < DomainValidator::EQUIVALENCY_SEARCH_MIN) {
+            return ['subjects' => [], 'pagination' => ['page' => 1, 'per_page' => 20, 'total_records' => 0, 'total_pages' => 1], 'needs_more_characters' => true];
+        }
         $result = $this->subjects->paginate($query);
-        return ['subjects' => $result['records'], 'pagination' => $result['pagination']];
+        return ['subjects' => $result['records'], 'pagination' => $result['pagination'], 'needs_more_characters' => false];
     }
 
     public function compare(array $input): array
@@ -70,6 +80,11 @@ class SubjectEquivalencyService
                 'subject_a' => $this->equivalencies->prerequisites($pair['subject_a_id'], $scope),
                 'subject_b' => $this->equivalencies->prerequisites($pair['subject_b_id'], $scope),
             ],
+            // Soft warning data only (advisory, never blocks): one subject is a prerequisite / corequisite of the other.
+            'requirement_links' => array_map(static fn(array $row): array => [
+                'subject_id' => (int)$row['subject_id'], 'required_subject_id' => (int)$row['required_subject_id'],
+                'requirement_type' => $row['requirement_type'], 'versions' => $row['versions'],
+            ], $this->equivalencies->requirementBetween($pair['subject_a_id'], $pair['subject_b_id'], $scope)),
             'scope_restricted' => $scope !== '',
             'existing_equivalency' => $this->equivalencies->findByPair($lowerId, $higherId),
         ];

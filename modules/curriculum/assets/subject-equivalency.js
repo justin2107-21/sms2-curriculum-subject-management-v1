@@ -1,8 +1,9 @@
 (function () {
     'use strict';
 
-    // Subject Equivalency Tool: one page. The records table is the main view; one dialog records, edits or shows a
-    // decision with the stored evidence of both subjects side by side. Decisions are human-only; CIMF only explains.
+    // Subject Equivalency Tool: one page. The records table is the main view; one dialog records, edits or shows a decision with the
+    // stored evidence of both subjects side by side. Decisions are human-only; CIMF only explains.
+    // Everything that scales is server-side: search, filters, sort, paging and the total. The page never loads or filters all records.
     const workspace = document.getElementById('subjectEquivalencyWorkspace');
     const ui = window.CurriculumUI;
     if (!workspace || !ui) return;
@@ -13,14 +14,15 @@
     const canManage = workspace.dataset.canManage === '1';
     const REASON_MIN = Number(workspace.dataset.reasonMin) || 10;
     const REASON_MAX = Number(workspace.dataset.reasonMax) || 4000;
-    const PREREQUISITE_LIMIT = 5;
+    const SEARCH_MIN = 2;
     const DECISIONS = {
         equivalent: ['Equivalent', 'csms-chip--approved'],
         not_equivalent: ['Not equivalent', 'csms-chip--returned'],
         needs_review: ['Needs review', 'csms-chip--under_review']
     };
-    const state = { records: new Map(), page: 1, request: 0, compareRequest: 0, loaded: false,
-        mode: 'create', record: null, comparison: null, archiveId: null };
+    const state = { records: new Map(), request: 0, abort: null, compareRequest: 0, loaded: false, filterOptionsLoaded: false,
+        mode: 'create', record: null, comparison: null, archiveId: null,
+        view: { search: '', decision_status: '', status: 'active', academic_program_id: '', reviewed_by: '', reviewed_from: '', reviewed_to: '', reason: '', sort: 'reviewed_at', direction: 'desc', page: 1, per_page: 20 } };
 
     const dialogElement = $('equivalencyDialog');
     const dialog = ui.createModal(dialogElement, { restoreFocus: () => $('equivalencySearch') });
@@ -28,7 +30,7 @@
     const form = $('equivalencyForm');
     const decisionFields = $('equivalencyDecisionFields');
     const decisionSelect = $('equivalencyDecision');
-    const reasonInput = $('equivalencyReason');
+    const reasonInput = $('equivalencyReasonText');
     const saveButton = $('equivalencySave');
 
     // ---------- shared formatting ----------
@@ -48,10 +50,85 @@
         return new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(date);
     }
     const notRecorded = '<span class="csms-sub">Not recorded</span>';
-    function subjectCell(code, title) {
-        return '<strong class="csms-ctable__code">' + esc(code) + '</strong><span class="csms-sub">' + esc(title) + '</span>';
-    }
+    function subjectCell(code, title) { return '<strong class="csms-ctable__code">' + esc(code) + '</strong><span class="csms-sub">' + esc(title) + '</span>'; }
     function pairLabel(record) { return record.subject_a_code + ' and ' + record.subject_b_code; }
+    function plural(count, one, many) { return count + ' ' + (count === 1 ? one : many); }
+
+    // ---------- list state in the URL (refresh, back and share keep the filters) ----------
+    const URL_KEYS = { q: 'search', decision: 'decision_status', status: 'status', program: 'academic_program_id', reviewer: 'reviewed_by', from: 'reviewed_from', to: 'reviewed_to', reason: 'reason', sort: 'sort', dir: 'direction', page: 'page', per_page: 'per_page' };
+    const SORTS = ['subject_a', 'subject_b', 'decision', 'reviewed_at'];
+    const DEFAULTS = { status: 'active', sort: 'reviewed_at', direction: 'desc', page: 1, per_page: 20 };
+    function readUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const view = state.view;
+        Object.entries(URL_KEYS).forEach(([key, field]) => { view[field] = params.has(key) ? params.get(key) : (DEFAULTS[field] ?? ''); });
+        view.page = Math.max(1, parseInt(view.page, 10) || 1);
+        view.per_page = [10, 20, 50, 100].includes(parseInt(view.per_page, 10)) ? parseInt(view.per_page, 10) : 20;
+        if (!SORTS.includes(view.sort)) view.sort = 'reviewed_at';
+        if (!['asc', 'desc'].includes(view.direction)) view.direction = 'desc';
+        if (!['active', 'archived', 'all'].includes(view.status)) view.status = 'active';
+    }
+    function writeUrl(push) {
+        const params = new URLSearchParams();
+        Object.entries(URL_KEYS).forEach(([key, field]) => {
+            const value = state.view[field];
+            if (value !== '' && value !== null && value !== undefined && String(value) !== String(DEFAULTS[field] ?? '')) params.set(key, String(value));
+        });
+        const query = params.toString();
+        const url = window.location.pathname + (query ? '?' + query : '');
+        if (url !== window.location.pathname + window.location.search) window.history[push ? 'pushState' : 'replaceState'](null, '', url);
+    }
+    function syncControls() {
+        const view = state.view;
+        $('equivalencySearch').value = view.search;
+        $('equivalencyDecisionFilter').value = view.decision_status;
+        $('equivalencyStatus').value = view.status;
+        $('equivalencyPerPage').value = String(view.per_page);
+        $('equivalencyProgram').value = view.academic_program_id;
+        $('equivalencyReviewer').value = view.reviewed_by;
+        $('equivalencyFrom').value = view.reviewed_from;
+        $('equivalencyTo').value = view.reviewed_to;
+        $('equivalencyReason').value = view.reason;
+        document.querySelectorAll('.equivalency-sort').forEach(button => {
+            const active = button.dataset.sort === view.sort;
+            button.closest('th').setAttribute('aria-sort', active ? (view.direction === 'asc' ? 'ascending' : 'descending') : 'none');
+            button.dataset.dir = active ? view.direction : '';
+        });
+    }
+
+    // ---------- filters: chips and counters ----------
+    function selectedText(select) { return select.selectedOptions[0]?.textContent || select.value; }
+    function activeFilters() {
+        const view = state.view, filters = [];
+        if (view.search) filters.push(['search', 'Search: ' + view.search]);
+        if (view.decision_status) filters.push(['decision_status', 'Decision: ' + decisionLabel(view.decision_status)]);
+        if (view.status !== 'active') filters.push(['status', 'Status: ' + selectedText($('equivalencyStatus'))]);
+        if (view.academic_program_id) filters.push(['academic_program_id', 'Program: ' + selectedText($('equivalencyProgram'))]);
+        if (view.reviewed_by) filters.push(['reviewed_by', 'Reviewed by: ' + selectedText($('equivalencyReviewer'))]);
+        if (view.reviewed_from) filters.push(['reviewed_from', 'From: ' + view.reviewed_from]);
+        if (view.reviewed_to) filters.push(['reviewed_to', 'To: ' + view.reviewed_to]);
+        if (view.reason) filters.push(['reason', view.reason === 'has' ? 'Has reason' : 'Missing reason']);
+        return filters;
+    }
+    function setMore(open) { $('equivalencyMore').hidden = !open; $('equivalencyMoreToggle').setAttribute('aria-expanded', open ? 'true' : 'false'); }
+    function renderChips() {
+        const filters = activeFilters();
+        const chips = $('equivalencyChips');
+        chips.hidden = filters.length === 0;
+        chips.innerHTML = filters.map(([field, label]) => '<button type="button" class="csms-chip csms-chip--type equivalency-chip" data-clear="' + esc(field) + '" aria-label="Remove filter ' + esc(label) + '">' + esc(label) + ' <i class="fa-solid fa-xmark" aria-hidden="true"></i></button>').join('') +
+            (filters.length ? '<button type="button" class="csms-link" id="equivalencyClearAll">Clear all</button>' : '');
+        const extra = ['academic_program_id', 'reviewed_by', 'reviewed_from', 'reviewed_to', 'reason'].filter(field => state.view[field]).length;
+        $('equivalencyMoreCount').hidden = extra === 0;
+        $('equivalencyMoreCount').textContent = String(extra);
+        if (extra && $('equivalencyMore').hidden) setMore(true);
+    }
+    function clearField(field) { state.view[field] = field === 'status' ? 'active' : ''; }
+    function clearAll() {
+        ['search', 'decision_status', 'academic_program_id', 'reviewed_by', 'reviewed_from', 'reviewed_to', 'reason'].forEach(clearField);
+        state.view.status = 'active';
+        state.view.page = 1;
+        applyView(true);
+    }
 
     // ---------- records table ----------
     function showListState(which, message) {
@@ -64,8 +141,6 @@
         $('equivalencyPagination').hidden = which !== 'list';
         if (which === 'error') $('equivalencyErrorText').textContent = message || '';
     }
-    function filtersActive() { return Boolean($('equivalencySearch').value.trim() || $('equivalencyStatus').value); }
-
     function recordRow(record) {
         const id = Number(record.id);
         const reason = String(record.remarks || '').trim();
@@ -78,39 +153,83 @@
             '<td class="csms-ctable__action"><button type="button" class="csms-rowmenu" data-menu="' + id + '" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for ' + esc(pairLabel(record)) + '"><i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i></button></td></tr>';
     }
 
-    async function loadRecords(page) {
-        state.page = page || 1;
-        const request = ++state.request;
-        if (!state.loaded) showListState('loading');
+    async function loadFilterOptions() {
+        if (state.filterOptionsLoaded) return;
+        state.filterOptionsLoaded = true;
         try {
-            const payload = await ui.fetchJson(endpoint, { action: 'list', page: state.page, per_page: $('equivalencyPerPage').value,
-                search: $('equivalencySearch').value.trim(), decision_status: $('equivalencyStatus').value });
+            const payload = await ui.fetchJson(endpoint, { action: 'filter_options' });
+            const fill = (select, rows, label) => rows.forEach(row => select.add(new Option(label(row), String(row.id))));
+            fill($('equivalencyProgram'), payload.programs || [], row => row.program_code + ' — ' + row.program_name);
+            fill($('equivalencyReviewer'), payload.reviewers || [], row => [row.first_name, row.last_name].filter(Boolean).join(' ').trim() || row.username);
+            $('equivalencyProgram').value = state.view.academic_program_id;
+            $('equivalencyReviewer').value = state.view.reviewed_by;
+            renderChips();
+        } catch (error) { state.filterOptionsLoaded = false; }
+    }
+
+    // A newer request aborts the older one, and a response that is not the latest is ignored.
+    async function loadRecords() {
+        const request = ++state.request;
+        state.abort?.abort();
+        const controller = state.abort = new AbortController();
+        if (!state.loaded) showListState('loading');
+        const view = state.view;
+        const url = new URL(endpoint, window.location.href);
+        const params = { action: 'list', page: view.page, per_page: view.per_page, search: view.search.length >= SEARCH_MIN ? view.search : '', decision_status: view.decision_status,
+            status: view.status, academic_program_id: view.academic_program_id, reviewed_by: view.reviewed_by, reviewed_from: view.reviewed_from, reviewed_to: view.reviewed_to,
+            reason: view.reason, sort: view.sort, direction: view.direction };
+        Object.entries(params).forEach(([key, value]) => { if (value !== '' && value !== null && value !== undefined) url.searchParams.set(key, String(value)); });
+        try {
+            const response = await fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal: controller.signal });
+            const payload = await response.json().catch(() => ({}));
             if (request !== state.request) return;
+            if (!response.ok || !payload.success) throw new Error(payload.message || 'The request could not be completed.');
             state.loaded = true;
             state.records.clear();
             const rows = payload.equivalencies || [];
             rows.forEach(record => state.records.set(Number(record.id), record));
             ui.setCount($('equivalencyCount'), Number(payload.pagination?.total_records || 0));
-            if (!rows.length) { showListState(filtersActive() ? 'nomatch' : 'empty'); return; }
+            if (Number(payload.pagination?.page) !== view.page) { view.page = Number(payload.pagination.page); writeUrl(false); }
+            renderChips();
+            if (!rows.length) { showListState(activeFilters().length ? 'nomatch' : 'empty'); return; }
             $('equivalencyRows').innerHTML = rows.map(recordRow).join('');
-            ui.renderPagination($('equivalencyPagination'), payload.pagination, loadRecords);
+            ui.renderPagination($('equivalencyPagination'), payload.pagination, page => { view.page = page; applyView(true); });
             showListState('list');
         } catch (error) {
-            if (request !== state.request) return;
+            if (error.name === 'AbortError' || request !== state.request) return;
             showListState('error', error.message);
         }
     }
+    function applyView(push) { syncControls(); renderChips(); writeUrl(push); loadRecords(); }
+    function filtersChanged() {
+        const view = state.view;
+        view.search = $('equivalencySearch').value.trim();
+        view.decision_status = $('equivalencyDecisionFilter').value;
+        view.status = $('equivalencyStatus').value;
+        view.per_page = parseInt($('equivalencyPerPage').value, 10);
+        view.academic_program_id = $('equivalencyProgram').value;
+        view.reviewed_by = $('equivalencyReviewer').value;
+        view.reviewed_from = $('equivalencyFrom').value;
+        view.reviewed_to = $('equivalencyTo').value;
+        view.reason = $('equivalencyReason').value;
+        view.page = 1;
+        applyView(true);
+    }
 
-    // ---------- subject pickers ----------
+    // ---------- subject pickers: server-side, 20 rows, minimum 2 characters ----------
     const pickers = {};
     function pickerOptions(side) {
         const other = side === 'A' ? 'B' : 'A';
         return {
             input: $('subject' + side + 'Search'), valueInput: $('subject' + side + 'Select'), list: $('subject' + side + 'Options'),
-            helpText: 'Choose a Subject Master record.', selectedText: 'Subject selected.', loadingText: 'Searching Subject Master…',
-            noResultsText: 'No matching subjects found.', errorText: 'Subject Master records could not be loaded.',
-            search: async query => ((await ui.fetchJson(endpoint, { action: 'subject_search', page: 1, per_page: 20, search: query })).subjects || [])
-                .filter(subject => String(subject.id) !== String(pickers[other]?.getSelectedId() || '')),
+            helpText: 'Type at least ' + SEARCH_MIN + ' characters of a code or title.', selectedText: 'Subject selected.', loadingText: 'Searching Subject Master…',
+            noResultsText: 'No matching subjects found.', errorText: 'Subject Master records could not be loaded.', minimumLength: SEARCH_MIN,
+            search: async query => {
+                const payload = await ui.fetchJson(endpoint, { action: 'subject_search', search: query });
+                const total = Number(payload.pagination?.total_records || 0);
+                $('subject' + side + 'Hint').textContent = total > (payload.subjects || []).length ? 'Showing the first 20 of ' + total + ' matches. Keep typing to narrow.' : '';
+                return (payload.subjects || []).filter(subject => String(subject.id) !== String(pickers[other]?.getSelectedId() || ''));
+            },
             getId: subject => subject.id,
             format: subject => ({ label: subject.subject_code + ' — ' + subject.subject_title, code: subject.subject_code, title: subject.subject_title }),
             onSelect: pickersChanged, onClear: pickersChanged
@@ -118,68 +237,74 @@
     }
     pickers.A = ui.createAutocomplete(pickerOptions('A'));
     pickers.B = ui.createAutocomplete(pickerOptions('B'));
-    function setPickersEnabled(enabled) {
-        ['A', 'B'].forEach(side => {
-            $('subject' + side + 'Search').disabled = !enabled;
-            const clear = $('subject' + side + 'Search').parentElement.querySelector('[data-autocomplete-clear]');
-            if (clear && !enabled) clear.hidden = true;
-        });
-    }
-    function setPicker(side, id, code, title) {
-        pickers[side]?.setSelected({ id, subject_code: code, subject_title: title }, false);
-    }
-    function pickersChanged() {
-        if (state.mode !== 'create') return;
-        state.record = null;
-        loadComparison();
-    }
+    function setPicker(side, id, code, title) { pickers[side]?.setSelected({ id, subject_code: code, subject_title: title }, false); }
+    function pickersChanged() { if (state.mode !== 'create') return; state.record = null; loadComparison(); }
 
-    // ---------- evidence comparison ----------
-    function compareMarker(same) {
+    // ---------- evidence table: 5 rows ----------
+    const hasValue = value => value !== null && value !== undefined && String(value).trim() !== '';
+    const unitText = value => hasValue(value) ? ui.formatUnits(value) : null;
+    function unitsParts(subject) { return [unitText(subject.units), unitText(subject.lecture_units), unitText(subject.laboratory_units)]; }
+    function unitsCell(subject) {
+        const [total, lecture, laboratory] = unitsParts(subject);
+        if (total === null && lecture === null && laboratory === null) return notRecorded;
+        return (total === null ? 'Not recorded' : esc(total)) + ' · Lec ' + (lecture === null ? '—' : esc(lecture)) + ' · Lab ' + (laboratory === null ? '—' : esc(laboratory));
+    }
+    function marker(same) {
         if (same === null) return '<span class="csms-sub">Not comparable</span>';
         return same ? '<span class="csms-chip csms-chip--inactive">Same</span>' : '<span class="csms-chip csms-chip--type">Differs</span>';
     }
-    function blank(value) { return value === null || value === undefined || String(value).trim() === ''; }
-    function prerequisiteCell(rows) {
-        if (!rows.length) return notRecorded;
-        const shown = rows.slice(0, PREREQUISITE_LIMIT).map(row => '<li><strong class="csms-ctable__code">' + esc(row.subject_code) + '</strong> ' + esc(row.subject_title) +
-            ' <span class="csms-sub">' + esc(row.requirement_type) + ', as placed in ' + esc(row.versions) + '</span></li>').join('');
-        const more = rows.length > PREREQUISITE_LIMIT ? '<li class="csms-sub">+' + (rows.length - PREREQUISITE_LIMIT) + ' more</li>' : '';
+    function prerequisiteState(prerequisites, usage) {
+        return { placed: Number(usage?.summary?.placements || 0) > 0, rows: prerequisites?.rows || [], total: Number(prerequisites?.total || 0) };
+    }
+    function prerequisiteCell(item) {
+        if (!item.placed) return '<span class="csms-sub">Not placed</span>';
+        if (!item.total) return '<span class="csms-sub">None in placed curricula</span>';
+        const shown = item.rows.map(row => '<li><strong class="csms-ctable__code">' + esc(row.subject_code) + '</strong> ' + esc(row.subject_title) +
+            '<span class="csms-sub">' + esc(row.requirement_type) + ' · ' + esc(row.versions) + '</span></li>').join('');
+        const more = item.total > item.rows.length ? '<li class="csms-sub">+' + (item.total - item.rows.length) + ' more</li>' : '';
         return '<ul class="equivalency-list">' + shown + more + '</ul>';
     }
-    function prerequisiteKey(rows) { return rows.map(row => row.requirement_type + ':' + row.subject_code).sort().join('|'); }
-
+    function prerequisiteKey(item) { return item.rows.map(row => row.requirement_type + ':' + row.subject_code).join('|') + '#' + item.total; }
+    function usedIn(summary) {
+        const s = summary || {};
+        return plural(Number(s.placements || 0), 'placement', 'placements') + ' · ' + plural(Number(s.programs || 0), 'program', 'programs') + ' · ' +
+            plural(Number(s.curricula || 0), 'curriculum', 'curricula') + ' · ' + plural(Number(s.curriculum_versions || 0), 'version', 'versions');
+    }
     function renderComparison(payload) {
         const a = payload.subject_a, b = payload.subject_b;
-        $('evidenceHeadA').innerHTML = '<span class="csms-ctable__code">' + esc(a.subject_code) + '</span>';
-        $('evidenceHeadB').innerHTML = '<span class="csms-ctable__code">' + esc(b.subject_code) + '</span>';
-        const unitFields = ['units', 'lecture_units', 'laboratory_units'];
-        const rows = (payload.differences || []).map(diff => {
-            const show = value => blank(value) ? notRecorded : esc(unitFields.includes(diff.field) ? ui.formatUnits(value) : (diff.field === 'status' ? String(value).charAt(0).toUpperCase() + String(value).slice(1) : value));
-            const cellClass = diff.field === 'subject_code' ? ' class="csms-ctable__code"' : (diff.field === 'description' ? ' class="equivalency-long"' : '');
-            const same = diff.result === 'not_available' ? null : diff.result === 'same';
-            return '<tr><th scope="row">' + esc(diff.label) + '</th><td' + cellClass + '>' + show(diff.subject_a) + '</td><td' + cellClass + '>' + show(diff.subject_b) + '</td><td>' + compareMarker(same) + '</td></tr>';
+        const head = subject => '<span class="csms-ctable__code">' + esc(subject.subject_code) + '</span><span class="csms-sub">' + esc(subject.subject_title) + '</span>';
+        $('evidenceHeadA').innerHTML = head(a);
+        $('evidenceHeadB').innerHTML = head(b);
+        const status = (payload.differences || []).find(row => row.field === 'status') || {};
+        const describe = value => hasValue(value) ? '<span class="equivalency-long">' + esc(value) + '</span>' : notRecorded;
+        const statusText = value => hasValue(value) ? esc(String(value).charAt(0).toUpperCase() + String(value).slice(1)) : notRecorded;
+        const unitsA = unitsParts(a), unitsB = unitsParts(b);
+        const pa = prerequisiteState(payload.prerequisites?.subject_a, payload.usage?.subject_a), pb = prerequisiteState(payload.prerequisites?.subject_b, payload.usage?.subject_b);
+        const rows = [
+            ['Description', describe(a.description), describe(b.description), marker(hasValue(a.description) && hasValue(b.description) ? String(a.description).trim() === String(b.description).trim() : null)],
+            ['Units', unitsCell(a), unitsCell(b), marker(unitsA[0] !== null && unitsB[0] !== null ? unitsA.join('|') === unitsB.join('|') : null)],
+            ['Technical status', statusText(a.status), statusText(b.status), marker(!status.result || status.result === 'not_available' ? null : status.result === 'same')],
+            ['Prerequisites', prerequisiteCell(pa), prerequisiteCell(pb), marker(pa.placed && pb.placed ? prerequisiteKey(pa) === prerequisiteKey(pb) : null)],
+            ['Used in', '<span class="equivalency-used">' + esc(usedIn(payload.usage?.subject_a?.summary)) + '</span>', '<span class="equivalency-used">' + esc(usedIn(payload.usage?.subject_b?.summary)) + '</span>', '']
+        ];
+        let markup = rows.map(([label, left, right, mark]) => '<tr><th scope="row">' + esc(label) + '</th><td>' + left + '</td><td>' + right + '</td><td>' + mark + '</td></tr>').join('');
+        // Soft, advisory warning (never blocks): one subject is a prerequisite / corequisite of the other in a version the reader may see.
+        const warnings = (payload.requirement_links || []).map(link => {
+            const requiredIsA = String(link.required_subject_id) === String(a.id);
+            const required = requiredIsA ? a : b, subject = requiredIsA ? b : a;
+            return esc(required.subject_code) + ' is a ' + esc(link.requirement_type) + ' of ' + esc(subject.subject_code) + ' in ' + esc(link.versions) + '; equivalence is unlikely. Advisory only.';
         });
-        const preA = payload.prerequisites?.subject_a || [], preB = payload.prerequisites?.subject_b || [];
-        rows.push('<tr><th scope="row">Prerequisites</th><td>' + prerequisiteCell(preA) + '</td><td>' + prerequisiteCell(preB) + '</td><td>' +
-            compareMarker(!preA.length && !preB.length ? null : prerequisiteKey(preA) === prerequisiteKey(preB)) + '</td></tr>');
-        const ua = payload.usage?.subject_a?.summary || {}, ub = payload.usage?.subject_b?.summary || {};
-        [['placements', 'Placements'], ['programs', 'Programs'], ['curricula', 'Curricula'], ['curriculum_versions', 'Curriculum versions']].forEach(([key, label]) => {
-            const x = Number(ua[key] || 0), y = Number(ub[key] || 0);
-            rows.push('<tr><th scope="row">' + label + '</th><td class="csms-ctable__num">' + x + '</td><td class="csms-ctable__num">' + y + '</td><td>' + compareMarker(x === y) + '</td></tr>');
-        });
-        $('comparisonRows').innerHTML = rows.join('');
-        const hidden = Number(ua.hidden_placements || 0) + Number(ub.hidden_placements || 0);
+        if (warnings.length) markup += '<tr class="equivalency-warning-row"><td colspan="4"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> ' + warnings.join('<br>') + '</td></tr>';
+        $('comparisonRows').innerHTML = markup;
+        const hidden = Number(payload.usage?.subject_a?.summary?.hidden_placements || 0) + Number(payload.usage?.subject_b?.summary?.hidden_placements || 0);
         $('comparisonScopeNote').hidden = !(payload.scope_restricted && hidden > 0);
         $('comparisonScopeNote').textContent = hidden + (hidden === 1 ? ' draft or unapproved placement is' : ' draft or unapproved placements are') + ' hidden for your role.';
     }
-
     function showComparisonState(which) {
         $('comparisonEmpty').hidden = which !== 'empty';
         $('comparisonLoading').hidden = which !== 'loading';
         $('comparisonResult').hidden = which !== 'result';
     }
-
     async function loadComparison() {
         const a = $('subjectASelect').value, b = $('subjectBSelect').value;
         state.comparison = null;
@@ -224,10 +349,7 @@
     }
     function showReasonError(message) { $('equivalencyReasonError').textContent = message; $('equivalencyReasonError').hidden = !message; reasonInput.setAttribute('aria-invalid', message ? 'true' : 'false'); }
     function updateCounter() { $('equivalencyReasonCount').textContent = String(reasonInput.value.trim().length); }
-    function updateSave() {
-        if (!saveButton) return;
-        saveButton.disabled = !state.comparison || !['create', 'edit'].includes(state.mode);
-    }
+    function updateSave() { if (saveButton) saveButton.disabled = !state.comparison || !['create', 'edit'].includes(state.mode); }
     function fillDecision(record) {
         $('equivalencyRecordId').value = record ? record.id : '';
         decisionSelect.value = record && DECISIONS[record.decision_status] ? record.decision_status : '';
@@ -237,31 +359,35 @@
     }
     function renderViewDetails(record) {
         const reason = String(record?.remarks || '').trim();
-        $('equivalencyViewDetails').innerHTML = record ? [
-            ['Decision', decisionChip(record) + (record.archived_at ? ' <span class="csms-sub">' + esc(decisionLabel(record.decision_status)) + ', archived ' + esc(dateTime(record.archived_at)) + '</span>' : '')],
+        const rows = record ? [
+            ['Decision', decisionChip(record) + (record.archived_at ? ' <span class="csms-sub">Was: ' + esc(decisionLabel(record.decision_status)) + '</span>' : '')],
             ['Reason', reason ? esc(reason) : '<span class="csms-sub">No reason recorded</span>'],
             ['Reviewed by', esc(reviewerName(record))],
-            ['Reviewed at', esc(dateTime(record.reviewed_at))],
-            ['Last updated', esc(dateTime(record.updated_at))]
-        ].map(([label, value]) => '<dt>' + esc(label) + '</dt><dd>' + value + '</dd>').join('') : '';
+            ['Reviewed at', esc(dateTime(record.reviewed_at))]
+        ] : [];
+        if (record?.archived_at) rows.push(['Archived', 'Archived ' + esc(dateTime(record.archived_at)) + '. Restore it to change the decision.']);
+        $('equivalencyViewDetails').innerHTML = rows.map(([label, value]) => '<dt>' + esc(label) + '</dt><dd>' + value + '</dd>').join('');
     }
     function applyMode() {
         const mode = state.mode, record = state.record;
-        const titles = { create: 'Record decision', edit: 'Edit decision', view: 'Equivalency decision' };
-        $('equivalencyDialogTitle').textContent = titles[mode];
-        $('equivalencyDialogContext').textContent = record ? record.subject_a_code + ' — ' + record.subject_a_title + ' and ' + record.subject_b_code + ' — ' + record.subject_b_title : 'Mutual equivalency between two Subject Master records.';
-        setPickersEnabled(mode === 'create');
+        $('equivalencyDialogTitle').textContent = { create: 'Record decision', edit: 'Edit decision', view: 'Equivalency decision' }[mode];
+        // Pickers only when recording; an existing pair is shown as plain text.
+        $('equivalencyPickers').hidden = mode !== 'create';
+        const lines = $('equivalencySubjectLines');
+        lines.hidden = mode === 'create' || !record;
+        if (record) lines.innerHTML = '<span><strong class="csms-ctable__code">' + esc(record.subject_a_code) + '</strong> ' + esc(record.subject_a_title) + '</span><span class="csms-sub"> and </span><span><strong class="csms-ctable__code">' + esc(record.subject_b_code) + '</strong> ' + esc(record.subject_b_title) + '</span>';
         decisionFields.hidden = mode === 'view' || !canManage;
         $('equivalencyViewDetails').hidden = mode !== 'view' || !record;
         if (mode === 'view') renderViewDetails(record);
         $('equivalencyCancel').textContent = mode === 'view' ? 'Close' : 'Cancel';
         if (saveButton) saveButton.hidden = mode === 'view';
-        if ($('equivalencyEdit')) $('equivalencyEdit').hidden = !(mode === 'view' && record && !record.archived_at);
+        const active = Boolean(record && !record.archived_at);
+        if ($('equivalencyEdit')) $('equivalencyEdit').hidden = !(mode === 'view' && active);
+        if ($('equivalencyArchive')) $('equivalencyArchive').hidden = !(mode === 'view' && active);
         if ($('equivalencyRestore')) $('equivalencyRestore').hidden = !(record && record.archived_at);
         if (mode === 'edit' && record && !String(record.remarks || '').trim()) setNotice('This record has no reason yet. Add one to save the decision.');
         updateSave();
     }
-
     function openDialog(mode, record) {
         if (mode !== 'view' && !canManage) mode = 'view';
         state.mode = mode;
@@ -272,6 +398,7 @@
         fillDecision(record || null);
         pickers.A?.clear(false);
         pickers.B?.clear(false);
+        ['A', 'B'].forEach(side => { $('subject' + side + 'Hint').textContent = ''; });
         if (record) {
             setPicker('A', record.subject_id, record.subject_a_code, record.subject_a_title);
             setPicker('B', record.equivalent_subject_id, record.subject_b_code, record.subject_b_title);
@@ -303,7 +430,7 @@
             const payload = await ui.postForm(endpoint, data);
             dialog.close();
             ui.showToast(payload.message, isUpdate ? 'updated' : 'success');
-            await loadRecords(state.page);
+            await loadRecords();
         } catch (error) {
             ui.showFormError(form, error.message);
         } finally {
@@ -311,14 +438,13 @@
             updateSave();
         }
     }
-
     async function postAction(action, id) {
         const data = new FormData();
         data.set('action', action);
         data.set('id', id);
         const payload = await ui.postForm(endpoint, data);
         ui.showToast(payload.message, 'success');
-        await loadRecords(state.page);
+        await loadRecords();
         return payload;
     }
     async function restore(id) {
@@ -348,18 +474,42 @@
     reasonInput.addEventListener('input', () => { updateCounter(); if (!$('equivalencyReasonError').hidden) showReasonError(reasonProblem()); });
     $('equivalencyEdit')?.addEventListener('click', () => { if (!state.record) return; state.mode = 'edit'; fillDecision(state.record); applyMode(); decisionSelect.focus(); });
     $('equivalencyRestore')?.addEventListener('click', () => { if (state.record) restore(state.record.id); });
+    $('equivalencyArchive')?.addEventListener('click', () => { if (state.record) { state.archiveId = Number(state.record.id); archiveDialog?.open(); } });
     document.querySelectorAll('#recordDecisionButton, [data-record-decision]').forEach(button => button.addEventListener('click', () => openDialog('create', null)));
     $('equivalencyArchiveConfirm')?.addEventListener('click', async () => {
         if (!state.archiveId) return;
-        try { await postAction('archive', state.archiveId); archiveDialog.close(); }
+        try { await postAction('archive', state.archiveId); archiveDialog.close(); dialog.close(); }
         catch (error) { ui.showToast(error.message, 'error'); }
         state.archiveId = null;
     });
 
-    const reload = ui.debounce(() => loadRecords(1), 300);
-    $('equivalencySearch').addEventListener('input', reload);
-    $('equivalencyStatus').addEventListener('change', () => loadRecords(1));
-    $('equivalencyPerPage').addEventListener('change', () => loadRecords(1));
+    // Search waits 300 ms and two characters; one character changes nothing. Older responses are aborted or ignored.
+    const searchLater = ui.debounce(() => {
+        if ($('equivalencySearch').value.trim().length === 1) return;
+        filtersChanged();
+    }, 300);
+    $('equivalencySearch').addEventListener('input', searchLater);
+    ['equivalencyDecisionFilter', 'equivalencyStatus', 'equivalencyPerPage', 'equivalencyProgram', 'equivalencyReviewer', 'equivalencyFrom', 'equivalencyTo', 'equivalencyReason']
+        .forEach(id => $(id).addEventListener('change', filtersChanged));
+    $('equivalencyMoreToggle').addEventListener('click', () => { setMore($('equivalencyMore').hidden); loadFilterOptions(); });
+    $('equivalencyChips').addEventListener('click', event => {
+        if (event.target.closest('#equivalencyClearAll')) { clearAll(); return; }
+        const chipButton = event.target.closest('[data-clear]');
+        if (!chipButton) return;
+        clearField(chipButton.dataset.clear);
+        state.view.page = 1;
+        applyView(true);
+    });
+    $('equivalencyClearFilters').addEventListener('click', clearAll);
+    $('equivalencyRetry').addEventListener('click', () => { state.loaded = false; loadRecords(); });
+    document.querySelectorAll('.equivalency-sort').forEach(button => button.addEventListener('click', () => {
+        const view = state.view, column = button.dataset.sort;
+        view.direction = view.sort === column ? (view.direction === 'asc' ? 'desc' : 'asc') : (column === 'reviewed_at' ? 'desc' : 'asc');
+        view.sort = column;
+        view.page = 1;
+        applyView(true);
+    }));
+    window.addEventListener('popstate', () => { readUrl(); applyView(false); });
 
     const rowMenu = window.CsmsMenu ? window.CsmsMenu.create($('equivalencyRowMenu'), {
         esc,
@@ -389,5 +539,9 @@
         if (event.target.matches?.('[data-row]') && ['Enter', ' '].includes(event.key)) { event.preventDefault(); openDialog('view', state.records.get(Number(event.target.dataset.row))); }
     });
 
-    loadRecords(1);
+    readUrl();
+    syncControls();
+    renderChips();
+    if (state.view.academic_program_id || state.view.reviewed_by) loadFilterOptions();
+    loadRecords();
 }());

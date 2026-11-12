@@ -51,6 +51,10 @@ function csms_legacy_baseline_declared_changes(): array
             'permissions_added' => ['api_client.manage'],
             'new_role_grants_only' => true, // the only grant is api_client.manage to super_admin
         ],
+        '031_equivalency_list_index.sql' => [
+            'checksum' => 'cc8f1eb4a0ac313566999efa816108d8b39af70b38270cf3e664482e195eaa45',
+            'indexes' => ['subject_equivalencies' => ['idx_subject_equivalencies_list']],
+        ],
     ];
 }
 

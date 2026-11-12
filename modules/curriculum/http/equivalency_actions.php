@@ -13,6 +13,10 @@ try {
             curriculum_require_read('equivalency.view');
             json_response(true, 'Subject equivalency records loaded.', $service->list($_GET));
 
+        case 'filter_options':
+            curriculum_require_read('equivalency.view');
+            json_response(true, 'Equivalency filter options loaded.', $service->filterOptions());
+
         case 'get':
             curriculum_require_read('equivalency.view');
             $id = DomainValidator::positiveId($_GET['id'] ?? null, 'Subject equivalency');

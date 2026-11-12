@@ -1,26 +1,71 @@
-/* Subject Equivalency Tool. Layout, table, chips, menus, empty states and dialogs come from the shared csms-* components and the
-   curriculum dialog shell; only what has no shared class is here. */
+/* Subject Equivalency Tool. Page shell, filter row, table, chips, menus, empty states and the dialog shell come from the shared
+   csms-* components and the curriculum dialog classes (same markup as Subject Offering History); only what has no shared class is here. */
 .subject-equivalency-content { min-width: 0; }
 /* Shared display rules (csms-detail-list grid, form-grid, button variants) would otherwise override the hidden attribute. */
 .subject-equivalency-content [hidden], #equivalencyDialog [hidden], #equivalencyArchiveDialog [hidden] { display: none !important; }
+
+/* Filter row: date fields match the shared 40 px select; "More filters" row and active-filter chips sit under the main row. */
+.equivalency-date { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--csms-text-secondary, #374151); }
+.equivalency-date input { box-sizing: border-box; height: 40px; padding: 0 10px; background: #fff; border: 1px solid var(--csms-border-strong, #cbd5e1); border-radius: 8px; font: inherit; font-size: 14px; color: var(--csms-text, #1f2937); }
+.equivalency-date input:focus-visible { outline: 3px solid var(--csms-focus, #2563eb); outline-offset: 1px; }
+.equivalency-more, .equivalency-chips { margin-top: 8px; }
+.equivalency-chip { gap: 6px; border: 0; cursor: pointer; font-family: inherit; }
+#equivalencyList .csms-filter-row .csms-search { flex: 1 1 12rem; min-width: 11rem; max-width: 18rem; }
+.equivalency-chip:hover { filter: brightness(.95); }
+.equivalency-chip:focus-visible, .equivalency-sort:focus-visible { outline: 3px solid var(--csms-focus, #2563eb); outline-offset: 1px; }
+#equivalencyMoreToggle { display: inline-flex; align-items: center; gap: 6px; }
+#equivalencyList .csms-page-table { margin-top: 12px; }
+
+/* Sortable headers: a shared link-style button plus an arrow for the active column. */
+.csms-ctable .equivalency-sort { color: var(--csms-text-secondary, #374151); font-size: 12px; font-weight: 500; text-decoration: none; }
+.csms-ctable .equivalency-sort:hover { color: var(--csms-text, #1f2937); text-decoration: underline; }
+.csms-ctable .equivalency-sort[data-dir] { color: var(--csms-code-blue, #2163c5); }
+.equivalency-sort[data-dir="asc"]::after { content: " \25B2"; font-size: 9px; }
+.equivalency-sort[data-dir="desc"]::after { content: " \25BC"; font-size: 9px; }
 
 /* Reason column: two lines, full text on hover and in the dialog. */
 #equivalencyRows td:nth-child(4) { min-width: 12rem; }
 .equivalency-reason { display: -webkit-box; max-width: 22rem; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow-wrap: anywhere; }
 
-/* Dialog content */
-.equivalency-pickers { margin-bottom: var(--csms-space-4, 16px); }
-.equivalency-notice { margin: 0 0 var(--csms-space-3, 12px); padding: 10px 12px; background: var(--csms-surface-muted, #f4f6fb); border: 1px solid var(--csms-border, #dfe4ee); border-radius: var(--csms-radius-md, 8px); color: var(--csms-text, #1f2937); font-size: 14px; }
-.equivalency-notice[hidden] { display: none; }
-.equivalency-section-title { display: flex; align-items: center; gap: 4px; margin: 0 0 8px; color: var(--csms-text, #1f2937); font-size: 15px; }
-.equivalency-evidence th[scope="row"] { color: var(--csms-text-secondary, #374151); font-weight: 600; white-space: nowrap; text-align: left; }
-.equivalency-evidence td { vertical-align: top; }
-.equivalency-evidence .equivalency-long { min-width: 14rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* Dialog: about 1000 px wide, 90vh high; the footer stays visible while the body scrolls only when the screen is shorter than the content. */
+.equivalency-dialog { max-width: min(1000px, 92vw); width: 92vw; max-height: 90vh; }
+.equivalency-dialog .confirmation-body { padding: 10px 20px 2px; }
+.equivalency-dialog .modal-header { padding: 8px 16px; }
+.equivalency-dialog .modal-header h2 { font-size: 18px; margin: 0; }
+.equivalency-dialog .modal-actions { position: sticky; bottom: 0; background: #fff; border-top: 1px solid var(--csms-border, #dfe4ee); padding-top: 8px; padding-bottom: 8px; z-index: 2; }
+@media (max-height: 800px) { .equivalency-dialog { max-height: 96vh; } }
+.equivalency-pickers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 8px; }
+.equivalency-pickers .form-field { margin: 0; }
+.equivalency-pickers label { display: block; margin-bottom: 4px; }
+.equivalency-hint { display: block; color: var(--csms-text-secondary, #374151); font-size: 13px; }
+.equivalency-notice { margin: 0 0 8px; padding: 8px 12px; background: var(--csms-surface-muted, #f4f6fb); border: 1px solid var(--csms-border, #dfe4ee); border-radius: var(--csms-radius-md, 8px); color: var(--csms-text, #1f2937); font-size: 14px; }
+.equivalency-summary { margin: 0 0 10px; padding: 0; grid-template-columns: 8rem minmax(0, 1fr); gap: 4px 16px; }
+.equivalency-subjects { margin: 0 0 8px; font-size: 14px; color: var(--csms-text, #1f2937); }
+.equivalency-subjects .csms-ctable__code { margin-right: 4px; }
+
+/* Evidence table: compact 8px 12px cells at 14px; headers carry the subject code in blue with the title under it. */
+.equivalency-evidence { font-size: 14px; }
+.equivalency-evidence thead th { padding: 6px 12px; font-size: 13px; vertical-align: bottom; }
+.equivalency-evidence thead th .csms-sub { display: block; font-weight: 400; }
+.equivalency-evidence th[scope="row"] { color: var(--csms-text-secondary, #374151); font-weight: 600; white-space: nowrap; text-align: left; padding: 7px 12px; border-top: 1px solid var(--csms-border, #dfe4ee); vertical-align: top; }
+.equivalency-evidence td { padding: 7px 12px; vertical-align: top; }
+.equivalency-evidence th:first-child { width: 8.5rem; }
+.equivalency-evidence th:last-child, .equivalency-evidence td:last-child { width: 8rem; white-space: nowrap; }
+.equivalency-evidence .equivalency-used { font-size: 13px; white-space: nowrap; }
+.equivalency-evidence .csms-sub { display: block; }
+.equivalency-evidence .equivalency-long { display: -webkit-box; max-width: 22rem; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow-wrap: anywhere; }
 .equivalency-list { margin: 0; padding-left: 1.1rem; }
-.equivalency-list li + li { margin-top: 4px; }
-#comparisonResult, #equivalencyViewDetails, #equivalencyDecisionFields { margin-top: var(--csms-space-4, 16px); }
+.equivalency-list li + li { margin-top: 2px; }
+.equivalency-warning-row td { background: #fff7e0; color: #7a4a00; border-top: 1px solid #f0d98a; }
+#comparisonResult { margin-top: 2px; }
+#comparisonEmpty, #comparisonLoading { padding: 16px; }
+
+/* Decision (about a third) and Reason (about two thirds) on one row. */
+.equivalency-decision-row { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; align-items: start; margin-top: 6px; }
+.equivalency-decision-row .form-field { margin: 0; min-width: 0; }
+.equivalency-decision-row textarea { width: 100%; box-sizing: border-box; resize: vertical; }
 .equivalency-field-error { color: #8a1c1c; font-weight: 600; }
-.equivalency-field-error[hidden] { display: none; }
+@media (max-width: 720px) { .equivalency-pickers, .equivalency-decision-row { grid-template-columns: 1fr; } }
 
 /* "Review with CIMF" keeps the dialog open and shows the advice beside it: the panel goes above the dialog and the dialog
    moves left of the panel (the panel is 420px wide by default). */
