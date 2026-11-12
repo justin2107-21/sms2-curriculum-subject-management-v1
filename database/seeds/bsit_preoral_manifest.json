@@ -12,14 +12,14 @@
       "status": "active"
     },
     "curriculum": {
-      "curriculum_code": "BSIT-DEMO-2026",
-      "curriculum_name": "BSIT Pre-Oral Demonstration Curriculum",
+      "curriculum_code": "BSIT-2026",
+      "curriculum_name": "BSIT 2026",
       "program_reference": "BSIT",
       "status": "active"
     },
     "curriculum_version": {
-      "version_label": "PREORAL-2026",
-      "curriculum_reference": "BSIT-DEMO-2026",
+      "version_label": "CMO No. 25, s. 2015",
+      "curriculum_reference": "BSIT-2026",
       "effective_academic_year": null,
       "description": "Synthetic pre-oral demonstration version based on the user-supplied BSIT subject list.",
       "status": "draft"
@@ -29,7 +29,7 @@
       "status": "active"
     },
     "placement_plan": {
-      "version_reference": "PREORAL-2026",
+      "version_reference": "CMO No. 25, s. 2015",
       "one_per_subject": true,
       "year_and_semester_source": "subjects manifest",
       "sequence_order": null,

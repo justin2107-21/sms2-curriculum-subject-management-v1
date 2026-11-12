@@ -16,8 +16,8 @@ $assertRead=static function(bool $ok,string $label)use(&$readChecks):void{
 };
 $auditBefore=(int)$conn->query('SELECT COUNT(*) FROM audit_logs')->fetch_row()[0];
 $program=(int)$conn->query("SELECT id FROM academic_programs WHERE program_code='BSIT'")->fetch_row()[0];
-$curriculum=(int)$conn->query("SELECT id FROM curricula WHERE curriculum_code='BSIT-DEMO-2026'")->fetch_row()[0];
-$version=(int)$conn->query("SELECT id FROM curriculum_versions WHERE curriculum_id=$curriculum AND version_label='PREORAL-2026'")->fetch_row()[0];
+$curriculum=(int)$conn->query("SELECT id FROM curricula WHERE curriculum_code='BSIT-2026'")->fetch_row()[0];
+$version=(int)$conn->query("SELECT id FROM curriculum_versions WHERE curriculum_id=$curriculum AND version_label='CMO No. 25, s. 2015'")->fetch_row()[0];
 $subjects=new SubjectService($conn);$mapping=new CurriculumVersionSubjectService($conn);
 $m=BsitDataset::manifest();
 foreach($m['subjects'] as $source) {
@@ -50,8 +50,8 @@ $assertRead((new CurriculumElectiveGroupService($conn))->list($version,[])['pagi
 $assertRead((new SubjectEquivalencyService($conn))->list([])['pagination']['total_records']===0,'Empty equivalency records');
 $export=new CurriculumExportService($conn);
 $report=$export->dataset(array_merge($context,['include_requirements'=>1,'include_electives'=>1,'include_grade_weighting'=>1,'include_compliance'=>1]));
-$assertRead($report['context']['program_code']==='BSIT' && $report['context']['curriculum_code']==='BSIT-DEMO-2026'
-    && $report['context']['version_label']==='PREORAL-2026','Export context');
+$assertRead($report['context']['program_code']==='BSIT' && $report['context']['curriculum_code']==='BSIT-2026'
+    && $report['context']['version_label']==='CMO No. 25, s. 2015','Export context');
 $assertRead(count($report['subjects'])===50 && (float)$report['summary']['total_units']===152.0,'Export 50 subjects / 152 units');
 $assertRead($report['summary']['total_lecture_units']===null && $report['summary']['total_laboratory_units']===null,
     'All-NULL lecture/lab summaries remain unavailable, never zero');

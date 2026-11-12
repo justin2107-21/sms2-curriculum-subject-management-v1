@@ -52,8 +52,8 @@ final class BsitDataset
         self::require($p['academic_program']['program_code']==='BSIT'
             && $p['academic_program']['program_name']==='Bachelor of Science in Information Technology'
             && $p['academic_program']['program_type']==="Bachelor's Degree"
-            && $p['curriculum']['curriculum_code']==='BSIT-DEMO-2026'
-            && $p['curriculum_version']['version_label']==='PREORAL-2026'
+            && $p['curriculum']['curriculum_code']==='BSIT-2026'
+            && $p['curriculum_version']['version_label']==='CMO No. 25, s. 2015'
             && $p['placement_plan']['is_required']===1,'Unexpected dataset structure.');
         return $m;
     }
