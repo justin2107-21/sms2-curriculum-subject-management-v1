@@ -45,7 +45,7 @@ class CurriculumVersionService
         // The curriculum's own MIN_TOTAL_UNITS rule beats its program's; no active rule means no target.
         $curriculumId = (int)$version['curriculum_id'];
         $programId = (int)$version['academic_program_id'];
-        $stmt = $this->db->prepare("SELECT rules.rule_name, rules.numeric_value FROM compliance_rules AS rules
+        $stmt = $this->db->prepare("SELECT rules.rule_name, rules.numeric_value, (rules.curriculum_id IS NOT NULL) AS curriculum_scoped FROM compliance_rules AS rules
             INNER JOIN compliance_references AS refs ON refs.id = rules.compliance_reference_id
             WHERE rules.rule_type = 'MIN_TOTAL_UNITS' AND rules.technical_status = 'active' AND refs.verification_status = 'verified'
             AND COALESCE(rules.rule_name, '') NOT LIKE 'DEV-DEMO%' AND COALESCE(refs.reference_code, '') NOT LIKE 'DEV-DEMO%'
@@ -54,8 +54,29 @@ class CurriculumVersionService
         $stmt->execute();
         $rule = $stmt->get_result()->fetch_assoc();
         $stmt->close();
+        // A curriculum's own rule wins. Otherwise the library total-units rule for the program, but only when its source is verified; else the program's custom rule.
+        if (!$rule || !(int)$rule['curriculum_scoped']) {
+            $library = $this->libraryTarget($programId);
+            if ($library) $rule = ['rule_name' => $library['rule_name'], 'numeric_value' => $library['value']];
+        }
         return ['version_id' => $versionId, 'last_edit' => $this->lastContentEdit($versionId), 'placements' => (int)$placed['placements'], 'placed_units' => round((float)$placed['units'], 2),
             'target' => $rule ? ['value' => (float)$rule['numeric_value'], 'rule_name' => (string)$rule['rule_name']] : null];
+    }
+
+    private function libraryTarget(int $programId): ?array
+    {
+        if ($this->db->query("SHOW TABLES LIKE 'compliance_library_rules'")->num_rows === 0) return null;
+        $stmt = $this->db->prepare("SELECT lib.title, lib.parameters_json FROM compliance_library_rules AS lib
+            INNER JOIN compliance_references AS refs ON refs.id = lib.compliance_reference_id
+            INNER JOIN academic_programs AS p ON p.id = ? AND lib.applies_to_kind = 'program_code' AND lib.applies_to_value = p.program_code
+            WHERE lib.computation_key = 'MIN_TOTAL_UNITS' AND lib.evaluation_mode = 'evaluate' AND lib.active = 1 AND refs.verification_status = 'verified'
+            ORDER BY lib.id LIMIT 1");
+        $stmt->bind_param('i', $programId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        $units = $row ? (json_decode((string)$row['parameters_json'], true)['min_units'] ?? null) : null;
+        return $units === null ? null : ['rule_name' => (string)$row['title'], 'value' => (float)$units];
     }
 
     /** Latest audit entry that changed this version's content (the same actions the working context counts), or null. */

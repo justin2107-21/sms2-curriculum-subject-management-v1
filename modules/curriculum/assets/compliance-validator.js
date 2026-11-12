@@ -14,8 +14,11 @@
     const canRun = root.dataset.canRun === '1', canManage = root.dataset.canManage === '1', canVerify = root.dataset.canVerify === '1';
     const SEARCH_MIN = 2;
     const VIEWS = ['results', 'rules', 'sources', 'history'];
-    const RESULT_CHIP = { PASS: ['Met', 'csms-chip--approved'], FAIL: ['Not met', 'csms-chip--returned'], NOT_EVALUATED: ['Cannot determine from stored data', 'csms-chip--draft'] };
-    const RULE_TYPES = { MIN_TOTAL_UNITS: 'Minimum total units', MAX_TOTAL_UNITS: 'Maximum total units', REQUIRED_SUBJECT: 'Required subject', MIN_SUBJECT_UNITS: 'Minimum subject units', MAX_SUBJECT_UNITS: 'Maximum subject units' };
+    const RESULT_CHIP = { PASS: ['Met', 'csms-chip--approved'], FAIL: ['Not met', 'csms-chip--returned'], NOT_EVALUATED: ['Cannot determine from stored data', 'csms-chip--draft'], PENDING_BCP: ['Pending BCP confirmation', 'csms-chip--type'] };
+    const SOURCE_CLASS = { public_regulation: 'Public regulation', client_reply: 'BCP client reply' };
+    const ORIGIN = { library: 'Library', custom: 'Custom' };
+    const MODE_LABEL = { evaluate: 'Checked in runs', display_only: 'Shown for reference', pending_bcp: 'Pending BCP confirmation' };
+    const RULE_TYPES = { MIN_TOTAL_UNITS: 'Minimum total units', MAX_TOTAL_UNITS: 'Maximum total units', REQUIRED_SUBJECT: 'Required subject', MIN_SUBJECT_UNITS: 'Minimum subject units', MAX_SUBJECT_UNITS: 'Maximum subject units', COMPONENT_UNITS: 'Units by component', GE_UNITS: 'General education units', PE_UNITS: 'Physical education', NSTP_REQUIREMENT: 'NSTP requirement', NSTP_PREREQUISITE: 'NSTP prerequisite', NSTP_COMPONENTS: 'NSTP components', SHS_HOURS: 'Senior High hours', GRADING_WEIGHTS: 'Grading weights' };
     const SOURCE_STATUS = { draft: ['Draft', 'csms-chip--draft'], verified: ['Source confirmed', 'csms-chip--approved'], inactive: ['Inactive', 'csms-chip--archived'] };
     const SOURCE_KINDS = { unknown: 'Unknown / not classified', regulatory_document: 'Regulatory document', ched_sample_curriculum: 'CHED sample curriculum', institutional_curriculum: 'Institutional curriculum', institutional_policy: 'Institutional policy', supporting_document: 'Supporting document', other_document: 'Other document' };
     const CATEGORIES = { CHED: 'CHED', DEPED: 'DepEd', INSTITUTIONAL: 'Institutional', OTHER: 'Other' };
@@ -52,18 +55,31 @@
     function sourceLine(row) {
         const code = row.reference_code || row.reference_title || row.title || 'Source';
         const year = row.reference_year || (row.effective_date ? String(row.effective_date).slice(0, 4) : '');
-        return '<strong class="csms-ctable__code">' + esc(code) + '</strong><span class="csms-sub">' + esc([row.issuing_body, year].filter(Boolean).join(' · ')) + '</span>';
+        const library = row.origin === 'library' || row.section_label;
+        const lines = [esc([row.issuing_body, year].filter(Boolean).join(' · '))];
+        if (library && row.section_label) lines.push(esc(row.section_label) + ' · ' + (row.source_page ? 'p. ' + esc(row.source_page) : 'Page not recorded'));
+        return '<strong class="csms-ctable__code">' + esc(code) + '</strong>' + lines.filter(Boolean).map(l => '<span class="csms-sub">' + l + '</span>').join('');
     }
+    // A client reply has no document: its label says where it came from.
+    const sourceCell = row => row.reference_code || row.reference_title ? sourceLine(row) : '<strong class="csms-ctable__code">BCP reply</strong><span class="csms-sub">' + esc(row.source_label || '') + '</span>';
     function requirementText(rule) {
         const subject = rule.subject_code ? rule.subject_code + (rule.subject_title ? ' — ' + rule.subject_title : '') : 'The chosen subject';
         const n = rule.numeric_value === null || rule.numeric_value === undefined ? '' : num(rule.numeric_value);
         return ({ MIN_TOTAL_UNITS: 'At least ' + n + ' units in total (all placements)', MAX_TOTAL_UNITS: 'At most ' + n + ' units in total (all placements)', REQUIRED_SUBJECT: subject + ' must be placed in the version',
             MIN_SUBJECT_UNITS: subject + ': at least ' + n + ' units', MAX_SUBJECT_UNITS: subject + ': at most ' + n + ' units' })[rule.rule_type] || rule.rule_type;
     }
-    const appliesTo = rule => rule.program_code ? 'Program ' + rule.program_code : (rule.curriculum_code ? 'Curriculum ' + rule.curriculum_code : '—');
+    const appliesTo = rule => rule.origin === 'library' ? ({ all_college: 'All college programs', senior_high: 'Senior High School', program_code: 'Program ' + (rule.applies_to_value || '') })[rule.applies_to_kind] || '—'
+        : rule.program_code ? 'Program ' + rule.program_code : (rule.curriculum_code ? 'Curriculum ' + rule.curriculum_code : '—');
+    const shorten = (text, n) => String(text || '').length > n ? String(text).slice(0, n - 1).trimEnd() + '…' : String(text || '');
+    function ruleStatusCell(rule) {
+        const active = chip(rule.technical_status === 'active' ? ['Active', 'csms-chip--approved'] : ['Inactive', 'csms-chip--archived']);
+        if (rule.origin !== 'library') return active + '<span class="csms-sub">' + esc(rule.verification_status === 'verified' ? 'Source confirmed' : 'Source not confirmed: not checked') + '</span>';
+        const note = rule.evaluation_mode === 'evaluate' && rule.source_class === 'public_regulation' && rule.verification_status !== 'verified' ? 'Source not confirmed: not checked' : MODE_LABEL[rule.evaluation_mode];
+        return active + '<span class="csms-sub">' + esc(note) + '</span>';
+    }
 
     // ---------- views and the address ----------
-    const OWN_KEYS = ['q', 'type', 'status', 'demo', 'per_page', 'page', 'only'];
+    const OWN_KEYS = ['q', 'type', 'status', 'origin', 'applies', 'demo', 'per_page', 'page', 'only'];
     function writeUrl(extra, push) {
         const params = new URLSearchParams(window.location.search);
         params.delete('tab');
@@ -132,7 +148,7 @@
                 list.loaded = true;
                 list.records.clear();
                 const rows = payload[config.key] || [];
-                rows.forEach(record => list.records.set(Number(record.id), record));
+                rows.forEach(record => list.records.set(rowKey(record), record));
                 ui.setCount(el('count'), Number(payload.pagination.total_records));
                 if (Number(payload.pagination.page) !== list.page) { list.page = Number(payload.pagination.page); }
                 if (!rows.length) { states(filtering() ? 'nomatch' : 'empty'); return; }
@@ -148,22 +164,23 @@
         const later = ui.debounce(() => { if (el('search') && el('search').value.trim().length === 1) return; reload(); }, 300);
         el('search')?.addEventListener('input', later);
         config.controls.forEach(id => $(id).addEventListener('change', reload));
-        el('rows').addEventListener('click', event => { const tr = event.target.closest('[data-row]'); if (tr) config.open(list.records.get(Number(tr.dataset.row))); });
-        el('rows').addEventListener('keydown', event => { if (event.target.matches?.('[data-row]') && ['Enter', ' '].includes(event.key)) { event.preventDefault(); config.open(list.records.get(Number(event.target.dataset.row))); } });
+        el('rows').addEventListener('click', event => { const tr = event.target.closest('[data-row]'); if (tr) config.open(list.records.get(tr.dataset.row)); });
+        el('rows').addEventListener('keydown', event => { if (event.target.matches?.('[data-row]') && ['Enter', ' '].includes(event.key)) { event.preventDefault(); config.open(list.records.get(event.target.dataset.row)); } });
         return list;
     }
-    const rowAttrs = (record, label) => 'class="csms-row-click" tabindex="0" data-row="' + Number(record.id) + '" aria-haspopup="dialog" aria-label="Open ' + esc(label) + '"';
+    const rowKey = record => (record.origin ? record.origin + ':' : '') + record.id;
+    const rowAttrs = (record, label) => 'class="csms-row-click" tabindex="0" data-row="' + esc(rowKey(record)) + '" aria-haspopup="dialog" aria-label="Open ' + esc(label) + '"';
 
     const lists = {
         rules: makeList({
-            view: 'rules', action: 'rule_list', key: 'rules', controls: ['ruleType', 'ruleStatus', 'ruleDemo', 'rulePerPage'],
+            view: 'rules', action: 'rule_list', key: 'rules', controls: ['ruleType', 'ruleStatus', 'ruleOrigin', 'ruleApplies', 'ruleDemo', 'rulePerPage'],
             ids: { search: 'ruleSearch', perPage: 'rulePerPage', count: 'ruleCount', rows: 'ruleRows', wrap: 'ruleWrap', pagination: 'rulePagination', empty: 'ruleEmpty', noMatch: 'ruleNoMatch', error: 'ruleError', errorText: 'ruleErrorText' },
-            filters: () => ({ rule_type: $('ruleType').value, technical_status: $('ruleStatus').value, include_demo: $('ruleDemo').checked ? '1' : '' }),
-            readFilters: (p, el) => { $('ruleType').value = p.get('type') || ''; $('ruleStatus').value = p.get('status') || ''; $('ruleDemo').checked = p.get('demo') === '1'; },
-            writeFilters: () => ({ type: $('ruleType').value, status: $('ruleStatus').value, demo: $('ruleDemo').checked ? '1' : '' }),
-            row: rule => '<tr ' + rowAttrs(rule, rule.rule_name) + '><td><strong>' + esc(rule.rule_name) + '</strong><span class="csms-sub">' + esc(RULE_TYPES[rule.rule_type] || rule.rule_type) + '</span>' + (Number(rule.is_demo) ? demoChip : '') + '</td><td>' + sourceLine(rule) + '</td><td>' + esc(requirementText(rule)) + '</td><td>' + esc(appliesTo(rule)) + '</td><td>' +
-                chip(rule.technical_status === 'active' ? ['Active', 'csms-chip--approved'] : ['Inactive', 'csms-chip--archived']) + '<span class="csms-sub">' + esc(rule.verification_status === 'verified' ? 'Source confirmed' : 'Source not confirmed: not checked') + '</span></td></tr>',
-            open: rule => rule && openRule(rule.id)
+            filters: () => ({ rule_type: $('ruleType').value, technical_status: $('ruleStatus').value, origin: $('ruleOrigin').value, applies_to: $('ruleApplies').value, include_demo: $('ruleDemo').checked ? '1' : '' }),
+            readFilters: (p, el) => { $('ruleType').value = p.get('type') || ''; $('ruleStatus').value = p.get('status') || ''; $('ruleOrigin').value = p.get('origin') || ''; $('ruleApplies').value = p.get('applies') || ''; $('ruleDemo').checked = p.get('demo') === '1'; },
+            writeFilters: () => ({ type: $('ruleType').value, status: $('ruleStatus').value, origin: $('ruleOrigin').value, applies: $('ruleApplies').value, demo: $('ruleDemo').checked ? '1' : '' }),
+            row: rule => '<tr ' + rowAttrs(rule, rule.rule_name) + '><td><strong>' + esc(rule.rule_name) + '</strong><span class="csms-sub">' + esc(RULE_TYPES[rule.rule_type] || rule.rule_type) + '</span>' + (Number(rule.is_demo) ? demoChip : '') + '</td><td>' + esc(ORIGIN[rule.origin] || 'Custom') + '</td><td>' + esc(rule.origin === 'library' ? (SOURCE_CLASS[rule.source_class] || rule.source_class) : 'Custom rule') + '</td><td>' + sourceCell(rule) + '</td><td>' + esc(rule.origin === 'library' ? shorten(rule.requirement_text, 150) : requirementText(rule)) + '</td><td>' + esc(appliesTo(rule)) + '</td><td>' +
+                ruleStatusCell(rule) + '</td></tr>',
+            open: rule => rule && (rule.origin === 'library' ? openLibraryRule(rule.id) : openRule(rule.id))
         }),
         sources: makeList({
             view: 'sources', action: 'reference_list', key: 'references', controls: ['sourceType', 'sourceStatus', 'sourceDemo', 'sourcePerPage'],
@@ -202,12 +219,13 @@
         const pair = RESULT_CHIP[result.result_status] || RESULT_CHIP.NOT_EVALUATED;
         const demo = String(result.rule_name_snapshot || '').startsWith('DEV-DEMO');
         return '<tr><td><strong>' + esc(result.rule_name_snapshot) + '</strong><span class="csms-sub">' + esc(RULE_TYPES[result.rule_type_snapshot] || result.rule_type_snapshot) + '</span>' + (demo ? demoChip : '') + '</td><td>' +
-            (result.reference_code ? sourceLine(result) : '<span class="csms-sub">' + esc(result.reference_identifier_snapshot) + '</span>') + '</td><td>' + esc(result.requirement_snapshot) + '</td><td>' + esc(result.actual_value_snapshot || '—') + '</td><td>' +
-            chip(pair) + '</td><td>' + esc(result.explanation) + '</td></tr>';
+            (result.reference_code || result.source_label ? sourceCell(result) : '<span class="csms-sub">' + esc(result.reference_identifier_snapshot) + '</span>') + '</td><td>' + esc(result.requirement_snapshot) + '</td><td>' + esc(result.actual_value_snapshot || '—') + '</td><td>' +
+            chip(pair) + '</td><td>' + esc(result.explanation) + (result.missing_data_text ? '<span class="csms-sub">Missing: ' + esc(result.missing_data_text) + '</span>' : '') + '</td></tr>';
     }
     function countsHtml(run) {
         return '<span class="compliance-counts__total">Rules checked: <strong>' + Number(run.rules_evaluated) + '</strong></span>' + chip(['Met ' + Number(run.met_count ?? run.passed_count), 'csms-chip--approved']) +
-            chip(['Not met ' + Number(run.not_met_count ?? run.failed_count), 'csms-chip--returned']) + chip(['Cannot determine ' + Number(run.cannot_determine_count ?? run.not_evaluated_count), 'csms-chip--draft']);
+            chip(['Not met ' + Number(run.not_met_count ?? run.failed_count), 'csms-chip--returned']) + chip(['Cannot determine ' + Number(run.cannot_determine_count ?? run.not_evaluated_count), 'csms-chip--draft']) +
+            (Number(run.pending_count) > 0 ? chip(['Pending BCP confirmation ' + Number(run.pending_count), 'csms-chip--type']) : '');
     }
     function showRun(run, caption) {
         state.run = run;
@@ -249,8 +267,9 @@
         if ($('runIncludeDemo')?.checked) data.set('include_demo', '1');
         try {
             const payload = await ui.postForm(api, data);
-            if (!payload.run) { state.run = null; $('resultsCaption').textContent = ''; resultsStates('norules'); ui.showToast(payload.message, 'warning'); }
-            else { showRun(payload.run, 'Run just now. ' + payload.message); ui.showToast(payload.message, 'success'); }
+            // The empty state and the caption already carry the message, so no toast repeats it (a toast would also cover the title).
+            if (!payload.run) { state.run = null; $('resultsCaption').textContent = ''; resultsStates('norules'); }
+            else showRun(payload.run, 'Run just now. ' + payload.message);
         } catch (error) { ui.showToast(error.message, 'error'); }
         finally { button.disabled = !versionId(); }
     });
@@ -305,6 +324,30 @@
     const errorBox = '<div class="form-error" role="alert" hidden></div>';
 
     // ---------- rule dialogs ----------
+    // Library rules are read-only: a manager can only switch one off or on again; its numbers and text never change here.
+    async function openLibraryRule(id) {
+        try {
+            const rule = (await ui.fetchJson(api, { action: 'library_rule_get', id })).rule;
+            state.dialog = { kind: 'libraryRule', rule };
+            const hasSource = Boolean(rule.reference_code || rule.reference_title);
+            const source = hasSource ? [rule.reference_code || rule.reference_title, rule.issuing_body, rule.reference_year].filter(Boolean).join(' · ') : (rule.source_label || '');
+            const toggle = Number(rule.active) === 1 ? ['Deactivate rule', '0', 'fa-ban'] : ['Activate rule', '1', 'fa-check'];
+            setDialog('Library rule', esc(rule.title), errorBox + detail([
+                ['Rule', esc(rule.title)], ['Requirement', esc(rule.requirement_text)], ['Source', esc(source)],
+                hasSource ? ['Source status', chip(SOURCE_STATUS[rule.verification_status] || SOURCE_STATUS.draft)] : null,
+                ['Section', esc(rule.section_label)], ['Page', rule.source_page ? 'p. ' + esc(rule.source_page) : '<span class="csms-sub">Page not recorded</span>'],
+                ['Source class', esc(SOURCE_CLASS[rule.source_class] || rule.source_class)], ['Applies to', esc(appliesTo(rule))],
+                ['How it is used', esc(MODE_LABEL[rule.evaluation_mode] || rule.evaluation_mode)], ['Status', esc(Number(rule.active) === 1 ? 'Active' : 'Inactive')],
+                rule.note ? ['Note', esc(rule.note)] : null
+            ]) + '<p class="compliance-evidence-note"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Library rules are recorded from the sources listed above and are not edited here. Pending rules are never evaluated, and no overall verdict is given.</p>',
+            [closeButton, canManage ? { html: '<i class="fa-solid ' + toggle[2] + '" aria-hidden="true"></i> ' + toggle[0], click: async () => {
+                const data = new FormData(); data.set('action', 'library_rule_active'); data.set('id', rule.id); data.set('active', toggle[1]);
+                try { const payload = await ui.postForm(api, data); await afterSave(payload.message); } catch (error) { ui.showFormError(form, error.message); }
+            } } : null].filter(Boolean), true);
+            dialog.open();
+        } catch (error) { ui.showToast(error.message, 'error'); }
+    }
+
     async function openRule(id) {
         try {
             const rule = (await ui.fetchJson(api, { action: 'rule_get', id })).rule;

@@ -101,7 +101,9 @@ require __DIR__ . '/../../../shared/sidebar.php';
         <div id="viewRules" data-panel="rules" hidden>
           <div class="csms-filter-row">
             <label class="csms-search"><span class="sr-only">Search rules</span><input type="search" id="ruleSearch" maxlength="100" placeholder="Search rule or source"/></label>
-            <select class="csms-select" id="ruleType" aria-label="Rule type"><option value="">All types</option><option value="MIN_TOTAL_UNITS">Minimum total units</option><option value="MAX_TOTAL_UNITS">Maximum total units</option><option value="REQUIRED_SUBJECT">Required subject</option><option value="MIN_SUBJECT_UNITS">Minimum subject units</option><option value="MAX_SUBJECT_UNITS">Maximum subject units</option></select>
+            <select class="csms-select" id="ruleType" aria-label="Rule type"><option value="">All types</option><option value="MIN_TOTAL_UNITS">Minimum total units</option><option value="MAX_TOTAL_UNITS">Maximum total units</option><option value="REQUIRED_SUBJECT">Required subject</option><option value="MIN_SUBJECT_UNITS">Minimum subject units</option><option value="MAX_SUBJECT_UNITS">Maximum subject units</option><option value="COMPONENT_UNITS">Units by component</option><option value="GE_UNITS">General education units</option><option value="PE_UNITS">Physical education</option><option value="NSTP_REQUIREMENT">NSTP requirement</option><option value="NSTP_PREREQUISITE">NSTP prerequisite</option><option value="NSTP_COMPONENTS">NSTP components</option><option value="SHS_HOURS">Senior High hours</option><option value="GRADING_WEIGHTS">Grading weights</option></select>
+            <select class="csms-select" id="ruleOrigin" aria-label="Origin"><option value="">All origins</option><option value="library">Library</option><option value="custom">Custom</option></select>
+            <select class="csms-select" id="ruleApplies" aria-label="Applies to"><option value="">Applies to: any</option><option value="all_college">All college programs</option><option value="senior_high">Senior High School</option><option value="program">One program or curriculum</option></select>
             <select class="csms-select" id="ruleStatus" aria-label="Rule status"><option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select>
             <label class="compliance-check"><input type="checkbox" id="ruleDemo"/> Include demo rules</label>
             <select class="csms-select" id="rulePerPage" aria-label="Rows per page"><option value="10">10 rows</option><option value="20" selected>20 rows</option><option value="50">50 rows</option><option value="100">100 rows</option></select>
@@ -112,7 +114,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
           <div class="csms-empty" id="ruleNoMatch" role="status" hidden><i class="fa-solid fa-filter" aria-hidden="true"></i><strong>No rules match these filters</strong><span>Change the search or a filter.</span></div>
           <div class="csms-empty" id="ruleError" role="alert" hidden><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><strong>Rules could not be loaded</strong><span id="ruleErrorText"></span></div>
           <div class="csms-page-table table-scroll" id="ruleWrap" tabindex="0" aria-label="Scrollable rule library" hidden>
-            <table class="csms-ctable"><thead><tr><th>Rule</th><th>Source</th><th>Requirement</th><th>Applies to</th><th>Status</th></tr></thead><tbody id="ruleRows"></tbody></table>
+            <table class="csms-ctable"><thead><tr><th>Rule</th><th>Origin</th><th>Source class</th><th>Source</th><th>Requirement</th><th>Applies to</th><th>Status</th></tr></thead><tbody id="ruleRows"></tbody></table>
           </div>
           <div class="pagination-bar" id="rulePagination"></div>
         </div>

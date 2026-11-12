@@ -233,11 +233,11 @@ final class CIMFGlobalContextBuilder
                     if (!empty($input['run_id'])) {
                         $run = (new ComplianceValidationService($this->db))->getRun((int)$input['run_id']);
                         if ($versionId && (int)$run['curriculum_version_id'] !== $versionId) throw new InvalidArgumentException('Validation run does not match the selected version.');
-                        $facts['validation'] = self::pick($run, ['curriculum_version_id', 'version_label', 'met_count', 'not_met_count', 'cannot_determine_count', 'results']);
+                        $facts['validation'] = self::pick($run, ['curriculum_version_id', 'version_label', 'met_count', 'not_met_count', 'cannot_determine_count', 'pending_count', 'results']);
                         // Demo rules are never part of the context, and the words are the ones on the page (Met / Not met / Cannot determine from stored data).
                         $facts['validation']['results'] = array_values(array_filter($run['results'], static fn($r) => !ComplianceDemo::isDemoName($r['rule_name_snapshot'] ?? null)));
                         if (!empty($input['finding_id'])) {
-                            $facts['validation']['results'] = array_values(array_filter($facts['validation']['results'], fn($r) => (int)$r['id'] === (int)$input['finding_id']));
+                            $facts['validation']['results'] = array_values(array_filter($facts['validation']['results'], fn($r) => (string)$r['id'] === (string)$input['finding_id']));
                             if (!$facts['validation']['results']) throw new InvalidArgumentException('Finding does not belong to the selected run.');
                         }
                         $versionId = (int)$run['curriculum_version_id'];

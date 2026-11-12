@@ -1,5 +1,5 @@
 <?php
-// Seeds the CHED/DepEd documentary sources the client holds locally, and one BSIT minimum-total-units rule. CLI only.
+// Seeds the CHED/DepEd documentary sources the client holds locally and the rule library built from them (migration 032). CLI only.
 //
 //   Dry run (default, writes nothing):
 //     php scripts/compliance-seed-references.php
@@ -7,14 +7,18 @@
 //     php scripts/compliance-seed-references.php --apply --confirm-database=<database name> --actor-user-id=<id>
 //
 // Needs DB_NAME (and DB_* if not default) in the environment. The actor must be an active user holding compliance.reference.verify
-// and compliance.manage (Super Admin). The script is idempotent: sources and the rule that already exist are skipped.
+// and compliance.manage (Super Admin). The script is idempotent: sources that exist are skipped, library rules are upserted by rule_code
+// (a re-run reports them as unchanged, and the active flag a manager set is never overwritten).
 // It refuses to write unless --confirm-database equals the connected database name, which also protects sms_db from an accidental run.
 //
 // What it creates, through the normal services (so validation and audit rows are the same as in the UI):
 //   * 14 sources, status Draft, each with ONE confirmed document_identity evidence event. The evidence is a locator plus a SHA-256
 //     fingerprint reported by the user on 2026-11-03. It is a pointer, not a stored document; institutional adoption is not assessed.
 //     Recording that event moves each source to "Source confirmed" through the normal service path.
-//   * ONE rule: "BSIT minimum total units (CMO 25 s.2015 Art. V Sec. 8.1)", MIN_TOTAL_UNITS 146, scope program code BSIT, active.
+//   * The library rules from modules/curriculum/services/ComplianceLibraryCatalog.php (compliance_library_rules, migration 032 must be applied):
+//     BSIT 146 units, the CMO 25 component table (display only), general education, PE, NSTP, the pending DepEd Senior High rules and the
+//     two BCP client-reply rules. The legacy custom BSIT rule is NOT created any more; if it already exists it is left alone (a run does not
+//     count it twice). Without migration 032 the sources are still seeded and the library rules are skipped with a message.
 //
 // Notes about the local files: the DM 036 s.2026, DM 048 s.2025 and DO 017 s.2026 copies carry a "-compressed" suffix in their file name
 // and were NOT byte-compared with the copies in the Project folder, so their fingerprints describe the local files only.
@@ -30,7 +34,8 @@ $actorId = null;
 function current_user_id(): ?int { global $actorId; return $actorId; }
 require_once __DIR__ . '/../shared/audit.php';
 require_once __DIR__ . '/../modules/curriculum/services/ComplianceReferenceService.php';
-require_once __DIR__ . '/../modules/curriculum/services/ComplianceRuleService.php';
+require_once __DIR__ . '/../modules/curriculum/services/ComplianceLibraryCatalog.php';
+require_once __DIR__ . '/../modules/curriculum/repositories/ComplianceLibraryRepository.php';
 
 $options = [];
 foreach (array_slice($argv, 1) as $arg) {
@@ -63,8 +68,6 @@ $sources = [
     ['DO 015 s.2026', 'DO 015 s.2026 Grading, Assessment and Awards', 'DEPED', 'DepEd', '2026-06-04', 'DO 015 s.2026.pdf', '1E47FB52DA8485D361617B29335DA5EE1D939176CFBCF0B6EC3EFA21B0CDC91A'],
     ['DO 017 s.2026', 'DO 017 s.2026 Strengthened Senior High School Curriculum', 'DEPED', 'DepEd', '2026-06-04', 'DO 017 s.2026-compressed.pdf', '0041B870F4923F7503757690A9E5955DCB0B800B4FD949B245A852F30EB030EC'],
 ];
-$ruleName = 'BSIT minimum total units (CMO 25 s.2015 Art. V Sec. 8.1)';
-$ruleExplanation = 'Sums the units of all placements of the version (core, electives, general education and others). The minimum is stated in CMO 25 s.2015 Art. V Sec. 8.1.';
 
 $one = static function (mysqli $c, string $sql, string $types = '', array $params = []): ?array {
     $st = $c->prepare($sql);
@@ -77,13 +80,19 @@ $one = static function (mysqli $c, string $sql, string $types = '', array $param
 
 $existing = [];
 foreach ($sources as $s) $existing[$s[0]] = $one($conn, 'SELECT id, verification_status FROM compliance_references WHERE reference_type=? AND reference_code=?', 'ss', [$s[2], $s[0]]);
-$program = $one($conn, "SELECT id FROM academic_programs WHERE program_code='BSIT'");
-$referenceCmo25 = $existing['CMO 25 s.2015'];
-$ruleExists = $referenceCmo25 && $one($conn, 'SELECT id FROM compliance_rules WHERE compliance_reference_id=? AND rule_name=?', 'is', [(int)$referenceCmo25['id'], $ruleName]);
+$library = new ComplianceLibraryRepository($conn);
+$libraryReady = $library->available();
+$catalog = ComplianceLibraryCatalog::rules();
+$referenceId = static function (?string $code) use ($one, $conn): ?int {
+    if ($code === null) return null;
+    $row = $one($conn, 'SELECT id FROM compliance_references WHERE reference_code = ? ORDER BY id LIMIT 1', 's', [$code]);
+    return $row ? (int)$row['id'] : null;
+};
 
 echo ($apply ? 'APPLY' : 'DRY RUN (nothing is written)') . "\n";
 foreach ($sources as $s) echo sprintf("  source %-40s %s\n", $s[0], $existing[$s[0]] ? 'exists, skipped' : 'would be created, Draft + confirmed document_identity evidence');
-echo '  rule   ' . $ruleName . ' ' . ($ruleExists ? 'exists, skipped' : ($program ? 'would be created (program BSIT)' : 'cannot be created: no program with code BSIT')) . "\n";
+if (!$libraryReady) echo "  library rules: migration 032 is not applied in this database, so none can be written (sources are still seeded).\n";
+else foreach ($catalog as $rule) echo sprintf("  rule   %-26s %s\n", $rule['rule_code'], $library->findByCode($rule['rule_code']) ? 'exists, will be checked for changes' : 'would be created');
 
 if (!$apply) { echo "Run again with --apply --confirm-database=$database --actor-user-id=<id> to write.\n"; exit(0); }
 
@@ -97,7 +106,6 @@ foreach (['compliance.reference.verify', 'compliance.manage'] as $permission) {
 }
 
 $references = new ComplianceReferenceService($conn);
-$rules = new ComplianceRuleService($conn);
 $created = 0; $skipped = 0;
 foreach ($sources as $s) {
     if ($existing[$s[0]]) { $skipped++; continue; }
@@ -114,16 +122,17 @@ foreach ($sources as $s) {
 }
 echo "Sources created: $created, skipped: $skipped\n";
 
-$cmo25 = $one($conn, "SELECT id FROM compliance_references WHERE reference_type='CHED' AND reference_code='CMO 25 s.2015'");
-if (!$program) { echo "Rule skipped: no academic program with code BSIT in this database.\n"; exit(0); }
-if ($one($conn, 'SELECT id FROM compliance_rules WHERE compliance_reference_id=? AND rule_name=?', 'is', [(int)$cmo25['id'], $ruleName])) { echo "Rule exists, skipped.\n"; exit(0); }
-try {
-    $rules->create([
-        'compliance_reference_id' => (int)$cmo25['id'], 'rule_name' => $ruleName, 'rule_type' => 'MIN_TOTAL_UNITS', 'numeric_value' => '146',
-        'scope_type' => 'program', 'scope_id' => (int)$program['id'], 'technical_status' => 'active', 'description' => $ruleExplanation,
-    ], $actorId);
-    echo "Rule created: $ruleName\n";
-} catch (DomainConflictException | DomainValidationException $error) {
-    // Rules apply to a whole program, so the edit policy refuses when any BSIT version is approved, under review or archived.
-    $fail('Sources were seeded. The rule was NOT created: ' . $error->getMessage());
+if (!$libraryReady) { echo "Library rules skipped: migration 032 is not applied in this database.\n"; exit(0); }
+$counts = ['created' => 0, 'updated' => 0, 'unchanged' => 0];
+foreach ($catalog as $rule) {
+    $reference = $referenceId($rule['reference_code']);
+    if ($rule['reference_code'] !== null && $reference === null) { echo "  rule {$rule['rule_code']} skipped: source {$rule['reference_code']} is not recorded.\n"; continue; }
+    $outcome = $library->upsert($rule, $reference);
+    $counts[$outcome]++;
+    if ($outcome !== 'unchanged') {
+        $row = $library->findByCode($rule['rule_code']);
+        audit_log_required('COMPLIANCE_LIBRARY_RULE_SEED', 'compliance_library_rule', (int)$row['id'], 'Library rule ' . $outcome . ' by the seed script.', ['rule_code' => $rule['rule_code'], 'outcome' => $outcome]);
+        echo "  rule {$rule['rule_code']} $outcome\n";
+    }
 }
+echo "Library rules created: {$counts['created']}, updated: {$counts['updated']}, unchanged: {$counts['unchanged']}\n";

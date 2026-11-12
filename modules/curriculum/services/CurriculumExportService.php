@@ -485,6 +485,15 @@ class CurriculumExportService
         $run['met_count'] = (int)$run['passed_count'];
         $run['not_met_count'] = (int)$run['failed_count'];
         $run['cannot_determine_count'] = (int)$run['not_evaluated_count'];
+        // Rules pending BCP confirmation are counted apart (never as Met or Not met); only exists after migration 032.
+        $run['pending_count'] = 0;
+        if ($this->db->query("SHOW TABLES LIKE 'compliance_library_results'")->num_rows > 0) {
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM compliance_library_results WHERE validation_run_id = ? AND status = 'PENDING_BCP'");
+            $stmt->bind_param('i', $run['id']);
+            $stmt->execute();
+            $run['pending_count'] = (int)$stmt->get_result()->fetch_row()[0];
+            $stmt->close();
+        }
         return $run;
     }
 

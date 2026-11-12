@@ -68,6 +68,36 @@ class ComplianceRuleRepository
         return $exists;
     }
 
+    /** The custom-rule branch of the combined (library + custom) list: join, where, bind types and parameters. */
+    public function keyFilter(array $query): array
+    {
+        $conditions = [];
+        $types = '';
+        $params = [];
+        if ($query['search'] !== null) {
+            $conditions[] = "(" . RepositoryQuery::searchColumn('rules.rule_name') . " LIKE ? ESCAPE '='
+                              OR " . RepositoryQuery::searchColumn('references_table.reference_code') . " LIKE ? ESCAPE '='
+                              OR " . RepositoryQuery::searchColumn('references_table.title') . " LIKE ? ESCAPE '=')";
+            $pattern = RepositoryQuery::likePattern($query['search']);
+            $types .= 'sss';
+            array_push($params, $pattern, $pattern, $pattern);
+        }
+        foreach (['compliance_reference_id' => 'i', 'academic_program_id' => 'i', 'curriculum_id' => 'i', 'rule_type' => 's', 'technical_status' => 's'] as $field => $type) {
+            if ($query[$field] !== null) {
+                $conditions[] = 'rules.' . $field . ' = ?';
+                $types .= $type;
+                $params[] = $query[$field];
+            }
+        }
+        if (!$query['include_demo']) $conditions[] = 'NOT ' . ComplianceDemo::ruleIsDemo('rules', 'references_table');
+        return [
+            'joins' => ' FROM compliance_rules AS rules INNER JOIN compliance_references AS references_table ON references_table.id = rules.compliance_reference_id',
+            'where' => $conditions ? ' WHERE ' . implode(' AND ', $conditions) : '',
+            'types' => $types,
+            'params' => $params,
+        ];
+    }
+
     public function paginate(array $query): array
     {
         $conditions = [];

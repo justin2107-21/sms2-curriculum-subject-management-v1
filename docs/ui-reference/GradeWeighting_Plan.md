@@ -15,7 +15,7 @@ Evidence: code read (file:line below); `sms_db_uitest` read-only; `sms_db` count
 - **Dead code retired:** the whole old inline editor (own context cascade, Subject picker, component modal, demo note) in `grade-weighting.js`, `grade-weighting.css` and the page; a few old `.grade-weighting-*` selectors remain in the shared files `css/csms-components.css`, `css/csms-typography.css` and `js/csms-live-states.js` (harmless; not touched).
 - **Test:** `tests/grade-weighting-http.php` (85 checks, disposable schema and server): page wording, editable flag per version state, list filters, sort whitelist, page-size cap, status filter, read-only data, exact-100 (33.3 + 33.3 + 33.4 accepted, 33.3 x 3 refused), case-insensitive duplicates, CSRF and permissions, removal (audit with old values, blocked on protected versions, un-place afterwards), update audit old / new, `component_list` scope.
 - **Scale (disposable clone, synthetic `ZZ-LOAD-` placements in one version, about half configured; the clone was dropped):** best of three, ms. 5,000 placements: default list 71, 100 rows 59, code search 100, status filters 94-115, sorts 49-87, deepest page 85-90, context + coverage 87. 20,000 placements: default list 159, code search 339, status filters 335-436, sorts 103-293, deepest page 280-289, context 349. EXPLAIN: every table is reached through an existing key (`uq_curriculum_version_subject`, `PRIMARY`, `uq_grade_weighting_scheme_placement`, `uq_grade_weighting_component_name`); the filesort over the version's placements is inherent. Real versions hold tens of placements. **No index and no migration are needed** (next free number stays 032).
-- **S3 (reference layer, migration 032) is deferred**, blocked on the client answers listed in section 12.
+- **S3 (reference layer, migration 033; 032 is now the Compliance rule library) is deferred**, blocked on the client answers listed in section 12.
 
 ## 1. The page today
 
@@ -146,7 +146,7 @@ Only the summary given with the request is used; the documents themselves are no
 - **Row click opens one compact dialog** (same shell as Equivalency / Offering History): subject (code and title as plain text), components table (add, edit and remove inline, drag-free: up / down buttons or the numeric order), running total bar with remaining or over-limit text, "Save" enabled only at exactly 100.00 and only when something changed, inline errors for name and weight, "Unsaved changes" guard on close, **Review with CIMF inside the dialog** (advice shown beside it, never copied into the fields; see decision D1). Read-only variant for non-managers and protected versions. Target: no scrolling at 1440x900 for up to about 6 components, internal scroll of the components table beyond that.
 - Server work is the same `configuration_save`; the dialog adds no new validation rules.
 
-**Slices** (next free migration is **032**; 030 Electives, 031 optional Equivalency list index)
+**Slices** (next free migration is **033**; 030 Electives, 031 optional Equivalency list index, 032 Compliance rule library)
 
 | Slice | Content | Schema? |
 |---|---|---|

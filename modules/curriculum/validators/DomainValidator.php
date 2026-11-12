@@ -752,6 +752,7 @@ class DomainValidator
             if (!in_array($ruleType, [
                 'MIN_TOTAL_UNITS', 'MAX_TOTAL_UNITS', 'REQUIRED_SUBJECT',
                 'MIN_SUBJECT_UNITS', 'MAX_SUBJECT_UNITS',
+                'COMPONENT_UNITS', 'GE_UNITS', 'PE_UNITS', 'NSTP_REQUIREMENT', 'NSTP_PREREQUISITE', 'NSTP_COMPONENTS', 'SHS_HOURS', 'GRADING_WEIGHTS',
             ], true)) {
                 throw new DomainValidationException('Invalid rule type filter.');
             }
@@ -768,6 +769,11 @@ class DomainValidator
         }
         $query['rule_type'] = $ruleType;
         $query['technical_status'] = $technicalStatus;
+        foreach (['origin' => ['library', 'custom'], 'applies_to' => ['all_college', 'senior_high', 'program'], 'source_class' => ['public_regulation', 'client_reply']] as $field => $allowed) {
+            $value = self::optionalString($input, $field, $field, 30);
+            if ($value !== null && !in_array($value, $allowed, true)) throw new DomainValidationException('Invalid ' . str_replace('_', ' ', $field) . ' filter.');
+            $query[$field] = $value;
+        }
         return $query;
     }
 

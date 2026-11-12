@@ -180,6 +180,127 @@ try {
     try { (new CIMFGlobalContextBuilder($db))->build($profile, 'reference', ['reference_id' => 3, 'academic_program_id' => 1, 'curriculum_id' => 1, 'curriculum_version_id' => 1]); } catch (InvalidArgumentException $e) { $threw = true; }
     ok($threw, 'CIMF refuses a DEV-DEMO source');
 
+    // ================= Slice 3: rule library (migration 032) =================
+    // Migration idempotence: drop the two tables, apply the migration file twice, and the table definitions do not change.
+    $migration = preg_replace('/^USE sms_db;\s*$/m', '', file_get_contents(__DIR__ . '/../database/migrations/032_compliance_rule_library.sql'));
+    $db->query('DROP TABLE IF EXISTS compliance_library_results'); $db->query('DROP TABLE IF EXISTS compliance_library_rules');
+    $db->multi_query($migration); do { if ($r = $db->store_result()) $r->free(); } while ($db->more_results() && $db->next_result());
+    $shape = fn() => $db->query('SHOW CREATE TABLE compliance_library_rules')->fetch_row()[1] . $db->query('SHOW CREATE TABLE compliance_library_results')->fetch_row()[1];
+    $first = $shape();
+    $db->multi_query($migration); do { if ($r = $db->store_result()) $r->free(); } while ($db->more_results() && $db->next_result());
+    ok($first !== '' && $first === $shape(), 'Migration 032: applied twice, the tables are identical (idempotent)');
+    ok(!str_contains(file_get_contents(__DIR__ . '/../database/migrations/032_compliance_rule_library.sql'), 'ALTER TABLE'), 'Migration 032: new tables only, no ALTER of a baseline-covered table');
+
+    // Fixtures: programs with a type, one verified source per catalog code.
+    $db->query("INSERT INTO academic_programs(id,program_code,program_name,program_type) VALUES(3,'BSIT','Library BSIT','Bachelor''s Degree'),(4,'BSCS','Other college program','Bachelor''s Degree'),(5,'SHSX','Senior high strand','Senior High School')");
+    $db->query("INSERT INTO curricula(id,curriculum_code,curriculum_name,academic_program_id) VALUES(3,'LB','BSIT curriculum',3),(4,'LC','BSCS curriculum',4),(5,'LS','SHS curriculum',5)");
+    $db->query("INSERT INTO curriculum_versions(id,curriculum_id,version_label,status,review_status,version_role,baseline_version_id) VALUES(4,3,'LIB-BSIT','draft','not_started','unclassified',NULL),(5,4,'LIB-BSCS','draft','not_started','unclassified',NULL),(6,5,'LIB-SHS','draft','not_started','unclassified',NULL)");
+    $db->query("INSERT INTO curriculum_version_subjects(curriculum_version_id,subject_id,year_level,semester,sequence_order) VALUES(4,1,'1st Year','1st Semester',1),(4,2,'1st Year','1st Semester',2),(4,3,'1st Year','1st Semester',3),(5,1,'1st Year','1st Semester',1),(6,1,'1st Year','1st Semester',1)");
+    require_once __DIR__ . '/../modules/curriculum/services/ComplianceLibraryCatalog.php';
+    require_once __DIR__ . '/../modules/curriculum/repositories/ComplianceLibraryRepository.php';
+    $refIds = [];
+    foreach (['CMO 25 s.2015' => ['CHED', 'CHED'], 'CMO 20 s.2013' => ['CHED', 'CHED'], 'CMO 39 s.2021' => ['CHED', 'CHED'], 'RA 9163' => ['OTHER', 'Republic of the Philippines'], 'DO 017 s.2026' => ['DEPED', 'DepEd'], 'DO 015 s.2026' => ['DEPED', 'DepEd']] as $code => [$type, $body]) {
+        $db->query("INSERT INTO compliance_references(reference_type,reference_code,title,issuing_body,effective_date,source_kind,verification_status,created_by) VALUES('$type','$code','$code','$body','2015-08-01','regulatory_document','verified',1)");
+        $refIds[$code] = (int)$db->insert_id;
+    }
+    $library = new ComplianceLibraryRepository($db);
+    $catalog = ComplianceLibraryCatalog::rules();
+    $seed = function () use ($library, $catalog, $refIds): array { $o = []; foreach ($catalog as $rule) $o[$rule['rule_code']] = $library->upsert($rule, $rule['reference_code'] === null ? null : $refIds[$rule['reference_code']]); return $o; };
+    $one = $seed();
+    ok(count($one) === 10 && array_unique(array_values($one)) === ['created'], 'Seed: 10 library rules created');
+    $two = $seed();
+    ok(array_unique(array_values($two)) === ['unchanged'] && (int)$db->query('SELECT COUNT(*) FROM compliance_library_rules')->fetch_row()[0] === 10, 'Seed: a second pass changes nothing (idempotent), still 10 rows');
+    $row = fn(string $code) => $db->query("SELECT * FROM compliance_library_rules WHERE rule_code='$code'")->fetch_assoc();
+    ok($row('CMO25-BSIT-MIN-UNITS')['source_page'] === '10' && $row('CMO39-PE')['source_page'] === null && $row('DO017-T9-ACADEMIC')['source_page'] === '16' && $row('DO015-T10-GRADING')['source_page'] === '14', 'Pages recorded only where given (PE and NSTP: none)');
+    ok($row('BCP-NSTP1-PREREQ-NSTP2')['compliance_reference_id'] === null && $row('BCP-NSTP1-PREREQ-NSTP2')['source_class'] === 'client_reply' && str_contains($row('BCP-NSTP1-PREREQ-NSTP2')['source_label'], 'not a published policy'), 'Client reply: no reference, labelled "not a published policy"');
+    ok(json_decode($row('CMO25-BSIT-MIN-UNITS')['parameters_json'], true) === ['min_units' => 146] && json_decode($row('CMO20-GE-MIN-UNITS')['parameters_json'], true)['min_units'] === 36 && str_contains($row('CMO20-GE-MIN-UNITS')['note'], '54 units') && str_contains($row('CMO20-GE-MIN-UNITS')['note'], 'no verdict'), 'Values as given (146; 36 = 24 + 9 + 3) and the two-figures note');
+    ok(!preg_match('/\bcompliant\b|official BCP/i', json_encode($catalog)) && !str_contains(json_encode($catalog), 'transmut') && !str_contains(json_encode($catalog), 'Key Stage'), 'Catalog: no verdict words and none of the excluded items');
+    $dep = fn(string $c) => $row($c)['evaluation_mode'];
+    ok($dep('DO017-T9-ACADEMIC') === 'pending_bcp' && $dep('DO017-T10-TECHPRO') === 'pending_bcp' && $dep('DO015-T10-GRADING') === 'pending_bcp' && $dep('CMO25-BSIT-COMPONENTS') === 'display_only' && $dep('BCP-NSTP-COMPONENTS') === 'display_only', 'Modes: DepEd pending, the component table and ROTC/CWTS display only');
+
+    // Applicability and statuses through the page's own endpoint.
+    $bsit = $run($manager, 4);
+    ok($bsit['status'] === 201, 'Run on the BSIT version');
+    $bsitRun = $bsit['json']['run'];
+    $titles = array_column($bsitRun['results'], 'rule_name_snapshot');
+    ok(count($bsitRun['results']) === 5 && in_array('BSIT minimum total units (CMO 25 s.2015 Art. V Sec. 8.1)', $titles, true) && !array_filter($titles, fn($t) => str_contains($t, 'Senior High')) && !array_filter($titles, fn($t) => str_contains($t, 'units by component')), 'BSIT: the 146 rule + the four all-college rules; no DepEd rule, no display-only rule');
+    $byTitle = array_column($bsitRun['results'], null, 'rule_name_snapshot');
+    $units = $byTitle['BSIT minimum total units (CMO 25 s.2015 Art. V Sec. 8.1)'];
+    ok($units['result_label'] === 'Not met' && str_contains($units['actual_value_snapshot'], 'units of all placements: 12') && str_contains($units['actual_value_snapshot'], 'units of required placements:') && str_contains($units['explanation'], 'Elective units count toward the total only up to the required amount.')
+        && $units['reference_code'] === 'CMO 25 s.2015' && $units['issuing_body'] === 'CHED' && $units['section_label'] === 'Art. V Sec. 8.1' && $units['source_page'] === '10', 'BSIT 146: Not met, BOTH unit numbers, elective note, source code / body / section / page');
+    $ge = $byTitle['General education minimum units (CMO 20 s.2013 Sec. 3)'];
+    ok($ge['result_label'] === 'Cannot determine from stored data' && str_contains($ge['missing_data_text'], 'no category') && $ge['source_page'] === '5-6', 'GE: Cannot determine, the missing data is named (no stored category)');
+    $nstp = $byTitle['NSTP 1 is a prerequisite of NSTP 2 (BCP reply)'];
+    ok($nstp['result_label'] === 'Cannot determine from stored data' && $nstp['reference_code'] === null && $nstp['source_class'] === 'client_reply' && str_contains($nstp['source_label'], 'not a published policy') && str_contains($nstp['missing_data_text'], 'NSTP subjects cannot be identified'), 'NSTP prerequisite (client reply): Cannot determine, names the missing data, labelled as a reply');
+    ok($bsitRun['not_met_count'] === 1 && $bsitRun['cannot_determine_count'] === 4 && $bsitRun['met_count'] === 0 && $bsitRun['pending_count'] === 0 && $bsitRun['rules_evaluated'] === 5, 'BSIT counts: 1 Not met, 4 Cannot determine, 0 Met, 0 pending');
+    $bscs = $run($manager, 5)['json']['run'];
+    ok(count($bscs['results']) === 4 && !array_filter($bscs['results'], fn($r) => str_contains($r['rule_name_snapshot'], 'BSIT minimum')), 'Non-BSIT college program: only the four all-college rules');
+    $shs = $run($manager, 6);
+    $shsRun = $shs['json']['run'];
+    ok($shs['status'] === 201 && count($shsRun['results']) === 3 && array_unique(array_column($shsRun['results'], 'result_status')) === ['PENDING_BCP'] && array_unique(array_column($shsRun['results'], 'result_label')) === ['Pending BCP confirmation'], 'SHS strand: only the three pending rules, labelled "Pending BCP confirmation"');
+    ok($shsRun['pending_count'] === 3 && $shsRun['met_count'] === 0 && $shsRun['not_met_count'] === 0 && $shsRun['cannot_determine_count'] === 0 && $shsRun['rules_evaluated'] === 0, 'Pending rules are counted apart and never as Met, Not met or Cannot determine');
+    ok(str_contains($shs['json']['message'], '3 rules are pending BCP confirmation and not evaluated.'), 'Run message names the pending rules');
+    $stored = $db->query('SELECT rules_evaluated,passed_count,failed_count,not_evaluated_count FROM compliance_validation_runs WHERE id=' . (int)$shsRun['id'])->fetch_assoc();
+    ok(array_sum($stored) === 0, 'Stored run row: pending rules are not in the Met / Not met / Cannot determine columns');
+    ok(!preg_match('/\bcompliant\b|official BCP|overall/i', json_encode([$bsit['json'], $shs['json']])), 'Library run responses: no verdict words');
+
+    // No double counting, unconfirmed sources, deactivation.
+    $db->query("INSERT INTO compliance_rules(compliance_reference_id,rule_name,rule_type,description,numeric_value,academic_program_id,technical_status,created_by) VALUES({$refIds['CMO 25 s.2015']},'Legacy BSIT 146','MIN_TOTAL_UNITS','',146,3,'active',1)");
+    ok(count($run($manager, 4)['json']['run']['results']) === 5, 'A legacy custom rule with the same source, program and number is not counted twice');
+    $db->query("UPDATE compliance_references SET verification_status='draft' WHERE id={$refIds['CMO 25 s.2015']}");
+    ok(count($run($manager, 4)['json']['run']['results']) === 4, 'A library rule whose source is not confirmed is not checked');
+    $db->query("UPDATE compliance_references SET verification_status='verified' WHERE id={$refIds['CMO 25 s.2015']}");
+    $db->query("DELETE FROM compliance_rules WHERE rule_name='Legacy BSIT 146'");
+
+    // Rule library list and the new endpoints.
+    $all = $api($manager, 'rule_list', ['per_page' => 100]);
+    $origins = array_count_values(array_column($all['json']['rules'], 'origin'));
+    ok($all['status'] === 200 && ($origins['library'] ?? 0) === 10 && ($origins['custom'] ?? 0) === 4 && $all['json']['pagination']['total_records'] === 14, 'Rule list: library and custom rules together, each with an origin (10 + 4)');
+    ok($api($manager, 'rule_list', ['origin' => 'library'])['json']['pagination']['total_records'] === 10 && $api($manager, 'rule_list', ['origin' => 'custom'])['json']['pagination']['total_records'] === 4 && $api($manager, 'rule_list', ['origin' => 'x'])['status'] === 422, 'Origin filter (and a bad value is refused)');
+    ok($api($manager, 'rule_list', ['applies_to' => 'senior_high'])['json']['pagination']['total_records'] === 3 && $api($manager, 'rule_list', ['applies_to' => 'all_college'])['json']['pagination']['total_records'] === 5 && $api($manager, 'rule_list', ['applies_to' => 'program'])['json']['pagination']['total_records'] === 6, 'Applies-to filter: senior high 3, all college 5 (3 public + 2 reply), one program 6 (2 library + 4 custom)');
+    ok($api($manager, 'rule_list', ['rule_type' => 'SHS_HOURS'])['json']['pagination']['total_records'] === 2 && $api($manager, 'rule_list', ['search' => 'nstp'])['json']['pagination']['total_records'] === 3 && $api($manager, 'rule_list', ['per_page' => 10])['json']['pagination']['total_pages'] === 2, 'Type filter, search and server-side paging over both tables');
+    $lib = array_column($all['json']['rules'], null, 'rule_code')['CMO25-BSIT-MIN-UNITS'];
+    $get = $api($manager, 'library_rule_get', ['id' => $lib['id']]);
+    ok($get['status'] === 200 && $get['json']['rule']['reference_code'] === 'CMO 25 s.2015' && $get['json']['rule']['source_page'] === '10' && $api($manager, 'library_rule_get', ['id' => 999999])['status'] === 404, 'Library rule dialog data; unknown id is 404');
+    ok($api($none, 'library_rule_get', ['id' => $lib['id']])['status'] === 403 && $api($viewer, 'library_rule_get', ['id' => $lib['id']])['status'] === 200, 'Library rule read needs compliance.view');
+    ok($api($viewer, 'library_rule_active', ['id' => $lib['id'], 'active' => '0'], 'POST')['status'] === 403 && $api($manager, 'library_rule_active', ['id' => $lib['id'], 'active' => '0'], 'POST', '')['status'] === 403, 'Deactivating needs compliance.manage and a CSRF token');
+    $before = (int)$db->query("SELECT COUNT(*) FROM audit_logs WHERE action='COMPLIANCE_LIBRARY_RULE_ACTIVE'")->fetch_row()[0];
+    $off = $api($manager, 'library_rule_active', ['id' => $lib['id'], 'active' => '0'], 'POST');
+    ok($off['status'] === 200 && $off['json']['rule']['technical_status'] === 'inactive' && (int)$db->query("SELECT COUNT(*) FROM audit_logs WHERE action='COMPLIANCE_LIBRARY_RULE_ACTIVE'")->fetch_row()[0] === $before + 1, 'Manager deactivates a library rule (audited)');
+    ok($api($manager, 'library_rule_active', ['id' => $lib['id'], 'active' => '7'], 'POST')['status'] === 422, 'A bad active flag is refused');
+    ok(count($run($manager, 4)['json']['run']['results']) === 4, 'A deactivated library rule is not checked');
+    $api($manager, 'library_rule_active', ['id' => $lib['id'], 'active' => '1'], 'POST');
+    ok($row('CMO25-BSIT-MIN-UNITS')['title'] === 'BSIT minimum total units (CMO 25 s.2015 Art. V Sec. 8.1)' && (int)$row('CMO25-BSIT-MIN-UNITS')['active'] === 1 && json_decode($row('CMO25-BSIT-MIN-UNITS')['parameters_json'], true) === ['min_units' => 146], 'Library values are unchanged by deactivating and activating');
+
+    // Read scope on the new results.
+    $bsitRunId = (int)$db->query('SELECT MAX(id) FROM compliance_validation_runs WHERE curriculum_version_id=4')->fetch_row()[0];
+    ok($api($restricted, 'run_get', ['id' => $bsitRunId])['status'] === 404 && $api($viewer, 'run_get', ['id' => $bsitRunId])['status'] === 200 && count($api($viewer, 'run_get', ['id' => $bsitRunId])['json']['run']['results']) === 4, 'run_get: library results follow the same read scope');
+
+    // Consumers: Builder target, Dashboard, Export, CIMF.
+    $svc = new CurriculumVersionService($db);
+    $target = $svc->builderSummary(4)['target'];
+    ok($target !== null && abs($target['value'] - 146) < 0.001 && str_contains($target['rule_name'], 'BSIT minimum total units'), 'Builder target: the library 146 rule when its source is verified');
+    $db->query("INSERT INTO compliance_rules(compliance_reference_id,rule_name,rule_type,description,numeric_value,academic_program_id,technical_status,created_by) VALUES(1,'Legacy 120','MIN_TOTAL_UNITS','',120,3,'active',1)");
+    ok(abs($svc->builderSummary(4)['target']['value'] - 146) < 0.001, 'Builder target: library rule wins over a legacy program rule (BSIT 146 not counted twice)');
+    $db->query("UPDATE compliance_references SET verification_status='draft' WHERE id={$refIds['CMO 25 s.2015']}");
+    ok(abs($svc->builderSummary(4)['target']['value'] - 120) < 0.001, 'Builder target: falls back to the legacy rule when the library rule\'s source is not verified');
+    $db->query("UPDATE compliance_references SET verification_status='verified' WHERE id={$refIds['CMO 25 s.2015']}");
+    $db->query("DELETE FROM compliance_rules WHERE rule_name='Legacy 120'");
+    $latest4 = $run($manager, 4)['json']['run']; // latest run again with every rule active
+    require_once __DIR__ . '/../dashboard/DashboardAnalyticsRepository.php';
+    $failing = array_column((new DashboardAnalyticsRepository($db))->complianceFailures(null), 'id');
+    ok((new DashboardAnalyticsRepository($db))->complianceFailureCount(null) >= 1 && in_array(4, array_map('intval', $failing), true) && !in_array(6, array_map('intval', $failing), true), 'Dashboard "Not met checks" reads the library result (BSIT version) and ignores a pending-only version');
+    require_once __DIR__ . '/../modules/curriculum/services/CurriculumExportService.php';
+    $dataset = (new CurriculumExportService($db))->dataset(['academic_program_id' => 5, 'curriculum_id' => 5, 'curriculum_version_id' => 6, 'include_compliance' => '1']);
+    $exportRun = $dataset['latest_compliance_run'];
+    ok($exportRun['pending_count'] === 3 && $exportRun['met_count'] === 0 && $exportRun['not_met_count'] === 0 && $exportRun['cannot_determine_count'] === 0, 'Export: the latest run carries the pending count apart from Met / Not met / Cannot determine');
+    $built = (new CIMFGlobalContextBuilder($db))->build($profile, 'explain', ['run_id' => (int)$shsRun['id'], 'academic_program_id' => 5, 'curriculum_id' => 5, 'curriculum_version_id' => 6]);
+    ok(($built['facts']['validation']['pending_count'] ?? null) === 3 && count($built['facts']['validation']['results']) === 3, 'CIMF context: pending count and library results');
+    $built = (new CIMFGlobalContextBuilder($db))->build($profile, 'finding', ['run_id' => (int)$latest4['id'], 'finding_id' => array_column($latest4['results'], null, 'rule_name_snapshot')['BSIT minimum total units (CMO 25 s.2015 Art. V Sec. 8.1)']['id'], 'academic_program_id' => 3, 'curriculum_id' => 3, 'curriculum_version_id' => 4]);
+    ok(count($built['facts']['validation']['results']) === 1, 'CIMF: a library finding can be selected by its id');
+    $js2 = file_get_contents(__DIR__ . '/../modules/curriculum/assets/compliance-validator.js');
+    ok(str_contains($js2, 'Pending BCP confirmation') && str_contains($js2, 'Page not recorded') && str_contains($js2, 'library_rule_active'), 'JS: pending chip, "Page not recorded", library dialog actions');
+
     // ---- Builder verification path for sources, and the retired code ----
     $js = file_get_contents(__DIR__ . '/../modules/curriculum/assets/compliance-validator.js');
     ok(!preg_match('/Internal Compliance Status|\bcompliant\b|official BCP/i', $js . file_get_contents(__DIR__ . '/../modules/curriculum/pages/compliance_validator.php')), 'Page code: no old status wording, no verdict word');

@@ -7,6 +7,7 @@ require_once __DIR__ . '/../repositories/CurriculumVersionRepository.php';
 require_once __DIR__ . '/../repositories/SubjectRepository.php';
 require_once __DIR__ . '/../repositories/ComplianceRuleRepository.php';
 require_once __DIR__ . '/../repositories/ComplianceValidationRepository.php';
+require_once __DIR__ . '/../repositories/ComplianceLibraryRepository.php';
 require_once __DIR__ . '/../../../shared/audit.php';
 
 class ComplianceValidationService
@@ -17,6 +18,7 @@ class ComplianceValidationService
     private SubjectRepository $subjects;
     private ComplianceRuleRepository $rules;
     private ComplianceValidationRepository $validations;
+    private ComplianceLibraryRepository $library;
 
     public function __construct(private mysqli $db)
     {
@@ -26,6 +28,7 @@ class ComplianceValidationService
         $this->subjects = new SubjectRepository($db);
         $this->rules = new ComplianceRuleRepository($db);
         $this->validations = new ComplianceValidationRepository($db);
+        $this->library = new ComplianceLibraryRepository($db);
     }
 
     /** Options for the shared Program > Curriculum > Version bar (versions respect the reader's scope). */
@@ -75,8 +78,9 @@ class ComplianceValidationService
         return ['subjects' => $result['records'], 'pagination' => $result['pagination']];
     }
 
-    /** Words shown to people. The stored values (PASS / FAIL / NOT_EVALUATED) are unchanged. */
-    public const RESULT_LABELS = ['PASS' => 'Met', 'FAIL' => 'Not met', 'NOT_EVALUATED' => 'Cannot determine from stored data'];
+    /** Words shown to people. The stored values (PASS / FAIL / NOT_EVALUATED / PENDING_BCP) are unchanged. */
+    public const RESULT_LABELS = ['PASS' => 'Met', 'FAIL' => 'Not met', 'NOT_EVALUATED' => 'Cannot determine from stored data', 'PENDING_BCP' => 'Pending BCP confirmation'];
+    private const MISSING_CATEGORY = 'Stored subjects have no category (general education, PE, NSTP), so these units cannot be counted from stored data.';
     public const NO_RULES_MESSAGE = 'No rules apply to this program. No CHED/DepEd source for it is recorded in this system yet.';
     public const ELECTIVE_NOTE = 'Elective units count toward the total only up to the required amount.';
 
@@ -86,10 +90,78 @@ class ComplianceValidationService
         $run['met_count'] = (int)$run['passed_count'];
         $run['not_met_count'] = (int)$run['failed_count'];
         $run['cannot_determine_count'] = (int)$run['not_evaluated_count'];
-        foreach ($run['results'] ?? [] as $index => $result) {
-            $run['results'][$index]['result_label'] = self::RESULT_LABELS[$result['result_status']] ?? $result['result_status'];
+        $results = [];
+        foreach ($run['results'] ?? [] as $result) {
+            $result['origin'] = 'custom';
+            $results[] = $result;
         }
+        // Library results (migration 032) come first and use the same keys as the custom ones; pending rules are counted apart.
+        $pending = 0;
+        if ($this->library->available() && isset($run['id'])) {
+            $libraryResults = [];
+            foreach ($this->library->resultsForRun((int)$run['id']) as $row) {
+                if ($row['status'] === 'PENDING_BCP') $pending++;
+                $libraryResults[] = [
+                    'id' => 'L' . $row['id'], 'origin' => 'library', 'rule_name_snapshot' => $row['title'], 'rule_type_snapshot' => $row['computation_key'],
+                    'reference_identifier_snapshot' => $row['reference_code'] ?? ($row['source_label'] ?? ''), 'requirement_snapshot' => $row['requirement_text'],
+                    'actual_value_snapshot' => $row['actual_text'], 'result_status' => $row['status'], 'explanation' => $row['explanation'], 'missing_data_text' => $row['missing_data_text'],
+                    'section_label' => $row['section_label'], 'source_page' => $row['source_page'], 'source_class' => $row['source_class'], 'source_label' => $row['source_label'],
+                    'reference_code' => $row['reference_code'], 'issuing_body' => $row['issuing_body'], 'reference_year' => $row['reference_year'], 'reference_type' => $row['reference_type'],
+                    'reference_status' => $row['reference_status'], 'source_kind' => $row['source_kind'], 'created_at' => $row['created_at'],
+                ];
+            }
+            $results = array_merge($libraryResults, $results);
+        }
+        $run['pending_count'] = $pending;
+        foreach ($results as $index => $result) {
+            $results[$index]['result_label'] = self::RESULT_LABELS[$result['result_status']] ?? $result['result_status'];
+        }
+        $run['results'] = $results;
         return $run;
+    }
+
+    /** Library rules that are checked in a run: not display-only, and a public rule only when its source is confirmed. Pending rules are listed, never evaluated. */
+    private function libraryRulesForRun(array $context): array
+    {
+        if (!$this->library->available()) return [];
+        $out = [];
+        foreach ($this->library->applicable((string)$context['program_code'], $context['program_type'] ?? null) as $rule) {
+            if ($rule['evaluation_mode'] === 'display_only') continue;
+            if ($rule['evaluation_mode'] === 'evaluate' && $rule['source_class'] === 'public_regulation' && $rule['verification_status'] !== 'verified') continue;
+            $out[] = $rule;
+        }
+        return $out;
+    }
+
+    /** @return array{0:string,1:?string,2:string,3:?string} status, actual text, explanation, missing data */
+    private function evaluateLibraryRule(array $rule, array $totals): array
+    {
+        if ($rule['evaluation_mode'] === 'pending_bcp') {
+            return ['PENDING_BCP', null, 'Pending BCP confirmation: this rule is recorded from a public source, but whether it applies to BCP is not confirmed. It is not evaluated.', null];
+        }
+        $parameters = $rule['parameters_json'] === null ? [] : (json_decode((string)$rule['parameters_json'], true) ?: []);
+        switch ($rule['computation_key']) {
+            case 'MIN_TOTAL_UNITS':
+                $minimum = (string)($parameters['min_units'] ?? '0');
+                $met = $this->compareDecimal((string)$totals['total_units'], $minimum) >= 0;
+                return [$met ? 'PASS' : 'FAIL', $this->unitsBoth($totals),
+                    ($met ? 'The unit total of all placements meets the minimum.' : 'The unit total of all placements is below the minimum.') . ' ' . self::ELECTIVE_NOTE, null];
+            case 'NSTP_PREREQUISITE':
+                return ['NOT_EVALUATED', null, 'The prerequisite between NSTP subjects cannot be checked from stored data.', 'NSTP subjects cannot be identified: stored subjects have no category.'];
+            default:
+                return ['NOT_EVALUATED', null, 'This rule cannot be checked from stored data.', self::MISSING_CATEGORY];
+        }
+    }
+
+    private function libraryDuplicatesCustom(array $custom, array $libraryRules, array $context): bool
+    {
+        if ($custom['rule_type'] !== 'MIN_TOTAL_UNITS' || (int)($custom['academic_program_id'] ?? 0) !== (int)$context['academic_program_id']) return false;
+        foreach ($libraryRules as $rule) {
+            $parameters = $rule['parameters_json'] === null ? [] : (json_decode((string)$rule['parameters_json'], true) ?: []);
+            if ($rule['computation_key'] === 'MIN_TOTAL_UNITS' && (int)$rule['compliance_reference_id'] === (int)$custom['compliance_reference_id']
+                && abs((float)($parameters['min_units'] ?? -1) - (float)$custom['numeric_value']) < 0.001) return true;
+        }
+        return false;
     }
 
     public function run(int $versionId, int $actorId, bool $includeDemo = false): array
@@ -103,7 +175,10 @@ class ComplianceValidationService
             (int)$context['curriculum_id'],
             $includeDemo
         );
-        if (!$rules) {
+        $libraryRules = $this->libraryRulesForRun($context);
+        // A custom rule that repeats a library total-units rule (same source, program and number) is not counted twice.
+        $rules = array_values(array_filter($rules, fn($rule) => !$this->libraryDuplicatesCustom($rule, $libraryRules, $context)));
+        if (!$rules && !$libraryRules) {
             return [
                 'run' => null,
                 'context' => $context,
@@ -118,6 +193,18 @@ class ComplianceValidationService
         $this->db->begin_transaction();
         try {
             $runId = $this->validations->createRun($versionId, $actorId);
+            foreach ($libraryRules as $rule) {
+                [$status, $actual, $explanation, $missing] = $this->evaluateLibraryRule($rule, $totals);
+                $this->library->createResult($runId, (int)$rule['id'], $status, $actual, $explanation, $missing);
+                if ($status === 'PENDING_BCP') {
+                    $summary['pending']++;
+                    continue;
+                }
+                $summary['rules_evaluated']++;
+                if ($status === 'PASS') $summary['passed']++;
+                elseif ($status === 'FAIL') $summary['failed']++;
+                else $summary['not_evaluated']++;
+            }
             foreach ($rules as $rule) {
                 $result = $this->evaluateRule($rule, $versionId, $totals);
                 $this->validations->createResult($runId, $result);
@@ -142,6 +229,7 @@ class ComplianceValidationService
                     'passed' => $summary['passed'],
                     'failed' => $summary['failed'],
                     'not_evaluated' => $summary['not_evaluated'],
+                    'pending_bcp' => $summary['pending'],
                 ]
             );
             $run = $this->validations->findRun($runId);
@@ -160,7 +248,8 @@ class ComplianceValidationService
             'context' => $context,
             'summary' => $summary,
             'results' => $run['results'],
-            'message' => 'Checked ' . $summary['rules_evaluated'] . ($summary['rules_evaluated'] === 1 ? ' rule' : ' rules') . ' from confirmed sources.',
+            'message' => 'Checked ' . $summary['rules_evaluated'] . ($summary['rules_evaluated'] === 1 ? ' rule' : ' rules') . ' from confirmed sources.'
+                . ($summary['pending'] > 0 ? ' ' . $summary['pending'] . ($summary['pending'] === 1 ? ' rule is' : ' rules are') . ' pending BCP confirmation and not evaluated.' : ''),
         ];
     }
 
@@ -304,6 +393,7 @@ class ComplianceValidationService
             'passed' => 0,
             'failed' => 0,
             'not_evaluated' => 0,
+            'pending' => 0,
         ];
     }
 }

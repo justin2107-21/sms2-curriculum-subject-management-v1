@@ -51,6 +51,18 @@ try {
             $id = DomainValidator::positiveId($_GET['id'] ?? null, 'Compliance rule');
             json_response(true, 'Compliance rule loaded.', ['rule' => $ruleService->get($id)]);
 
+        case 'library_rule_get':
+            curriculum_require_read('compliance.view');
+            $id = DomainValidator::positiveId($_GET['id'] ?? null, 'Library rule');
+            json_response(true, 'Library rule loaded.', ['rule' => $ruleService->getLibrary($id)]);
+
+        case 'library_rule_active':
+            curriculum_require_mutation('compliance.manage');
+            $id = DomainValidator::positiveId($_POST['id'] ?? null, 'Library rule');
+            $flag = (string)($_POST['active'] ?? '');
+            if (!in_array($flag, ['0', '1'], true)) throw new DomainValidationException('Active must be 0 or 1.');
+            json_response(true, $flag === '1' ? 'Library rule activated.' : 'Library rule deactivated.', ['rule' => $ruleService->setLibraryActive($id, $flag === '1')]);
+
         case 'history_list':
             curriculum_require_read('compliance.view');
             json_response(true, 'Compliance validation history loaded.', $validationService->history($_GET));

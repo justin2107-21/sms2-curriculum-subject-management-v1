@@ -18,7 +18,7 @@ class ComplianceValidationRepository
                     curricula.id AS curriculum_id, curricula.curriculum_code,
                     curricula.curriculum_name, curricula.status AS curriculum_status,
                     programs.id AS academic_program_id, programs.program_code,
-                    programs.program_name
+                    programs.program_name, programs.program_type
              FROM curriculum_versions AS versions
              INNER JOIN curricula ON curricula.id = versions.curriculum_id
              INNER JOIN academic_programs AS programs

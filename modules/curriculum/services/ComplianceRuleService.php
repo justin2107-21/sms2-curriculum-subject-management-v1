@@ -5,6 +5,8 @@ require_once __DIR__ . '/CurriculumVersionEditPolicy.php';
 require_once __DIR__ . '/../validators/DomainValidator.php';
 require_once __DIR__ . '/../repositories/ComplianceReferenceRepository.php';
 require_once __DIR__ . '/../repositories/ComplianceRuleRepository.php';
+require_once __DIR__ . '/../repositories/ComplianceLibraryRepository.php';
+require_once __DIR__ . '/../repositories/ComplianceLibraryRepository.php';
 require_once __DIR__ . '/../repositories/AcademicProgramRepository.php';
 require_once __DIR__ . '/../repositories/CurriculumRepository.php';
 require_once __DIR__ . '/../repositories/SubjectRepository.php';
@@ -14,6 +16,7 @@ class ComplianceRuleService
 {
     private ComplianceReferenceRepository $references;
     private ComplianceRuleRepository $rules;
+    private ComplianceLibraryRepository $library;
     private AcademicProgramRepository $programs;
     private CurriculumRepository $curricula;
     private SubjectRepository $subjects;
@@ -22,15 +25,59 @@ class ComplianceRuleService
     {
         $this->references = new ComplianceReferenceRepository($db);
         $this->rules = new ComplianceRuleRepository($db);
+        $this->library = new ComplianceLibraryRepository($db);
         $this->programs = new AcademicProgramRepository($db);
         $this->curricula = new CurriculumRepository($db);
         $this->subjects = new SubjectRepository($db);
     }
 
+    /** Library rules and custom rules together (library first). Without migration 032 only the custom rules exist. */
     public function list(array $input): array
     {
-        $result = $this->rules->paginate(DomainValidator::complianceRuleQuery($input));
-        return ['rules' => $result['records'], 'pagination' => $result['pagination']];
+        $query = DomainValidator::complianceRuleQuery($input);
+        if (!$this->library->available()) {
+            if (($query['origin'] ?? null) === 'library' || ($query['source_class'] ?? null) === 'client_reply' || in_array($query['applies_to'] ?? null, ['all_college', 'senior_high'], true)) {
+                return ['rules' => [], 'pagination' => RepositoryQuery::pagination(0, $query['page'], $query['per_page'])];
+            }
+            $result = $this->rules->paginate($query);
+            foreach ($result['records'] as &$record) $record['origin'] = 'custom';
+            return ['rules' => $result['records'], 'pagination' => $result['pagination']];
+        }
+        $page = $this->library->pageKeys($query, $this->rules->keyFilter($query));
+        $records = [];
+        foreach ($page['keys'] as $key) {
+            $record = $key['origin'] === 'library' ? $this->library->findById((int)$key['id']) : $this->rules->findById((int)$key['id']);
+            if ($record) {
+                $record['origin'] = $key['origin'];
+                $records[] = $record;
+            }
+        }
+        return ['rules' => $records, 'pagination' => $page['pagination']];
+    }
+
+    public function getLibrary(int $id): array
+    {
+        $rule = $this->library->available() ? $this->library->findById($id) : null;
+        if (!$rule) throw new DomainNotFoundException('Library rule not found.');
+        return $rule;
+    }
+
+    /** Library values are never edited in the application. A manager can only switch a library rule off (or on again). */
+    public function setLibraryActive(int $id, bool $active): array
+    {
+        $this->db->begin_transaction();
+        try {
+            $rule = $this->getLibrary($id);
+            $this->library->setActive($id, $active);
+            audit_log_required('COMPLIANCE_LIBRARY_RULE_ACTIVE', 'compliance_library_rule', $id, 'Library rule ' . ($active ? 'activated.' : 'deactivated.'),
+                ['rule_code' => $rule['rule_code'], 'old_active' => (int)$rule['active'], 'new_active' => $active ? 1 : 0]);
+            $updated = $this->getLibrary($id);
+            $this->db->commit();
+        } catch (Throwable $error) {
+            $this->db->rollback();
+            throw $error;
+        }
+        return $updated;
     }
 
     public function get(int $id): array
