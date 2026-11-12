@@ -10,8 +10,9 @@
 .export-top { align-items: center; display: flex; flex-wrap: wrap; gap: var(--csms-space-3, 12px) var(--csms-space-4, 16px); margin: 14px 0; }
 .export-top > .export-context-picker { flex: 1 1 34rem; margin: 0; min-width: 0; }
 .export-actions { align-items: flex-end; display: flex; flex: 0 1 auto; flex-direction: column; gap: var(--csms-space-2, 8px); max-width: 100%; }
-.export-actions .export-toolbar { justify-content: flex-end; }
-@media (max-width: 1280px) { .export-actions { align-items: stretch; flex: 1 1 100%; } .export-actions .export-toolbar, .export-actions .export-protect-row { justify-content: flex-start; } .export-protect-fields { justify-content: start; } }
+.export-actions .export-toolbar { flex-wrap: wrap; justify-content: flex-end; }
+.export-toolbar .export-protect-row { flex: none; }
+@media (max-width: 1280px) { .export-actions { align-items: stretch; flex: 1 1 100%; } .export-actions .export-toolbar { justify-content: flex-start; } .export-protect-fields { justify-content: start; } }
 .export-protect { align-items: flex-end; display: flex; flex-direction: column; gap: var(--csms-space-2, 8px); }
 .export-protect-row { align-items: center; display: flex; gap: var(--csms-space-2, 8px); justify-content: flex-end; margin: 0; }
 .export-protect-row label { align-items: center; cursor: pointer; display: inline-flex; gap: var(--csms-space-2, 8px); }
