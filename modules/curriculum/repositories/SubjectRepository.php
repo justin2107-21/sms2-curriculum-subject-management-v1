@@ -228,24 +228,8 @@ class SubjectRepository
     }
 
     /**
-     * Year-level number of a stored label: 1-4 for college ("1", "1st", "1st year", "1st yr", "year 1", "yr 1") and 11 or 12 for "Grade 11" / "Grade 12".
-     * Plain string lists keep this cheap for thousands of placements; any other label is simply not counted in a bar.
-     */
-    private static function yearNumberSql(string $column): string
-    {
-        $y = "LOWER(TRIM($column))";
-        $parts = [];
-        foreach ([1 => '1st', 2 => '2nd', 3 => '3rd', 4 => '4th'] as $n => $ord) {
-            $list = implode(',', array_map(static fn(string $t): string => "'$t'", [(string)$n, $ord, "$ord year", "$ord yr", "year $n", "yr $n"]));
-            $parts[] = "WHEN $y IN ($list) THEN $n";
-        }
-        foreach ([11, 12] as $g) $parts[] = "WHEN $y IN ('grade $g', 'grade$g') THEN $g";
-        return 'CASE ' . implode(' ', $parts) . ' END';
-    }
-
-    /**
-     * Counts for a page of program cards from ONE aggregate query: curricula, versions, distinct placed subjects, versions per status bucket and distinct
-     * subjects per year level. Versions and placements a reader may not see (CurriculumReadScope) are not counted; curricula are structure and are.
+     * Counts for a page of program cards from ONE aggregate query: curricula, versions, distinct placed subjects and versions per status bucket.
+     * Versions and placements a reader may not see (CurriculumReadScope) are not counted; curricula are structure and are.
      */
     private function cardCounts(array $programs): array
     {
@@ -256,10 +240,9 @@ class SubjectRepository
             $bucket = "CASE WHEN v.status = 'archived' THEN 'archived' WHEN v.review_status = 'approved' THEN 'approved' WHEN v.review_status = 'under_review' THEN 'in_review' WHEN v.review_status = 'returned' THEN 'returned' WHEN v.status = 'active' THEN 'active' ELSE 'draft' END";
             $select = 'COUNT(DISTINCT curriculum_id) AS curriculum_count, COUNT(DISTINCT version_id) AS version_count, COUNT(DISTINCT subject_id) AS subject_count';
             foreach (['draft', 'active', 'approved', 'in_review', 'returned', 'archived'] as $b) $select .= ", COUNT(DISTINCT CASE WHEN bucket = '$b' THEN version_id END) AS v_$b";
-            foreach ([1, 2, 3, 4, 11, 12] as $n) $select .= ", COUNT(DISTINCT CASE WHEN yn = $n THEN subject_id END) AS y_$n";
             $in = implode(',', array_fill(0, count($ids), '?'));
             $rows = $this->rows("SELECT program_id, $select FROM (
-                    SELECT c.academic_program_id AS program_id, c.id AS curriculum_id, v.id AS version_id, p.subject_id, $bucket AS bucket, " . self::yearNumberSql('p.year_level') . " AS yn
+                    SELECT c.academic_program_id AS program_id, c.id AS curriculum_id, v.id AS version_id, p.subject_id, $bucket AS bucket
                     FROM curricula c
                     LEFT JOIN curriculum_versions v ON v.curriculum_id = c.id" . ($scope !== '' ? ' AND ' . $scope : '') . "
                     LEFT JOIN curriculum_version_subjects p ON p.curriculum_version_id = v.id
@@ -273,8 +256,6 @@ class SubjectRepository
             $program['subject_count'] = (int)($c['subject_count'] ?? 0);
             $program['version_statuses'] = [];
             foreach (['active', 'draft', 'approved', 'in_review', 'returned', 'archived'] as $b) if ((int)($c['v_' . $b] ?? 0) > 0) $program['version_statuses'][$b] = (int)$c['v_' . $b];
-            $program['year_counts'] = [];
-            foreach (((int)$program['is_shs'] === 1 ? [11, 12] : [1, 2, 3, 4]) as $n) $program['year_counts'][(string)$n] = (int)($c['y_' . $n] ?? 0);
             return $program;
         }, $programs);
     }

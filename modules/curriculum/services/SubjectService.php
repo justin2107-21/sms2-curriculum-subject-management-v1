@@ -92,7 +92,7 @@ class SubjectService
         $programs = array_map(static fn(array $p): array => [
             'id' => (int)$p['id'], 'program_code' => $p['program_code'], 'program_name' => $p['program_name'], 'level' => (int)$p['is_shs'] === 1 ? 'shs' : 'college',
             'subject_count' => (int)$p['subject_count'], 'curriculum_count' => (int)$p['curriculum_count'], 'version_count' => (int)$p['version_count'],
-            'version_statuses' => $p['version_statuses'], 'year_counts' => $p['year_counts'],
+            'version_statuses' => $p['version_statuses'],
         ], $result['records']);
         return ['programs' => $programs, 'pagination' => $result['pagination'], 'groups' => $result['groups'], 'unplaced_count' => $this->subjects->unplacedCount()];
     }

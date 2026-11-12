@@ -38,11 +38,20 @@
 #programSummary { margin: 0 0 12px; }
 .subject-title-cell { max-width: 32rem; overflow-wrap: anywhere; }
 
-/* The search box (the way into any subject) and its capped result panel. */
-.subject-find { position: relative; margin: 20px 0 0; }
-.subject-find ~ .mapping-workspace-panel, .subject-find ~ .subject-back-row { margin-top: 20px; }
-.subject-find__icon { position: absolute; left: 18px; top: 19px; font-size: 16px; color: #475569; pointer-events: none; }
-.subject-master-content .subject-find__input { width: 100%; box-sizing: border-box; height: 54px; min-height: 54px; padding: 0 18px 0 48px; font: inherit; font-size: 16px; color: var(--csms-text, #1f2937); background: #fff; border: 1px solid var(--csms-border-strong, #cbd5e1); border-radius: 12px; box-shadow: var(--csms-shadow-sm, 0 1px 3px rgba(15, 23, 42, .06)); }
+/* One row: the search box (capped width), the level control directly beside it, the record count at the far right. It wraps below 1024px. */
+.subject-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 20px 0 0; }
+.subject-toolbar ~ .mapping-workspace-panel, .subject-toolbar ~ .subject-back-row { margin-top: 20px; }
+.subject-toolbar__cards { display: contents; }
+.subject-toolbar__count { margin-left: auto; font-size: 14px; color: #475569; white-space: nowrap; }
+.subject-toolbar .csms-search { display: block; flex: 0 1 11rem; min-width: 8rem; }
+.subject-toolbar .csms-search input { box-sizing: border-box; width: 100%; height: 40px; padding: 0 12px; font: inherit; font-size: 14px; color: var(--csms-text, #1f2937); background: #fff; border: 1px solid var(--csms-border-strong, #cbd5e1); border-radius: 8px; }
+.subject-toolbar .csms-search input:focus-visible { outline: 2px solid #2163c5; outline-offset: 1px; }
+/* From 1024px the row stays on one line (the search box gives way down to 240px) unless the optional program filter is showing. */
+@media (min-width: 1024px) { .subject-toolbar:has(#cardFilterWrap[hidden]) { flex-wrap: nowrap; } }
+@media (max-width: 1023px) { .subject-find { flex: 1 1 100%; max-width: 520px; } .subject-toolbar__count { margin-left: 0; } }
+.subject-find { position: relative; flex: 0 1 520px; min-width: 240px; }
+.subject-find__icon { position: absolute; left: 16px; top: 16px; font-size: 16px; color: #475569; pointer-events: none; }
+.subject-master-content .subject-find__input { width: 100%; box-sizing: border-box; height: 48px; min-height: 48px; padding: 0 16px 0 44px; font: inherit; font-size: 15px; color: var(--csms-text, #1f2937); background: #fff; border: 1px solid var(--csms-border-strong, #cbd5e1); border-radius: 12px; box-shadow: var(--csms-shadow-sm, 0 1px 3px rgba(15, 23, 42, .06)); }
 .subject-master-content .subject-find__input:focus-visible { outline: 2px solid #2163c5; outline-offset: 2px; border-color: #2163c5; }
 .subject-find__panel { position: absolute; z-index: 50; left: 0; right: 0; top: calc(100% + 6px); max-height: 60vh; overflow: auto; padding: 6px; background: #fff; border: 1px solid var(--csms-border, #dfe4ee); border-radius: 12px; box-shadow: 0 12px 28px rgba(15, 23, 42, .14); }
 .subject-find__note { margin: 0; padding: 12px; font-size: 14px; color: #475569; }
@@ -62,7 +71,6 @@
 .subject-card-groups { display: flex; flex-direction: column; gap: 26px; margin-top: 18px; }
 #cardLoading { margin-top: 18px; }
 #cardLevel { flex: 0 0 auto; }
-.subject-card-controls { margin-top: 0; }
 
 /* Dialog. */
 .subject-dialog { max-width: 640px; width: 100%; }

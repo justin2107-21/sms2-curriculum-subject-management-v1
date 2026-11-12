@@ -64,11 +64,22 @@ require __DIR__ . '/../../../shared/sidebar.php';
     </div>
 
     <section class="mapping-workspace-shell">
-      <div class="subject-find">
-        <label class="sr-only" for="subjectFind">Find a subject by code or title</label>
-        <i class="fa-solid fa-magnifying-glass subject-find__icon" aria-hidden="true"></i>
-        <input type="search" id="subjectFind" class="subject-find__input" maxlength="100" placeholder="Find a subject by code or title" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="findResults" aria-autocomplete="list"/>
-        <div class="subject-find__panel" id="findResults" role="listbox" aria-label="Matching subjects" hidden></div>
+      <div class="subject-toolbar">
+        <div class="subject-find">
+          <label class="sr-only" for="subjectFind">Find a subject by code or title</label>
+          <i class="fa-solid fa-magnifying-glass subject-find__icon" aria-hidden="true"></i>
+          <input type="search" id="subjectFind" class="subject-find__input" maxlength="100" placeholder="Find a subject by code or title" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="findResults" aria-autocomplete="list"/>
+          <div class="subject-find__panel" id="findResults" role="listbox" aria-label="Matching subjects" hidden></div>
+        </div>
+        <div class="subject-toolbar__cards" id="cardTools">
+          <div class="program-tabs" id="cardLevel" role="group" aria-label="Program level">
+            <button type="button" class="program-tab" data-level="all" aria-pressed="true">All</button>
+            <button type="button" class="program-tab" data-level="college" aria-pressed="false">College programs</button>
+            <button type="button" class="program-tab" data-level="shs" aria-pressed="false">SHS strands</button>
+          </div>
+          <label class="csms-search" id="cardFilterWrap" hidden><span class="sr-only">Filter programs</span><input type="search" id="cardFilter" maxlength="100" placeholder="Filter programs"/></label>
+          <span class="subject-toolbar__count" id="cardCount" role="status"></span>
+        </div>
       </div>
 
       <?php if ($canBrowse): ?>
@@ -89,15 +100,6 @@ require __DIR__ . '/../../../shared/sidebar.php';
       <section class="mapping-workspace-panel csms-panel" aria-label="Subjects">
         <!-- Program and strand cards -->
         <div id="viewCards" data-panel="cards" hidden>
-          <div class="csms-filter-row subject-card-controls">
-            <div class="program-tabs" id="cardLevel" role="group" aria-label="Program level">
-              <button type="button" class="program-tab" data-level="all" aria-pressed="true">All</button>
-              <button type="button" class="program-tab" data-level="college" aria-pressed="false">College programs</button>
-              <button type="button" class="program-tab" data-level="shs" aria-pressed="false">SHS strands</button>
-            </div>
-            <label class="csms-search" id="cardFilterWrap" hidden><span class="sr-only">Filter programs</span><input type="search" id="cardFilter" maxlength="100" placeholder="Filter programs"/></label>
-            <span class="csms-filter-row__summary" id="cardCount" role="status"></span>
-          </div>
           <div class="csms-program-grid" id="cardLoading" aria-busy="true" aria-label="Loading programs"></div>
           <div class="csms-empty" id="cardError" role="alert" hidden><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><strong>Programs could not be loaded</strong><span id="cardErrorText"></span><button type="button" class="button-muted" id="cardRetry">Retry</button></div>
           <div class="csms-empty" id="cardNoMatch" role="status" hidden><i class="fa-solid fa-filter" aria-hidden="true"></i><strong>No programs match this filter</strong><span>Change the filter or the level.</span><button type="button" class="button-muted" id="cardClear">Clear filter</button></div>

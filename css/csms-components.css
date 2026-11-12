@@ -690,48 +690,38 @@ strong.csms-ctable__code, dd.csms-ctable__code, span.csms-ctable__code { color: 
   .csms-picker__panel { left: 0; right: auto; width: 100%; max-width: none; }
 }
 
-/* ---- Program card (csms-program-card): one link per program or strand, shared so other pages can adopt it. ----------------------
-   Markup: <a class="csms-program-card csms-program-card--college|--shs [--muted]" href aria-label>
-             <span class="csms-program-card__top"><span class="csms-program-card__icon"><i/></span><span class="csms-program-card__level csms-chip"></span></span>
-             <span class="csms-program-card__code"></span><span class="csms-program-card__name"></span>
-             <span class="csms-program-card__stats"><span class="csms-program-card__stat"><strong></strong><small></small></span>...</span>
-             <span class="csms-program-card__statuses"><span class="csms-chip csms-chip--..."></span></span> [<span class="csms-program-card__bars" role="img" aria-label>]
-             <span class="csms-program-card__foot">Open subjects <i class="fa-solid fa-arrow-right"></i></span></a>
+/* ---- Program card (csms-program-card): one compact link per program or strand, shared so other pages can adopt it. ------------------
+   Markup: <a class="csms-program-card csms-program-card--college|--shs [--muted]" href title aria-label>
+             <span class="csms-program-card__main"><span class="csms-program-card__icon"><i/></span>
+               <span class="csms-program-card__text"><span class="csms-program-card__code"></span><span class="csms-program-card__name"></span></span></span>
+             <span class="csms-program-card__foot"><span class="csms-program-card__count"><strong>52</strong> subjects</span>
+               <span class="csms-chip csms-chip--active">Active</span><i class="fa-solid fa-arrow-right csms-program-card__arrow"></i></span></a>
    The 3 px top edge is decorative (blue for college, teal for SHS); every text keeps at least 4.5:1 contrast on its surface. */
-.csms-program-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; align-items: stretch; }
-.csms-program-card { --card-accent: #2163c5; position: relative; display: flex; flex-direction: column; gap: 14px; min-width: 0; height: 100%; box-sizing: border-box; padding: 18px 18px 14px; overflow: hidden; color: inherit; text-decoration: none; background: #fff; border: 1px solid var(--csms-border, #dfe4ee); border-radius: var(--csms-radius-surface, 12px); box-shadow: var(--csms-shadow-sm, 0 1px 3px rgba(15, 23, 42, .06)); transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease; }
+.csms-program-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(224px, 1fr)); gap: 16px; align-items: stretch; }
+.csms-program-card { --card-accent: #2163c5; position: relative; display: flex; flex-direction: column; gap: 12px; min-width: 0; height: 100%; box-sizing: border-box; padding: 16px 16px 12px; overflow: hidden; color: inherit; text-decoration: none; background: #fff; border: 1px solid var(--csms-border, #dfe4ee); border-radius: var(--csms-radius-surface, 12px); box-shadow: var(--csms-shadow-sm, 0 1px 3px rgba(15, 23, 42, .06)); transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease; }
 .csms-program-card::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--card-accent); }
 .csms-program-card--shs { --card-accent: #0f8b82; }
 .csms-program-card:hover { transform: translateY(-2px); border-color: var(--card-accent); box-shadow: 0 8px 20px rgba(15, 23, 42, .10); }
 /* The app-wide focus ring is navy (!important in csms-tokens.css); the card asks for the blue ring. */
 body .csms-program-card:focus-visible { outline: 2px solid #2163c5 !important; outline-offset: 2px; }
-.csms-program-card__top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.csms-program-card__icon { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 10px; font-size: 18px; background: #e8eefb; color: #1a3a8c; }
+.csms-program-card__main { display: flex; align-items: center; gap: 12px; min-width: 0; min-height: 62px; }
+.csms-program-card__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.csms-program-card__icon { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 10px; font-size: 18px; background: #e8eefb; color: #1a3a8c; }
 .csms-program-card--shs .csms-program-card__icon { background: #dff3f1; color: #0b5e57; }
-.csms-program-card__level { background: #e8eefb; color: #1a3a8c; }
-.csms-program-card--shs .csms-program-card__level { background: #dff3f1; color: #0b5e57; }
-.csms-program-card__code { font-family: "Newsreader", Georgia, "Times New Roman", serif; font-size: 28px; font-weight: 600; line-height: 1.1; color: #2163c5; overflow-wrap: anywhere; }
-.csms-program-card__name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; min-height: 2.8em; font-size: 14px; font-weight: 600; line-height: 1.4; color: var(--csms-text, #1f2937); }
-.csms-program-card__stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.csms-program-card__stat { display: flex; flex-direction: column; gap: 2px; padding: 0 12px; border-left: 1px solid #e5e9f2; }
-.csms-program-card__stat:first-child { padding-left: 0; border-left: 0; }
-.csms-program-card__stat strong { font-size: 22px; font-weight: 700; line-height: 1.1; color: var(--csms-text, #1f2937); }
-.csms-program-card__stat small { font-size: 12px; color: #475569; }
-.csms-program-card__statuses { display: flex; flex-wrap: wrap; gap: 6px; min-height: 24px; }
-.csms-program-card__bars { display: flex; align-items: flex-end; gap: 6px; height: 46px; }
-.csms-program-card__bar { flex: 1 1 0; display: flex; flex-direction: column; align-items: stretch; justify-content: flex-end; height: 100%; gap: 3px; font-size: 11px; line-height: 1; color: #475569; text-align: center; }
-.csms-program-card__bar i { display: block; min-height: 2px; border-radius: 3px 3px 0 0; background: var(--card-accent); opacity: .75; }
-.csms-program-card__foot { display: flex; align-items: center; justify-content: space-between; margin-top: auto; padding-top: 10px; border-top: 1px solid #eef1f7; font-size: 13px; font-weight: 600; color: #1a3a8c; }
-.csms-program-card__foot i { transition: transform 150ms ease; }
-.csms-program-card:hover .csms-program-card__foot i, .csms-program-card:focus-visible .csms-program-card__foot i { transform: translateX(4px); }
-/* No curriculum yet (and the "not placed" card): dashed, lighter, gray icon, no stats. */
+.csms-program-card__code { font-family: "Newsreader", Georgia, "Times New Roman", serif; font-size: 22px; font-weight: 600; line-height: 1.15; color: #2163c5; overflow-wrap: anywhere; }
+.csms-program-card__name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; min-height: 2.7em; font-size: 13px; font-weight: 600; line-height: 1.35; color: var(--csms-text, #1f2937); }
+.csms-program-card__name--lead { font-size: 14px; }
+.csms-program-card__foot { display: flex; align-items: center; gap: 10px; margin-top: auto; padding-top: 10px; border-top: 1px solid #eef1f7; font-size: 13px; color: #475569; }
+.csms-program-card__count { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.csms-program-card__count strong { font-weight: 700; color: var(--csms-text, #1f2937); }
+.csms-program-card__foot .csms-chip { flex: none; }
+.csms-program-card__arrow { flex: none; font-size: 12px; color: #1a3a8c; transition: transform 150ms ease; }
+.csms-program-card:hover .csms-program-card__arrow, .csms-program-card:focus-visible .csms-program-card__arrow { transform: translateX(4px); }
+/* No curriculum yet (and the "not placed" card): dashed, lighter, gray icon. */
 .csms-program-card--muted { background: #f6f7fb; border-style: dashed; box-shadow: none; }
 .csms-program-card--muted::before { height: 0; }
 .csms-program-card--muted .csms-program-card__icon { background: #e5e7eb; color: #4b5563; }
-.csms-program-card--muted .csms-program-card__level { background: #e5e7eb; color: #374151; }
 .csms-program-card--muted .csms-program-card__code { color: #2163c5; }
-.csms-program-card__none { margin: 0; font-size: 14px; color: #475569; }
-.csms-program-card__big { font-size: 30px; font-weight: 700; line-height: 1.1; color: var(--csms-text, #1f2937); }
 /* Loading placeholder in the same shape. */
 .csms-program-card--loading { pointer-events: none; }
 .csms-skeleton { display: block; border-radius: 6px; background: linear-gradient(90deg, #eceff6 25%, #f6f8fc 50%, #eceff6 75%); background-size: 200% 100%; animation: csms-shimmer 1.2s linear infinite; }
@@ -741,8 +731,8 @@ body .csms-program-card:focus-visible { outline: 2px solid #2163c5 !important; o
 .csms-program-group__head::after { content: ""; flex: 1 1 auto; height: 1px; background: var(--csms-border, #dfe4ee); }
 .csms-program-group__empty { margin: 0; padding: 14px 16px; border: 1px dashed var(--csms-border-strong, #cbd5e1); border-radius: 10px; font-size: 14px; color: #475569; background: #f6f7fb; }
 @media (prefers-reduced-motion: reduce) {
-  .csms-program-card, .csms-program-card__foot i { transition: none; }
+  .csms-program-card, .csms-program-card__arrow { transition: none; }
   .csms-program-card:hover { transform: none; }
-  .csms-program-card:hover .csms-program-card__foot i, .csms-program-card:focus-visible .csms-program-card__foot i { transform: none; }
+  .csms-program-card:hover .csms-program-card__arrow, .csms-program-card:focus-visible .csms-program-card__arrow { transform: none; }
   .csms-skeleton { animation: none; }
 }

@@ -85,6 +85,7 @@
         state.view = view;
         const table = view === 'program';
         $('viewCards').hidden = view !== 'cards';
+        $('cardTools').hidden = view !== 'cards';
         $('viewProgram').hidden = !table;
         $('viewUnplaced').hidden = view !== 'unplaced';
         if ($('subjectContextBar')) $('subjectContextBar').hidden = !table;
@@ -148,35 +149,43 @@
     // ---------- program and strand cards ----------
     const ICON = { college: 'fa-graduation-cap', shs: 'fa-book-open-reader' };
     const STATUS_CHIPS = { active: ['Active', 'csms-chip--active'], draft: ['Draft', 'csms-chip--draft'], approved: ['Approved', 'csms-chip--approved'], in_review: ['In review', 'csms-chip--under_review'], returned: ['Returned', 'csms-chip--returned'], archived: ['Archived', 'csms-chip--archived'] };
-    const YEAR_LABEL = { 1: 'Y1', 2: 'Y2', 3: 'Y3', 4: 'Y4', 11: 'G11', 12: 'G12' };
+    const plural = (n, one, many) => n + ' ' + (n === 1 ? one : (many || one + 's'));
+    // One status chip per card: Active if any version is active, else Draft if any is a draft, else Archived. No chip when the reader can see no version.
+    function cardChip(statuses) {
+        const s = statuses || {};
+        if (!Object.values(s).some(n => Number(n) > 0)) return null;
+        if (Number(s.active) > 0) return STATUS_CHIPS.active;
+        if (Number(s.draft) > 0) return STATUS_CHIPS.draft;
+        return STATUS_CHIPS.archived;
+    }
+    function statusBreakdown(statuses) {
+        return ['active', 'draft', 'approved', 'in_review', 'returned', 'archived'].filter(k => Number((statuses || {})[k]) > 0).map(k => statuses[k] + ' ' + STATUS_CHIPS[k][0]).join(', ');
+    }
+    function cardSummary(program) {
+        const breakdown = statusBreakdown(program.version_statuses);
+        return plural(Number(program.curriculum_count), 'curriculum', 'curricula') + ' \u00b7 ' + plural(Number(program.version_count), 'version') + (breakdown ? ' (' + breakdown + ')' : '') + ' \u00b7 ' + plural(Number(program.subject_count), 'subject');
+    }
     function skeletonCard() {
-        return '<div class="csms-program-card csms-program-card--loading" aria-hidden="true"><span class="csms-program-card__top"><span class="csms-skeleton" style="width:40px;height:40px"></span><span class="csms-skeleton" style="width:60px;height:20px"></span></span>' +
-            '<span class="csms-skeleton" style="width:45%;height:30px"></span><span class="csms-skeleton" style="width:90%;height:14px"></span><span class="csms-skeleton" style="width:100%;height:40px"></span><span class="csms-skeleton" style="width:60%;height:20px"></span></div>';
+        return '<div class="csms-program-card csms-program-card--loading" aria-hidden="true"><span class="csms-program-card__main"><span class="csms-skeleton" style="width:40px;height:40px;flex:none"></span><span class="csms-program-card__text"><span class="csms-skeleton" style="width:45%;height:22px"></span><span class="csms-skeleton" style="width:90%;height:14px"></span></span></span><span class="csms-program-card__foot"><span class="csms-skeleton" style="width:40%;height:14px"></span></span></div>';
     }
     function cardHref(program) { return 'subjects.php?view=program&program_id=' + Number(program.id); }
-    function barsHtml(program) {
-        const entries = Object.entries(program.year_counts || {});
-        const max = Math.max(0, ...entries.map(([, n]) => Number(n)));
-        if (!max) return '';
-        const alt = 'Subjects per year level: ' + entries.map(([k, n]) => (YEAR_LABEL[k] || k) + ' ' + n).join(', ');
-        return '<span class="csms-program-card__bars" role="img" aria-label="' + esc(alt) + '">' + entries.map(([k, n]) => '<span class="csms-program-card__bar" aria-hidden="true"><i style="height:' + Math.max(4, Math.round(Number(n) / max * 100)) + '%"></i>' + (YEAR_LABEL[k] || k) + '</span>').join('') + '</span>';
-    }
     function cardHtml(program) {
         const level = program.level === 'shs' ? 'shs' : 'college';
-        const head = '<span class="csms-program-card__top"><span class="csms-program-card__icon" aria-hidden="true"><i class="fa-solid ' + ICON[level] + '"></i></span><span class="csms-program-card__level csms-chip">' + (level === 'shs' ? 'SHS' : 'College') + '</span></span>' +
-            '<span class="csms-program-card__code">' + esc(program.program_code) + '</span><span class="csms-program-card__name">' + esc(program.program_name) + '</span>';
         const muted = Number(program.curriculum_count) === 0;
-        const body = muted ? '<p class="csms-program-card__none">No curriculum yet</p>' :
-            '<span class="csms-program-card__stats">' + [['subject_count', 'Subjects'], ['curriculum_count', 'Curricula'], ['version_count', 'Versions']].map(([k, label]) => '<span class="csms-program-card__stat"><strong>' + Number(program[k]) + '</strong><small>' + label + '</small></span>').join('') + '</span>' +
-            '<span class="csms-program-card__statuses">' + Object.entries(program.version_statuses || {}).map(([k, n]) => STATUS_CHIPS[k] ? '<span class="csms-chip ' + STATUS_CHIPS[k][1] + '">' + n + ' ' + STATUS_CHIPS[k][0] + '</span>' : '').join('') + '</span>' + barsHtml(program);
-        return '<a class="csms-program-card csms-program-card--' + level + (muted ? ' csms-program-card--muted' : '') + '" href="' + cardHref(program) + '" aria-label="Open subjects of ' + esc(program.program_code) + '">' + head + body +
-            '<span class="csms-program-card__foot">Open subjects <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></span></a>';
+        const summary = muted ? 'No curriculum yet' : cardSummary(program);
+        const main = '<span class="csms-program-card__main"><span class="csms-program-card__icon" aria-hidden="true"><i class="fa-solid ' + ICON[level] + '"></i></span>' +
+            '<span class="csms-program-card__text"><span class="csms-program-card__code">' + esc(program.program_code) + '</span><span class="csms-program-card__name">' + esc(program.program_name) + '</span></span></span>';
+        const chip = cardChip(program.version_statuses);
+        const n = Number(program.subject_count);
+        const foot = muted ? '<span class="csms-program-card__foot"><span class="csms-program-card__count">No curriculum yet</span>' :
+            '<span class="csms-program-card__foot"><span class="csms-program-card__count"><strong>' + n + '</strong> ' + (n === 1 ? 'subject' : 'subjects') + '</span>' + (chip ? '<span class="csms-chip ' + chip[1] + '">' + chip[0] + '</span>' : '');
+        return '<a class="csms-program-card csms-program-card--' + level + (muted ? ' csms-program-card--muted' : '') + '" href="' + cardHref(program) + '" title="' + esc(summary) + '" aria-label="Open subjects of ' + esc(program.program_code) + '. ' + esc(summary) + '">' + main +
+            foot + '<i class="fa-solid fa-arrow-right csms-program-card__arrow" aria-hidden="true"></i></span></a>';
     }
     function unplacedCardHtml(count) {
-        return '<a class="csms-program-card csms-program-card--muted" href="subjects.php?view=unplaced" aria-label="Open the ' + count + ' subjects not placed in any curriculum">' +
-            '<span class="csms-program-card__top"><span class="csms-program-card__icon" aria-hidden="true"><i class="fa-solid fa-box-open"></i></span></span>' +
-            '<span class="csms-program-card__big">' + count + '</span><span class="csms-program-card__name">Not placed in any curriculum</span>' +
-            '<span class="csms-program-card__foot">Open subjects <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></span></a>';
+        return '<a class="csms-program-card csms-program-card--muted" href="subjects.php?view=unplaced" aria-label="Open the ' + plural(count, 'subject') + ' not placed in any curriculum">' +
+            '<span class="csms-program-card__main"><span class="csms-program-card__icon" aria-hidden="true"><i class="fa-solid fa-box-open"></i></span><span class="csms-program-card__text"><span class="csms-program-card__name csms-program-card__name--lead">Not placed in any curriculum</span></span></span>' +
+            '<span class="csms-program-card__foot"><span class="csms-program-card__count"><strong>' + count + '</strong> ' + (count === 1 ? 'subject' : 'subjects') + '</span><i class="fa-solid fa-arrow-right csms-program-card__arrow" aria-hidden="true"></i></span></a>';
     }
     function cardStates(which, message) {
         $('cardLoading').hidden = which !== 'loading';
@@ -188,7 +197,7 @@
     async function loadCards() {
         const ticket = ++cards.request;
         document.querySelectorAll('#cardLevel [data-level]').forEach(b => b.setAttribute('aria-pressed', b.dataset.level === cards.level ? 'true' : 'false'));
-        $('cardLoading').innerHTML = skeletonCard().repeat(4);
+        $('cardLoading').innerHTML = skeletonCard().repeat(5);
         cardStates('loading');
         const params = { action: 'program_cards', page: 1, per_page: 100 };
         const q = $('cardFilter').value.trim();
@@ -200,7 +209,7 @@
             cards.loaded = true;
             cards.total = Number(payload.pagination.total_records);
             (payload.programs || []).forEach(p => state.programs.set(String(p.id), { id: p.id, code: p.program_code, name: p.program_name, level: p.level }));
-            ui.setCount($('cardCount'), cards.total);
+            $('cardCount').textContent = plural(cards.total, 'program');
             if (cards.total > 100) $('cardCount').textContent = '100 of ' + cards.total + ' programs';
             $('cardFilterWrap').hidden = !(cards.total > CARD_FILTER_MIN_CARDS || q.length >= SEARCH_MIN);
             const unplaced = Number(payload.unplaced_count) || 0;
