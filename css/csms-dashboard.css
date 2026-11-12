@@ -144,47 +144,9 @@ a.csms-stat:hover { border-color: var(--csms-navy, #1a3a8c); }
 .csms-state__title { font-size: var(--csms-text-sm, .875rem); }
 .csms-card--list .csms-state { min-height: 0; }
 
-/* Part C: searchable Program / Strand picker (options reuse record-autocomplete classes) */
-.csms-picker { position: relative; }
-.csms-picker__trigger {
-  display: inline-flex; align-items: center; justify-content: space-between; gap: 10px;
-  width: 22rem; max-width: 100%; height: var(--csms-control-h, 36px); padding: 0 12px;
-  border: 1px solid var(--csms-border-strong, #cbd5e1); border-radius: var(--csms-radius-sm, 6px);
-  background: #fff; color: var(--csms-text, #1f2937); font-size: var(--csms-text-sm, .875rem); cursor: pointer; text-align: left;
-}
-.csms-picker__trigger:hover { border-color: var(--csms-navy, #1a3a8c); }
-.csms-picker__trigger:focus-visible { outline: 3px solid var(--csms-focus, #2563eb); outline-offset: 2px; }
-.csms-picker__value { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.csms-picker__trigger .fa-chevron-down { flex: 0 0 auto; font-size: var(--csms-icon-sm, 14px); color: var(--dash-muted); }
-.csms-picker__panel {
-  position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; width: 26rem; max-width: calc(100vw - 24px);
-  padding: 10px; background: #fff; border: 1px solid var(--csms-border-strong, #cbd5e1);
-  border-radius: var(--csms-radius-md, 8px); box-shadow: 0 12px 28px rgba(15, 23, 42, .16);
-}
-.csms-picker__panel[hidden] { display: none; }
-.csms-picker__search {
-  width: 100%; height: 36px; padding: 0 10px; border: 1px solid var(--csms-border-strong, #cbd5e1);
-  border-radius: var(--csms-radius-sm, 6px); font-size: var(--csms-text-sm, .875rem);
-}
-.csms-picker__search:focus-visible { outline: 3px solid var(--csms-focus, #2563eb); outline-offset: 1px; }
-.csms-picker__levels { display: inline-flex; margin: 8px 0 4px; border: 1px solid var(--csms-border-strong, #cbd5e1); border-radius: var(--csms-radius-sm, 6px); overflow: hidden; }
-.csms-picker__levels button { padding: 4px 12px; border: 0; background: #fff; color: var(--csms-text-secondary, #374151); font-size: var(--csms-text-sm, .875rem); cursor: pointer; }
-.csms-picker__levels button + button { border-left: 1px solid var(--csms-border-strong, #cbd5e1); }
-.csms-picker__levels button[aria-pressed="true"] { background: var(--csms-navy, #1a3a8c); color: #fff; }
-.csms-picker__count { margin: 2px 2px 6px; font-size: var(--csms-text-xs, .75rem); color: var(--dash-muted); }
-.csms-picker .csms-picker__list { position: static; display: block; max-height: 320px; overflow-y: auto; margin: 0; box-shadow: none; border: 1px solid var(--dash-border); }
-.csms-picker__group-label { position: sticky; top: 0; z-index: 1; padding: 6px 10px; background: var(--csms-table-head, #eef1f7); font-size: var(--csms-text-xs, .75rem); font-weight: 700; color: var(--csms-text-secondary, #374151); text-transform: uppercase; letter-spacing: .03em; }
-.csms-picker__option { display: flex; align-items: baseline; gap: 8px; cursor: pointer; font-size: var(--csms-text-sm, .875rem); }
-.csms-picker__option[hidden], .csms-picker__group[hidden] { display: none; }
-.csms-picker__option .record-autocomplete-code { flex: 0 0 auto; font-weight: 700; color: var(--csms-text, #1f2937); }
-.csms-picker__option .record-autocomplete-label { flex: 1 1 auto; min-width: 0; color: var(--dash-muted); }
-.csms-picker__option--pinned .record-autocomplete-label { color: var(--csms-text, #1f2937); }
-.csms-picker__option.is-current { box-shadow: inset 3px 0 0 var(--csms-navy, #1a3a8c); }
-.csms-picker__inactive { flex: 0 0 auto; padding: 1px 6px; border-radius: 999px; background: var(--csms-neutral-bg, #e9ecf2); color: var(--csms-neutral, #374151); font-size: var(--csms-text-xs, .75rem); font-weight: 600; }
+/* The searchable Program / Strand picker styles live in css/csms-components.css (shared). */
 @media (max-width: 600px) {
   .csms-dash-filter { width: 100%; }
-  .csms-picker, .csms-picker__trigger { width: 100%; }
-  .csms-picker__panel { left: 0; right: auto; width: 100%; max-width: none; }
   .csms-dash-version, .csms-dash-version select { width: 100%; max-width: 100%; }
 }
 

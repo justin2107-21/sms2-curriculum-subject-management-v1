@@ -70,22 +70,23 @@ require __DIR__ . '/../../../shared/sidebar.php';
             <span class="csms-filter-row__summary" id="equivalencyCount" role="status">0 records</span>
           </div>
           <div class="csms-filter-row equivalency-more" id="equivalencyMore" hidden>
-            <select class="csms-select" id="equivalencyProgram" aria-label="Program (either subject is placed in or assigned to it)"><option value="">All programs</option></select>
-            <select class="csms-select" id="equivalencyReviewer" aria-label="Reviewed by"><option value="">Any reviewer</option></select>
-            <label class="equivalency-date"><span>Reviewed from</span><input type="date" id="equivalencyFrom"/></label>
-            <label class="equivalency-date"><span>Reviewed to</span><input type="date" id="equivalencyTo"/></label>
+            <div class="equivalency-program"><label class="sr-only" for="equivalencyProgram">Program (either subject is placed in or assigned to it)</label>
+              <select id="equivalencyProgram"><option value="all">All programs</option></select></div>
+            <span class="record-autocomplete equivalency-reviewer"><input type="search" id="equivalencyReviewerSearch" placeholder="Any reviewer (type 2+ characters)" aria-label="Reviewed by" autocomplete="off"/><input type="hidden" id="equivalencyReviewer"/><button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear reviewer" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button><span class="record-autocomplete-options" id="equivalencyReviewerOptions" role="listbox" aria-label="Reviewer suggestions" hidden></span></span>
+            <select class="csms-select" id="equivalencyRange" aria-label="Reviewed date"><option value="">All dates</option><option value="today">Today</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="custom">Custom range</option></select>
+            <label class="equivalency-date" id="equivalencyFromWrap" hidden><span>From</span><input type="date" id="equivalencyFrom"/></label>
+            <label class="equivalency-date" id="equivalencyToWrap" hidden><span>To</span><input type="date" id="equivalencyTo"/></label>
             <select class="csms-select" id="equivalencyReason" aria-label="Reason"><option value="">Any reason</option><option value="has">Has reason</option><option value="missing">Missing reason</option></select>
-          </div>
-          <div class="csms-filter-row equivalency-chips" id="equivalencyChips" aria-label="Active filters" hidden></div>
+          </div>          <div class="csms-filter-row equivalency-chips" id="equivalencyChips" aria-label="Active filters" hidden></div>
           <div class="csms-empty" id="equivalencyNoMatch" role="status" hidden><i class="fa-solid fa-filter" aria-hidden="true"></i><strong>No decisions match these filters</strong><span>Change or remove a filter.</span><button type="button" class="button-muted" id="equivalencyClearFilters">Clear filters</button></div>
           <div class="csms-page-table table-scroll" id="equivalencyTableWrap" tabindex="0" aria-label="Scrollable equivalency records">
             <table class="csms-ctable">
               <thead><tr>
-                <th aria-sort="none"><button type="button" class="csms-link equivalency-sort" data-sort="subject_a">Subject A</button></th>
-                <th aria-sort="none"><button type="button" class="csms-link equivalency-sort" data-sort="subject_b">Subject B</button></th>
-                <th aria-sort="none"><button type="button" class="csms-link equivalency-sort" data-sort="decision">Decision</button></th>
+                <th aria-sort="none"><button type="button" class="equivalency-sort" data-sort="subject_a">Subject A</button></th>
+                <th aria-sort="none"><button type="button" class="equivalency-sort" data-sort="subject_b">Subject B</button></th>
+                <th aria-sort="none"><button type="button" class="equivalency-sort" data-sort="decision">Decision</button></th>
                 <th>Reason</th><th>Reviewed by</th>
-                <th aria-sort="descending"><button type="button" class="csms-link equivalency-sort" data-sort="reviewed_at">Reviewed at</button></th>
+                <th aria-sort="descending"><button type="button" class="equivalency-sort" data-sort="reviewed_at">Reviewed at</button></th>
                 <th class="csms-ctable__action"><span class="sr-only">Actions</span></th></tr></thead>
               <tbody id="equivalencyRows"></tbody>
             </table>
@@ -165,6 +166,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 <script src="../assets/curriculum-common.js?v=<?= $v('../assets/curriculum-common.js') ?>"></script>
 <script src="../../../js/csms-menu.js?v=<?= $v('../../../js/csms-menu.js') ?>"></script>
+<script src="../../../js/csms-program-picker.js?v=<?= $v('../../../js/csms-program-picker.js') ?>"></script>
 <script src="../assets/subject-equivalency.js?v=<?= $v('../assets/subject-equivalency.js') ?>"></script>
 </body>
 </html>

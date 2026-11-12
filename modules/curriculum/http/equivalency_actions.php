@@ -15,7 +15,11 @@ try {
 
         case 'filter_options':
             curriculum_require_read('equivalency.view');
-            json_response(true, 'Equivalency filter options loaded.', $service->filterOptions());
+            json_response(true, 'Equivalency filter options loaded.', $service->filterOptions($_GET));
+
+        case 'reviewer_search':
+            curriculum_require_read('equivalency.view');
+            json_response(true, 'Reviewers loaded.', $service->reviewerSearch($_GET));
 
         case 'get':
             curriculum_require_read('equivalency.view');

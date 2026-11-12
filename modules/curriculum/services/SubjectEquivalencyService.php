@@ -5,6 +5,7 @@ require_once __DIR__ . '/../repositories/SubjectRepository.php';
 require_once __DIR__ . '/../repositories/SubjectEquivalencyRepository.php';
 require_once __DIR__ . '/../../../shared/audit.php';
 require_once __DIR__ . '/CurriculumReadScope.php';
+require_once __DIR__ . '/../../../dashboard/DashboardShaper.php';
 
 class SubjectEquivalencyService
 {
@@ -25,11 +26,39 @@ class SubjectEquivalencyService
         return ['equivalencies' => $result['records'], 'pagination' => $result['pagination']];
     }
 
-    public function filterOptions(): array
+    /**
+     * Program picker data (grouped exactly like the Dashboard: DashboardShaper::isShs decides programs vs Senior High strands)
+     * and, when the URL names a reviewer, that reviewer's label.
+     */
+    public function filterOptions(array $input = []): array
     {
-        return ['reviewers' => $this->equivalencies->reviewers(), 'programs' => $this->equivalencies->programOptions()];
+        $programs = array_map(static function (array $program): array {
+            $isShs = DashboardShaper::isShs($program['program_type'] ?? null);
+            return [
+                'id' => (int)$program['id'], 'code' => (string)$program['program_code'], 'name' => (string)$program['program_name'],
+                'group' => $isShs ? 'Senior High School strands' : 'College programs', 'level' => $isShs ? 'shs' : 'college',
+                'inactive' => strtolower((string)($program['status'] ?? 'active')) !== 'active',
+            ];
+        }, $this->equivalencies->programOptions());
+        usort($programs, static fn(array $a, array $b): int => [$a['inactive'], $a['code']] <=> [$b['inactive'], $b['code']]);
+        $reviewer = null;
+        $reviewerId = trim((string)($input['reviewed_by'] ?? ''));
+        if ($reviewerId !== '') {
+            $found = $this->equivalencies->reviewers(null, DomainValidator::positiveId($reviewerId, 'Reviewed by'));
+            $reviewer = $found[0] ?? null;
+        }
+        return ['programs' => $programs, 'reviewer' => $reviewer];
     }
 
+    /** Reviewed-by search: two characters minimum, at most 20 users. */
+    public function reviewerSearch(array $input): array
+    {
+        $search = DomainValidator::optionalString($input, 'search', 'Search', 100);
+        if ($search === null || mb_strlen($search, 'UTF-8') < DomainValidator::EQUIVALENCY_SEARCH_MIN) {
+            return ['reviewers' => [], 'needs_more_characters' => true];
+        }
+        return ['reviewers' => $this->equivalencies->reviewers($search), 'needs_more_characters' => false];
+    }
     public function get(int $id): array
     {
         $record = $this->equivalencies->findById($id);

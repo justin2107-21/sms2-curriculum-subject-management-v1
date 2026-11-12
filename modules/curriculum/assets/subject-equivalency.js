@@ -20,9 +20,9 @@
         not_equivalent: ['Not equivalent', 'csms-chip--returned'],
         needs_review: ['Needs review', 'csms-chip--under_review']
     };
-    const state = { records: new Map(), request: 0, abort: null, compareRequest: 0, loaded: false, filterOptionsLoaded: false,
+    const state = { records: new Map(), request: 0, abort: null, compareRequest: 0, loaded: false, filterOptionsLoaded: false, programs: new Map(), reviewerLabel: '', reviewerReady: true,
         mode: 'create', record: null, comparison: null, archiveId: null,
-        view: { search: '', decision_status: '', status: 'active', academic_program_id: '', reviewed_by: '', reviewed_from: '', reviewed_to: '', reason: '', sort: 'reviewed_at', direction: 'desc', page: 1, per_page: 20 } };
+        view: { search: '', decision_status: '', status: 'active', academic_program_id: '', reviewed_by: '', reviewed_from: '', reviewed_to: '', range: '', reason: '', sort: 'reviewed_at', direction: 'desc', page: 1, per_page: 20 } };
 
     const dialogElement = $('equivalencyDialog');
     const dialog = ui.createModal(dialogElement, { restoreFocus: () => $('equivalencySearch') });
@@ -55,13 +55,15 @@
     function plural(count, one, many) { return count + ' ' + (count === 1 ? one : many); }
 
     // ---------- list state in the URL (refresh, back and share keep the filters) ----------
-    const URL_KEYS = { q: 'search', decision: 'decision_status', status: 'status', program: 'academic_program_id', reviewer: 'reviewed_by', from: 'reviewed_from', to: 'reviewed_to', reason: 'reason', sort: 'sort', dir: 'direction', page: 'page', per_page: 'per_page' };
+    const URL_KEYS = { q: 'search', decision: 'decision_status', status: 'status', program: 'academic_program_id', reviewer: 'reviewed_by', from: 'reviewed_from', to: 'reviewed_to', range: 'range', reason: 'reason', sort: 'sort', dir: 'direction', page: 'page', per_page: 'per_page' };
     const SORTS = ['subject_a', 'subject_b', 'decision', 'reviewed_at'];
     const DEFAULTS = { status: 'active', sort: 'reviewed_at', direction: 'desc', page: 1, per_page: 20 };
     function readUrl() {
         const params = new URLSearchParams(window.location.search);
         const view = state.view;
         Object.entries(URL_KEYS).forEach(([key, field]) => { view[field] = params.has(key) ? params.get(key) : (DEFAULTS[field] ?? ''); });
+        if (!['', 'today', '7', '30', 'custom'].includes(view.range)) view.range = '';
+        if (!view.range && (view.reviewed_from || view.reviewed_to)) view.range = 'custom';
         view.page = Math.max(1, parseInt(view.page, 10) || 1);
         view.per_page = [10, 20, 50, 100].includes(parseInt(view.per_page, 10)) ? parseInt(view.per_page, 10) : 20;
         if (!SORTS.includes(view.sort)) view.sort = 'reviewed_at';
@@ -84,8 +86,10 @@
         $('equivalencyDecisionFilter').value = view.decision_status;
         $('equivalencyStatus').value = view.status;
         $('equivalencyPerPage').value = String(view.per_page);
-        $('equivalencyProgram').value = view.academic_program_id;
-        $('equivalencyReviewer').value = view.reviewed_by;
+        $('equivalencyProgram').value = view.academic_program_id || 'all';
+        $('equivalencyProgram').dispatchEvent(new Event('csms:picker-sync'));
+        $('equivalencyRange').value = view.range;
+        $('equivalencyFromWrap').hidden = $('equivalencyToWrap').hidden = view.range !== 'custom';
         $('equivalencyFrom').value = view.reviewed_from;
         $('equivalencyTo').value = view.reviewed_to;
         $('equivalencyReason').value = view.reason;
@@ -93,6 +97,7 @@
             const active = button.dataset.sort === view.sort;
             button.closest('th').setAttribute('aria-sort', active ? (view.direction === 'asc' ? 'ascending' : 'descending') : 'none');
             button.dataset.dir = active ? view.direction : '';
+            button.innerHTML = esc(button.dataset.label) + (active ? ' <i class="fa-solid fa-arrow-' + (view.direction === 'asc' ? 'up' : 'down') + ' equivalency-sort__icon" aria-hidden="true"></i>' : '');
         });
     }
 
@@ -100,14 +105,15 @@
     function selectedText(select) { return select.selectedOptions[0]?.textContent || select.value; }
     function activeFilters() {
         const view = state.view, filters = [];
-        if (view.search) filters.push(['search', 'Search: ' + view.search]);
-        if (view.decision_status) filters.push(['decision_status', 'Decision: ' + decisionLabel(view.decision_status)]);
-        if (view.status !== 'active') filters.push(['status', 'Status: ' + selectedText($('equivalencyStatus'))]);
-        if (view.academic_program_id) filters.push(['academic_program_id', 'Program: ' + selectedText($('equivalencyProgram'))]);
-        if (view.reviewed_by) filters.push(['reviewed_by', 'Reviewed by: ' + selectedText($('equivalencyReviewer'))]);
-        if (view.reviewed_from) filters.push(['reviewed_from', 'From: ' + view.reviewed_from]);
-        if (view.reviewed_to) filters.push(['reviewed_to', 'To: ' + view.reviewed_to]);
-        if (view.reason) filters.push(['reason', view.reason === 'has' ? 'Has reason' : 'Missing reason']);
+        if (view.search) filters.push(['search', 'Search: ' + view.search, '']);
+        if (view.decision_status) filters.push(['decision_status', 'Decision: ' + decisionLabel(view.decision_status), '']);
+        if (view.status !== 'active') filters.push(['status', 'Status: ' + selectedText($('equivalencyStatus')), '']);
+        if (view.academic_program_id) { const program = state.programs.get(String(view.academic_program_id)); filters.push(['academic_program_id', 'Program: ' + (program ? program.code : '#' + view.academic_program_id), program ? program.code + ' — ' + program.name : '']); }
+        if (view.reviewed_by) filters.push(['reviewed_by', 'Reviewed by: ' + (state.reviewerLabel || '#' + view.reviewed_by), '']);
+        if (view.range && view.range !== 'custom') filters.push(['range', 'Reviewed: ' + selectedText($('equivalencyRange')), '']);
+        if (view.range === 'custom' && view.reviewed_from) filters.push(['reviewed_from', 'From: ' + view.reviewed_from, '']);
+        if (view.range === 'custom' && view.reviewed_to) filters.push(['reviewed_to', 'To: ' + view.reviewed_to, '']);
+        if (view.reason) filters.push(['reason', view.reason === 'has' ? 'Has reason' : 'Missing reason', '']);
         return filters;
     }
     function setMore(open) { $('equivalencyMore').hidden = !open; $('equivalencyMoreToggle').setAttribute('aria-expanded', open ? 'true' : 'false'); }
@@ -115,16 +121,22 @@
         const filters = activeFilters();
         const chips = $('equivalencyChips');
         chips.hidden = filters.length === 0;
-        chips.innerHTML = filters.map(([field, label]) => '<button type="button" class="csms-chip csms-chip--type equivalency-chip" data-clear="' + esc(field) + '" aria-label="Remove filter ' + esc(label) + '">' + esc(label) + ' <i class="fa-solid fa-xmark" aria-hidden="true"></i></button>').join('') +
+        chips.innerHTML = filters.map(([field, label, tip]) => '<button type="button" class="csms-chip csms-chip--type equivalency-chip" data-clear="' + esc(field) + '"' + (tip ? ' title="' + esc(tip) + '"' : '') + ' aria-label="Remove filter ' + esc(tip || label) + '">' + esc(label) + ' <i class="fa-solid fa-xmark" aria-hidden="true"></i></button>').join('') +
             (filters.length ? '<button type="button" class="csms-link" id="equivalencyClearAll">Clear all</button>' : '');
-        const extra = ['academic_program_id', 'reviewed_by', 'reviewed_from', 'reviewed_to', 'reason'].filter(field => state.view[field]).length;
+        const extra = ['academic_program_id', 'reviewed_by', 'range', 'reason'].filter(field => state.view[field]).length;
         $('equivalencyMoreCount').hidden = extra === 0;
         $('equivalencyMoreCount').textContent = String(extra);
         if (extra && $('equivalencyMore').hidden) setMore(true);
     }
-    function clearField(field) { state.view[field] = field === 'status' ? 'active' : ''; }
+    function clearField(field) {
+        const view = state.view;
+        if (field === 'range') { view.range = ''; view.reviewed_from = ''; view.reviewed_to = ''; }
+        else if (field === 'reviewed_by') { view.reviewed_by = ''; state.reviewerLabel = ''; pickers.reviewer?.clear(false); }
+        else view[field] = field === 'status' ? 'active' : '';
+        if (!view.reviewed_from && !view.reviewed_to && view.range === 'custom') view.range = '';
+    }
     function clearAll() {
-        ['search', 'decision_status', 'academic_program_id', 'reviewed_by', 'reviewed_from', 'reviewed_to', 'reason'].forEach(clearField);
+        ['search', 'decision_status', 'academic_program_id', 'reviewed_by', 'range', 'reason'].forEach(clearField);
         state.view.status = 'active';
         state.view.page = 1;
         applyView(true);
@@ -153,20 +165,33 @@
             '<td class="csms-ctable__action"><button type="button" class="csms-rowmenu" data-menu="' + id + '" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for ' + esc(pairLabel(record)) + '"><i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i></button></td></tr>';
     }
 
+    // Program picker data comes from the server grouped like the Dashboard (College programs / Senior High School strands). The
+    // select is filled once and then enhanced by the shared searchable picker (js/csms-program-picker.js).
     async function loadFilterOptions() {
         if (state.filterOptionsLoaded) return;
         state.filterOptionsLoaded = true;
         try {
-            const payload = await ui.fetchJson(endpoint, { action: 'filter_options' });
-            const fill = (select, rows, label) => rows.forEach(row => select.add(new Option(label(row), String(row.id))));
-            fill($('equivalencyProgram'), payload.programs || [], row => row.program_code + ' — ' + row.program_name);
-            fill($('equivalencyReviewer'), payload.reviewers || [], row => [row.first_name, row.last_name].filter(Boolean).join(' ').trim() || row.username);
-            $('equivalencyProgram').value = state.view.academic_program_id;
-            $('equivalencyReviewer').value = state.view.reviewed_by;
+            const payload = await ui.fetchJson(endpoint, { action: 'filter_options', reviewed_by: state.view.reviewed_by });
+            const select = $('equivalencyProgram');
+            const groups = new Map();
+            (payload.programs || []).forEach(program => {
+                state.programs.set(String(program.id), program);
+                if (!groups.has(program.group)) { const group = document.createElement('optgroup'); group.label = program.group; groups.set(program.group, group); select.appendChild(group); }
+                const option = new Option(program.code + ' — ' + program.name + (program.inactive ? ' (Inactive)' : ''), String(program.id));
+                Object.assign(option.dataset, { code: program.code, name: program.name, level: program.level });
+                if (program.inactive) option.dataset.inactive = '1';
+                groups.get(program.group).appendChild(option);
+            });
+            select.value = state.view.academic_program_id || 'all';
+            window.CsmsProgramPicker?.enhance(select);
+            if (payload.reviewer) {
+                state.reviewerLabel = [payload.reviewer.first_name, payload.reviewer.last_name].filter(Boolean).join(' ').trim() || payload.reviewer.username;
+                pickers.reviewer?.setSelected({ id: payload.reviewer.id, label: state.reviewerLabel }, false);
+            }
             renderChips();
         } catch (error) { state.filterOptionsLoaded = false; }
+        state.reviewerReady = true;
     }
-
     // A newer request aborts the older one, and a response that is not the latest is ignored.
     async function loadRecords() {
         const request = ++state.request;
@@ -201,16 +226,32 @@
         }
     }
     function applyView(push) { syncControls(); renderChips(); writeUrl(push); loadRecords(); }
+    function localDate(offsetDays) {
+        const date = new Date();
+        date.setDate(date.getDate() - offsetDays);
+        return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+    }
+    // Presets work like the Archives filter: a range select; "Custom range" reveals the two date inputs.
+    function applyRange(range) {
+        const view = state.view;
+        view.range = range;
+        if (range === 'today') { view.reviewed_from = view.reviewed_to = localDate(0); }
+        else if (range === '7') { view.reviewed_from = localDate(6); view.reviewed_to = localDate(0); }
+        else if (range === '30') { view.reviewed_from = localDate(29); view.reviewed_to = localDate(0); }
+        else if (range === '') { view.reviewed_from = view.reviewed_to = ''; }
+    }
     function filtersChanged() {
         const view = state.view;
         view.search = $('equivalencySearch').value.trim();
         view.decision_status = $('equivalencyDecisionFilter').value;
         view.status = $('equivalencyStatus').value;
         view.per_page = parseInt($('equivalencyPerPage').value, 10);
-        view.academic_program_id = $('equivalencyProgram').value;
-        view.reviewed_by = $('equivalencyReviewer').value;
-        view.reviewed_from = $('equivalencyFrom').value;
-        view.reviewed_to = $('equivalencyTo').value;
+        const program = $('equivalencyProgram').value;
+        view.academic_program_id = program === 'all' ? '' : program;
+        if (state.reviewerReady) { view.reviewed_by = $('equivalencyReviewer').value; if (!view.reviewed_by) state.reviewerLabel = ''; }
+        const range = $('equivalencyRange').value;
+        if (range !== view.range) { applyRange(range); }
+        else if (range === 'custom') { view.reviewed_from = $('equivalencyFrom').value; view.reviewed_to = $('equivalencyTo').value; }
         view.reason = $('equivalencyReason').value;
         view.page = 1;
         applyView(true);
@@ -235,6 +276,16 @@
             onSelect: pickersChanged, onClear: pickersChanged
         };
     }
+    // Reviewed-by picker: server-side search, at most 20 users, two characters minimum.
+    pickers.reviewer = ui.createAutocomplete({
+        input: $('equivalencyReviewerSearch'), valueInput: $('equivalencyReviewer'), list: $('equivalencyReviewerOptions'),
+        helpText: 'Type at least ' + SEARCH_MIN + ' characters of a name or username.', selectedText: 'Reviewer selected.', loadingText: 'Searching reviewers…',
+        noResultsText: 'No reviewer matches.', errorText: 'Reviewers could not be loaded.', minimumLength: SEARCH_MIN,
+        search: async query => (await ui.fetchJson(endpoint, { action: 'reviewer_search', search: query })).reviewers || [],
+        getId: user => user.id,
+        format: user => { if (user.label) return { label: user.label }; const name = [user.first_name, user.last_name].filter(Boolean).join(' ').trim() || user.username; state.reviewerLabel = name; return { label: name, code: user.username, title: '' }; },
+        onSelect: () => filtersChanged(), onClear: () => filtersChanged()
+    });
     pickers.A = ui.createAutocomplete(pickerOptions('A'));
     pickers.B = ui.createAutocomplete(pickerOptions('B'));
     function setPicker(side, id, code, title) { pickers[side]?.setSelected({ id, subject_code: code, subject_title: title }, false); }
@@ -285,7 +336,7 @@
             ['Units', unitsCell(a), unitsCell(b), marker(unitsA[0] !== null && unitsB[0] !== null ? unitsA.join('|') === unitsB.join('|') : null)],
             ['Technical status', statusText(a.status), statusText(b.status), marker(!status.result || status.result === 'not_available' ? null : status.result === 'same')],
             ['Prerequisites', prerequisiteCell(pa), prerequisiteCell(pb), marker(pa.placed && pb.placed ? prerequisiteKey(pa) === prerequisiteKey(pb) : null)],
-            ['Used in', '<span class="equivalency-used">' + esc(usedIn(payload.usage?.subject_a?.summary)) + '</span>', '<span class="equivalency-used">' + esc(usedIn(payload.usage?.subject_b?.summary)) + '</span>', '']
+            ['Used in', '<span class="equivalency-used">' + esc(usedIn(payload.usage?.subject_a?.summary)) + '</span>', '<span class="equivalency-used">' + esc(usedIn(payload.usage?.subject_b?.summary)) + '</span>', '—']
         ];
         let markup = rows.map(([label, left, right, mark]) => '<tr><th scope="row">' + esc(label) + '</th><td>' + left + '</td><td>' + right + '</td><td>' + mark + '</td></tr>').join('');
         // Soft, advisory warning (never blocks): one subject is a prerequisite / corequisite of the other in a version the reader may see.
@@ -489,9 +540,9 @@
         filtersChanged();
     }, 300);
     $('equivalencySearch').addEventListener('input', searchLater);
-    ['equivalencyDecisionFilter', 'equivalencyStatus', 'equivalencyPerPage', 'equivalencyProgram', 'equivalencyReviewer', 'equivalencyFrom', 'equivalencyTo', 'equivalencyReason']
+    ['equivalencyDecisionFilter', 'equivalencyStatus', 'equivalencyPerPage', 'equivalencyProgram', 'equivalencyRange', 'equivalencyFrom', 'equivalencyTo', 'equivalencyReason']
         .forEach(id => $(id).addEventListener('change', filtersChanged));
-    $('equivalencyMoreToggle').addEventListener('click', () => { setMore($('equivalencyMore').hidden); loadFilterOptions(); });
+    $('equivalencyMoreToggle').addEventListener('click', () => setMore($('equivalencyMore').hidden));
     $('equivalencyChips').addEventListener('click', event => {
         if (event.target.closest('#equivalencyClearAll')) { clearAll(); return; }
         const chipButton = event.target.closest('[data-clear]');
@@ -539,9 +590,11 @@
         if (event.target.matches?.('[data-row]') && ['Enter', ' '].includes(event.key)) { event.preventDefault(); openDialog('view', state.records.get(Number(event.target.dataset.row))); }
     });
 
+    document.querySelectorAll('.equivalency-sort').forEach(button => { button.dataset.label = button.textContent.trim(); });
     readUrl();
+    state.reviewerReady = !state.view.reviewed_by;
     syncControls();
     renderChips();
-    if (state.view.academic_program_id || state.view.reviewed_by) loadFilterOptions();
+    loadFilterOptions();
     loadRecords();
 }());

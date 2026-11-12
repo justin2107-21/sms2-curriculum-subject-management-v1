@@ -204,9 +204,27 @@ try {
     ok($s['status'] === 200 && $s['json']['subjects'] === [] && $s['json']['needs_more_characters'] === true, 'Subject picker: one character returns nothing (never preloads the Subject Master)');
     $s = $manager->api('equivalency', 'subject_search', []);
     ok($s['status'] === 200 && $s['json']['subjects'] === [], 'Subject picker: no search text returns nothing');
+    $db->query("UPDATE academic_programs SET program_type='College' WHERE id IN (1,2)");
+    $db->query("UPDATE academic_programs SET program_type='Senior High School', status='inactive' WHERE id=3");
     $fo = $viewer->api('equivalency', 'filter_options');
-    ok($fo['status'] === 200 && count($fo['json']['reviewers']) === 2 && count($fo['json']['programs']) === 3, 'Filter options: reviewers who reviewed a record and the programs');
-    ok($faculty->api('equivalency', 'filter_options')['status'] === 403, 'Filter options need equivalency.view');
+    $groups = array_unique(array_column($fo['json']['programs'] ?? [], 'group'));
+    sort($groups);
+    ok($fo['status'] === 200 && count($fo['json']['programs']) === 3 && $fo['json']['reviewer'] === null && $groups === ['College programs', 'Senior High School strands'], 'Filter options: programs grouped like the Dashboard (College programs / Senior High School strands)');
+    $byCode = array_column($fo['json']['programs'], null, 'code');
+    ok($byCode['QP3']['level'] === 'shs' && $byCode['QP3']['inactive'] === true && $byCode['QP']['level'] === 'college' && $byCode['QP']['inactive'] === false, 'Filter options: level (shs / college) and inactive flag per program');
+    ok(array_search('QP3', array_column($fo['json']['programs'], 'code')) === 2, 'Filter options: inactive programs sort last (same rule as the Dashboard)');
+    $fo = $manager->api('equivalency', 'filter_options', ['reviewed_by' => 2]);
+    ok($fo['status'] === 200 && ($fo['json']['reviewer']['username'] ?? '') === 'qviewer' && $manager->api('equivalency', 'filter_options', ['reviewed_by' => 'abc'])['status'] === 422, 'Filter options: a reviewer named in the URL is labelled; a bad id is rejected');
+    // Reviewed-by picker: server-side, two characters minimum, at most 20, only users who reviewed a record
+    $rv = $manager->api('equivalency', 'reviewer_search', ['search' => 'q']);
+    ok($rv['status'] === 200 && $rv['json']['reviewers'] === [] && $rv['json']['needs_more_characters'] === true, 'Reviewer search: one character returns nothing');
+    $rv = $manager->api('equivalency', 'reviewer_search', ['search' => 'qman']);
+    ok($rv['status'] === 200 && count($rv['json']['reviewers']) === 1 && $rv['json']['reviewers'][0]['username'] === 'qmanager', 'Reviewer search: matches by username');
+    $rv = $manager->api('equivalency', 'reviewer_search', ['search' => 'qfac']);
+    ok($rv['status'] === 200 && $rv['json']['reviewers'] === [], 'Reviewer search: a user who never reviewed a record is not offered');
+    $rv = $manager->api('equivalency', 'reviewer_search', ['search' => 'Test Only']);
+    ok($rv['status'] === 200 && count($rv['json']['reviewers']) === 2 && count($rv['json']['reviewers']) <= 20, 'Reviewer search: matches by name (full name), capped at 20');
+    ok($faculty->api('equivalency', 'reviewer_search', ['search' => 'qman'])['status'] === 403 && $viewer->api('equivalency', 'reviewer_search', ['search' => 'qman'])['status'] === 200, 'Reviewer search needs equivalency.view');    ok($faculty->api('equivalency', 'filter_options')['status'] === 403, 'Filter options need equivalency.view');
     // Prerequisite warning data (advisory) and read scope
     $c = $manager->api('equivalency', 'compare', ['subject_a_id' => 1, 'subject_b_id' => 2])['json'];
     ok(count($c['requirement_links']) === 1 && (int)$c['requirement_links'][0]['subject_id'] === 1 && (int)$c['requirement_links'][0]['required_subject_id'] === 2 && $c['requirement_links'][0]['requirement_type'] === 'corequisite' && str_contains($c['requirement_links'][0]['versions'], 'APPROVED1'), 'Compare returns the corequisite link (A requires B) with its version');

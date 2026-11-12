@@ -5,6 +5,12 @@
 .subject-equivalency-content [hidden], #equivalencyDialog [hidden], #equivalencyArchiveDialog [hidden] { display: none !important; }
 
 /* Filter row: date fields match the shared 40 px select; "More filters" row and active-filter chips sit under the main row. */
+.equivalency-program { display: inline-block; }
+.equivalency-program .csms-picker__trigger { width: 17rem; height: 40px; border-radius: 8px; font-size: 14px; }
+.equivalency-program .csms-picker__panel { left: 0; right: auto; }
+.equivalency-reviewer { position: relative; display: inline-block; width: 17rem; max-width: 100%; }
+.equivalency-reviewer input[type="search"] { padding-right: 40px; }
+.equivalency-reviewer .record-autocomplete-options { z-index: 60; }
 .equivalency-date { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--csms-text-secondary, #374151); }
 .equivalency-date input { box-sizing: border-box; height: 40px; padding: 0 10px; background: #fff; border: 1px solid var(--csms-border-strong, #cbd5e1); border-radius: 8px; font: inherit; font-size: 14px; color: var(--csms-text, #1f2937); }
 .equivalency-date input:focus-visible { outline: 3px solid var(--csms-focus, #2563eb); outline-offset: 1px; }
@@ -16,13 +22,12 @@
 #equivalencyMoreToggle { display: inline-flex; align-items: center; gap: 6px; }
 #equivalencyList .csms-page-table { margin-top: 12px; }
 
-/* Sortable headers: a shared link-style button plus an arrow for the active column. */
-.csms-ctable .equivalency-sort { color: var(--csms-text-secondary, #374151); font-size: 12px; font-weight: 500; text-decoration: none; }
-.csms-ctable .equivalency-sort:hover { color: var(--csms-text, #1f2937); text-decoration: underline; }
-.csms-ctable .equivalency-sort[data-dir] { color: var(--csms-code-blue, #2163c5); }
-.equivalency-sort[data-dir="asc"]::after { content: " \25B2"; font-size: 9px; }
-.equivalency-sort[data-dir="desc"]::after { content: " \25BC"; font-size: 9px; }
-
+/* Sortable headers: a plain button that inherits the header text style (same weight, colour and size as the other headers);
+   the sort state is an arrow icon only. */
+.equivalency-sort { padding: 0; margin: 0; border: 0; background: none; font: inherit; color: inherit; text-align: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.equivalency-sort:hover .equivalency-sort__icon, .equivalency-sort:focus-visible .equivalency-sort__icon { opacity: 1; }
+.equivalency-sort__icon { font-size: 11px; color: var(--csms-text, #1f2937); }
+.equivalency-sort:focus-visible { border-radius: 4px; }
 /* Reason column: two lines, full text on hover and in the dialog. */
 #equivalencyRows td:nth-child(4) { min-width: 12rem; }
 .equivalency-reason { display: -webkit-box; max-width: 22rem; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow-wrap: anywhere; }
@@ -39,15 +44,15 @@
 .equivalency-pickers label { display: block; margin-bottom: 4px; }
 .equivalency-hint { display: block; color: var(--csms-text-secondary, #374151); font-size: 13px; }
 .equivalency-notice { margin: 0 0 8px; padding: 8px 12px; background: var(--csms-surface-muted, #f4f6fb); border: 1px solid var(--csms-border, #dfe4ee); border-radius: var(--csms-radius-md, 8px); color: var(--csms-text, #1f2937); font-size: 14px; }
-.equivalency-summary { margin: 0 0 10px; padding: 0; grid-template-columns: 8rem minmax(0, 1fr); gap: 4px 16px; }
-.equivalency-subjects { margin: 0 0 8px; font-size: 14px; color: var(--csms-text, #1f2937); }
+.equivalency-dialog .equivalency-summary { margin: 0 0 14px; padding: 0; grid-template-columns: 8rem minmax(0, 1fr); gap: 4px 16px; }
+.equivalency-dialog .equivalency-subjects { margin: 0 0 14px; font-size: 14px; color: var(--csms-text, #1f2937); }
 .equivalency-subjects .csms-ctable__code { margin-right: 4px; }
 
 /* Evidence table: compact 8px 12px cells at 14px; headers carry the subject code in blue with the title under it. */
 .equivalency-evidence { font-size: 14px; }
-.equivalency-evidence thead th { padding: 6px 12px; font-size: 13px; vertical-align: bottom; }
+.csms-ctable.equivalency-evidence thead th { padding: 6px 12px; font-size: 12px; font-weight: 600; vertical-align: bottom; }
 .equivalency-evidence thead th .csms-sub { display: block; font-weight: 400; }
-.equivalency-evidence th[scope="row"] { color: var(--csms-text-secondary, #374151); font-weight: 600; white-space: nowrap; text-align: left; padding: 7px 12px; border-top: 1px solid var(--csms-border, #dfe4ee); vertical-align: top; }
+.csms-ctable.equivalency-evidence th[scope="row"] { color: var(--csms-text-secondary, #374151); font-size: 12px; font-weight: 600; white-space: nowrap; text-align: left; padding: 7px 12px; border-top: 1px solid var(--csms-border, #dfe4ee); vertical-align: top; }
 .equivalency-evidence td { padding: 7px 12px; vertical-align: top; }
 .equivalency-evidence th:first-child { width: 8.5rem; }
 .equivalency-evidence th:last-child, .equivalency-evidence td:last-child { width: 8rem; white-space: nowrap; }
@@ -72,3 +77,7 @@
 body.equivalency-cimf-beside #csmsCimfPanel { z-index: 2200; }
 body.equivalency-cimf-beside #equivalencyDialog { justify-content: flex-start; padding-right: min(444px, 50vw); }
 @media (max-width: 1024px) { body.equivalency-cimf-beside #equivalencyDialog { padding-right: 24px; } }
+
+/* The table scrolls inside its wrapper; the wrapper is the containing block so the screen-reader-only header cell cannot widen the page. */
+#equivalencyTableWrap { position: relative; }
+@media (max-width: 1100px) { .equivalency-evidence .equivalency-used { white-space: normal; } }

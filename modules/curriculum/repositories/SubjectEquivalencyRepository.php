@@ -165,26 +165,40 @@ class SubjectEquivalencyRepository
         $pagination['direction'] = strtolower($direction);
         return ['records' => $records, 'pagination' => $pagination];
     }
-    /** Users who reviewed at least one record (for the "Reviewed by" filter), limited. */
-    public function reviewers(int $limit = 100): array
+    /**
+     * Reviewed-by picker: users who reviewed at least one record whose name or username matches (server-side, two characters
+     * minimum is enforced by the service), at most $limit rows. With $id it returns that one reviewer (to label a URL filter).
+     */
+    public function reviewers(?string $search, ?int $id = null, int $limit = 20): array
     {
+        $conditions = ['EXISTS (SELECT 1 FROM subject_equivalencies AS e WHERE e.reviewed_by = users.id)'];
+        $types = '';
+        $params = [];
+        if ($id !== null) {
+            $conditions[] = 'users.id = ?';
+            $types .= 'i';
+            $params[] = $id;
+        } elseif ($search !== null) {
+            $pattern = RepositoryQuery::likePattern($search);
+            $conditions[] = "(LOWER(CONCAT_WS(' ', users.first_name, users.last_name)) LIKE ? ESCAPE '=' OR LOWER(users.username) LIKE ? ESCAPE '=')";
+            $types .= 'ss';
+            array_push($params, $pattern, $pattern);
+        }
         $stmt = RepositoryQuery::execute(
             $this->db,
-            'SELECT users.id, users.username, users.first_name, users.last_name FROM users
-             WHERE EXISTS (SELECT 1 FROM subject_equivalencies AS e WHERE e.reviewed_by = users.id)
-             ORDER BY users.last_name, users.first_name, users.username LIMIT ?',
-            'i',
-            [$limit]
+            'SELECT users.id, users.username, users.first_name, users.last_name FROM users WHERE ' . implode(' AND ', $conditions) .
+            ' ORDER BY users.last_name, users.first_name, users.username LIMIT ?',
+            $types . 'i',
+            array_merge($params, [$limit])
         );
         $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
         return $rows;
     }
-
     /** Programs for the Program filter (small table), limited. */
     public function programOptions(int $limit = 200): array
     {
-        $stmt = RepositoryQuery::execute($this->db, 'SELECT id, program_code, program_name FROM academic_programs ORDER BY program_code LIMIT ?', 'i', [$limit]);
+        $stmt = RepositoryQuery::execute($this->db, 'SELECT id, program_code, program_name, program_type, status FROM academic_programs ORDER BY program_code LIMIT ?', 'i', [$limit]);
         $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
         return $rows;

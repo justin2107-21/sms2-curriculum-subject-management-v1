@@ -173,5 +173,7 @@
     syncTrigger();
   }
 
+  // Pages that build the select after load (Subject Equivalency filter) call CsmsProgramPicker.enhance(select).
+  window.CsmsProgramPicker = { enhance };
   document.querySelectorAll('select[data-program-picker]').forEach(enhance);
 }());
