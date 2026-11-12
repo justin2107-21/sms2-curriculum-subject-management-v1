@@ -83,6 +83,7 @@ require __DIR__ . '/../../../shared/sidebar.php';
       </div>
 
       <?php if ($canBrowse): ?>
+      <div class="subject-drill" id="drillBar">
       <p class="subject-back-row" id="programBackRow" hidden><a class="button-muted" id="programBack" href="subjects.php"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> All programs</a></p>
       <section class="mapping-context-bar" id="subjectContextBar" aria-label="Curriculum context" hidden>
         <?php foreach (['program' => 'Program / Strand', 'curriculum' => 'Curriculum', 'version' => 'Curriculum Version'] as $key => $label): ?>
@@ -95,6 +96,8 @@ require __DIR__ . '/../../../shared/sidebar.php';
         <?php if ($key !== 'version'): ?><span class="mapping-context-separator" aria-hidden="true"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span><?php endif; ?>
         <?php endforeach; ?>
       </section>
+      <?php if ($canExport): ?><a class="button-muted subject-drill__export" id="programExport" href="curriculum_export.php" hidden><i class="fa-solid fa-download" aria-hidden="true"></i> Export</a><?php endif; ?>
+      </div>
       <?php endif; ?>
 
       <section class="mapping-workspace-panel csms-panel" aria-label="Subjects">
@@ -122,7 +125,6 @@ require __DIR__ . '/../../../shared/sidebar.php';
               <select class="csms-select" id="programYear" aria-label="Year level"><option value="">All year levels</option></select>
               <select class="csms-select" id="programSemester" aria-label="Semester"><option value="">All semesters</option></select>
               <select class="csms-select" id="programStatus" aria-label="Status"><option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select>
-              <?php if ($canExport): ?><a class="button-muted" id="programExport" href="curriculum_export.php"><i class="fa-solid fa-download" aria-hidden="true"></i> Export</a><?php endif; ?>
             </div>
             <div class="csms-empty" id="programNoMatch" role="status" hidden><i class="fa-solid fa-filter" aria-hidden="true"></i><strong>No placements match these filters</strong><span>Change the search or a filter.</span></div>
             <div class="csms-empty" id="programEmpty" role="status" hidden><i class="fa-solid fa-book" aria-hidden="true"></i><strong>No subjects placed in this version</strong><span>Place subjects from Curriculum Builder or Subject Mapping.</span></div>

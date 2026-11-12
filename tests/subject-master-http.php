@@ -201,7 +201,7 @@ try {
     $leftover = array_values(array_filter($oldClasses, fn(string $c): bool => str_contains($cardJs, $c) || str_contains(file_get_contents(__DIR__ . '/../css/csms-components.css'), $c) || str_contains($pageSrcEarly, $c)));
     ok($leftover === [] && !str_contains($cardBody, 'Open subjects <i') && !str_contains($cardBody, '>Open subjects<') && !str_contains($cardBody, "'College'") && !str_contains($cardBody, "'SHS'"), 'No old classes: no level chip, no stat row, no year bars, no status-chip row, no "Open subjects" footer text' . ($leftover ? ' (found: ' . implode(', ', $leftover) . ')' : ''));
     $shared = file_get_contents(__DIR__ . '/../css/csms-components.css');
-    ok(str_contains($shared, '.csms-program-card {') && str_contains($shared, '.csms-program-card--muted') && str_contains($shared, 'border-style: dashed') && str_contains($shared, 'minmax(224px, 1fr)') && str_contains($shared, 'font-size: 22px; font-weight: 600') && str_contains($shared, '-webkit-line-clamp: 2') && str_contains($shared, 'width: 40px; height: 40px') && str_contains($shared, 'translateX(4px)') && str_contains($shared, 'prefers-reduced-motion: reduce') && str_contains($shared, 'translateY(-2px)') && str_contains($shared, '#2163c5'), 'Shared csms-program-card: component, muted state, auto-fill grid (224px minimum: 4 per row at 1366, 3 at 1024 with the sidebar open), 40px icon tile, 22px code, 2-line name clamp, arrow nudge, hover lift and reduced motion');
+    ok(str_contains($shared, '.csms-program-card {') && str_contains($shared, '.csms-program-card--muted') && str_contains($shared, 'border-style: dashed') && str_contains($shared, 'minmax(260px, 1fr)') && str_contains($shared, 'font-size: 22px; font-weight: 600') && !str_contains($shared, 'line-clamp') && str_contains($shared, 'width: 40px; height: 40px') && str_contains($shared, 'translateX(4px)') && str_contains($shared, 'prefers-reduced-motion: reduce') && str_contains($shared, 'translateY(-2px)') && str_contains($shared, '#2163c5'), 'Shared csms-program-card: component, muted state, auto-fill grid (260px minimum), 40px icon tile, 22px code, the full name (no clamp), arrow nudge, hover lift and reduced motion');
     ok(str_contains(file_get_contents(__DIR__ . '/../modules/curriculum/assets/subject-master.css'), 'padding-bottom: 96px'), 'Style: bottom padding for the floating launcher');
 
     // Card numbers equal separate SELECTs, for each role (the restricted reader counts only versions it may read).
@@ -230,6 +230,18 @@ try {
     }
     $unplacedWant = fn(bool $restricted): int => (int)$db->query("SELECT COUNT(*) FROM subjects s WHERE s.archived_at IS NULL AND NOT EXISTS (SELECT 1 FROM curriculum_version_subjects p JOIN curriculum_versions v ON v.id=p.curriculum_version_id WHERE p.subject_id=s.id" . ($restricted ? " AND (v.review_status='approved' OR v.status='active')" : '') . ')')->fetch_row()[0];
     ok($api($mgr, 'program_cards')['json']['unplaced_count'] === $unplacedWant(false) && $api($rest, 'program_cards')['json']['unplaced_count'] === $unplacedWant(true) && $unplacedWant(false) < $unplacedWant(true), 'Cards: the unplaced count equals a separate SELECT, and the restricted reader (who cannot read the draft placements) sees more unplaced subjects');
+    // Active programs first within each group, then Draft, then other curricula, then programs without one.
+    $rankOf = fn(array $p): int => ($p['version_statuses']['active'] ?? 0) > 0 ? 0 : (($p['version_statuses']['draft'] ?? 0) > 0 ? 1 : ($p['curriculum_count'] > 0 ? 2 : 3));
+    foreach ([$mgr, $rest] as $who) {
+        foreach (['college', 'shs'] as $lvl) {
+            $ranks = array_map($rankOf, array_values(array_filter($api($who, 'program_cards')['json']['programs'], fn(array $p): bool => $p['level'] === $lvl)));
+            $sorted = $ranks; sort($sorted);
+            ok($ranks === $sorted, "Cards: $lvl programs are ordered Active, Draft, other, no curriculum");
+        }
+    }
+    // Opened program: no search box, one top row with back link, context bar and Export.
+    $drill = substr($pageSrcEarly, strpos($pageSrcEarly, 'id="drillBar"'), strpos($pageSrcEarly, 'id="viewCards"') - strpos($pageSrcEarly, 'id="drillBar"'));
+    ok(str_contains($drill, 'id="programBack"') && str_contains($drill, 'id="subjectContextBar"') && str_contains($drill, 'id="programExport"') && strpos($drill, 'id="programBack"') < strpos($drill, 'id="subjectContextBar"') && strpos($drill, 'id="subjectContextBar"') < strpos($drill, 'id="programExport"') && substr_count($pageSrcEarly, 'id="programExport"') === 1 && str_contains($smCss, '#subjectWorkspace[data-view="program"] .subject-toolbar') && preg_match('/\.subject-drill__export \{[^}]*margin-left: auto/', $smCss) === 1, 'Page: in an opened program the search row is hidden and back link, context bar and Export (far right) share one top row');
     $oneChip = function (array $statuses): string { return ($statuses['active'] ?? 0) > 0 ? 'Active' : (($statuses['draft'] ?? 0) > 0 ? 'Draft' : 'Archived'); };
     ok(array_map(fn(array $p): bool => !array_key_exists('year_counts', $p), $api($mgr, 'program_cards')['json']['programs']) === array_fill(0, count($api($mgr, 'program_cards')['json']['programs']), true), 'Cards: the response carries no year counts');
     ok($oneChip(['active' => 1, 'draft' => 3]) === 'Active' && $oneChip(['draft' => 2, 'archived' => 5]) === 'Draft' && $oneChip(['archived' => 1]) === 'Archived', 'Cards: the footer chip rule (Active, else Draft, else Archived) on status counts');

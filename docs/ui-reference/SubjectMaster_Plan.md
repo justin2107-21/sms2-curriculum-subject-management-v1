@@ -117,3 +117,9 @@ Next free migration is **033** (032 is the Compliance rule library). The Grade W
 - **Grid:** auto-fill, minimum 224 px (not 260: with the sidebar open the content is about 1130 px at 1440, 1060 at 1366, 716 at 1024, so 224 gives 4, 4 and 3 columns; 260 gives 4, 3 and 2). Cost: at 1024 long names such as "Bachelor of Science in Information Technology" clamp to two lines with an ellipsis. Raise the minimum in `.csms-program-grid` to trade columns for full names.
 - **Aggregate:** the year-level columns and `year_counts` are gone from the query and the response; cards endpoint 43 ms (was 85 ms) at 63 programs, 4,800 placements, 5,000 subjects.
 - Tests: `subject-master-http` 107 checks; `subject-mapping-http` 200.
+
+### Slice 1b polish 2 (2026-11-12): full names, Active first, compact drill-in
+- **Card:** icon tile and code share the first line; the full program name (no clamp, no ellipsis) sits under them across the whole card width; footer unchanged. Grid minimum back to 260 px (4 columns at 1440, 3 at 1366, 2 at 1024; the 224 px minimum of the previous commit cut names).
+- **Order:** inside College and SHS, programs with an Active version come first, then Draft, then other curricula, then programs without a curriculum, then by code (SQL ranking on the same status buckets and read scope as the chip).
+- **Gap** between the search row and the first group heading reduced.
+- **Opened program / unplaced list:** the search box row is hidden; one top row holds the back link, the Program > Curriculum > Version context and Export (far right, shown once placements load).

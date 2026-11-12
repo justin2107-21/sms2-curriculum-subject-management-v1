@@ -221,10 +221,20 @@ class SubjectRepository
         $where = ' WHERE ' . implode(' AND ', $conditions);
         $total = (int)$this->rows('SELECT COUNT(*) AS total FROM academic_programs ap' . $where, $types, $params)[0]['total'];
         $pagination = RepositoryQuery::pagination($total, $query['page'], $query['per_page']);
-        $programs = $this->rows("SELECT ap.id, ap.program_code, ap.program_name, ap.program_type, ($shs) AS is_shs FROM academic_programs ap" . $where . ' ORDER BY is_shs ASC, ap.program_code ASC, ap.id ASC LIMIT ? OFFSET ?', $types . 'ii', array_merge($params, [$pagination['per_page'], $pagination['offset']]));
+        // Within each group: programs with an Active version first, then Draft, then other curricula, then programs without a curriculum; by code after that.
+        $scope = CurriculumReadScope::sql('v');
+        $has = static fn(string $bucket): string => "EXISTS (SELECT 1 FROM curricula c JOIN curriculum_versions v ON v.curriculum_id = c.id WHERE c.academic_program_id = ap.id" . ($scope !== '' ? ' AND ' . $scope : '') . " AND (" . self::bucketSql() . ") = '$bucket')";
+        $rank = 'CASE WHEN ' . $has('active') . ' THEN 0 WHEN ' . $has('draft') . ' THEN 1 WHEN EXISTS (SELECT 1 FROM curricula c WHERE c.academic_program_id = ap.id) THEN 2 ELSE 3 END';
+        $programs = $this->rows("SELECT ap.id, ap.program_code, ap.program_name, ap.program_type, ($shs) AS is_shs FROM academic_programs ap" . $where . " ORDER BY is_shs ASC, $rank ASC, ap.program_code ASC, ap.id ASC LIMIT ? OFFSET ?", $types . 'ii', array_merge($params, [$pagination['per_page'], $pagination['offset']]));
         $rows = $this->cardCounts($programs);
         unset($pagination['offset']);
         return ['records' => $rows, 'pagination' => $pagination, 'groups' => ['college' => (int)$groups['college'], 'shs' => (int)$groups['shs']]];
+    }
+
+    /** Status bucket of a version row aliased v (the same buckets the cards count and the status chip is chosen from). */
+    private static function bucketSql(): string
+    {
+        return "CASE WHEN v.status = 'archived' THEN 'archived' WHEN v.review_status = 'approved' THEN 'approved' WHEN v.review_status = 'under_review' THEN 'in_review' WHEN v.review_status = 'returned' THEN 'returned' WHEN v.status = 'active' THEN 'active' ELSE 'draft' END";
     }
 
     /**
@@ -237,7 +247,7 @@ class SubjectRepository
         $counts = [];
         if ($ids) {
             $scope = CurriculumReadScope::sql('v');
-            $bucket = "CASE WHEN v.status = 'archived' THEN 'archived' WHEN v.review_status = 'approved' THEN 'approved' WHEN v.review_status = 'under_review' THEN 'in_review' WHEN v.review_status = 'returned' THEN 'returned' WHEN v.status = 'active' THEN 'active' ELSE 'draft' END";
+            $bucket = self::bucketSql();
             $select = 'COUNT(DISTINCT curriculum_id) AS curriculum_count, COUNT(DISTINCT version_id) AS version_count, COUNT(DISTINCT subject_id) AS subject_count';
             foreach (['draft', 'active', 'approved', 'in_review', 'returned', 'archived'] as $b) $select .= ", COUNT(DISTINCT CASE WHEN bucket = '$b' THEN version_id END) AS v_$b";
             $in = implode(',', array_fill(0, count($ids), '?'));

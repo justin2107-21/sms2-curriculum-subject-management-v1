@@ -83,6 +83,7 @@
         if (view !== 'cards' && !canBrowse) view = 'cards';
         if (view === 'program' && !cascade) view = 'cards';
         state.view = view;
+        root.dataset.view = view;
         const table = view === 'program';
         $('viewCards').hidden = view !== 'cards';
         $('cardTools').hidden = view !== 'cards';
@@ -173,8 +174,8 @@
         const level = program.level === 'shs' ? 'shs' : 'college';
         const muted = Number(program.curriculum_count) === 0;
         const summary = muted ? 'No curriculum yet' : cardSummary(program);
-        const main = '<span class="csms-program-card__main"><span class="csms-program-card__icon" aria-hidden="true"><i class="fa-solid ' + ICON[level] + '"></i></span>' +
-            '<span class="csms-program-card__text"><span class="csms-program-card__code">' + esc(program.program_code) + '</span><span class="csms-program-card__name">' + esc(program.program_name) + '</span></span></span>';
+        const main = '<span class="csms-program-card__main"><span class="csms-program-card__head"><span class="csms-program-card__icon" aria-hidden="true"><i class="fa-solid ' + ICON[level] + '"></i></span>' +
+            '<span class="csms-program-card__code">' + esc(program.program_code) + '</span></span><span class="csms-program-card__name">' + esc(program.program_name) + '</span></span>';
         const chip = cardChip(program.version_statuses);
         const n = Number(program.subject_count);
         const foot = muted ? '<span class="csms-program-card__foot"><span class="csms-program-card__count">No curriculum yet</span>' :
@@ -184,7 +185,7 @@
     }
     function unplacedCardHtml(count) {
         return '<a class="csms-program-card csms-program-card--muted" href="subjects.php?view=unplaced" aria-label="Open the ' + plural(count, 'subject') + ' not placed in any curriculum">' +
-            '<span class="csms-program-card__main"><span class="csms-program-card__icon" aria-hidden="true"><i class="fa-solid fa-box-open"></i></span><span class="csms-program-card__text"><span class="csms-program-card__name csms-program-card__name--lead">Not placed in any curriculum</span></span></span>' +
+            '<span class="csms-program-card__main"><span class="csms-program-card__head"><span class="csms-program-card__icon" aria-hidden="true"><i class="fa-solid fa-box-open"></i></span><span class="csms-program-card__name csms-program-card__name--lead">Not placed in any curriculum</span></span></span>' +
             '<span class="csms-program-card__foot"><span class="csms-program-card__count"><strong>' + count + '</strong> ' + (count === 1 ? 'subject' : 'subjects') + '</span><i class="fa-solid fa-arrow-right csms-program-card__arrow" aria-hidden="true"></i></span></a>';
     }
     function cardStates(which, message) {
@@ -391,6 +392,7 @@
         $('programLoading').hidden = which !== 'loading';
         $('programError').hidden = which !== 'error';
         $('programBody').hidden = which !== 'body';
+        if ($('programExport')) $('programExport').hidden = which !== 'body';
         if (which === 'error') $('programErrorText').textContent = message || '';
     }
     function exportHref() {

@@ -697,20 +697,21 @@ strong.csms-ctable__code, dd.csms-ctable__code, span.csms-ctable__code { color: 
              <span class="csms-program-card__foot"><span class="csms-program-card__count"><strong>52</strong> subjects</span>
                <span class="csms-chip csms-chip--active">Active</span><i class="fa-solid fa-arrow-right csms-program-card__arrow"></i></span></a>
    The 3 px top edge is decorative (blue for college, teal for SHS); every text keeps at least 4.5:1 contrast on its surface. */
-.csms-program-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(224px, 1fr)); gap: 16px; align-items: stretch; }
+.csms-program-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; align-items: stretch; }
 .csms-program-card { --card-accent: #2163c5; position: relative; display: flex; flex-direction: column; gap: 12px; min-width: 0; height: 100%; box-sizing: border-box; padding: 16px 16px 12px; overflow: hidden; color: inherit; text-decoration: none; background: #fff; border: 1px solid var(--csms-border, #dfe4ee); border-radius: var(--csms-radius-surface, 12px); box-shadow: var(--csms-shadow-sm, 0 1px 3px rgba(15, 23, 42, .06)); transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease; }
 .csms-program-card::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--card-accent); }
 .csms-program-card--shs { --card-accent: #0f8b82; }
 .csms-program-card:hover { transform: translateY(-2px); border-color: var(--card-accent); box-shadow: 0 8px 20px rgba(15, 23, 42, .10); }
 /* The app-wide focus ring is navy (!important in csms-tokens.css); the card asks for the blue ring. */
 body .csms-program-card:focus-visible { outline: 2px solid #2163c5 !important; outline-offset: 2px; }
-.csms-program-card__main { display: flex; align-items: center; gap: 12px; min-width: 0; min-height: 62px; }
-.csms-program-card__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.csms-program-card__main { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.csms-program-card__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.csms-program-card__head { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .csms-program-card__icon { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 10px; font-size: 18px; background: #e8eefb; color: #1a3a8c; }
 .csms-program-card--shs .csms-program-card__icon { background: #dff3f1; color: #0b5e57; }
 .csms-program-card__code { font-family: "Newsreader", Georgia, "Times New Roman", serif; font-size: 22px; font-weight: 600; line-height: 1.15; color: #2163c5; overflow-wrap: anywhere; }
-.csms-program-card__name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; min-height: 2.7em; font-size: 13px; font-weight: 600; line-height: 1.35; color: var(--csms-text, #1f2937); }
-.csms-program-card__name--lead { font-size: 14px; }
+.csms-program-card__name { min-height: 2.7em; overflow-wrap: anywhere; font-size: 13px; font-weight: 600; line-height: 1.35; color: var(--csms-text, #1f2937); }
+.csms-program-card__name--lead { min-height: 0; font-size: 14px; align-self: center; }
 .csms-program-card__foot { display: flex; align-items: center; gap: 10px; margin-top: auto; padding-top: 10px; border-top: 1px solid #eef1f7; font-size: 13px; color: #475569; }
 .csms-program-card__count { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .csms-program-card__count strong { font-weight: 700; color: var(--csms-text, #1f2937); }
