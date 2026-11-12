@@ -12,7 +12,7 @@ final class CurriculumVersionReferenceRepository
             'SELECT cvr.*, cr.reference_type, cr.source_kind AS current_source_kind,
                     cr.reference_code AS current_reference_code, cr.title AS current_title,
                     cr.issuing_body AS current_issuing_body, cr.source_url AS current_source_url,
-                    cr.effective_date AS current_effective_date, cr.verification_status,
+                    cr.effective_date AS current_effective_date, cr.notes AS current_notes, cr.verification_status,
                     cr.supersedes_reference_id, u.username AS linked_by_username
              FROM curriculum_version_references cvr
              JOIN compliance_references cr ON cr.id=cvr.compliance_reference_id

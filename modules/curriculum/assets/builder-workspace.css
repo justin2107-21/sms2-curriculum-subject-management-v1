@@ -167,3 +167,7 @@
 .builder-more__menu { left: auto; right: 0; max-width: calc(100vw - 32px); }
 /* Code column text uses the blue of the Subject Mapping Code column (--csms-code-blue). */
 .builder-subjects td.builder-subjects__code { color: var(--csms-code-blue, #2163c5); }
+
+/* Attached sources: the title, issuer, locator note and assessment lines each on their own line; long notes wrap. */
+#builderReferencesTable .compliance-subtext { display: block; margin-top: 2px; font-weight: 400; overflow-wrap: anywhere; }
+#builderReferencesTable .builder-source-locator { max-width: 60ch; line-height: 1.5; }

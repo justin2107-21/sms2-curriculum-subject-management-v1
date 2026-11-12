@@ -384,12 +384,14 @@
             ['Institutional adoption', 'Institutional adoption/approval not verified']
         ];
         $('builderDetails').innerHTML = fields.map(([label, value, html]) => '<div><dt>' + esc(label) + '</dt><dd>' + (html ? value : esc(value)) + '</dd></div>').join('');
-        $('builderReferences').innerHTML = ws.references.length ? ws.references.map(function (item) {
+        const PURPOSE_ORDER = { school_curriculum: 0, regulatory: 1, institutional_policy: 2, other: 3 };
+        $('builderReferences').innerHTML = ws.references.length ? ws.references.slice().sort((x, y) => (PURPOSE_ORDER[x.reference_purpose] ?? 9) - (PURPOSE_ORDER[y.reference_purpose] ?? 9)).map(function (item) {
             const name = item.reference_code_snapshot || item.reference_title_snapshot || ('Source #' + item.compliance_reference_id);
             const assess = ['document_identity', 'declared_origin', 'applicability'].map(key => key.replaceAll('_', ' ') + ': ' + assessment(item.current_assessments && item.current_assessments[key])).join(' · ');
             const warning = (item.attachment_matches_current_source ? '' : ' · CURRENT SOURCE CHANGED SINCE ATTACHMENT') + (item.verification_status === 'inactive' ? ' · CURRENT SOURCE INACTIVE/WITHDRAWN' : '');
-            return '<tr><td><strong>' + esc(name) + '</strong><span class="compliance-subtext">' + esc(item.reference_title_snapshot || '') + ' · ' + esc(item.issuing_body_snapshot || 'Issuer unavailable') + '</span></td>' +
-                '<td>' + esc(ui.statusLabel(item.reference_purpose)) + '</td><td>' + esc(sourceKind(item.source_kind_snapshot)) + '<span class="compliance-subtext">' + esc(assess + warning) + '</span></td>' +
+            return '<tr><td><strong>' + esc(name) + '</strong><span class="compliance-subtext">' + esc(item.reference_title_snapshot || '') + ' · ' + esc(item.issuing_body_snapshot || 'Issuer unavailable') + '</span>' +
+                (item.current_notes ? '<span class="compliance-subtext builder-source-locator">' + esc(item.current_notes) + '</span>' : '<span class="compliance-subtext builder-source-locator">No locator on file.</span>') + '</td>' +
+                '<td>' + esc(({ school_curriculum: 'Curriculum source', regulatory: 'Governing standard', institutional_policy: 'Institutional policy', other: 'Supporting reference' })[item.reference_purpose] || ui.statusLabel(item.reference_purpose)) + '</td><td>' + esc(sourceKind(item.source_kind_snapshot)) + '<span class="compliance-subtext">' + esc(assess + warning) + '</span></td>' +
                 '<td>' + esc(item.linked_by_username || 'Unknown user') + '<span class="compliance-subtext">' + esc(item.linked_at) + '</span></td></tr>';
         }).join('') : '';
         $('builderReferencesTable').hidden = !ws.references.length;
