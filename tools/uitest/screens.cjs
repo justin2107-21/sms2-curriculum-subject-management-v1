@@ -839,19 +839,42 @@ async function main() {
     }
 
     if (arg('probe', '') === 'signinshot') {
-      // Sign-in page without a session: the password step, an error, and the Email OTP step (shown by unhiding it; no mail is sent).
+      // Sign-in page without a session. Pass --urls=/auth/signin.php,/auth/signin_main_tmp.php (a temporary copy of main's page) to compare.
+      // For the real page it also shows the Email OTP step through window.csmsOtp.show (no mail is sent) and exercises the digit boxes.
       report.signin = {};
       for (const width of widths) {
         await setWidth(width);
-        await send('Network.clearBrowserCookies');
-        await navigate(base + '/auth/signin.php');
-        await sleep(1500);
-        await shotView(path.join(out, `signin-password-${width}.png`));
-        await evaluate(`(() => { document.getElementById('authErrorText').textContent = 'Invalid username or password.'; document.getElementById('authError').hidden = false; return true; })()`);
-        await shotView(path.join(out, `signin-error-${width}.png`));
-        await evaluate(`(() => { document.getElementById('authError').hidden = true; document.getElementById('stepPassword').hidden = true; document.getElementById('stepOtp').hidden = false; document.getElementById('otpEmailHint').textContent = 'j*****@example.com'; const c = document.getElementById('otpCode'); c.value = '482913'; return true; })()`);
-        await shotView(path.join(out, `signin-otp-${width}.png`));
-        report.signin[width] = await evaluate(`({ overflowX: document.documentElement.scrollWidth > innerWidth, h2Font: getComputedStyle(document.querySelector('#stepOtp h2')).fontFamily.slice(0, 30), btnBg: getComputedStyle(document.getElementById('btnOtp')).backgroundColor })`);
+        for (const url of urls) {
+          const tag = /main_tmp/.test(url) ? 'main' : 'new';
+          await send('Network.clearBrowserCookies');
+          await navigate(base + url);
+          await sleep(1500);
+          await shotView(path.join(out, `signin-${tag}-password-${width}.png`));
+          if (tag !== 'new') continue;
+          await evaluate(`(() => { document.getElementById('authErrorText').textContent = 'Invalid username or password.'; document.getElementById('authError').hidden = false; return true; })()`);
+          await shotView(path.join(out, `signin-new-error-${width}.png`));
+          await evaluate(`(() => { document.getElementById('authError').hidden = true; window.csmsOtp.show({ email_hint: 'j*****@example.com', expires_in: 300, resend_in: 45 }); return true; })()`);
+          await sleep(700);
+          await shotView(path.join(out, `signin-new-otp-empty-${width}.png`));
+          const behaviour = await evaluate(`(() => {
+            const boxes = [...document.querySelectorAll('#stepOtp .otp-box')], out = {};
+            const type = (box, text) => { box.focus(); box.value = text; box.dispatchEvent(new Event('input', { bubbles: true })); };
+            type(boxes[0], '4'); out.advance = document.activeElement === boxes[1];
+            type(boxes[1], '8'); type(boxes[2], '2');
+            boxes[3].focus(); boxes[3].dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true, cancelable: true })); out.backspace = document.activeElement === boxes[2];
+            boxes.forEach(b => { b.value = ''; });
+            const paste = new Event('paste', { bubbles: true, cancelable: true }); paste.clipboardData = { getData: () => ' 482-913 ' };
+            boxes[2].focus(); boxes[2].dispatchEvent(paste); out.pasteFilled = boxes.map(b => b.value).join('');
+            out.pasteFocus = boxes.indexOf(document.activeElement);
+            boxes[0].focus(); boxes[0].value = '123456'; boxes[0].dispatchEvent(new Event('input', { bubbles: true })); out.autofill = boxes.map(b => b.value).join('');
+            out.attrs = { mode: boxes[0].inputMode, ac: boxes[0].autocomplete, count: boxes.length };
+            out.resend = { text: document.getElementById('btnResend').textContent, disabled: document.getElementById('btnResend').disabled };
+            out.countdown = document.getElementById('otpCountdown').textContent;
+            return out; })()`);
+          await evaluate(`(() => { const boxes = [...document.querySelectorAll('#stepOtp .otp-box')]; '482913'.split('').forEach((d, i) => { boxes[i].value = d; }); return true; })()`);
+          await shotView(path.join(out, `signin-new-otp-filled-${width}.png`));
+          report.signin[width] = { behaviour, overflowX: await evaluate('document.documentElement.scrollWidth > innerWidth') };
+        }
       }
     }
 
