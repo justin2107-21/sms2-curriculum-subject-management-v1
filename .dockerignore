@@ -25,6 +25,9 @@
 !images/
 !images/**
 !js/
+!lib/
+!lib/PHPMailer/
+!lib/PHPMailer/*.php
 !js/**
 !modules/
 !modules/**

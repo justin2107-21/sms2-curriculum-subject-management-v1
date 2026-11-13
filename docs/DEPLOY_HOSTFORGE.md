@@ -47,7 +47,7 @@ Status: the Dockerfile has passed local Docker runs before (see `hostforge-deplo
 5. **Passwords and keys:** user passwords use plain `password_hash`, so the imported hashes validate on any host. Only `API_KEY_PEPPER` must equal the local value (API client keys). Set the variables in section 2 in the panel, never in the repository.
 6. **Directory permissions:** nothing to set by hand; the image sets directories 755 and files 644, and the session directory belongs to `www-data` (700).
 7. **Force HTTPS:** enable HTTPS and the HTTP-to-HTTPS redirect in the Hostforge domain settings. The Offering API refuses non-HTTPS requests in production.
-8. **Change every demo/seed account password** to a strong one before anyone else uses the site: sign in as an administrator, open the users page and reset each account (a temporary password is generated and the person must change it at first sign-in), and change your own password in Account Settings. Remove accounts you do not need.
+8. **Change every demo/seed account password** to a strong one before anyone else uses the site: sign in as each account (or have the person do it) and change the password in Account Settings. The Users page has no "reset password" button; a newly created account gets a temporary password that must be changed at first sign-in. Remove accounts you do not need.
 9. **Smoke test** (below).
 
 ## 4. HTTPS behind the Hostforge proxy
@@ -94,3 +94,21 @@ Sign in once per role (five roles: Super Admin, Admin, Staff, Academic Office, A
 - Audit client IP shows the proxy (section 4).
 - The PHP timezone is not set (UTC); the app stores UTC timestamps. Confirm that is acceptable for the demo.
 - `API_KEY_PEPPER` must match local if API keys exist.
+
+## 9. Email OTP at sign-in (optional, off by default)
+
+OTP is a second step after the password: a 6-digit code sent by email, valid 5 minutes, single use. It is **off** unless `OTP_ENABLED=1`. With OTP off the sign-in never reads or writes the OTP table.
+
+**Environment variables** (set in the Hostforge panel; names only): `OTP_ENABLED`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` (**secret**), `SMTP_FROM`, `SMTP_FROM_NAME`. Port 587 uses STARTTLS (default); 465 uses implicit TLS; the server certificate is always verified; timeouts are 10 seconds. An unset or invalid `OTP_ENABLED` means OTP off.
+
+**Migration 033** creates the table `login_otp_challenges`. The hosted database console is read-only, so the deploy must create it: set `CSMS_RUN_MIGRATIONS=1` and `CSMS_MIGRATION_CONFIRM_DATABASE=<the same value as DB_NAME>` for one deploy. The container then runs `database/startup.php` (status, apply, schema check) before Apache starts; a failure stops the container and the log says at which stage. The app database user needs permission to create tables (and a foreign key) for that one deploy. It is safe on a database that already has data (it only adds one table, guarded by IF NOT EXISTS and the migration journal) and safe to run again.
+
+**Order of steps**
+1. Deploy this release with `CSMS_RUN_MIGRATIONS=1` and `CSMS_MIGRATION_CONFIRM_DATABASE=<DB_NAME>`, and `OTP_ENABLED` empty. Check the log shows "Startup migrations: completed and verified."
+2. **Remove** both migration variables (they are meant for one deploy) and restart.
+3. Make sure every active account that should sign in has an email address that can receive mail (the Users page, Edit User). Addresses such as name@something.local cannot receive mail and would lock that account out while OTP is on.
+4. Add the `SMTP_*` variables, still with `OTP_ENABLED` empty. Restart.
+5. Set `OTP_ENABLED=1` and restart. Sign in with a test account that has a real mailbox and check the email and the code step (see the checklist in the hand-over notes).
+6. **Emergency switch:** unset `OTP_ENABLED` (or set it to 0) and restart the container. Everyone signs in with the password only again; a waiting code screen is dropped. No redeploy or migration is needed.
+
+If OTP is on and mail cannot be sent, nobody with an email address can sign in (the code cannot be delivered, and the system never logs a user in without it). Accounts without a valid email address always sign in with the password only.

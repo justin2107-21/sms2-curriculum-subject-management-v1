@@ -3,7 +3,7 @@
 Options -Indexes
 RewriteEngine On
 RewriteRule (^|/)(\.git|\.agents|\.codex|\.github|\.vscode|\.idea)(/|$) - [F,L,NC]
-RewriteRule ^(database|tests|docs|docker|config|storage|tmp|temp|logs|backups|scripts)(/|$) - [F,L,NC]
+RewriteRule ^(database|tests|docs|docker|config|storage|tmp|temp|logs|backups|scripts|lib)(/|$) - [F,L,NC]
 # Machine API: pretty URL, and keep the Authorization header (FastCGI drops it otherwise).
 RewriteRule ^api/v1/offerings/?$ api/v1/offerings.php [L,QSA]
 SetEnvIf Authorization "(.+)" HTTP_AUTHORIZATION=$1

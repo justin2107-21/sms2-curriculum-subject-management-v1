@@ -1,0 +1,41 @@
+/* Email OTP step of the sign-in page (auth/signin.php). Every rule starts with #stepOtp, so nothing here can change the
+   username and password step. It reuses the existing sign-in tokens: DM Sans, #2163c5 / #1a3a8c, the same input border,
+   radius and focus colour, and the same .btn-signin button and h2 heading. */
+
+#stepOtp { width: 100%; }
+#stepOtp[hidden] { display: none; }
+#stepOtp .otp-lead { margin: -8px 0 20px; font-size: 0.9rem; line-height: 1.55; color: #374151; }
+#stepOtp .otp-lead strong { color: #111; overflow-wrap: anywhere; }
+
+#stepOtp .otp-boxes { display: flex; gap: 8px; width: 100%; }
+#stepOtp .otp-boxes .otp-box {
+  flex: 1 1 0; min-width: 0; width: auto; height: 54px; padding: 0;
+  text-align: center; font-family: inherit; font-size: 1.5rem; font-weight: 700; color: #111;
+  background: #fff; border: 1.5px solid #d0d7e2; border-radius: 6px; outline: none;
+  transition: border-color 0.2s; caret-color: #1a3a8c;
+}
+#stepOtp .otp-boxes .otp-box:focus { border-color: #1a3a8c; }
+#stepOtp .otp-boxes .otp-box[aria-invalid="true"] { border-color: #b3261e; }
+
+#stepOtp .otp-timer { margin: 2px 0 8px; font-size: 0.85rem; color: #374151; text-align: center; }
+#stepOtp .otp-timer.is-expired { color: #8f1d17; font-weight: 600; }
+#stepOtp .otp-timer [hidden] { display: none; }
+
+#stepOtp .btn-signin:disabled { opacity: 0.6; cursor: not-allowed; }
+
+#stepOtp .otp-actions { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; margin-top: 16px; }
+#stepOtp .otp-link {
+  padding: 6px 2px; background: none; border: 0; border-radius: 4px; cursor: pointer;
+  font-family: inherit; font-size: 0.85rem; font-weight: 600; color: #1a3a8c;
+  text-decoration: underline; text-underline-offset: 2px;
+}
+#stepOtp .otp-link:hover:not(:disabled) { text-decoration: none; }
+#stepOtp .otp-link:disabled { color: #4b5563; text-decoration: none; cursor: not-allowed; }
+#stepOtp .otp-link:focus-visible { outline: 2px solid #1a3a8c; outline-offset: 2px; }
+#stepOtp .otp-help { margin: 14px 0 0; font-size: 0.78rem; line-height: 1.5; color: #4b5563; text-align: center; }
+
+@media (max-width: 480px) {
+  #stepOtp .otp-boxes { gap: 6px; }
+  #stepOtp .otp-boxes .otp-box { height: 50px; font-size: 1.35rem; }
+  #stepOtp .otp-actions { flex-direction: column; align-items: flex-start; }
+}
