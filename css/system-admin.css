@@ -103,3 +103,18 @@
 .audit-pagination a,.audit-pagination span{padding:7px 11px;border:1px solid #dbe3ee;border-radius:7px;text-decoration:none;color:#475569;font-size:.78rem}
 .audit-pagination .current{background:#1a3a8c;color:#fff;border-color:#1a3a8c}
 .audit-pagination .disabled{color:#cbd5e1}
+
+/* Users list: toolbar and sortable column headers (real buttons). */
+.system-admin-toolbar { padding: 12px 16px; border-bottom: 1px solid #eef2f7; }
+.system-admin-sort { display: inline-flex; align-items: center; gap: 6px; padding: 0; margin: 0; background: none; border: 0; border-radius: 4px; font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; cursor: pointer; white-space: nowrap; }
+.system-admin-sort:hover { color: var(--csms-code-blue, #2163c5); }
+.system-admin-sort:focus-visible { outline: 3px solid var(--csms-focus, #2563eb); outline-offset: 2px; }
+.system-admin-sort__icon { display: inline-block; width: 10px; font-size: 10px; line-height: 1; }
+.system-admin-table th[aria-sort="ascending"], .system-admin-table th[aria-sort="descending"] { color: var(--csms-code-blue, #2163c5); }
+#usersNoMatch td { padding: 0; }
+#usersNoMatch .csms-empty { margin: 16px; }
+#usersNoMatch[hidden] { display: none; }
+@media (max-width: 900px) {
+  /* The table is wider than a phone and scrolls sideways; keep the empty message in view instead of centred in the scrolled width. */
+  #usersNoMatch .csms-empty { position: sticky; left: 0; box-sizing: border-box; width: min(calc(100vw - 80px), 22rem); }
+}

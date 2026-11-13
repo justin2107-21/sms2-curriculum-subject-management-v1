@@ -795,6 +795,49 @@ async function main() {
       }
     }
 
+    if (arg('probe', '') === 'usersfilter') {
+      // Users page: toolbar, filters, sorting, empty state, address state after a reload. Reports counts and states only (no emails or names).
+      report.usersFilter = {};
+      for (const width of widths) {
+        const result = {};
+        await setWidth(width);
+        issues = [];
+        await navigate(base + urls[0]);
+        await sleep(3000);
+        const q = expr => evaluate(expr);
+        const rowsText = `[...document.querySelectorAll('#usersTable tbody tr:not(#usersNoMatch)')].filter(r => !r.hidden)`;
+        result.initial = await q(`({ rows: ${rowsText}.length, count: document.getElementById('usersCount').textContent, roles: [...document.querySelectorAll('#usersRole option')].map(o => o.textContent), clearHidden: document.getElementById('usersClear').hidden, ariaSort: [...document.querySelectorAll('#usersTable th[data-sort]')].map(t => t.getAttribute('aria-sort')), overflowX: document.documentElement.scrollWidth > innerWidth, paddingBottom: getComputedStyle(document.querySelector('main.content')).paddingBottom })`);
+        await shotView(path.join(out, `${role}-users-${width}.png`));
+        result.sorts = {};
+        for (const key of ['username', 'name', 'email', 'role', 'status', 'created']) {
+          const first = await q(`(() => { const b = document.querySelector('#usersTable th[data-sort="${key}"] button'); b.click(); const th = b.closest('th'); return { aria: th.getAttribute('aria-sort'), arrow: th.querySelector('.system-admin-sort__icon').innerHTML.includes('fa-arrow-up'), arrows: document.querySelectorAll('.system-admin-sort__icon i').length, order: [...document.querySelectorAll('#usersTable tbody tr:not(#usersNoMatch)')].map(r => r.cells[0].textContent.trim().length).join(',') }; })()`);
+          const second = await q(`(() => { const b = document.querySelector('#usersTable th[data-sort="${key}"] button'); b.click(); const th = b.closest('th'); return { aria: th.getAttribute('aria-sort'), arrow: th.querySelector('.system-admin-sort__icon').innerHTML.includes('fa-arrow-down'), url: location.search }; })()`);
+          result.sorts[key] = { first: [first.aria, first.arrow, first.arrows], second: [second.aria, second.arrow, second.url] };
+        }
+        await shotView(path.join(out, `${role}-users-sorted-${width}.png`));
+        result.keyboard = await q(`(() => { const b = document.querySelector('#usersTable th[data-sort="status"] button'); b.focus(); return { tag: document.activeElement.tagName, focusable: document.activeElement === b }; })()`);
+        result.search = await q(`(() => { const i = document.getElementById('usersSearch'); i.value = 'zzzz-no-such'; i.dispatchEvent(new Event('input', { bubbles: true })); return new Promise(r => setTimeout(() => r({ rows: ${rowsText}.length, empty: !document.getElementById('usersNoMatch').hidden, emptyText: document.getElementById('usersNoMatch').textContent.trim(), count: document.getElementById('usersCount').textContent, clearShown: !document.getElementById('usersClear').hidden, url: location.search }), 400)); })()`);
+        await shotView(path.join(out, `${role}-users-empty-${width}.png`));
+        result.clearFromEmpty = await q(`(() => { document.getElementById('usersNoMatchClear').click(); return { rows: ${rowsText}.length, empty: !document.getElementById('usersNoMatch').hidden, url: location.search }; })()`);
+        result.roleFilter = {};
+        const optionCount = await q(`document.querySelectorAll('#usersRole option').length`);
+        for (let i = 1; i < optionCount; i++) {
+          result.roleFilter[i] = await q(`(() => { const s = document.getElementById('usersRole'); s.selectedIndex = ${i}; s.dispatchEvent(new Event('change', { bubbles: true })); return { label: s.options[${i}].textContent, rows: ${rowsText}.length, count: document.getElementById('usersCount').textContent }; })()`);
+        }
+        await q(`(() => { const s = document.getElementById('usersRole'); s.selectedIndex = 0; s.dispatchEvent(new Event('change', { bubbles: true })); const t = document.getElementById('usersStatus'); t.value = 'inactive'; t.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+        result.status = await q(`({ rows: ${rowsText}.length, count: document.getElementById('usersCount').textContent, url: location.search })`);
+        // Reload keeps the view (what Create User / Edit User do after saving).
+        const before = await q(`location.search`);
+        await navigate(base + urls[0] + before);
+        await sleep(3000);
+        result.afterReload = await q(`({ url: location.search, status: document.getElementById('usersStatus').value, rows: ${rowsText}.length, count: document.getElementById('usersCount').textContent, ariaSort: [...document.querySelectorAll('#usersTable th[data-sort]')].map(t => t.getAttribute('aria-sort')).join(',') })`);
+        await shotView(path.join(out, `${role}-users-reloaded-${width}.png`));
+        result.editButtonsAfterSort = await q(`document.querySelectorAll('[data-admin-edit]').length`);
+        result.issues = issues.length;
+        report.usersFilter[width] = result;
+      }
+    }
+
     if (arg('probe', '') === 'prereq') {
       // Pre-requisite Configuration: viewport shots of each tab, chrome measurements, and (with --builderflow=1) a row click.
       report.prereq = {};

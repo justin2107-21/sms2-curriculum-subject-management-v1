@@ -44,14 +44,28 @@ require __DIR__ . '/../shared/sidebar.php';
     <div class="system-admin-summary"><button class="primary-action-button" type="button" id="adminNewUser"><i class="fa-solid fa-plus" aria-hidden="true"></i> Create User</button></div>
     <section class="system-admin-card" aria-label="User accounts">
       <p class="system-admin-summary">
-        <?= number_format($totalUsers) ?> account<?= $totalUsers === 1 ? '' : 's' ?>.
         Legacy accounts are retained. Use Account Settings for your own profile.
-        <?= $totalUsers > count($users) ? 'Showing the first 100 accounts.' : '' ?>
+        <?= $totalUsers > count($users) ? 'Showing the first 100 of ' . number_format($totalUsers) . ' accounts.' : '' ?>
       </p>
       <?php if ($users !== []): ?>
+      <div class="csms-filter-row system-admin-toolbar" id="usersToolbar">
+        <label class="csms-search"><span class="sr-only">Search username, name or email</span><input type="search" id="usersSearch" maxlength="100" placeholder="Search username, name or email" autocomplete="off"/></label>
+        <select class="csms-select" id="usersRole" aria-label="Role"><option value="">All roles</option></select>
+        <select class="csms-select" id="usersStatus" aria-label="Status"><option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select>
+        <button type="button" class="csms-link" id="usersClear" hidden>Clear filters</button>
+        <span class="csms-filter-row__summary" id="usersCount" role="status" aria-live="polite"></span>
+      </div>
       <div class="system-admin-table-wrap">
-        <table class="system-admin-table">
-          <thead><tr><th>Username</th><th>Name</th><th>Email</th><th>RBAC Roles</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
+        <table class="system-admin-table" id="usersTable">
+          <thead><tr>
+            <th scope="col" data-sort="username" aria-sort="none"><button type="button" class="system-admin-sort">Username<span class="system-admin-sort__icon" aria-hidden="true"></span></button></th>
+            <th scope="col" data-sort="name" aria-sort="none"><button type="button" class="system-admin-sort">Name<span class="system-admin-sort__icon" aria-hidden="true"></span></button></th>
+            <th scope="col" data-sort="email" aria-sort="none"><button type="button" class="system-admin-sort">Email<span class="system-admin-sort__icon" aria-hidden="true"></span></button></th>
+            <th scope="col" data-sort="role" aria-sort="none"><button type="button" class="system-admin-sort">RBAC Roles<span class="system-admin-sort__icon" aria-hidden="true"></span></button></th>
+            <th scope="col" data-sort="status" aria-sort="none"><button type="button" class="system-admin-sort">Status<span class="system-admin-sort__icon" aria-hidden="true"></span></button></th>
+            <th scope="col" data-sort="created" aria-sort="none"><button type="button" class="system-admin-sort">Created<span class="system-admin-sort__icon" aria-hidden="true"></span></button></th>
+            <th scope="col">Actions</th>
+          </tr></thead>
           <tbody>
           <?php foreach ($users as $user): ?>
             <tr>
@@ -63,6 +77,7 @@ require __DIR__ . '/../shared/sidebar.php';
               <td><?= htmlspecialchars((string)$user['created_at'], ENT_QUOTES, 'UTF-8') ?></td>
             <td><?php if((int)$user['id'] !== (int)current_user_id() && in_array($user['role_names'], array_column(ProvisionalRoles::definitions(), 'label'), true) && (new AccountAdministration(authorization_connection()))->manageableBy((int)current_user_id(), get_user_roles((int)$user['id']))): ?><button class="button-muted" type="button" data-admin-edit="<?= (int)$user['id'] ?>">Edit User</button><?php endif; ?></td></tr>
           <?php endforeach; ?>
+            <tr id="usersNoMatch" hidden><td colspan="7"><div class="csms-empty" role="status"><i class="fa-solid fa-filter" aria-hidden="true"></i><strong>No accounts match these filters.</strong><button type="button" class="button-muted" id="usersNoMatchClear">Clear filters</button></div></td></tr>
           </tbody>
         </table>
       </div>
@@ -77,5 +92,6 @@ require __DIR__ . '/../shared/sidebar.php';
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 <script src="../modules/curriculum/assets/curriculum-common.js?v=<?= (int)filemtime(__DIR__.'/../modules/curriculum/assets/curriculum-common.js') ?>"></script>
 <script src="../js/account-administration.js?v=<?= (int)filemtime(__DIR__.'/../js/account-administration.js') ?>"></script>
+<script src="../js/users-list.js?v=<?= (int)filemtime(__DIR__.'/../js/users-list.js') ?>"></script>
 </body>
 </html>
