@@ -838,6 +838,23 @@ async function main() {
       }
     }
 
+    if (arg('probe', '') === 'signinshot') {
+      // Sign-in page without a session: the password step, an error, and the Email OTP step (shown by unhiding it; no mail is sent).
+      report.signin = {};
+      for (const width of widths) {
+        await setWidth(width);
+        await send('Network.clearBrowserCookies');
+        await navigate(base + '/auth/signin.php');
+        await sleep(1500);
+        await shotView(path.join(out, `signin-password-${width}.png`));
+        await evaluate(`(() => { document.getElementById('authErrorText').textContent = 'Invalid username or password.'; document.getElementById('authError').hidden = false; return true; })()`);
+        await shotView(path.join(out, `signin-error-${width}.png`));
+        await evaluate(`(() => { document.getElementById('authError').hidden = true; document.getElementById('stepPassword').hidden = true; document.getElementById('stepOtp').hidden = false; document.getElementById('otpEmailHint').textContent = 'j*****@example.com'; const c = document.getElementById('otpCode'); c.value = '482913'; return true; })()`);
+        await shotView(path.join(out, `signin-otp-${width}.png`));
+        report.signin[width] = await evaluate(`({ overflowX: document.documentElement.scrollWidth > innerWidth, h2Font: getComputedStyle(document.querySelector('#stepOtp h2')).fontFamily.slice(0, 30), btnBg: getComputedStyle(document.getElementById('btnOtp')).backgroundColor })`);
+      }
+    }
+
     if (arg('probe', '') === 'prereq') {
       // Pre-requisite Configuration: viewport shots of each tab, chrome measurements, and (with --builderflow=1) a row click.
       report.prereq = {};
