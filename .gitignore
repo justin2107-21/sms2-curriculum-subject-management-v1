@@ -42,3 +42,11 @@ cookies*.txt
 
 # Dev-only UI build tooling (compiled output lives in assets/ui/dist)
 node_modules/
+
+# Local files kept on disk but never committed
+/task2-review.diff
+/assets/ui/preview/
+docs/**/*.zip
+*.sql.gz
+/uploads/
+/storage/uploads/
