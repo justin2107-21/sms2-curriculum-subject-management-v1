@@ -43,10 +43,6 @@ require __DIR__ . '/../shared/sidebar.php';
     </div>
     <div class="system-admin-summary"><button class="primary-action-button" type="button" id="adminNewUser"><i class="fa-solid fa-plus" aria-hidden="true"></i> Create User</button></div>
     <section class="system-admin-card" aria-label="User accounts">
-      <p class="system-admin-summary">
-        Legacy accounts are retained. Use Account Settings for your own profile.
-        <?= $totalUsers > count($users) ? 'Showing the first 100 of ' . number_format($totalUsers) . ' accounts.' : '' ?>
-      </p>
       <?php if ($users !== []): ?>
       <div class="csms-filter-row system-admin-toolbar" id="usersToolbar">
         <label class="csms-search"><span class="sr-only">Search username, name or email</span><input type="search" id="usersSearch" maxlength="100" placeholder="Search username, name or email" autocomplete="off"/></label>
@@ -55,6 +51,7 @@ require __DIR__ . '/../shared/sidebar.php';
         <button type="button" class="csms-link" id="usersClear" hidden>Clear filters</button>
         <span class="csms-filter-row__summary" id="usersCount" role="status" aria-live="polite"></span>
       </div>
+      <?php if ($totalUsers > count($users)): ?><p class="system-admin-summary">Showing the first 100 of <?= number_format($totalUsers) ?> accounts.</p><?php endif; ?>
       <div class="system-admin-table-wrap">
         <table class="system-admin-table" id="usersTable">
           <thead><tr>
