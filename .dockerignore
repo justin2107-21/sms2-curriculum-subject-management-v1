@@ -8,6 +8,12 @@
 !students.sql
 !admin/
 !admin/**
+!api/
+!api/**
+!assets/
+!assets/ui/
+!assets/ui/dist/
+!assets/ui/dist/**
 !auth/
 !auth/**
 !css/
