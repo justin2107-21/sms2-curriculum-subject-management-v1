@@ -790,6 +790,26 @@ async function main() {
       }
     }
 
+    if (arg('probe', '') === 'electivesempty') {
+      // Electives Manager empty states: groups tab and Validation Review as they stand (use a version with no groups), plus the filtered state.
+      // Pass --urls=/modules/curriculum/pages/electives_manager.php?version_id=<id>. Reports the visible text so it can be checked for wording.
+      report.electivesEmpty = {};
+      for (const width of widths) {
+        await setWidth(width);
+        issues = [];
+        await navigate(base + urls[0]);
+        await sleep(4500);
+        const result = {};
+        result.groups = await evaluate(`(() => { const c = document.getElementById('groupCards'); return { text: c.innerText, createButtons: [...document.querySelectorAll('#createElectiveGroupButton, #groupCards [data-create-group]')].map(b => b.textContent.trim()) }; })()`);
+        await shotView(path.join(out, `${role}-electives-empty-groups-${width}.png`));
+        result.review = await evaluate(`(() => { document.getElementById('reviewTab').click(); return new Promise(r => setTimeout(() => r(document.getElementById('reviewPanel').innerText), 300)); })()`);
+        await shotView(path.join(out, `${role}-electives-empty-review-${width}.png`));
+        result.wording = await evaluate(`/compliant|approved|official/i.test(document.querySelector('main, body').innerText)`);
+        result.issues = issues.length;
+        report.electivesEmpty[width] = result;
+      }
+    }
+
     if (arg('probe', '') === 'electives') {
       // Electives Manager: chrome measurements, grouped table, row click, row menu (keyboard), issues dialog, review tab; viewport shots.
       // Needs the fixtures from tools/uitest/elective-fixtures.php (version PREORAL-2026). Pass --urls=/modules/curriculum/pages/electives_manager.php?version_id=<id>

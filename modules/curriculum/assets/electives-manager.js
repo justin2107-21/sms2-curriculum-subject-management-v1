@@ -131,9 +131,11 @@
         if ($('warnGroupEdit')) $('warnGroupEdit').hidden = g.status === 'archived';
         warnModal.open();
     }
+    // Empty states: a filter or search is active -> "No groups match"; otherwise the version simply has no (visible) groups.
+    const filtersActive = () => !!($('groupSearch').value.trim() || $('yearFilter').value || $('termFilter').value || $('statusFilter').value);
     function emptyGroups() {
-        if (state.data.groups.length) return '<div class="csms-empty"><i class="fa-solid fa-filter" aria-hidden="true"></i><strong>No groups match these filters</strong><button type="button" class="secondary-action-button" data-clear-filters>Clear filters</button></div>';
-        return '<div class="csms-empty"><i class="fa-solid fa-layer-group" aria-hidden="true"></i><strong>No elective groups yet</strong><span>Create a group when this curriculum contains alternative subject choices.</span>'+(canManage?'<button type="button" class="primary-action-button" data-create-group>Create elective group</button>':'<span>Ask someone who can manage electives to create one.</span>')+'</div>';
+        if (filtersActive() && state.data.groups.length) return '<div class="csms-empty"><i class="fa-solid fa-filter" aria-hidden="true"></i><strong>No groups match these filters</strong><button type="button" class="secondary-action-button" data-clear-filters>Clear filters</button></div>';
+        return '<div class="csms-empty"><i class="fa-solid fa-layer-group" aria-hidden="true"></i><strong>No elective groups yet</strong><span>An elective group lets a curriculum require N subjects from a pool in one term.</span>'+(canManage?'<button type="button" class="primary-action-button" data-create-group>Create Elective Group</button>':'<span>Ask someone who can manage electives to create one.</span>')+'</div>';
     }
     const reviewUi = window.CsmsReview.create($('reviewChecks'), { esc, onAction: (action, id) => { const g = groupById(id); if (!g) return; if (action === 'edit' && g.status !== 'archived') openEdit(g); else openView(g); } });
     const groupAction = (g, label) => '<button type="button" class="csms-link" data-review-action="' + (canManage && g.status !== 'archived' ? 'edit' : 'view') + '" data-review-id="' + Number(g.id) + '">' + (canManage && g.status !== 'archived' ? 'Edit' : 'View') + ' group<span class="sr-only"> ' + esc(g.group_name) + '</span></button>';
@@ -150,7 +152,8 @@
         };
         const checks = Object.keys(meta).map(key => ({ key, label: meta[key][0], hint: meta[key][1], rows: data[key], ...defs[key] }));
         reviewUi.render([{ title: 'Group checks', note: 'Selected version only; archived groups are not checked', checks }]);
-        $('reviewResult').innerHTML = reviewUi.total() ? '' : '<div class="csms-empty"><i class="fa-solid fa-circle-check" aria-hidden="true"></i><strong>No elective group issues detected.</strong><span>Checks cover empty and short pools, shared and inactive subjects, and placement.</span></div>';
+        const hasGroups = state.data.groups.some(g => g.status !== 'archived');
+        $('reviewResult').innerHTML = reviewUi.total() ? '' : !hasGroups ? '<div class="csms-empty"><i class="fa-solid fa-layer-group" aria-hidden="true"></i><strong>No elective groups to check</strong><span>Validation Review checks the groups of the selected version. This version has no active or inactive elective groups yet.</span></div>' : '<div class="csms-empty"><i class="fa-solid fa-circle-check" aria-hidden="true"></i><strong>No elective group issues detected.</strong><span>Checks cover empty and short pools, shared and inactive subjects, and placement.</span></div>';
     }
     function render() {
         const ready=!!state.data;

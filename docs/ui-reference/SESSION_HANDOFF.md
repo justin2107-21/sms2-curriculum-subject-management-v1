@@ -358,3 +358,18 @@ Rule: add a record only if it is stated in a local reference PDF whose page I re
 | Read-only comparison | `docs/cmo25-bsit-comparison.md`: terms, courses, electives, the BSIT curriculum map (pp. 28-34; 29 courses, 19 match a placed code) and the 12 prerequisite rules (1 confirmed: CAP102 requires CAP101; 2 differ: the CAP101 rules; 9 not testable) | Nothing imported | The owner decides next. |
 
 Backup: `C:\Users\esquitajustin\csms-backups\sms_db_pre-slice3_*.sql`.
+
+### Electives: empty state and term slots, 2026-11-13
+
+| Module | ADDED | NOT ADDED | Why |
+|---|---|---|---|
+| Electives Manager | Honest empty state: "No elective groups yet", the line "An elective group lets a curriculum require N subjects from a pool in one term.", and the primary button "Create Elective Group" (view-only roles get a sentence, no button). "No groups match these filters" + "Clear filters" now appears only when a filter or search is active and groups exist. Validation Review with no groups says "No elective groups to check" instead of "No elective group issues detected". | The four groups "IT Elective N (term slot)" (choose 1, pool = the placed IT ELECTIVE 1-4). **NOT ADDED.** | The normal service refuses a pool of one subject: `ElectivesWorkspaceService::save` throws "Choose at least two available subjects to form an elective group." (line 111; the dialog also disables Save below two). Tried on a clone for IT ELECTIVE 1 (2/1), choose 1: refused, nothing written. No code was changed to bypass it and `sms_db` was not written. Owner decision: allow a pool of one for a slot, or give each slot a real pool of alternatives (CMO 25 p. 18 lists six recommended electives, IPT102, PT101, WS101, PF101, SIA102, HCI102). |
+
+CMO 25 wording read (printed = PDF page): p. 20 BSIT summary row "Electives" shows 3 in each of 2nd year 1st sem, 2nd year 2nd sem, 3rd year 1st sem and 4th year 2nd sem, total 12; the BSCS chart on the same page has rows "ADV (Elective)" with slots "PROFEL 1" to "PROFEL 4". p. 21 BSIT "ADV (Elective)" row: PT101 Platform Technologies (2/1), IPT101 Integrative Programming and Technologies (2/2), PF101 Event Driven Programming (3/1), SIA102 Systems Integration and Architecture 2 (4/2). p. 18: a "Recommended Electives" list of six courses, 3 units each (HCI102 blank). So CMO 25 gives four 3-unit slots **and** a recommended list, but states no rule tying the slots to the list.
+
+Tests: `tests/electives-workspace.cjs` (empty-state logic added; the suite still stops at the old `item.getAttribute` error, later in the file), `tests/elective-slots-refusal.php` (clone only, 7 checks: refusal for all four slots, no group or audit row written, units/titles/placements unchanged). Probe `-Probe electivesempty` in `tools/uitest/screens.cjs` (screenshots at 1440, Super Admin and Acad Faculty).
+
+**Cleanup / open items (owner decides):**
+- IT ELECTIVE 4 (ITE4, System Integration and Architecture 2) is 5 units in the team dataset; the CMO 25 sample has SIA102 at 3 units (4th year 2nd semester; ITE4 is placed 4/1). Units not changed.
+- The two CAP101 prerequisite rules differ from CMO 25: ours has CAP101 requiring BPM101 (not a CMO BSIT course); CMO 25 p. 33 has IAS101 and CC106. Not changed.
+- The version's only elective group is the archived GE group (team-made); no professional-elective group exists, so compliance rule C2 stays Cannot determine.

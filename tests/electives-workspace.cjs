@@ -36,6 +36,13 @@ const base={groups:[{id:10,group_name:'<b>Group</b>',status:'active',year_level:
  el('groupSearch').value='subject 2';el('groupSearch').handlers.input();assert.match(el('groupCards').innerHTML,/&lt;b>Group/,'search also matches pool subjects');
  el('groupSearch').value='zzz';el('groupSearch').handlers.input();assert.match(el('groupCards').innerHTML,/No groups match/);el('groupSearch').handlers.keydown({key:'Escape'});assert.equal(el('groupSearch').value,'');assert.match(el('groupCards').innerHTML,/csms-term/);
  assert.equal(el('statusFilter').value,'');el('groupSearch').value='';el('groupSearch').handlers.input();
+ // Empty states: a version with no groups shows the honest empty state with the primary action; filters never do.
+ {const keep=response;response={...base,groups:[]};cascade.onChange();await tick();
+  const empty=el('groupCards').innerHTML;assert.match(empty,/No elective groups yet/);assert.match(empty,/An elective group lets a curriculum require N subjects from a pool in one term./);assert.match(empty,/data-create-group[^>]*>Create Elective Group</);assert.doesNotMatch(empty,/No groups match|data-clear-filters/);
+  assert.match(el('reviewResult').innerHTML,/No elective groups to check/);assert.doesNotMatch(el('reviewResult').innerHTML,/No elective group issues detected/);
+  root.handlers.click({target:{closest:selector=>selector==='[data-create-group]'?{}:null}});assert.equal(el('groupFormTitle').textContent,'Create Elective Group','the empty-state button opens the same dialog as the header button');
+  el('groupSearch').value='zzz';el('groupSearch').handlers.input();assert.doesNotMatch(el('groupCards').innerHTML,/No groups match/,'no groups at all: never claim a filter hid them');assert.match(el('groupCards').innerHTML,/No elective groups yet/);
+  el('groupSearch').value='';el('groupSearch').handlers.input();response=keep;cascade.onChange();await tick();assert.match(el('groupCards').innerHTML,/csms-term/);}
  const click=(kind,id)=>root.handlers.click({target:{closest:selector=>selector==='[data-view],[data-edit],[data-archive]'?{dataset:{[kind]:String(id)}}:null}});
  const hit=(selector,dataset,extra={})=>root.handlers.click({target:{closest:s=>s===selector?{dataset,setAttribute(){},focus(){},...extra}:null}});
  // Slice 2: grouped table, row click, row menu, detail dialog.
