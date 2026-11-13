@@ -736,7 +736,7 @@ async function main() {
     }
 
     if (arg('probe', '') === 'mappingtabs') {
-      // Subject Mapping: Mapping Review with every check expanded, then a Subject Trace search; overflow and console are reported per width.
+      // Subject Mapping: Mapping Review with every check expanded; overflow and console are reported per width.
       report.mappingTabs = {};
       for (const width of widths) {
         const result = {};
@@ -752,16 +752,46 @@ async function main() {
         result.expanded = await evaluate(`document.querySelectorAll('.mapping-check.is-open').length`);
         await evaluate(`window.scrollTo(0, 0); true`);
         await shotView(path.join(out, `${role}-review-expanded-${width}.png`));
-        await evaluate(`document.getElementById('mappingTabTrace').click(); true`);
-        await sleep(400);
-        await evaluate(`(() => { const i = document.getElementById('mappingTraceSearch'); i.focus(); i.value = 'a'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-        await sleep(1500);
-        await evaluate(`(() => { const o = document.querySelector('#mappingTraceOptions [role=option]'); if (!o) return false; o.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); o.click(); return true; })()`);
-        await sleep(2000);
-        result.trace = await evaluate(`({ rows: document.querySelectorAll('#mappingTraceResults tbody tr').length, link: (document.querySelector('.mapping-open-link') || {}).textContent, legacy: /Open Placement/.test(document.getElementById('mappingTraceResults').textContent) })`);
-        await shotView(path.join(out, `${role}-trace-${width}.png`));
         result.overflow = await evaluate(`document.documentElement.scrollWidth > innerWidth`);
         report.mappingTabs[width] = result;
+      }
+    }
+
+    if (arg('probe', '') === 'mappingdedupe') {
+      // Subject Mapping after Subject Trace was removed: tab bar, ?tab=trace fallback, Graduate Outcomes dialog (--outcome=<id>), the button to the map,
+      // then (second URL) the Subjects details dialog with its placements. Pass --urls=<subject_mapping url with version_id>,<subjects.php?subject_id=N>.
+      report.mappingDedupe = {};
+      const outcome = arg('outcome', '3');
+      for (const width of widths) {
+        const result = {};
+        await setWidth(width);
+        issues = [];
+        await navigate(base + urls[0]);
+        await sleep(4000);
+        result.tabs = await evaluate(`[...document.querySelectorAll('#mappingWorkspaceTabs [role=tab]')].map(t => t.textContent.trim())`);
+        await shotView(path.join(out, `${role}-mapping-tabs-${width}.png`));
+        await navigate(base + urls[0] + '&tab=trace');
+        await sleep(3500);
+        result.traceFallback = await evaluate(`({ active: (document.querySelector('#mappingWorkspaceTabs .is-active') || {}).textContent, mapVisible: !document.getElementById('mappingPanelMap').hidden })`);
+        await navigate(base + urls[0] + '&tab=outcomes');
+        await sleep(4000);
+        result.opened = await evaluate(`(() => { const r = document.querySelector('#outcomeMatrix tr[data-outcome-open="${outcome}"]'); if (!r) return false; r.click(); return true; })()`);
+        await sleep(600);
+        result.dialog = await evaluate(`(() => { const d = document.getElementById('outcomeDetail'); return { headings: [...d.querySelectorAll('h3')].map(h => h.textContent), text: d.innerText, buttons: [...d.querySelectorAll('button')].map(b => b.textContent.trim()), details: d.querySelectorAll('details').length, recordMapping: /Record Mapping/.test(d.innerText) }; })()`);
+        await shotView(path.join(out, `${role}-mapping-outcome-dialog-${width}.png`));
+        await evaluate(`(() => { const d = document.getElementById('outcomeDetail'); d.scrollTop = d.scrollHeight; return true; })()`);
+        await sleep(200);
+        await shotView(path.join(out, `${role}-mapping-outcome-dialog-bottom-${width}.png`));
+        result.toMap = await evaluate(`(() => { const b = document.querySelector('#outcomeDetail [data-outcome-map]'); if (!b) return null; b.click(); return new Promise(r => setTimeout(() => r({ dialogHidden: document.getElementById('outcomeViewModal').hidden, mapTab: !document.getElementById('mappingPanelMap').hidden, highlighted: document.querySelectorAll('.is-focus-col').length, focus: (document.activeElement || {}).dataset ? document.activeElement.dataset.col : null }), 600)); })()`);
+        if (result.toMap) await shotView(path.join(out, `${role}-mapping-column-${width}.png`));
+        if (urls[1]) {
+          await navigate(base + urls[1]);
+          await sleep(4500);
+          result.subjectDialog = await evaluate(`(() => { const d = document.getElementById('subjectDialog') || document.querySelector('.curriculum-modal:not([hidden])'); return d ? d.innerText : null; })()`);
+          await shotView(path.join(out, `${role}-subject-dialog-${width}.png`));
+        }
+        result.issues = issues.length;
+        report.mappingDedupe[width] = result;
       }
     }
 

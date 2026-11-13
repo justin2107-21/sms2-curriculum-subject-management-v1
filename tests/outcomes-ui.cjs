@@ -30,7 +30,7 @@ const url='http://localhost/modules/curriculum/pages/subject_mapping.php?program
     }
     const h=harness({url});await h.settle();
     function tab(id){h.el('mappingWorkspaceTabs').handlers.click({target:{closest:()=>({id})}});}
-    tab('mappingTabTrace');check(h.context.window.location.search.includes('tab=trace'),'tab click persists URL');
+    tab('mappingTabReview');check(h.context.window.location.search.includes('tab=review'),'tab click persists URL');
     check(!h.el('mappingPanelTrace').hidden&&h.el('mappingPanelOutcomes').hidden,'tab visibility and selected state switch');
     const traceUrl=String(h.context.window.location);
     h.context.window.location=new URL(url);await h.windowEvents.popstate();await h.settle();

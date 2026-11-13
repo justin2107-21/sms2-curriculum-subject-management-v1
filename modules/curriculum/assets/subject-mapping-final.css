@@ -87,11 +87,6 @@
 .mapping-detail-facts dd { color: #263b58; margin: 0; font-size: .85rem; font-weight: 600; overflow-wrap: anywhere; }
 #addMappingModal .modal-dialog, #editMappingModal .modal-dialog, #removeMappingModal .modal-dialog { max-height: 88dvh; overflow-y: auto; }
 .mapping-details-modal .modal-footer { flex-wrap: wrap; }
-#mappingPanelTrace { display: flex; }
-.mapping-trace-search { background: #fff; border: 1px solid #dbe3ee; border-radius: 10px; padding: 20px; max-width: none; margin: 0; }
-.mapping-trace-search h2 { font-size: 1rem; margin: 8px 0; color: #172b49; }
-.mapping-trace-search > p:not(.eyebrow), .mapping-trace-subject p { color: #64748b; font-size: .8rem; line-height: 1.55; }
-.mapping-trace-search > p:not(.eyebrow) { margin-bottom: 20px; }
 .mapping-usage-card { background: #fff; border: 1px solid #dbe3ee; border-radius: 10px; padding: 16px; min-width: 0; }
 .mapping-usage-card.is-current { border-color: #a6c5f4; }
 .mapping-usage-card > header { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
@@ -101,8 +96,6 @@
 .mapping-usage-card dt { color: #64748b; font-size: var(--csms-text-xs, .75rem); margin-bottom: 4px; }
 .mapping-usage-card dd { margin: 0; color: #263b58; font-size: .82rem; font-weight: 600; overflow-wrap: anywhere; }
 #addMappingButton[hidden], #mappingDetailsRemove[hidden] { display: none !important; }
-#mappingTraceResults, .mapping-trace-subject > div { min-width: 0; overflow-wrap: anywhere; }
-.mapping-trace-usage > header { flex-wrap: wrap; }
 .mapping-issue-row { grid-template-columns: minmax(70px, .3fr) minmax(0, 1fr) auto; }
 .mapping-issue-row > span > small { display: block; margin-top: 5px; }
 .mapping-review-success { display: flex; gap: 14px; align-items: start; }
@@ -274,24 +267,10 @@
 .map-toggle:focus-visible { outline: 3px solid var(--csms-focus, #2563eb); outline-offset: 0; }
 @media (max-width: 600px) { .map-toggle { min-width: 2.75rem; min-height: 2.75rem; } }
 
-/* Slice 4: Subject Trace and Mapping Review in the Builder style (shared csms-card / csms-term / csms-ctable). */
-#mappingPanelTrace .mapping-trace-search { max-width: none; padding: 14px 18px; gap: 6px; background: #fff; border: 1px solid var(--csms-border, #dfe4ee); border-radius: var(--csms-radius-surface, 12px); }
-#mappingPanelTrace .mapping-trace-search h3 { margin: 0; font-size: 16px; }
-#mappingPanelTrace .mapping-trace-search > p { margin: 0 0 4px; font-size: 14px; color: var(--csms-text-secondary, #374151); }
-.mapping-trace-subject { margin-bottom: 0; padding: 12px 18px; border-radius: var(--csms-radius-surface, 12px); border-color: var(--csms-border, #dfe4ee); }
-.mapping-trace-subject h2 { color: var(--csms-code-blue, #2163c5); font-size: 16px; margin: 0 0 2px; }
-.mapping-trace-subject p { margin: 2px 0 0; font-size: 14px; }
-.mapping-trace-usage { gap: 8px; }
-.mapping-trace-usage > header h3 { font-size: 14px; }
-.mapping-trace-usage > header span { font-size: 13px; }
-.csms-ctable--trace { min-width: 44rem; }
-.csms-ctable--trace tr.is-current td { background: #f3f7fe; }
+/* Slice 4: Mapping Review in the Builder style (shared csms-card / csms-term / csms-ctable). */
 /* Review: one compact row per check, count on the right, list opens below the row. */
 
 #mappingReviewCards { display: flex; flex-direction: column; gap: 16px; margin: 0; }
-.csms-ctable--trace thead th { white-space: nowrap; }
-#mappingTraceResults { display: flex; flex-direction: column; gap: 16px; }
-.mapping-trace-usage > header { padding: 0 4px; }
 
 /* ---- Graduate Outcomes and Course outcomes tabs ---------------------------------------------------------------------------------------- */
 .mapping-content { padding-bottom: 96px; } /* keeps the floating assistant launcher off the last row */
@@ -329,3 +308,6 @@
 @media (max-width: 1100px) { body .csms-tabs#mappingWorkspaceTabs [role="tab"] { padding-left: 8px; padding-right: 8px; font-size: 14px; } }
 .course-picker .record-autocomplete-option { display: flex; flex-direction: row; align-items: baseline; gap: 10px; padding: 8px 12px; text-align: left; }
 .course-picker .record-autocomplete-option strong { flex: none; min-width: 6.5rem; font-weight: 700; }
+
+/* Curriculum Map: the outcome column opened from "Map subjects in Curriculum Map" in the outcome dialog. */
+.map-table .is-focus-col { background: #eaf1fd; box-shadow: inset 2px 0 0 #2163c5, inset -2px 0 0 #2163c5; }

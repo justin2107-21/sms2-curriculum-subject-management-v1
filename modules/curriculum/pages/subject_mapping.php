@@ -9,7 +9,7 @@ require_permission('curriculum.view');
 
 // Durable, allowlisted workspace state; never used for authorization.
 $requestedTab = $_GET['tab'] ?? (($_GET['outcomes'] ?? '') === '1' ? 'outcomes' : 'map');
-$activeTab = is_string($requestedTab) && in_array($requestedTab, ['map', 'trace', 'review', 'outcomes', 'course'], true) ? $requestedTab : 'map';
+$activeTab = is_string($requestedTab) && in_array($requestedTab, ['map', 'review', 'outcomes', 'course'], true) ? $requestedTab : 'map';
 $userId = current_user_id();
 $canViewPrograms = $userId !== null && user_can($userId, 'program.view');
 $canViewSubjects = $userId !== null && user_can($userId, 'subject.view');
@@ -89,7 +89,6 @@ require __DIR__ . '/../../../shared/sidebar.php';
       </section>
       <nav class="csms-tabs" id="mappingWorkspaceTabs" role="tablist" aria-label="Subject Mapping views">
         <button type="button" class="<?= $activeTab === 'map' ? 'is-active' : '' ?>" id="mappingTabMap" role="tab" tabindex="<?= $activeTab === 'map' ? '0' : '-1' ?>" aria-selected="<?= $activeTab === 'map' ? 'true' : 'false' ?>" aria-controls="mappingPanelMap">Curriculum Map</button>
-        <button type="button" class="<?= $activeTab === 'trace' ? 'is-active' : '' ?>" id="mappingTabTrace" role="tab" tabindex="<?= $activeTab === 'trace' ? '0' : '-1' ?>" aria-selected="<?= $activeTab === 'trace' ? 'true' : 'false' ?>" aria-controls="mappingPanelTrace">Subject Trace</button>
         <button type="button" class="<?= $activeTab === 'review' ? 'is-active' : '' ?>" id="mappingTabReview" role="tab" tabindex="<?= $activeTab === 'review' ? '0' : '-1' ?>" aria-selected="<?= $activeTab === 'review' ? 'true' : 'false' ?>" aria-controls="mappingPanelReview">Mapping Review</button>
         <button type="button" class="<?= $activeTab === 'outcomes' ? 'is-active' : '' ?>" id="mappingTabOutcomes" role="tab" tabindex="<?= $activeTab === 'outcomes' ? '0' : '-1' ?>" aria-selected="<?= $activeTab === 'outcomes' ? 'true' : 'false' ?>" aria-controls="mappingPanelOutcomes">Graduate Outcomes</button>
         <button type="button" class="<?= $activeTab === 'course' ? 'is-active' : '' ?>" id="mappingTabCourse" role="tab" tabindex="<?= $activeTab === 'course' ? '0' : '-1' ?>" aria-selected="<?= $activeTab === 'course' ? 'true' : 'false' ?>" aria-controls="mappingPanelCourse">Course outcomes</button>
@@ -107,13 +106,6 @@ require __DIR__ . '/../../../shared/sidebar.php';
           <span class="csms-filter-row__summary" id="mappingCount" role="status">Select a version</span>
         </div>
         <div class="csms-plan" id="mappingMap"><p class="mapping-state">Select a curriculum version to view its map.</p></div>
-      </section>
-      <section id="mappingPanelTrace" class="mapping-workspace-panel csms-panel" role="tabpanel" aria-labelledby="mappingTabTrace" <?= $activeTab === 'trace' ? '' : 'hidden' ?>>
-        <div class="csms-card mapping-trace-search"><h3>Where is this subject placed?</h3><p class="csms-panel__note" id="mappingTraceHelper">Search a Subject Master record to view all curriculum placements.</p><label class="mapping-context-field"><span>Subject</span><div class="record-autocomplete">
-          <input type="search" id="mappingTraceSearch" placeholder="Search code or title..." <?= $canViewSubjects ? '' : 'disabled' ?>/><input type="hidden" id="mappingTraceSubjectId"/>
-          <button type="button" class="record-autocomplete-clear" data-autocomplete-clear aria-label="Clear subject" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button><div class="record-autocomplete-options" id="mappingTraceOptions" role="listbox" aria-label="Subject options" hidden></div>
-        </div></label></div>
-        <div id="mappingTraceResults"><p class="mapping-state"><?= $canViewSubjects ? 'Select a subject to view its curriculum placements.' : 'Subject Trace requires Subject Master view permission.' ?></p></div>
       </section>
       <section id="mappingPanelReview" class="mapping-workspace-panel csms-panel" role="tabpanel" aria-labelledby="mappingTabReview" <?= $activeTab === 'review' ? '' : 'hidden' ?>>
         <div class="csms-panel__bar"><p class="csms-panel__note">Checks the placements and recorded outcome mappings of the selected curriculum version. Select a check to list what it found.</p></div>

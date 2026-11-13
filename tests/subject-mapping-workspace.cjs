@@ -6,7 +6,7 @@ class Element {
     constructor(id) {
         Object.assign(this, { id, value: '', hidden: false, disabled: false, textContent: '', handlers: {}, attributes: {}, children: [], style: {},
             dataset: {}, clientWidth: 1000, clientHeight: 600, scrollLeft: 0, scrollTop: 0 });
-        this.classes = new Set();
+        this.classes = new Set(); this.scrollIntoView = () => { this.scrolled = true; };
         this.classList = { toggle: (name, on) => on ? this.classes.add(name) : this.classes.delete(name),
             add: name => this.classes.add(name), remove: name => this.classes.delete(name) };
     }
@@ -147,7 +147,8 @@ class FormDataMock extends Map {
         }
     }
 }
-const context = { window: { CurriculumUI: ui, location: new URL('http://localhost/?program_id=1&curriculum_id=2&version_id=3'), addEventListener() {}, history: {pushState(_a,_b,url) { context.window.location = new URL(url); }} },
+let popstateHandler = null;
+const context = { window: { CurriculumUI: ui, location: new URL('http://localhost/?program_id=1&curriculum_id=2&version_id=3'), addEventListener(type, fn) { if (type === 'popstate') popstateHandler = fn; }, history: {pushState(_a,_b,url) { context.window.location = new URL(url); }} },
     document: { getElementById: el, createElement: () => new Element('option'), addEventListener() {} },
     Option: class { constructor(text, value) { this.text = text; this.value = value; } },
     URL, URLSearchParams, FormData: FormDataMock, setTimeout, clearTimeout, console };
@@ -248,13 +249,18 @@ const terms = () => [...el('mappingMap').innerHTML.matchAll(/<tr class="map-tabl
     assert.ok(!/<button|map-toggle/.test(el('mappingMap').innerHTML), 'read-only version has no cell controls');
     assert.match(el('mapAccessNote').textContent, /Read-only: this curriculum version cannot be edited/);
     workspaceEditable = true; selectors.mappingVersionInput.setSelected(version); await settle();
-    // Subject Trace and Mapping Review keep working.
-    selectors.mappingTraceSearch.setSelected({ id: 1, subject_code: 'S1', subject_title: '<unsafe>', units: .1 }); await settle();
-    assert.match(el('mappingTraceResults').innerHTML, /&lt;unsafe&gt;/);
-    // Slice 4: Trace rows are a compact table linking out to the Builder; no placement modal button.
-    assert.match(el('mappingTraceResults').innerHTML, /<td class="csms-ctable__code">S1<\/td>/);
-    assert.match(el('mappingTraceResults').innerHTML, /href="curriculum_builder\.php\?program_id=1&amp;curriculum_id=2&amp;version_id=3"[^>]*>Open in Builder/);
-    assert.ok(!/Open Placement|data-open-trace-mapping/.test(el('mappingTraceResults').innerHTML));
+    // Subject Trace was removed (it showed placement only; the Subjects dialog and the Builder show it). Four tabs; ?tab=trace falls back to the map.
+    {
+        const page = fs.readFileSync('modules/curriculum/pages/subject_mapping.php', 'utf8'), js = fs.readFileSync('modules/curriculum/assets/subject-mapping-final.js', 'utf8');
+        assert.ok(!/mappingTabTrace|mappingPanelTrace|mappingTraceSearch|Subject Trace/.test(page), 'no Subject Trace tab or panel in the page');
+        assert.ok(!/mappingTrace|loadTrace|traceScope|'trace'/.test(js), 'no Subject Trace code in the page script');
+        assert.deepEqual([...page.slice(page.indexOf('id="mappingWorkspaceTabs"'), page.indexOf('</nav>')).matchAll(/aria-controls="mappingPanel([A-Za-z]+)"/g)].map(m => m[1]), ['Map', 'Review', 'Outcomes', 'Course'], 'four tabs: Curriculum Map, Mapping Review, Graduate Outcomes, Course outcomes');
+        assert.ok(['Curriculum Map', 'Mapping Review', 'Graduate Outcomes', 'Course outcomes'].every(label => page.includes('>' + label + '</button>')), 'tab labels');
+        el('mappingWorkspaceTabs').handlers.click({ target: { closest: () => ({ id: 'mappingTabReview' }) } }); await settle();
+        context.window.location = new URL('http://localhost/?program_id=1&curriculum_id=2&version_id=3&tab=trace'); popstateHandler(); await settle();
+        assert.equal(el('mappingPanelMap').hidden, false, '?tab=trace falls back to the default tab');
+        assert.equal(el('mappingPanelReview').hidden, true);
+    }
     // Mapping Review: structural checks plus the two outcome-coverage checks, each a row with a count and an expandable list.
     outcomeLinks = [{ id: 501, placement_id: 101, outcome_id: 1 }, { id: 502, placement_id: 102, outcome_id: 1 }]; selectors.mappingVersionInput.setSelected(version); await settle();
     const review = () => el('mappingReviewCards').innerHTML;
@@ -297,6 +303,24 @@ const terms = () => [...el('mappingMap').innerHTML.matchAll(/<tr class="map-tabl
     assert.match(el('outcomeMatrix').innerHTML, /<td class="csms-ctable__num">2<\/td>/); assert.match(el('outcomeMatrix').innerHTML, />View links<\/button>/);
     assert.ok(!/outcomeOverview|outcomeCoverage|academic-notice/.test(fs.readFileSync('modules/curriculum/pages/subject_mapping.php', 'utf8')), 'no stat cards, coverage dropdown or yellow banner');
     el('outcomeMatrix').handlers.click({ target: { closest: () => ({ dataset: { outcomeOpen: '1' } }) } }); assert.equal(el('outcomeViewModal').hidden, false, 'View links opens the same dialog');
+    {
+        // Graduate Outcomes dialog: no Record Mapping form; statement, coverage, Linked subjects, then Assess coverage as a plain section.
+        const html = el('outcomeDetail').innerHTML, at = text => html.indexOf(text);
+        assert.ok(!/Record Mapping|data-outcome-add|outcome-add-form|Management Actions/.test(html), 'no Record Mapping form in the dialog');
+        assert.ok(!/<details|reference-action-details/.test(html), 'Assess coverage is not a collapsible');
+        assert.ok(at('Graduate Outcome</h3>') >= 0 && at('Graduate Outcome</h3>') < at('Coverage Summary') && at('Coverage Summary') < at('Linked subjects') && at('Linked subjects') < at('Assess coverage</h3>'), 'order: outcome, coverage, linked subjects, assess coverage');
+        assert.match(html, /data-outcome-assess="1"/); assert.match(html, /Mark Coverage Complete/); assert.match(html, /data-outcome-map="1"[^>]*>[^]*Map subjects in Curriculum Map/);
+        assert.equal((html.match(/data-outcome-remove=/g) || []).length, outcomeLinks.filter(link => link.outcome_id === 1).length, 'Remove link is kept for editable versions');
+        el('outcomeDetail').handlers.click({ target: { closest: selector => selector === '[data-outcome-map]' ? { dataset: { outcomeMap: '1' } } : null } });
+        assert.equal(el('outcomeViewModal').hidden, true, 'the button closes the dialog'); assert.equal(el('mappingPanelMap').hidden, false, 'and shows the Curriculum Map tab'); assert.equal(context.window.location.searchParams.get('tab'), 'map'); assert.match(el('mappingMap').innerHTML, /<th scope="col" class="map-table__outcome" data-col="1"/, 'every outcome column carries data-col so it can be highlighted');
+        const openOutcome = async () => { tabClick('mappingTabOutcomes'); await settle(); el('outcomeMatrix').handlers.click({ target: { closest: () => ({ dataset: { outcomeOpen: '1' } }) } }); };
+        workspaceEditable = false; selectors.mappingVersionInput.setSelected(version); await settle(); await openOutcome();
+        const readOnly = el('outcomeDetail').innerHTML;
+        assert.ok(!/data-outcome-map|data-outcome-remove|data-outcome-assess|data-outcome-add/.test(readOnly) && /Read only/.test(readOnly) && /Linked subjects/.test(readOnly), 'a protected version: linked subjects are listed, no action is offered');
+        const saved = outcomeLinks; outcomeLinks = []; workspaceEditable = true; selectors.mappingVersionInput.setSelected(version); await settle(); await openOutcome();
+        assert.match(el('outcomeDetail').innerHTML, /No subjects linked yet/); assert.match(el('outcomeDetail').innerHTML, /data-outcome-map="1"/, 'the empty state has the same button');
+        outcomeLinks = saved; selectors.mappingVersionInput.setSelected(version); await settle();
+    }
     el('viewSourceDetails').handlers.click(); assert.equal(el('sourceDetailsModal').hidden, false);
     assert.match(el('outcomeSources').innerHTML, /Important Academic Notice/); assert.match(el('outcomeSources').innerHTML, /fingerprinted/); assert.match(el('outcomeSources').innerHTML, /adoption\/approval is not verified/); assert.match(el('outcomeSources').innerHTML, /Limitation/);
     // All counts zero: one honest line with a button that opens the Curriculum Map; counts show 0, not blank.
@@ -333,5 +357,5 @@ const terms = () => [...el('mappingMap').innerHTML.matchAll(/<tr class="map-tabl
     assert.match(el('mappingReviewCards').innerHTML, /No outcome catalog for this program yet./);
     assert.ok(!/outcomesNoSubject|subjectsNoOutcome/.test(el('mappingReviewCards').innerHTML), 'no outcome checks without a catalog, not zero');
     assert.ok(el('mappingReviewCards').innerHTML.includes('data-review-issue="missingYear"'), 'structural checks still apply');
-    console.log('PASS: complete pagination, editing (rationale dialog with prefill, remove confirmation, server refusal shown, read-only version), Builder-style map (terms, order, escaping, filters, Builder link), stale-response guard, Subject Trace, Mapping Review, empty state');
+    console.log('PASS: complete pagination, editing (rationale dialog with prefill, remove confirmation, server refusal shown, read-only version), Builder-style map (terms, order, escaping, filters, Builder link), stale-response guard, Subject Trace removed (four tabs, ?tab=trace falls back), outcome dialog without Record Mapping, Mapping Review, empty state');
 })().catch(error => { console.error(error); process.exitCode = 1; });

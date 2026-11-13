@@ -26,7 +26,8 @@ Visual standard: the Curriculum Builder (DM Sans / Newsreader, plain text tabs w
 - **Link:** a text link "Edit placements in Builder" in the tab header, going to `curriculum_builder.php?program_id=&curriculum_id=&version_id=`.
 - **Removed:** the placement grid, year pills, "Place Subject" and its dialogs (add, edit, remove placement), the prerequisite-connections toggle and its modal (prerequisites are shown in the Builder's conflict dialog and the Pre-requisite module).
 
-## 2. Subject Trace
+## 2. Subject Trace (REMOVED 2026-11-13: it showed placement only)
+> **Update 2026-11-13:** the tab is gone; Subject Mapping now has four tabs: Curriculum Map, Mapping Review, Graduate Outcomes, Course outcomes. `?tab=trace` falls back to the Curriculum Map. Where a subject is placed is shown in the Subjects details dialog ("Used in": program, curriculum, version, year, semester, Required/Elective, Open in Builder) and in the Builder. The text below is kept as history.
 - Same search-and-results behaviour; restyled with the Builder's card, table and chip classes. Results table: Code (blue) | Program | Curriculum | Version | Year / Semester | Status chip.
 - "Open Placement" becomes **"Open in Builder"**, linking to the Builder with that placement's program, curriculum and version. The placement details modal goes with the placement grid, so each result row links out instead.
 - Read-only for every role (as today).
@@ -83,3 +84,8 @@ Visual standard: the Curriculum Builder (DM Sans / Newsreader, plain text tabs w
 - **Code font:** `.csms-code` (shared, `csms-components.css`): monospace stack with a slashed zero, so "IT01" is never read as "ITO1".
 - **Tests:** `subject-mapping-workspace.cjs` (chips equal rows for every chip and with a search, zero-state, picker empty and grouped, Create CLO prefill, read-only, URL state `tab=course`), `subject-mapping-http` 201 checks (five tabs; no banner, stat cards or coverage dropdown).
 - **Not changed:** the other three tabs, the mapping data model, the audit trail, permissions. `outcomes-ui.cjs` and `foundation-outcomes-ui.cjs` were already failing before this work (stale fixtures) and still do.
+
+## 9. Duplicate workflows removed (2026-11-13)
+- **Subject Trace tab removed** (see section 2). It had no endpoint of its own: it used `assignment.mapping_list` (also used by the map) and `subject.list`, which stay.
+- **Graduate Outcomes dialog:** the "Record Mapping" form is gone (links are added only in the Curriculum Map matrix). Order now: outcome statement and source reference; coverage summary; **Linked subjects** (code, title, year/semester, reason; "Remove link" kept for editable versions); **Assess coverage** as a plain section. The button **"Map subjects in Curriculum Map"** closes the dialog, shows the Curriculum Map tab and marks that outcome's column (also in the empty state, "No subjects linked yet"). Permissions, version immutability, audit entries and server validation are unchanged (the server `add` action stays; the matrix uses it).
+- **Next step, not built:** a per-subject mapping dialog (one dialog per subject, 13 checkboxes for IT01-IT13, one shared reason).

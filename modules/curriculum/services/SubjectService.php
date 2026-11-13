@@ -66,7 +66,7 @@ class SubjectService
         }
         if ($withUsage) {
             $subject['placements'] = array_map(static function (array $p): array {
-                return ['placement_id' => (int)$p['placement_id'], 'program_code' => $p['program_code'], 'curriculum_code' => $p['curriculum_code'], 'curriculum_version_id' => (int)$p['curriculum_version_id'],
+                return ['placement_id' => (int)$p['placement_id'], 'academic_program_id' => (int)$p['academic_program_id'], 'curriculum_id' => (int)$p['curriculum_id'], 'program_code' => $p['program_code'], 'curriculum_code' => $p['curriculum_code'], 'curriculum_version_id' => (int)$p['curriculum_version_id'],
                     'version_label' => $p['version_label'], 'version_status' => $p['version_status'], 'review_status' => $p['review_status'], 'year_level' => $p['year_level'], 'semester' => $p['semester'], 'is_required' => (int)$p['is_required'],
                     'version_editable' => CurriculumVersionEditPolicy::isEditable($p)];
             }, $this->subjects->placementsFor($id));

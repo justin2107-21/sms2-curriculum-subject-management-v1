@@ -132,6 +132,7 @@ try {
     ok($d['editable'] === false && $d['reason_code'] === 'protected_version' && str_contains($d['reason_text'], 'APPROVED2') && count($d['placements']) === 2, 'Details: a subject in an approved version is not editable, with the reason, and lists where it is used');
     $u = $api($mgr, 'get', ['id' => 12])['json']['subject'];
     ok($u['editable'] === true && $u['placements'] === [] && $u['reason_text'] === null, 'Details: an unplaced subject is editable and has no placements');
+    ok(isset($d['placements'][0]['curriculum_id'], $d['placements'][0]['academic_program_id'], $d['placements'][0]['is_required']) && $d['placements'][0]['curriculum_id'] > 0 && $d['placements'][0]['academic_program_id'] > 0, 'Details: each placement carries program, curriculum, version and Required/Elective for the Open in Builder link');
     ok(count($api($rest, 'get', ['id' => 5])['json']['subject']['placements']) === 0 && count($api($rest, 'get', ['id' => 1])['json']['subject']['placements']) === 1 && $api($view, 'get', ['id' => 1])['json']['subject']['placements'] === [], 'Details respect the read scope and curriculum.view');
     ok($api($mgr, 'update', ['id' => 1, 'subject_code' => 'T01', 'subject_title' => 'Changed title', 'units' => 3], 'POST')['status'] === 409, 'The guard refuses an edit of a subject placed in an approved version');
     ok($api($mgr, 'archive', ['id' => 1], 'POST')['status'] !== 200 && (int)$db->query('SELECT COUNT(*) FROM subjects WHERE id=1 AND archived_at IS NULL')->fetch_row()[0] === 1, 'The guard refuses archiving it');

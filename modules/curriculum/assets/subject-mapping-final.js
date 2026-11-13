@@ -51,9 +51,7 @@
     }
     let curriculumAutocomplete;
     let versionAutocomplete;
-    let traceRequest = 0;
     let contextReset = false;
-    let selectedTraceSubject = null;
     let reviewIssues = null;
     let contextRequest = 0;
     let selectedOutcome = null;
@@ -87,20 +85,6 @@
         });
     }
     function isShs() { return /shs|senior\s*high/i.test(state.program?.program_type || ''); }
-    function traceScope() {
-        return { academic_program_id: programIdInput.value, curriculum_id: curriculumIdInput.value, curriculum_version_id: versionIdInput.value };
-    }
-    function contextualTrace() { return Object.values(traceScope()).some(Boolean); }
-    function traceEmpty() {
-        return versionIdInput.value ? 'Select a subject from this curriculum version to view its placement.' : contextualTrace() ? 'Select a subject from the selected context to view its placements.' : 'Select a subject to view its curriculum placements.';
-    }
-    function resetTrace() {
-        traceRequest++;
-        selectedTraceSubject = null;
-        traceAutocomplete?.clear(false);
-        el('mappingTraceHelper').textContent = contextualTrace() ? 'Search subjects within the selected curriculum context.' : 'Search a Subject Master record to view all curriculum placements.';
-        showPanelState(el('mappingTraceResults'), permission.subjects ? traceEmpty() : 'Subject Trace requires Subject Master view permission.');
-    }
     function yearChoices() { return [...new Set([...(isShs() ? ['Grade 11', 'Grade 12'] : ['1st Year', '2nd Year', '3rd Year', '4th Year']), ...state.allMappings.map(row => row.year_level).filter(value => !isBlank(value))])].sort(sortLabel); }
     function updateContextMessage() {
         const complete = Boolean(state.program && state.curriculum && state.version && versionIdInput.value);
@@ -166,7 +150,6 @@
             if (contextReset) return;
             contextRequest++;
             writeUrl();
-            resetTrace();
             if (index === 0) onProgramChange();
             else if (index === 1) onCurriculumChange();
             else { updateContextMessage(); loadMap(); }
@@ -175,19 +158,6 @@
     const programAutocomplete = mappingContextCascade?.get(0);
     curriculumAutocomplete = mappingContextCascade?.get(1);
     versionAutocomplete = mappingContextCascade?.get(2);
-    const traceOptions = {
-        input: el('mappingTraceSearch'), valueInput: el('mappingTraceSubjectId'), list: el('mappingTraceOptions'),
-        helpText: 'Search the Subject Master.', selectedText: 'Subject selected.', noResultsText: 'Subject not found in Subject Master.',
-        search: async query => {
-            traceOptions.noResultsText = contextualTrace() ? 'No matching subject is placed in the selected context.' : 'Subject not found in Subject Master.';
-            return (await ui.fetchJson(api.subjects, { action: 'list', ...traceScope(), page: 1, per_page: 50, search: query, status: '' })).subjects;
-        },
-        getId: item => item.id,
-        format: item => ({ label: item.subject_code + ' — ' + item.subject_title, code: item.subject_code, title: item.subject_title }),
-        onSelect: item => { selectedTraceSubject = item; loadTrace(item); },
-        onClear: () => { selectedTraceSubject = null; traceRequest += 1; showPanelState(el('mappingTraceResults'), traceEmpty()); }
-    };
-    const traceAutocomplete = ui.createAutocomplete(traceOptions);
 
     function resetMapContext() {
         const prior = contextReset;
@@ -253,18 +223,14 @@
         showPanelState(el('outcomeMatrix'), 'Select a BSIT curriculum version to view its recorded outcome mappings.');
         if (['outcomes', 'course'].includes(state.currentTab)) loadOutcomes();
         state.matrix = null; state.loaded = false; state.reviewLoaded = false; state.allMappings = []; state.requirements = []; state.relationshipRequest = null; state.relationshipsLoaded = false; state.requirementError = '';
-        state.mappings.clear(); state.detailRequest++; traceRequest++;
+        state.mappings.clear(); state.detailRequest++;
         detailsModal?.close();
         state.selectedMapping = null;
         updateContextMessage();
         el('mappingCount').textContent = version ? 'Loading...' : 'Select a version';
         setSelectOptions(el('mappingYearFilter'), [], isShs() ? 'All Grades' : 'All Years', '');
         ['mappingMap', 'mappingReviewCards', 'mappingReviewResults'].forEach(id => showPanelState(el(id), version ? 'Loading selected curriculum version...' : 'Select a program, curriculum, and version to view placements.'));
-        if (selectedTraceSubject) showPanelState(el('mappingTraceResults'), version ? 'Refreshing subject usage...' : 'Select a curriculum version to view subject usage.');
-        if (!version) {
-            if (selectedTraceSubject) loadTrace(selectedTraceSubject);
-            return;
-        }
+        if (!version) return;
         try {
             const mappings = await fetchAll(api.mappings, 'mappings', { action: 'mapping_list', curriculum_version_id: version });
             if (request !== state.mapRequest) return;
@@ -274,7 +240,6 @@
             state.semesterValues = [...new Set(mappings.map(item => item.semester).filter(value => !isBlank(value)))].sort(sortLabel);
             setSelectOptions(el('mappingSemesterFilter'), state.semesterValues, 'All Semesters', el('mappingSemesterFilter').value);
             updateContextMessage(); renderFilteredMap(); loadReview(true);
-            if (selectedTraceSubject) loadTrace(selectedTraceSubject);
         } catch (error) {
             if (request !== state.mapRequest) return;
             state.loaded = false; el('mappingCount').textContent='Not loaded'; updateContextMessage();
@@ -482,25 +447,24 @@
     });
 
     el('outcomeDetail')?.addEventListener('submit', async event => {
-        const form = event.target.closest('[data-outcome-add], [data-outcome-assess]');
+        const form = event.target.closest('[data-outcome-assess]');
         if (!form) return;
         event.preventDefault();
         if(academicSubmissions.has(form)||!state.outcomeData?.context.editable||!permission.manageOutcomes)return;
-        if(String(form.dataset.outcomeAdd||form.dataset.outcomeAssess)!==String(selectedOutcome))return;
+        if(String(form.dataset.outcomeAssess)!==String(selectedOutcome))return;
         const data = new FormData(form);
         data.set('curriculum_version_id', String(versionIdInput.value));
-        if (form.matches('[data-outcome-add]')) {
-            data.set('action','add'); data.set('outcome_id',form.dataset.outcomeAdd);
-        } else {
-            data.set('action','assess'); data.set('outcome_id',form.dataset.outcomeAssess);
-            data.set('assessment_state',event.submitter?.value || 'incomplete');
-        }
+        data.set('action','assess'); data.set('outcome_id',form.dataset.outcomeAssess);
+        data.set('assessment_state',event.submitter?.value || 'incomplete');
         ui.clearFormError(form); setAcademicSubmitting(form,true);
         try { const result=await ui.postForm(api.outcomes,data); ui.showToast(result.message || 'Outcome record saved.','success'); await loadOutcomes(); }
         catch(error) { ui.showFormError(form,error.message || 'Outcome record could not be saved.'); }
         finally { setAcademicSubmitting(form,false); }
     });
     el('outcomeDetail')?.addEventListener('click', async event => {
+        // "Map subjects in Curriculum Map": close the dialog, show the Curriculum Map tab and mark that outcome's column.
+        const go=event.target.closest('[data-outcome-map]');
+        if (go) { outcomeModal.close(); setTab('map'); highlightOutcomeColumn(Number(go.dataset.outcomeMap)); return; }
         const button=event.target.closest('[data-outcome-remove]'); if (!button) return;
         if (!window.confirm('Remove this subject outcome mapping? Dependent CLO alignments will be withdrawn and coverage will require review.')) return;
         const data=new FormData(); data.set('action','remove'); data.set('curriculum_version_id',String(versionIdInput.value)); data.set('mapping_id',button.dataset.outcomeRemove);
@@ -541,9 +505,20 @@
         mapTarget.innerHTML = matrixView.render(rows, matrix.outcomes, matrix.index, { esc, group: placementView.group, yearLabel: placementView.yearLabel, editable: matrix.editable });
         updateAccessNote();
         fitMatrix();
+        if (highlightedOutcome !== null) applyColumnHighlight();
         if (pendingFocus) { const b = mapTarget.querySelector('[data-placement="' + pendingFocus.placement + '"][data-outcome="' + pendingFocus.outcome + '"]'); pendingFocus = null; if (b) b.focus(); }
     }
-    let pendingFocus = null;
+    let pendingFocus = null, highlightedOutcome = null;
+    // Marks one outcome column of the map (header, cells, footer) and scrolls it into view; cleared when the tab changes.
+    function applyColumnHighlight() {
+        mapTarget.querySelectorAll('.is-focus-col').forEach(node => node.classList.remove('is-focus-col'));
+        if (highlightedOutcome === null) return;
+        const cells = mapTarget.querySelectorAll('[data-col="' + highlightedOutcome + '"]');
+        cells.forEach(node => node.classList.add('is-focus-col'));
+        const head = mapTarget.querySelector('th[data-col="' + highlightedOutcome + '"]');
+        if (head) { head.scrollIntoView({ block: 'nearest', inline: 'center' }); head.focus({ preventScroll: true }); }
+    }
+    function highlightOutcomeColumn(id) { highlightedOutcome = Number(id); applyColumnHighlight(); }
     // Horizontal scroll only when the matrix is wider than its card; otherwise the header and footer stay sticky against the page scroll.
     function fitMatrix() {
         const box = mapTarget.querySelector('.map-scroll'), table = box && box.querySelector('table');
@@ -623,7 +598,7 @@
         finally { button.disabled = false; }
     });
 
-    async function openMappingDetails(mapping, fromTrace = false) {
+    async function openMappingDetails(mapping) {
         if (!mapping || !detailsModal) return;
         const request = ++state.detailRequest;
         state.selectedMapping = mapping; state.mappings.set(Number(mapping.id), mapping);
@@ -651,30 +626,6 @@
         } catch (error) { if (request === state.detailRequest) el('mappingDetailsRequires').textContent = 'Stored prerequisites could not be loaded.'; }
     }
 
-    const chip = (kind, label) => '<span class="csms-chip csms-chip--' + kind + '">' + esc(label) + '</span>';
-    function builderUrl(row) {
-        return 'curriculum_builder.php?' + new URLSearchParams({ program_id: String(row.academic_program_id || ''), curriculum_id: String(row.curriculum_id || ''), version_id: String(row.curriculum_version_id || '') });
-    }
-    async function loadTrace(subject) {
-        const request = ++traceRequest, target = el('mappingTraceResults');
-        if (!permission.subjects) { showPanelState(target, 'Subject Trace requires Subject Master view permission.'); return; }
-        showPanelState(target, 'Loading stored subject usage...');
-        try {
-            const usage = await fetchAll(api.mappings, 'mappings', { action: 'mapping_list', ...traceScope(), subject_id: subject.id });
-            if (request !== traceRequest) return;
-            usage.forEach(row => state.mappings.set(Number(row.id), row));
-            const versions = new Set(usage.map(row => Number(row.curriculum_version_id))).size;
-            const programs = new Set(usage.map(row => Number(row.academic_program_id))).size;
-            const placementChip = row => String(row.is_required) === '1' ? chip('approved', 'Required') : String(row.is_required) === '0' ? chip('draft', 'Optional') : '<span class="csms-ctable__muted">Not set</span>';
-            const cards = usage.length ? '<div class="csms-term"><div class="csms-ctable__scroll"><table class="csms-ctable csms-ctable--trace"><thead><tr><th class="csms-ctable__code" scope="col">Code</th><th scope="col">Program</th><th scope="col">Curriculum</th><th scope="col">Version</th><th scope="col">Year / Semester</th><th scope="col">Placement</th><th class="csms-ctable__action" scope="col"><span class="sr-only">Action</span></th></tr></thead><tbody>' + usage.map(row => '<tr' + (String(row.curriculum_version_id) === versionIdInput.value ? ' class="is-current"' : '') + '><td class="csms-ctable__code">' + esc(subject.subject_code).replaceAll('/', '/<wbr>') + '</td><td>' + esc(row.program_code) + '</td><td>' + esc(row.curriculum_code) + '</td><td>' + esc(row.version_label) + '</td><td>' + esc((row.year_level || 'Year not set') + ' \u00b7 ' + (row.semester || 'Semester not set')) + '</td><td>' + placementChip(row) + '</td><td class="csms-ctable__action"><a class="csms-link" href="' + esc(builderUrl(row)) + '">Open in Builder<span class="sr-only"> for ' + esc(row.program_code + ' ' + row.curriculum_code + ' ' + row.version_label) + '</span></a></td></tr>').join('') + '</tbody></table></div></div>' : '';
-            if (contextualTrace() && !usage.length) {
-                selectedTraceSubject = null; traceAutocomplete.clear(false);
-                showPanelState(target, 'No matching subject is placed in the selected context.'); return;
-            }
-            const heading = versionIdInput.value ? 'Placement in Selected Curriculum Version' : contextualTrace() ? 'Placements in Selected Context' : 'Usage Across All Contexts';
-            target.innerHTML = '<article class="mapping-trace-subject"><div><h2>' + esc(subject.subject_code) + '</h2><strong>' + esc(subject.subject_title) + '</strong><p>Used in ' + versions + ' Curriculum ' + (versions === 1 ? 'Version' : 'Versions') + ' \u00b7 ' + programs + ' ' + (programs === 1 ? 'Program' : 'Programs') + '</p></div><span class="mapping-unit-chip">' + esc(ui.formatUnits(subject.units)) + ' Units</span></article><section class="mapping-trace-usage"><header><h3>' + heading + '</h3><span>' + usage.length + (usage.length === 1 ? ' placement' : ' placements') + '</span></header>' + (cards || emptyBox('This subject is not placed in any curriculum version.')) + '</section>';
-        } catch (error) { if (request === traceRequest) showPanelState(target, error.message || 'Subject usage could not be loaded.', true); }
-    }
     const reviewLabels = {
         placement: ['Missing / Invalid Placement', 'Indicator must be Required or Optional'],
         duplicates: ['Duplicate Placements', 'Same subject in the same version, year/grade and semester'],
@@ -716,12 +667,13 @@
     }
 
     function setTab(name, persist = true) {
-        name = ['map','trace','review','outcomes','course'].includes(name) ? name : 'map';
+        name = ['map','review','outcomes','course'].includes(name) ? name : 'map';
         state.currentTab = name;
+        if (name !== 'map' && highlightedOutcome !== null) { highlightedOutcome = null; mapTarget.querySelectorAll('.is-focus-col').forEach(node => node.classList.remove('is-focus-col')); }
         if(!['outcomes','course'].includes(name))closeAcademicDialogs();
         if (persist) writeUrl(true);
         updateContextMessage();
-        [['map', 'mappingTabMap', 'mappingPanelMap'], ['trace', 'mappingTabTrace', 'mappingPanelTrace'], ['review', 'mappingTabReview', 'mappingPanelReview'], ['outcomes','mappingTabOutcomes','mappingPanelOutcomes'], ['course','mappingTabCourse','mappingPanelCourse']].forEach(([key, tabId, panelId]) => {
+        [['map', 'mappingTabMap', 'mappingPanelMap'], ['review', 'mappingTabReview', 'mappingPanelReview'], ['outcomes','mappingTabOutcomes','mappingPanelOutcomes'], ['course','mappingTabCourse','mappingPanelCourse']].forEach(([key, tabId, panelId]) => {
             const active = key === name;
             el(tabId).classList.toggle('is-active', active);
             el(tabId).setAttribute('aria-selected', String(active));
@@ -732,11 +684,11 @@
         if (name === 'outcomes' || name === 'course') loadOutcomes();
     }
 
-    const TAB_BY_ID = { mappingTabMap: 'map', mappingTabTrace: 'trace', mappingTabReview: 'review', mappingTabOutcomes: 'outcomes', mappingTabCourse: 'course' };
+    const TAB_BY_ID = { mappingTabMap: 'map', mappingTabReview: 'review', mappingTabOutcomes: 'outcomes', mappingTabCourse: 'course' };
     function urlTab() {
         const params = new URLSearchParams(window.location.search);
         const name = params.has('tab') ? params.get('tab') : (params.get('outcomes') === '1' ? 'outcomes' : 'map');
-        return ['map','trace','review','outcomes','course'].includes(name) ? name : 'map';
+        return ['map','review','outcomes','course'].includes(name) ? name : 'map';
     }
     function writeUrl(tabOnly = false) {
         const url = new URL(window.location.href);
@@ -752,11 +704,10 @@
         const params = new URLSearchParams(window.location.search);
         state.program = null; state.curriculum = null; state.version = null;
         contextReset = true; mappingContextCascade.clear(); contextReset = false;
-        resetTrace();
         setTab(urlTab(), false);
         updateContextMessage(); await loadMap();
         const fail = message => {
-            ['mappingMap','mappingTraceResults','mappingReviewResults','outcomeMatrix'].forEach(id => showPanelState(el(id),message,true));
+            ['mappingMap','mappingReviewResults','outcomeMatrix'].forEach(id => showPanelState(el(id),message,true));
         };
         if (!permission.programs) { fail('Program context is not available with your current permissions.'); return; }
         if (!params.get('version_id')) return;
@@ -768,7 +719,6 @@
             if ((params.has('program_id') && params.get('program_id') !== String(program.id)) || (params.has('curriculum_id') && params.get('curriculum_id') !== String(curriculum.id))) throw new Error('The linked mapping context is inconsistent. Please choose a context.');
             state.program = program; state.curriculum = curriculum; state.version = version;
             mappingContextCascade.setContext([program,curriculum,version]);
-            resetTrace();
             updateContextMessage(); await loadMap();
             if (request !== contextRequest) return;
             if (params.get('placement_id')) openMappingDetails(state.mappings.get(Number(params.get('placement_id'))));
@@ -799,10 +749,6 @@
         const tab = tabs[next];
         setTab(TAB_BY_ID[tab.id] || 'map');
         tab.focus();
-    });
-    el('mappingTraceResults')?.addEventListener('click', event => {
-        const row = event.target.closest('[data-open-trace-mapping]');
-        if (row) openMappingDetails(state.mappings.get(Number(row.dataset.openTraceMapping)), true);
     });
     el('mappingSubjectSearch')?.addEventListener('input', ui.debounce(renderFilteredMap, 150));
     el('mappingYearFilter').addEventListener('change', () => { state.year = el('mappingYearFilter').value; renderFilteredMap(); });

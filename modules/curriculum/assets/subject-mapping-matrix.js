@@ -24,7 +24,7 @@
     function render(rows, outcomes, idx, h) {
         const esc = h.esc, cols = outcomes.length + 2;
         const head = '<tr><th class="map-table__code" scope="col">Code</th><th class="map-table__name" scope="col">Subject name</th>' + outcomes.map(o =>
-            '<th scope="col" class="map-table__outcome" tabindex="0" title="' + esc(o.outcome_text) + '" data-tip="' + esc(o.outcome_text) + '">' +
+            '<th scope="col" class="map-table__outcome" data-col="' + Number(o.id) + '" tabindex="0" title="' + esc(o.outcome_text) + '" data-tip="' + esc(o.outcome_text) + '">' +
             '<span class="map-code" aria-hidden="true">' + esc(o.outcome_code) + '</span><span class="sr-only">' + esc(o.outcome_code + ': ' + o.outcome_text) + '</span></th>').join('') + '</tr>';
         let body = '';
         h.group(rows).years.forEach((semesters, year) => semesters.forEach((term, semester) => {
@@ -35,9 +35,9 @@
                 body += '<tr><td class="map-table__code">' + esc(r.subject_code).replaceAll('/', '/<wbr>') + '</td><td class="map-table__name">' + esc(r.subject_title) + '</td>' +
                     outcomes.map(o => {
                         const on = set.has(Number(o.id));
-                        if (!h.editable) return '<td class="map-table__cell">' + mapCell(on) + '</td>';
+                        if (!h.editable) return '<td class="map-table__cell" data-col="' + Number(o.id) + '">' + mapCell(on) + '</td>';
                         const label = (on ? 'Remove mapping of ' : 'Map ') + r.subject_code + ' to ' + o.outcome_code;
-                        return '<td class="map-table__cell"><button type="button" class="map-toggle" aria-pressed="' + on + '" aria-label="' + esc(label) + '" data-placement="' + Number(r.placement_id) + '" data-outcome="' + Number(o.id) + '"' + (on ? ' data-mapping="' + set.get(Number(o.id)) + '"' : '') + '>' + mapCell(on) + '</button></td>';
+                        return '<td class="map-table__cell" data-col="' + Number(o.id) + '"><button type="button" class="map-toggle" aria-pressed="' + on + '" aria-label="' + esc(label) + '" data-placement="' + Number(r.placement_id) + '" data-outcome="' + Number(o.id) + '"' + (on ? ' data-mapping="' + set.get(Number(o.id)) + '"' : '') + '>' + mapCell(on) + '</button></td>';
                     }).join('') + '</tr>';
             });
         }));

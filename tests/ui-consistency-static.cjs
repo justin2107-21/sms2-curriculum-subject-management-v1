@@ -91,4 +91,9 @@ assert.ok(/csms-review[.]js/.test(electives) && /id="reviewChecks"/.test(electiv
 assert.ok(fs.existsSync('js/csms-menu.js') && /csms-menu[.]js/.test(prereq) && /csms-menu[.]js/.test(electives), 'both pages load the shared row menu');
 assert.ok(/class="csms-menu"/.test(prereq) && /class="csms-menu"/.test(electives) && !/pr-menu|pr-rowmenu|pr-warn(?!ing)/.test(prereq + read('modules/curriculum/assets/prerequisite-configuration.css') + read('modules/curriculum/assets/prerequisite-configuration.js')), 'row menu markup and styles are shared');
 assert.match(components, /.csms-menu {/);assert.match(components, /.csms-chip--type {/);
+// Subject Mapping: four tabs, no Subject Trace, no Record Mapping form in the outcome dialog.
+{ const mapping = read('modules/curriculum/pages/subject_mapping.php'), nav = mapping.slice(mapping.indexOf('id="mappingWorkspaceTabs"'), mapping.indexOf('</nav>'));
+  assert.equal((nav.match(/role="tab"/g) || []).length, 4, 'Subject Mapping has four tabs');
+  assert.ok(!/Subject Trace|mappingTabTrace|mappingPanelTrace/.test(mapping + read('modules/curriculum/assets/subject-mapping-final.js')), 'no Subject Trace in the page or its script');
+  assert.ok(!/Record Mapping|data-outcome-add/.test(read('modules/curriculum/assets/outcomes-presentation.js')), 'no Record Mapping form in the outcome dialog'); }
 console.log('PASS: Batch 5 wiring (shared header assets, h1 titles, reports on shared topbar, hidden year holder, context bar hooks, live-state helpers)');
