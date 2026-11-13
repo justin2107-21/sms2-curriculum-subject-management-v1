@@ -194,7 +194,8 @@ try {
         case 'otp_resend':
         case 'otp_verify': {
             $pending = $_SESSION['otp_pending'] ?? null;
-            if (!is_array($pending) || time() - (int)($pending['started_at'] ?? 0) > EmailOtpService::PENDING_SECONDS) {
+            // Emergency switch: with OTP_ENABLED off (after a restart) a pending code screen is dropped and the OTP table is never touched.
+            if (!EmailOtpService::enabled() || !is_array($pending) || time() - (int)($pending['started_at'] ?? 0) > EmailOtpService::PENDING_SECONDS) {
                 unset($_SESSION['otp_pending']);
                 respond(false, 'Your sign-in session expired. Please sign in again.', ['restart' => true], 401);
             }

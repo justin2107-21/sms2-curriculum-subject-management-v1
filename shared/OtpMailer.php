@@ -1,13 +1,18 @@
 <?php
 // Sends the sign-in code by email with PHPMailer (lib/PHPMailer, no composer).
 // Settings come from real environment variables, read the same way as shared/database_config.php:
-//   SMTP_HOST, SMTP_PORT (default 587; 465 uses SSL, other ports use STARTTLS when the server offers it), SMTP_USER, SMTP_PASS,
-//   SMTP_FROM, SMTP_FROM_NAME. Nothing here logs the code, the password or the address.
+//   SMTP_HOST, SMTP_PORT (default 587), SMTP_USER, SMTP_PASS, SMTP_FROM, SMTP_FROM_NAME. Nothing here logs the code, the password or the address.
+// Transport: port 587 (or any port except 465) requires STARTTLS; port 465 uses implicit TLS. The server certificate and its host name are always
+// verified (never switched off). Connect and read timeouts are 10 seconds, so a blocked port gives a quick failure and sign-in stays closed.
+// Only a loopback host (a local test sink) may skip TLS.
 
 final class OtpMailer
 {
     /** @var callable|null Tests replace the real SMTP send: fn(string $to, string $subject, string $html, string $text): bool */
     private static $transport = null;
+
+    /** Connect and read timeout for the SMTP server. */
+    public const TIMEOUT_SECONDS = 10;
 
     public static function useTransport(?callable $transport): void { self::$transport = $transport; }
 
@@ -46,11 +51,17 @@ final class OtpMailer
             $user = self::env('SMTP_USER');
             $mail->SMTPAuth = $user !== '';
             if ($user !== '') { $mail->Username = $user; $mail->Password = self::env('SMTP_PASS'); }
+            $loopback = in_array(strtolower($mail->Host), ['localhost', '127.0.0.1', '::1'], true);
             if ($mail->Port === 465) $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
-            elseif ($user !== '') $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
-            $mail->Timeout = 12;
+            elseif (!$loopback) $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+            $mail->SMTPOptions = ['ssl' => ['verify_peer' => true, 'verify_peer_name' => true, 'allow_self_signed' => false]];
+            $mail->Timeout = self::TIMEOUT_SECONDS;
+            $mail->SMTPKeepAlive = false;
             $mail->SMTPDebug = 0;
             $mail->setFrom(self::env('SMTP_FROM'), self::env('SMTP_FROM_NAME', 'CSMS-SMS2'));
+            // Message-ID and the greeting use the sender's domain, not the container's internal host name; no library fingerprint header.
+            $mail->Hostname = substr((string)strrchr(self::env('SMTP_FROM'), '@'), 1);
+            $mail->XMailer = ' ';
             $mail->addAddress($to, $displayName);
             $mail->isHTML(true);
             $mail->Subject = self::subject();

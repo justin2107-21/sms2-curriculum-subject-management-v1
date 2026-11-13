@@ -42,26 +42,29 @@ while ($c = @stream_socket_accept($srv, 600)) {
 SINK);
 
 $base = ['APP_ENV' => 'development', 'SMS_SESSION_COOKIE_SECURE' => '0', 'CIMF_AI_ENABLED' => 'false', 'DB_NAME' => $config['database']];
-$sinkPort = 8561; $offPort = 8562; $onPort = 8563; $brokenPort = 8564; $mailFile = $tmp . '/mail.txt';
+$sinkPort = 8561; $offPort = 8562; $onPort = 8563; $brokenPort = 8564; $securePort = 8565; $mailFile = $tmp . '/mail.txt';
 $procs[] = startPhp([$tmp . '/sink.php', (string)$sinkPort, $mailFile], [], $tmp . '/sink.log')[0];
 waitPort($sinkPort);
 $smtp = ['SMTP_HOST' => '127.0.0.1', 'SMTP_PORT' => (string)$sinkPort, 'SMTP_FROM' => 'csms@example.test', 'SMTP_FROM_NAME' => 'CSMS Test'];
 $procs[] = startPhp(['-S', "127.0.0.1:$offPort", '-t', dirname(__DIR__)], $base + ['OTP_ENABLED' => '0'] + $smtp, $tmp . '/off.log')[0];
 $procs[] = startPhp(['-S', "127.0.0.1:$onPort", '-t', dirname(__DIR__)], $base + ['OTP_ENABLED' => '1'] + $smtp, $tmp . '/on.log')[0];
 $procs[] = startPhp(['-S', "127.0.0.1:$brokenPort", '-t', dirname(__DIR__)], $base + ['OTP_ENABLED' => '1', 'SMTP_HOST' => '127.0.0.1', 'SMTP_PORT' => '9', 'SMTP_FROM' => 'csms@example.test'], $tmp . '/broken.log')[0];
-foreach ([$offPort, $onPort, $brokenPort] as $p) waitPort($p);
+// Behind an HTTPS proxy the container sees plain HTTP; the image forces Secure cookies with SMS_SESSION_COOKIE_SECURE=1.
+$procs[] = startPhp(['-S', "127.0.0.1:$securePort", '-t', dirname(__DIR__)], ['SMS_SESSION_COOKIE_SECURE' => '1'] + $base + ['OTP_ENABLED' => '1'] + $smtp, $tmp . '/secure.log')[0];
+foreach ([$offPort, $onPort, $brokenPort, $securePort] as $p) waitPort($p);
 
 final class Client {
-    private array $cookies = []; public string $csrf = '';
-    public function __construct(private int $port) {}
+    private array $cookies = []; public string $csrf = ''; public array $setCookie = [];
+    public function __construct(public int $port) {}
     public function req(string $path, ?array $post = null): array {
         $headers = []; if ($this->cookies) $headers[] = 'Cookie: ' . http_build_query($this->cookies, '', '; ');
         $opts = ['ignore_errors' => true, 'follow_location' => 0, 'method' => $post === null ? 'GET' : 'POST', 'timeout' => 40];
         if ($post !== null) { $headers[] = 'Content-Type: application/x-www-form-urlencoded'; $opts['content'] = http_build_query($post); }
         $opts['header'] = implode("\r\n", $headers);
         $body = (string)@file_get_contents("http://127.0.0.1:{$this->port}/$path", false, stream_context_create(['http' => $opts]));
-        $status = 0; $location = '';
+        $status = 0; $location = ''; $this->setCookie = [];
         foreach ($http_response_header ?? [] as $h) {
+            if (stripos($h, 'Set-Cookie:') === 0) $this->setCookie[] = $h;
             if (preg_match('#^HTTP/\S+ (\d+)#', $h, $m)) $status = (int)$m[1];
             if (preg_match('/^Set-Cookie: ([^=]+)=([^;]*)/i', $h, $m)) $this->cookies[$m[1]] = urldecode($m[2]);
             if (preg_match('/^Location: (.*)$/i', $h, $m)) $location = trim($m[1]);
@@ -157,13 +160,38 @@ try {
     check($r['status'] === 503 && ($r['json']['success'] ?? true) === false && str_contains((string)$r['json']['message'], 'could not send') && !$c->signedIn(), 'mail server down: a clear error and the user is NOT signed in');
     check((int)$db->query('SELECT COUNT(*) FROM login_otp_challenges WHERE user_id = ' . $u5['id'])->fetch_row()[0] === 0, 'the unsent code is not kept');
 
+    // ---- Behind an HTTPS proxy: Secure session cookie, relative redirects, CSRF and form posts still work -------------------------
+    $u6 = $makeUser('proxy', 'otp_' . bin2hex(random_bytes(3)) . '@example.test', $pw());
+    $c = new Client($securePort); $c->fresh();
+    $r = $c->auth('login', ['username' => $u6['username'], 'password' => $u6['password']]);
+    $cookieLines = implode(' | ', $c->setCookie);
+    check(($r['json']['otp_required'] ?? false) === true && stripos($cookieLines, 'PHPSESSID') !== false && stripos($cookieLines, '; secure') !== false && stripos($cookieLines, 'httponly') !== false && stripos($cookieLines, 'samesite=lax') !== false, 'with SMS_SESSION_COOKIE_SECURE=1 the session cookie is Secure, HttpOnly and SameSite=Lax');
+    $proxyCode = $lastCode();
+    $r = $c->auth('otp_verify', ['code' => (string)$proxyCode]);
+    check(($r['json']['success'] ?? false) === true && !preg_match('~^https?:|localhost~i', (string)($r['json']['redirect'] ?? 'x')) && $c->signedIn(), 'the whole code flow works behind the proxy setup, and the redirect is relative (no host or scheme)');
+    $mailText = quoted_printable_decode(implode('', $mails()));
+    check(!preg_match('~https?://|localhost~i', $mailText), 'no emailed message holds a URL or a localhost address');
+
+    // ---- Emergency switch: OTP_ENABLED=0 after a restart drops a waiting code screen, and the OTP table is not touched ------------------
+    $u7 = $makeUser('switch', 'otp_' . bin2hex(random_bytes(3)) . '@example.test', $pw());
+    $c = new Client($onPort); $c->fresh(); $login($c, $u7); $switchCode = $lastCode();
+    $c->port = $offPort;
+    $r = $c->auth('otp_verify', ['code' => (string)$switchCode]);
+    check($r['status'] === 401 && ($r['json']['restart'] ?? false) === true && !$c->signedIn(), 'OTP switched off: a pending code screen is refused and sign-in starts again');
+    check((int)$db->query('SELECT attempts FROM login_otp_challenges WHERE user_id = ' . $u7['id'])->fetch_row()[0] === 0, 'OTP switched off: the OTP table was not read or written');
+    $r = $login($c, $u7);
+    check(($r['json']['success'] ?? false) === true && !isset($r['json']['otp_required']) && $c->signedIn(), 'OTP switched off: the same account signs in with the password only');
+
     // ---- Audit log ----------------------------------------------------------------------------------------------------------------
     $ids = implode(',', $userIds);
     $count = static fn(string $action) => (int)$db->query("SELECT COUNT(*) FROM audit_logs WHERE action = '$action' AND entity_id IN ($ids)")->fetch_row()[0];
     foreach (['AUTH_OTP_SENT', 'AUTH_OTP_VERIFIED', 'AUTH_OTP_FAILED', 'AUTH_OTP_EXPIRED', 'AUTH_OTP_RESEND_BLOCKED', 'AUTH_OTP_SEND_FAILED'] as $action) check($count($action) >= 1, "audit entry written: $action");
     $text = ''; $res = $db->query("SELECT description, COALESCE(metadata_json, '') AS m FROM audit_logs WHERE action LIKE 'AUTH_OTP%' AND entity_id IN ($ids)");
     while ($row = $res->fetch_assoc()) $text .= $row['description'] . ' ' . $row['m'] . ' ';
-    foreach ([$code, $code2, $code3, $code4] as $secret) check(!str_contains($text, (string)$secret), 'no sign-in code appears in the audit log');
+    $hashes = $db->query("SELECT code_hash FROM login_otp_challenges WHERE user_id IN ($ids)")->fetch_all(MYSQLI_NUM);
+    foreach ($hashes as [$hash]) check($hash !== '' && !str_contains($text, substr($hash, 0, 16)) && !str_contains($text, substr($hash, -16)), 'no code hash appears in the audit log');
+    check(!preg_match('/password|passwd|pass_word/i', preg_replace('/AUTH_LOGIN[A-Z_]*|invalid_credentials|missing_credentials/', '', $text)), 'no password text appears in the OTP audit entries');
+    foreach ([$code, $code2, $code3, $code4, $proxyCode, $switchCode] as $secret) check(!str_contains($text, (string)$secret), 'no sign-in code appears in the audit log');
     check(!preg_match('/otp_[0-9a-f]{6}@/', $text), 'no email address appears in the audit log');
 } catch (Throwable $e) { $failed = $e; }
 finally {

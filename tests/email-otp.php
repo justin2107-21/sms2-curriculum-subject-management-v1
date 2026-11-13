@@ -93,6 +93,59 @@ check($g['status'] === 'ok', 'after the first send is older than 15 minutes, sen
 $o = $otp->issue(10); $t += 61; $otp->discard($o['challenge_id']);
 check(count($rows(10)) === 0, 'a code that could not be emailed is discarded (it does not count toward the limit)');
 
+// ---- One clock: UTC from PHP, never the database clock or any time zone ---------------------------------------------------------
+// A UTC host with a +08:00 database, a Manila host, a New York host: the stored times, the expiry and the limits must not move.
+$zones = [['UTC', '+00:00'], ['UTC', '+08:00'], ['Asia/Manila', '+08:00'], ['Asia/Manila', '+00:00'], ['America/New_York', '-05:00']];
+$uid = 200;
+foreach ($zones as [$phpZone, $dbZone]) {
+    date_default_timezone_set($phpZone);
+    $db->query("SET time_zone = '$dbZone'");
+    $label = "PHP $phpZone, database $dbZone";
+    $t = 1_950_000_000; $uid += 2;
+    $x = $otp->issue($uid);
+    $stored = $rows($uid)[0];
+    check($stored['expires_at'] === gmdate('Y-m-d H:i:s', $t + 300) && $stored['created_at'] === gmdate('Y-m-d H:i:s', $t), "$label: stored times are UTC");
+    $t += 299; check($otp->verify($uid, $x['code'])['status'] === 'ok', "$label: valid at 4:59");
+    $t = 1_950_000_000; $y = $otp->issue($uid + 1);
+    $t += 300; check($otp->verify($uid + 1, $y['code'])['status'] === 'expired', "$label: expired at exactly 5:00");
+    $t = 1_950_000_000 + 1000; $a = $otp->issue($uid); $t += 30; $b = $otp->issue($uid);
+    check($a['status'] === 'ok' && $b['status'] === 'cooldown' && $b['retry_after'] === 30, "$label: the 60-second cooldown holds");
+    $t += 30; $otp->issue($uid); $t += 60; $otp->issue($uid); $t += 60; $limit = $otp->issue($uid);
+    check($limit['status'] === 'limit', "$label: the 15-minute send limit holds");
+}
+date_default_timezone_set('UTC');
+$db->query("SET time_zone = '+00:00'");
+$source = (string)file_get_contents(__DIR__ . '/../shared/EmailOtp.php');
+check(!preg_match('/\b(NOW|UTC_TIMESTAMP|CURRENT_TIMESTAMP|CURDATE|SYSDATE|UNIX_TIMESTAMP)\s*\(/', $source) && !str_contains($source, 'date_default_timezone_set') && substr_count($source, 'gmdate(') === 1, 'the OTP rules use PHP time only: no database clock, no timezone setting, one UTC formatter');
+check(!preg_match('/\bTIMESTAMP\b/i', $sql) && !preg_match('/DEFAULT\s+(CURRENT_TIMESTAMP|NOW)/i', $sql), 'the table has no TIMESTAMP columns or database-clock defaults');
+
+// ---- One user locked does not affect another; old rows are harmless ------------------------------------------------------------
+$t = 1_960_000_000;
+$lockA = $otp->issue(301); $lockB = $otp->issue(302);
+for ($i = 0; $i < 5; $i++) $otp->verify(301, $lockA['code'] === '000000' ? '111111' : '000000');
+check($otp->verify(301, $lockA['code'])['status'] === 'locked', 'user A is locked');
+check($otp->verify(302, $lockB['code'])['status'] === 'ok', 'user B is not affected by A being locked');
+check($otp->issue(303)['status'] === 'ok', 'user C can still request a code');
+$t += 2 * 86400; $otp->issue(304);
+check((int)$db->query('SELECT COUNT(*) FROM login_otp_challenges WHERE user_id IN (301, 302, 303)')->fetch_row()[0] === 0, 'challenge rows older than a day are removed when the next code is issued');
+$t = 1_960_000_000 + 3 * 86400; $stale = $otp->issue(305); $t += 600;
+check($otp->verify(305, $stale['code'])['status'] === 'expired', 'an old unused row only ever expires (harmless)');
+
+// ---- SMTP settings: TLS verified, quick timeouts, no hard-coded URLs -------------------------------------------------------------
+$mailer = (string)file_get_contents(__DIR__ . '/../shared/OtpMailer.php');
+check(str_contains($mailer, "'verify_peer' => true") && str_contains($mailer, "'verify_peer_name' => true") && str_contains($mailer, "'allow_self_signed' => false") && !preg_match("/verify_peer(_name)?'\s*=>\s*false/", $mailer) && !str_contains($mailer, 'SMTPAutoTLS = false'), 'certificate verification is on and never disabled');
+check(str_contains($mailer, 'ENCRYPTION_STARTTLS') && str_contains($mailer, 'ENCRYPTION_SMTPS') && str_contains($mailer, '$mail->Port === 465') && OtpMailer::TIMEOUT_SECONDS === 10 && str_contains($mailer, '$mail->Timeout = self::TIMEOUT_SECONDS'), 'STARTTLS (587), implicit TLS on 465, 10-second timeouts');
+foreach (['shared/EmailOtp.php', 'shared/OtpMailer.php', 'auth/signin.php', 'css/signin-otp.css'] as $file) {
+    $text = (string)file_get_contents(__DIR__ . '/../' . $file);
+    check(!preg_match('~http://|https?://localhost|//127\.0\.0\.1|@import~i', $text), "$file has no hard-coded http, localhost or address");
+}
+check(!preg_match('~https?://|href=|<a |src=~i', OtpMailer::htmlBody('Ana', '123456', 5)), 'the email carries no links or URLs');
+// A blocked port must fail quickly and stay closed (real transport, an address that never answers).
+putenv('SMTP_HOST=10.255.255.1'); putenv('SMTP_PORT=587'); putenv('SMTP_FROM=csms@example.test'); putenv('SMTP_USER=user'); putenv('SMTP_PASS=pass');
+$started = microtime(true); $sentOk = @OtpMailer::send('person@example.test', 'Ana', '123456'); $took = microtime(true) - $started;
+check($sentOk === false && $took < 16, 'a blocked SMTP port fails within the timeout (' . (int)ceil($took) . ' s) and nothing is sent');
+foreach (['SMTP_HOST', 'SMTP_PORT', 'SMTP_FROM', 'SMTP_USER', 'SMTP_PASS'] as $name) putenv($name);
+
 // ---- Mail template and transport -------------------------------------------------------------------------------------------------
 $html = OtpMailer::htmlBody('Ana <b>Cruz</b>', '482913', 5); $text = OtpMailer::textBody('Ana Cruz', '482913', 5);
 check(str_contains($html, '482913') && str_contains($html, '#2163c5') && str_contains($html, 'valid for <strong>5 minutes</strong>') && str_contains($html, 'ignore this email'), 'HTML mail: code, brand color, 5 minutes, ignore note');
