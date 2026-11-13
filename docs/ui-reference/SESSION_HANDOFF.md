@@ -371,5 +371,5 @@ Tests: `tests/electives-workspace.cjs` (empty-state logic added; the suite still
 
 **Cleanup / open items (owner decides):**
 - IT ELECTIVE 4 (ITE4, System Integration and Architecture 2) is 5 units in the team dataset; the CMO 25 sample has SIA102 at 3 units (4th year 2nd semester; ITE4 is placed 4/1). Units not changed.
-- The two CAP101 prerequisite rules differ from CMO 25: ours has CAP101 requiring BPM101 (not a CMO BSIT course); CMO 25 p. 33 has IAS101 and CC106. Not changed.
+- The two CAP101 prerequisite rules differ from CMO 25: ours has CAP101 requiring BPM101 and CAP101 requiring PM101 (neither is a CMO BSIT course); CMO 25 p. 33 has IAS101 and CC106. Not changed.
 - The version's only elective group is the archived GE group (team-made); no professional-elective group exists, so compliance rule C2 stays Cannot determine.
