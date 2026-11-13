@@ -154,6 +154,7 @@ class CurriculumVersionSubjectService
                     'year_level' => $data['year_level'],
                     'previous_year_level' => $assignment['year_level'],
                     'previous_semester' => $assignment['semester'],
+                    'previous_is_required' => (int)$assignment['is_required'],
                     'affected_relationships' => $validation['relationships'],
                     'semester' => $data['semester'],
                     'sequence_order' => $data['sequence_order'],

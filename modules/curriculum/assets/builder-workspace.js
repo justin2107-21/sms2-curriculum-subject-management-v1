@@ -298,7 +298,7 @@
                         '<td class="builder-subjects__code">' + codeHtml(row.subject_code) + '</td>' +
                         '<td class="builder-subjects__title"><div class="builder-title-wrap"><span class="builder-title-text">' + esc(row.subject_title) + (required ? '' : ' <span class="placement-indicator placement-optional">Optional</span>') + '</span>' +
                         (problems ? '<button type="button" class="builder-conflict-btn" data-conflict="' + Number(row.subject_id) + '" aria-label="View conflict for ' + esc(row.subject_code) + '" title="View conflict"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i></button>' : '') + '</div></td>' +
-                        '<td class="builder-subjects__units">' + esc(ui.formatUnits(row.units)) + '</td>' + (editable ? '<td class="builder-subjects__actions"><button type="button" class="builder-row-btn" data-move="' + Number(row.id) + '" aria-haspopup="menu" aria-expanded="false" aria-label="Move ' + esc(row.subject_code) + ' to another term" title="Move"><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></button><button type="button" class="builder-row-btn builder-row-btn--remove" data-remove="' + Number(row.id) + '" aria-label="Remove ' + esc(row.subject_code) + '" title="Remove"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></td>' : '') + '</tr>';
+                        '<td class="builder-subjects__units">' + esc(ui.formatUnits(row.units)) + '</td>' + (editable ? '<td class="builder-subjects__actions"><button type="button" class="builder-row-btn" data-edit="' + Number(row.id) + '" aria-haspopup="dialog" aria-label="Edit placement" title="Edit placement"><i class="fa-solid fa-pen" aria-hidden="true"></i></button><button type="button" class="builder-row-btn builder-row-btn--remove" data-remove="' + Number(row.id) + '" aria-label="Remove ' + esc(row.subject_code) + '" title="Remove"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></td>' : '') + '</tr>';
                 });
                 html += '</tbody></table></article>';
             });
@@ -447,7 +447,7 @@
 
     // ---- Dialogs ------------------------------------------------------------------------------------------------
     const dialogs = {};
-    ['Review', 'Attach', 'Classify', 'Clone', 'Conflict', 'Add', 'Remove', 'Curriculum', 'Version'].forEach(function (name) {
+    ['Review', 'Attach', 'Classify', 'Clone', 'Conflict', 'Add', 'Edit', 'Remove', 'Curriculum', 'Version'].forEach(function (name) {
         const element = $('builder' + name + 'Modal');
         if (element) dialogs[name.toLowerCase()] = ui.createModal(element);
     });
@@ -647,88 +647,56 @@
             ui.showToast(result.message || 'Subject added.', 'success');
             await loadVersion(state.versionId, true);
             const added = state.placements.find(row => String(row.subject_id) === String(subjectId));
-            (added && document.querySelector('[data-move="' + Number(added.id) + '"]') || $('builderAddOpen')).focus();
+            (added && document.querySelector('[data-edit="' + Number(added.id) + '"]') || $('builderAddOpen')).focus();
         } catch (error) { ui.showFormError(form, error.message || 'The subject could not be added.'); }
         finally { ui.setFormSubmitting(form, false); }
     });
 
-    // Move menu: every term except the current one.
-    const moveMenu = $('builderMoveMenu');
-    let moveTrigger = null;
-    function closeMoveMenu(refocus) {
-        if (!moveMenu || moveMenu.hidden) return;
-        moveMenu.hidden = true;
-        if (moveTrigger) { moveTrigger.setAttribute('aria-expanded', 'false'); if (refocus) moveTrigger.focus(); }
-        moveTrigger = null;
-    }
-    function openMoveMenu(trigger) {
-        const row = placementById(trigger.dataset.move);
-        if (!row) return;
-        const choices = termChoices();
-        const currentYear = view.yearLabel(row.year_level);
-        let html = '';
-        choices.years.forEach(year => {
-            const items = choices.semesters.filter(semester => !(year === currentYear && semester === row.semester));
-            if (!items.length) return;
-            html += '<div class="builder-move-menu__group" role="presentation">' + esc(year) + '</div>' + items.map(semester => '<button type="button" role="menuitem" tabindex="-1" data-year="' + esc(year) + '" data-semester="' + esc(semester) + '">' + esc(semester) + '</button>').join('');
-        });
-        moveMenu.innerHTML = html;
-        moveMenu.dataset.placement = row.id;
-        moveMenu.hidden = false;
-        moveTrigger = trigger;
-        trigger.setAttribute('aria-expanded', 'true');
-        const box = trigger.getBoundingClientRect();
-        const menu = moveMenu.getBoundingClientRect();
-        moveMenu.style.left = Math.max(8, Math.min(box.right - menu.width, innerWidth - menu.width - 8)) + 'px';
-        const below = box.bottom + 4;
-        moveMenu.style.top = (below + menu.height > innerHeight - 8 ? Math.max(8, box.top - menu.height - 4) : below) + 'px';
-        moveMenu.querySelector('button').focus();
-    }
-    async function moveTo(id, year, semester) {
+    // Edit placement: Type (Required / Optional), Year and Semester in one dialog. The server (update_mapping) decides:
+    // editable version, permission, sequence rules, audit. A refusal is shown in the dialog; sequence conflicts open the conflict dialog.
+    let editId = 0;
+    function openEdit(id) {
         const row = placementById(id);
+        if (!row || !dialogs.edit) return;
+        editId = Number(id);
+        const form = $('builderEditForm');
+        form.reset(); ui.clearFormError(form);
+        const choices = termChoices(), year = view.yearLabel(row.year_level);
+        fillSelect($('builderEditYear'), choices.years, 'Select year / grade level', year);
+        fillSelect($('builderEditSemester'), choices.semesters, 'Select semester', row.semester);
+        form.elements.is_required.value = Number(row.is_required) === 1 ? '1' : '0';
+        $('builderEditContext').textContent = row.subject_code + ' \u2014 ' + row.subject_title + ' (' + state.ws.curriculum_code + ' / ' + state.ws.version_label + ')';
+        dialogs.edit.open();
+        $('builderEditType').focus();
+    }
+    $('builderEditForm')?.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        const form = event.currentTarget, row = placementById(editId);
         if (!row) return;
+        if (!form.reportValidity()) return;
         const data = new FormData();
         data.set('action', 'update_mapping');
-        data.set('id', id);
-        data.set('year_level', year);
-        data.set('semester', semester);
-        data.set('is_required', Number(row.is_required) === 1 ? '1' : '0');
-        const focus = '[data-move="' + Number(id) + '"]';
+        data.set('id', editId);
+        data.set('year_level', form.elements.year_level.value);
+        data.set('semester', form.elements.semester.value);
+        data.set('is_required', form.elements.is_required.value);
+        const focus = '[data-edit="' + editId + '"]';
+        ui.setFormSubmitting(form, true, 'Saving\u2026');
         try {
             const result = await ui.postForm(api.assignments, data);
-            ui.showToast(result.message || 'Subject moved.', 'success');
+            dialogs.edit.close();
+            ui.showToast(result.message || 'Placement updated.', 'success');
             await refreshPlan(focus);
         } catch (error) {
             const conflicts = error.payload && error.payload.validation && error.payload.validation.conflicts;
             if (conflicts && conflicts.length) {
-                showConflicts(conflicts.map(item => ({ kind: 'sequence', item: item })), row.subject_id, row.subject_code + ' was not moved to ' + year + ' / ' + semester);
+                dialogs.edit.close();
+                showConflicts(conflicts.map(item => ({ kind: 'sequence', item: item })), row.subject_id, row.subject_code + ' was not changed to ' + form.elements.year_level.value + ' / ' + form.elements.semester.value);
             } else {
-                ui.showToast(error.message || 'The subject could not be moved.', 'error');
-                await refreshPlan(focus);
+                ui.showFormError(form, error.message || 'The placement could not be updated.');
             }
-        }
-    }
-    if (moveMenu) {
-        moveMenu.addEventListener('click', function (event) {
-            const item = event.target.closest('[role="menuitem"]');
-            if (!item) return;
-            const id = moveMenu.dataset.placement;
-            closeMoveMenu(true);
-            moveTo(id, item.dataset.year, item.dataset.semester);
-        });
-        moveMenu.addEventListener('keydown', function (event) {
-            const items = Array.from(moveMenu.querySelectorAll('[role="menuitem"]'));
-            const index = items.indexOf(document.activeElement);
-            const step = { ArrowDown: 1, ArrowUp: -1 }[event.key];
-            if (step) { event.preventDefault(); items[(index + step + items.length) % items.length].focus(); }
-            else if (event.key === 'Home') { event.preventDefault(); items[0].focus(); }
-            else if (event.key === 'End') { event.preventDefault(); items[items.length - 1].focus(); }
-            else if (event.key === 'Escape' || event.key === 'Tab') { event.preventDefault(); closeMoveMenu(true); }
-        });
-        document.addEventListener('click', event => { if (!moveMenu.hidden && !moveMenu.contains(event.target) && !event.target.closest('[data-move]')) closeMoveMenu(false); });
-        window.addEventListener('resize', () => closeMoveMenu(false));
-        window.addEventListener('scroll', () => closeMoveMenu(false), true);
-    }
+        } finally { ui.setFormSubmitting(form, false); }
+    });
 
     // Remove.
     let removeId = 0;
@@ -932,8 +900,8 @@
         if (conflict) { openConflict(conflict.dataset.conflict); return; }
         const add = event.target.closest('[data-add-year]');
         if (add) { openAdd(add.dataset.addYear, add.dataset.addSemester); return; }
-        const move = event.target.closest('[data-move]');
-        if (move) { const again = moveTrigger === move; closeMoveMenu(false); if (!again) openMoveMenu(move); return; }
+        const editButton = event.target.closest('[data-edit]');
+        if (editButton) { openEdit(editButton.dataset.edit); return; }
         const remove = event.target.closest('[data-remove]');
         if (remove) openRemove(remove.dataset.remove);
     });

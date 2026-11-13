@@ -164,6 +164,13 @@ try {
     $check($who['staff']->post($aapi, $addBody)[0] === 409, 'adding the same subject twice is refused');
     $moved = $who['staff']->post($aapi, ['action' => 'update_mapping', 'id' => $newId, 'year_level' => '3rd Year', 'semester' => '2nd Semester', 'is_required' => '1']);
     $check($moved[0] === 200 && $termOf($newId) === '3rd Year|2nd Semester', 'Staff moves it to another term');
+    // Edit placement dialog: the type (Required / Optional) is changed through the same update_mapping action, with its own audit detail.
+    $typed = $who['staff']->post($aapi, ['action' => 'update_mapping', 'id' => $newId, 'year_level' => '3rd Year', 'semester' => '2nd Semester', 'is_required' => '0']);
+    $check($typed[0] === 200 && (int)$one("SELECT is_required FROM curriculum_version_subjects WHERE id=$newId") === 0 && $termOf($newId) === '3rd Year|2nd Semester', 'Staff changes the type to Optional without moving it');
+    $check((int)$one("SELECT COUNT(*) FROM audit_logs WHERE action='CURRICULUM_SUBJECT_UPDATE' AND entity_id=$newId AND metadata_json LIKE '%\"previous_is_required\":1%' AND metadata_json LIKE '%\"is_required\":0%'") >= 1, 'the audit entry records the previous and the new type');
+    $badType = $who['staff']->post($aapi, ['action' => 'update_mapping', 'id' => $newId, 'year_level' => '3rd Year', 'semester' => '2nd Semester', 'is_required' => '7']);
+    $check($badType[0] === 422 && (int)$one("SELECT is_required FROM curriculum_version_subjects WHERE id=$newId") === 0, 'an invalid type is refused and nothing changes');
+    foreach (['acadoffice', 'acadfaculty'] as $role) $check($who[$role]->post($aapi, ['action' => 'update_mapping', 'id' => $newId, 'year_level' => '3rd Year', 'semester' => '2nd Semester', 'is_required' => '1'])[0] === 403 && (int)$one("SELECT is_required FROM curriculum_version_subjects WHERE id=$newId") === 0, "$role cannot change the type");
     $check($who['staff']->post($aapi, ['action' => 'remove', 'id' => $newId])[0] === 200 && (int)$one("SELECT COUNT(*) FROM curriculum_version_subjects WHERE id=$newId") === 0, 'Staff removes it');
     // GE4 is the prerequisite of GE1 in the scenario: moving it later is a sequence conflict, with details for the dialog.
     $ge4 = $placementOf($rev, 'GE4');
@@ -177,6 +184,7 @@ try {
         $code = $one("SELECT s.subject_code FROM curriculum_version_subjects p JOIN subjects s ON s.id=p.subject_id WHERE p.curriculum_version_id=$locked ORDER BY p.id LIMIT 1");
         $lockedId = $placementOf($locked, $code);
         $check($who['staff']->post($aapi, ['action' => 'update_mapping', 'id' => $lockedId, 'year_level' => '4th Year', 'semester' => '2nd Semester', 'is_required' => '1'])[0] === 409, "moving in $label is refused");
+        $check($who['staff']->post($aapi, ['action' => 'update_mapping', 'id' => $lockedId, 'year_level' => (string)$one("SELECT year_level FROM curriculum_version_subjects WHERE id=$lockedId"), 'semester' => (string)$one("SELECT semester FROM curriculum_version_subjects WHERE id=$lockedId"), 'is_required' => '0'])[0] === 409, "changing the type in $label is refused");
         $check($who['staff']->post($aapi, ['action' => 'remove', 'id' => $lockedId])[0] === 409, "removing from $label is refused");
     }
     $wsProgram = $who['staff']->req("modules/curriculum/http/version_reference_actions.php?action=workspace&curriculum_version_id=$rev");

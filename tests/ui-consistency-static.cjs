@@ -96,4 +96,12 @@ assert.match(components, /.csms-menu {/);assert.match(components, /.csms-chip--t
   assert.equal((nav.match(/role="tab"/g) || []).length, 4, 'Subject Mapping has four tabs');
   assert.ok(!/Subject Trace|mappingTabTrace|mappingPanelTrace/.test(mapping + read('modules/curriculum/assets/subject-mapping-final.js')), 'no Subject Trace in the page or its script');
   assert.ok(!/Record Mapping|data-outcome-add/.test(read('modules/curriculum/assets/outcomes-presentation.js')), 'no Record Mapping form in the outcome dialog'); }
+// Placement edit (Builder), Subjects column and Archive style.
+{ const bw = read('modules/curriculum/assets/builder-workspace.js'), bp = read('modules/curriculum/pages/builder_workspace.php'), sm = read('modules/curriculum/assets/subject-master.js');
+  assert.ok(bw.includes('aria-label="Edit placement" title="Edit placement"><i class="fa-solid fa-pen"') && bw.includes('data-edit='), 'Builder row has an Edit (pencil) button labelled "Edit placement"');
+  assert.ok(!/builderMoveMenu|data-move|fa-chevron-down/.test(bw + bp), 'the move (down-arrow) menu is gone');
+  assert.ok(/id="builderEditModal"/.test(bp) && /name="is_required" id="builderEditType"/.test(bp) && /id="builderEditYear"/.test(bp) && /id="builderEditSemester"/.test(bp) && /<option value="1">Required<\/option><option value="0">Optional<\/option>/.test(bp), 'the edit dialog has Type (Required / Optional), Year and Semester');
+  assert.ok(/data-remove=/.test(bw), 'Remove stays');
+  assert.ok(/<th>Type in curriculum<\/th>/.test(sm) && !/<th>Required<\/th>/.test(sm), 'Subjects placement column is "Type in curriculum"');
+  assert.ok(/Archive', cls: 'button-danger'/.test(sm) && !/Archive', cls: 'button-muted'/.test(sm), 'the Subjects details Archive button uses the danger style'); }
 console.log('PASS: Batch 5 wiring (shared header assets, h1 titles, reports on shared topbar, hidden year holder, context bar hooks, live-state helpers)');

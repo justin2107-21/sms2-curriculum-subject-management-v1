@@ -191,8 +191,22 @@ require __DIR__ . '/../../../shared/sidebar.php';
 </div>
 
 <?php if ($can('curriculum.update')): ?>
-<!-- Plan editing: move menu, add and remove dialogs -->
-<div class="builder-move-menu" id="builderMoveMenu" role="menu" aria-label="Move to term" hidden></div>
+<!-- Plan editing: edit placement, add and remove dialogs -->
+<div class="curriculum-modal" id="builderEditModal" hidden aria-hidden="true">
+  <div class="modal-backdrop" data-modal-close></div>
+  <section class="modal-dialog modal-dialog-medium" role="dialog" aria-modal="true" aria-labelledby="builderEditTitle">
+    <div class="modal-header"><div><h2 id="builderEditTitle">Edit placement</h2><p class="modal-context" id="builderEditContext"></p></div><button type="button" class="modal-close-button" data-modal-close aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
+    <form id="builderEditForm" class="domain-form" novalidate>
+      <div class="form-error" role="alert" hidden></div>
+      <div class="form-grid">
+        <label class="form-field"><span>Type <strong>*</strong></span><select name="is_required" id="builderEditType" required><option value="1">Required</option><option value="0">Optional</option></select></label>
+        <label class="form-field"><span>Year / Grade level <strong>*</strong></span><select name="year_level" id="builderEditYear" required></select></label>
+        <label class="form-field"><span>Semester <strong>*</strong></span><select name="semester" id="builderEditSemester" required></select></label>
+      </div>
+      <div class="modal-actions"><button type="button" class="button-muted" data-modal-close>Cancel</button><button type="submit" class="button-primary">Save</button></div>
+    </form>
+  </section>
+</div>
 <?php if ($can('subject.view')): ?>
 <div class="curriculum-modal" id="builderAddModal" hidden aria-hidden="true">
   <div class="modal-backdrop" data-modal-close></div>

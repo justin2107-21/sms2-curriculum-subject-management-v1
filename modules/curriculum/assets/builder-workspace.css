@@ -110,14 +110,9 @@
 .builder-row-btn { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; color: var(--csms-text-muted, #5b6478); background: transparent; border: 1px solid transparent; border-radius: 8px; cursor: pointer; transition: background-color .15s, color .15s, border-color .15s; }
 .builder-row-btn:hover { color: var(--csms-primary, #1e3a8a); background: var(--csms-surface-muted, #f4f6fb); border-color: var(--csms-border, #dfe4ee); }
 .builder-row-btn--remove:hover { color: #b42318; background: #fef3f2; border-color: #fecdca; }
-.builder-row-btn:focus-visible, .builder-term__add:focus-visible, .builder-move-menu button:focus-visible { outline: 2px solid var(--csms-primary, #1e3a8a); outline-offset: 1px; }
+.builder-row-btn:focus-visible, .builder-term__add:focus-visible { outline: 2px solid var(--csms-primary, #1e3a8a); outline-offset: 1px; }
 .builder-term__add { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; margin-left: 8px; padding: 0; color: var(--csms-primary, #1e3a8a); background: #fff; border: 1px solid var(--csms-border, #dfe4ee); border-radius: 8px; cursor: pointer; vertical-align: middle; }
 .builder-term__add:hover { background: var(--csms-surface-muted, #f4f6fb); }
-.builder-move-menu { position: fixed; z-index: 1200; width: 190px; max-height: min(320px, 70vh); overflow-y: auto; padding: 6px; background: #fff; border: 1px solid var(--csms-border, #dfe4ee); border-radius: var(--csms-radius-surface, 12px); box-shadow: 0 10px 28px rgba(15, 23, 42, .16); }
-.builder-move-menu[hidden] { display: none; }
-.builder-move-menu__group { padding: 8px 8px 4px; font-size: 12px; font-weight: 600; color: var(--csms-text-muted, #5b6478); }
-.builder-move-menu button { display: block; width: 100%; min-height: 36px; padding: 6px 8px; font-size: 14px; text-align: left; color: inherit; background: transparent; border: 0; border-radius: 8px; cursor: pointer; }
-.builder-move-menu button:hover, .builder-move-menu button:focus { background: var(--csms-surface-muted, #f4f6fb); }
 @media (max-width: 600px) {
   .builder-row-btn { width: 40px; height: 40px; }
   .builder-term__add { width: 40px; height: 40px; }

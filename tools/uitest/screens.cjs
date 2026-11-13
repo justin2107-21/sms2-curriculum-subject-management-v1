@@ -677,7 +677,7 @@ async function main() {
         await setWidth(width);
         await navigate(base + urls[0]);
         await sleep(3000);
-        const counts = `({ add: !document.getElementById('builderAddOpen').hidden, termAdd: document.querySelectorAll('.builder-term__add').length, move: document.querySelectorAll('[data-move]').length, remove: document.querySelectorAll('[data-remove]').length, rows: document.querySelectorAll('.builder-subjects tbody tr').length, overflow: document.documentElement.scrollWidth > innerWidth })`;
+        const counts = `({ add: !document.getElementById('builderAddOpen').hidden, termAdd: document.querySelectorAll('.builder-term__add').length, move: document.querySelectorAll('[data-edit]').length, remove: document.querySelectorAll('[data-remove]').length, rows: document.querySelectorAll('.builder-subjects tbody tr').length, overflow: document.documentElement.scrollWidth > innerWidth })`;
         result.controls = await evaluate(counts);
         await evaluate(`document.querySelector('.builder-tabs').scrollIntoView(); window.scrollBy(0, -70); true`);
         await sleep(300);
@@ -696,19 +696,19 @@ async function main() {
           await sleep(2500);
           result.afterAdd = await evaluate(counts);
           result.focusAfterAdd = await evaluate(`document.activeElement.getAttribute('aria-label')`);
-          // Open the move menu on the new row; the focused move button belongs to it.
+          // Open the edit dialog on the new row; the focused edit button belongs to it.
           await evaluate(`document.activeElement.click(); true`);
           await sleep(300);
-          result.menu = await evaluate(`[...document.querySelectorAll('#builderMoveMenu [role=menuitem]')].length`);
+          result.menu = await evaluate(`({ open: !document.getElementById('builderEditModal').hidden, type: document.getElementById('builderEditType').value, year: document.getElementById('builderEditYear').value, semester: document.getElementById('builderEditSemester').value })`);
           await shotView(path.join(out, `${role}-plan-menu-${width}.png`));
-          await evaluate(`[...document.querySelectorAll('#builderMoveMenu [role=menuitem]')].find(b => b.dataset.year === '4th Year' && b.dataset.semester === '2nd Semester').click(); true`);
+          await evaluate(`(() => { document.getElementById('builderEditYear').value = '4th Year'; document.getElementById('builderEditSemester').value = '2nd Semester'; document.getElementById('builderEditForm').requestSubmit(); return true; })()`);
           await sleep(2500);
           result.afterMove = await evaluate(`[...document.querySelectorAll('.builder-term')].map(t => t.querySelector('header strong').textContent)`);
           await shotView(path.join(out, `${role}-plan-moved-${width}.png`));
           // Refused move: GE4 is a prerequisite of GE1 and cannot go later.
-          await evaluate(`[...document.querySelectorAll('[data-move]')].find(b => b.getAttribute('aria-label').includes('GE4')).click(); true`);
+          await evaluate(`[...document.querySelectorAll('[data-edit]')].find(b => b.closest('tr').textContent.includes('GE4')).click(); true`);
           await sleep(300);
-          await evaluate(`[...document.querySelectorAll('#builderMoveMenu [role=menuitem]')].find(b => b.dataset.year === '2nd Year').click(); true`);
+          await evaluate(`(() => { document.getElementById('builderEditYear').value = '2nd Year'; document.getElementById('builderEditForm').requestSubmit(); return true; })()`);
           await sleep(1500);
           result.refused = await evaluate(`(() => { const m = document.getElementById('builderConflictModal'); return { open: !m.hidden, context: document.getElementById('builderConflictSubject').textContent, body: document.getElementById('builderConflictBody').textContent.slice(0, 160) }; })()`);
           await shotView(path.join(out, `${role}-plan-refused-${width}.png`));
